@@ -1,5 +1,7 @@
-# Stevenarella
-[![Build Status](https://img.shields.io/endpoint.svg?url=https%3A%2F%2Factions-badge.atrox.dev%2Ficeiix%2Fstevenarella%2Fbadge%3Fref%3Dmaster&style=plastic)](https://actions-badge.atrox.dev/iceiix/stevenarella/goto?ref=master)
+# Leafish
+**This project was built upon preexisting code located here: https://github.com/iceiix/stevenarella/**
+But why creating a new project in the first place..?
+Because I wanted to remove some stuff and add other stuff freely without having to wait for prs to get accepted.
 
 Multi-protocol Minecraft-compatible client written in Rust.
 
@@ -12,12 +14,6 @@ Don't expect it to go anywhere, just doing this for fun.
 
 
 In action: http://gfycat.com/NeedyElaborateGypsymoth
-
-## Community
-
-IRC channel: `#stevenarella` on [irc.esper.net](https://esper.net).
-
-Discussion forum: [https://github.com/iceiix/stevenarella/discussions](https://github.com/iceiix/stevenarella/discussions).
 
 
 ## Protocol support
@@ -50,7 +46,7 @@ Discussion forum: [https://github.com/iceiix/stevenarella/discussions](https://g
 | 1.8.9  | 47  | ✓ |
 | 1.7.10 | 5   | ✓ |
 
-Stevenarella is designed to support multiple protocol versions, so that client
+Leafish is designed to support multiple protocol versions, so that client
 development is not in lock-step with the server version. The level of
 support varies, but the goal is to support major versions from 1.7.10
 up to the current latest major version. Occasionally, snapshots are also supported.
@@ -58,12 +54,6 @@ up to the current latest major version. Occasionally, snapshots are also support
 Forge servers are supported on 1.7.10 - 1.12.2 (FML) and 1.13.2 - 1.16.5 (FML2).
 
 Support for older protocols will _not_ be dropped as newer protocols are added.
-
-## Downloads
-
-Windows, Ubuntu Linux, and macOS users can download pre-compiled builds
-from [GitHub Actions](https://actions-badge.atrox.dev/iceiix/stevenarella/goto?ref=master).
-(Click the artifacts drop-down and select your platform.)
 
 ## Dependencies
 
@@ -92,19 +82,17 @@ Just compile:
 cargo build --release
 ```
 
-For progress on web support, see [www/](./www).
-
 ## Running
 
 ### Standalone
 
-Just running Stevenarella via a double click (Windows) or `./stevenarella` (everything else)
+Just running Leafish via a double click (Windows) or `./leafish` (everything else)
 will bring up a login screen followed by a server list which you can select a server
 from.
 
 ## Contributions
 
-Stevenarella is an [OPEN Open Source Project](https://github.com/openopensource/openopensource.github.io):
+Leafish is an [OPEN Open Source Project](https://github.com/openopensource/openopensource.github.io):
 
 > Individuals making significant and valuable contributions are given
 > commit-access to the project to contribute as they see fit. This project
