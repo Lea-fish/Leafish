@@ -1,0 +1,69 @@
+[package]
+name = "leafish"
+version = "0.1.0"
+authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>", "iceiix <ice_ix@protonmail.ch>", "terrarier2111" ]
+edition = "2018"
+resolver = "2"
+description = "Multi-protocol multi-platform Minecraft-compatible client"
+repository = "https://github.com/terrarier2111/Leafish"
+license = "MIT/Apache-2.0"
+
+#[lib]
+#crate-type = ["cdylib", "rlib"]
+#path = "src/main.rs"
+
+[profile.dev]
+split-debuginfo = "unpacked"
+# Steven runs horrendously slow with no optimizations, and often freezes.
+# However, building with full -O3 optimizations takes too long for a debug build.
+# Use an -O1 optimization level strikes a good compromise between build and program performance.
+opt-level = 1
+
+[dependencies]
+winit = "0.25.0"
+glow = "0.10.0"
+byteorder = "1.4.3"
+serde = "1.0.126"
+serde_json = "1.0.61"
+flate2 = { version = "1.0.20", features = ["rust_backend"], default-features = false }
+zip = { version = "0.5.13", features = ["deflate"], default-features = false }
+image = "0.23.14"
+getrandom = { version = "0.2.3", features = ["js"] }
+rand = "0.8.4"
+rand_pcg = "0.3.1"
+base64 = "0.13.0"
+log = { version = "0.4.14", features = ["std"] }
+cgmath = "0.17.0"
+lazy_static = "1.4.0"
+collision = "0.20.1"
+rsa_public_encrypt_pkcs1 = "0.3.0"
+structopt = "0.3.21"
+clipboard = "0.5.0"
+instant = "0.1.9"
+dirs = "3.0.2"
+# clippy = "*"
+# tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
+rayon = "1.5.1" # test!
+
+reqwest = { version = "0.11.3", features = [ "blocking" ]}
+glutin = "0.27.0"
+
+[dependencies.leafish_resources]
+path = "./resources"
+version = "0"
+
+[dependencies.leafish_blocks]
+path = "./blocks"
+version = "0"
+
+[dependencies.leafish_shared]
+path = "./shared"
+version = "0"
+
+[dependencies.leafish_protocol]
+path = "./protocol"
+version = "0"
+
+#[dependencies.std_or_web]
+#path = "./std_or_web"
+#version = "0"
