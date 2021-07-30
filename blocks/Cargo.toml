@@ -1,0 +1,15 @@
+[package]
+name = "leafish_blocks"
+version = "0.0.1"
+authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>" ]
+edition = "2018"
+
+[dependencies]
+lazy_static = "1.4.0"
+cgmath = "0.17.0"
+collision = "0.20.1"
+
+
+[dependencies.leafish_shared]
+path = "../shared"
+version = "0"

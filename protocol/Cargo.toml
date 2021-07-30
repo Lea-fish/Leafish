@@ -1,0 +1,33 @@
+[package]
+name = "leafish_protocol"
+version = "0.0.1"
+authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>", "iceiix <ice_ix@protonmail.ch>", "terrarier2111" ]
+edition = "2018"
+
+[dependencies]
+serde = "1.0.126"
+serde_json = "1.0.64"
+hex = "0.4.2"
+sha-1 = "0.9.1"
+aes = "0.4.0"
+cfb8 = "0.4.0"
+byteorder = "1.4.3"
+log = { version = "0.4.14", features = ["std"] }
+flate2 = { version = "1.0.20", features = ["rust_backend"], default-features = false }
+num-traits = "0.2.12"
+instant = "0.1.9"
+
+regex = "1.5.4"
+lazy_static = "1.4.0"
+trust-dns-resolver = "0.20.3"
+# srv-rs = { version = "0.2.0", features = ["libresolv"] }
+
+reqwest = { version = "0.11.3", features = [ "blocking" ]}
+
+[dependencies.leafish_shared]
+path = "../shared"
+version = "0"
+
+[dependencies.std_or_web]
+path = "../std_or_web"
+version = "0"
