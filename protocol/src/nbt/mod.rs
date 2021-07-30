@@ -287,7 +287,7 @@ impl Serializable for Tag {
                 }
             }
         }
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -302,5 +302,5 @@ pub fn read_string<R: io::Read>(buf: &mut R) -> Result<String, protocol::Error> 
     let mut bytes = Vec::<u8>::new();
     buf.take(len as u64).read_to_end(&mut bytes)?;
     let ret = String::from_utf8(bytes).unwrap();
-    Result::Ok(ret)
+    Ok(ret)
 }

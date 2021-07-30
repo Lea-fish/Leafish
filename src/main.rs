@@ -52,8 +52,6 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
-use std::sync::mpsc::Sender;
-use leafish_protocol::protocol::packet::Packet;
 
 const CL_BRAND: console::CVar<String> = console::CVar {
     ty: PhantomData,
@@ -265,7 +263,6 @@ fn init_config_dir() {
 // TODO: Minecraftify movement (esspecially walking backwards and jumping while doing so)
 // TODO: Fix pistons.
 // TODO: Implement capes and distribute them via client settings (especially the skin layer or other stuff if it gets sent to other clients)
-// TODO: Fix the system being loaded entirely. (in terms of ram if the window gets unfocused - it has to be some sort of crazy memory leak!)
 // TODO: Improve startup performance (try fixing the bottleneck!)
 fn main() {
     init_config_dir();
@@ -297,7 +294,7 @@ fn main() {
     let events_loop = winit::event_loop::EventLoop::new();
 
     let window_builder = winit::window::WindowBuilder::new()
-        .with_title("leafish");
+        .with_title("Leafish")
         /*.with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0))*/;
 
     let (context, shader_version, dpi_factor, glutin_window) = {
@@ -471,7 +468,7 @@ fn tick_all(
             res.version()
         } else {
             // TODO: why does game.resource_manager.write() sometimes deadlock?
-            //warn!("Failed to obtain mutable reference to resource manager!");
+            warn!("Failed to obtain mutable reference to resource manager!"); // was uncommented
             *last_resource_version
         }
     };

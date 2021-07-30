@@ -22,7 +22,6 @@ pub mod ui;
 
 use crate::gl;
 use crate::resources;
-use crate::world;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::prelude::*;
 use image::{GenericImage, GenericImageView};
@@ -855,10 +854,8 @@ impl TransInfo {
 
         chunk_shader.program.use_program();
         // bound with layout(location=)
-        { // TODO: Cleanup!
-            gl::bind_frag_data_location(&chunk_shader.program, 0, "accum");
-            gl::bind_frag_data_location(&chunk_shader.program, 1, "revealage");
-        }
+        gl::bind_frag_data_location(&chunk_shader.program, 0, "accum");
+        gl::bind_frag_data_location(&chunk_shader.program, 1, "revealage");
         gl::check_framebuffer_status();
         gl::draw_buffers(&[gl::COLOR_ATTACHMENT_0, gl::COLOR_ATTACHMENT_1]);
 
@@ -1048,7 +1045,6 @@ impl TextureManager {
         use std::io::Read;
         use std::io::{Error, ErrorKind};
         use std::path::Path;
-        // use std_or_web::fs;
         use std::fs;
         let path = format!("skin-cache/{}/{}.png", &hash[..2], hash);
         let cache_path = Path::new(&path);

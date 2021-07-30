@@ -37,7 +37,6 @@ use std::thread;
 use leafish_protocol::protocol::packet::Packet;
 use std::sync::mpsc::Sender;
 use std::io::Write;
-use std::borrow::Borrow;
 use leafish_protocol::protocol::{VarInt, Serializable};
 
 pub mod plugin_messages;
@@ -165,7 +164,7 @@ impl Server {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {}", val.username, val.uuid);
                     let mut read = conn.clone();
-                    let mut write_int = conn.clone();
+                    let write_int = conn.clone();
                     let mut write = conn;
                     read.state = protocol::State::Play;
                     write.state = protocol::State::Play;
@@ -185,7 +184,7 @@ impl Server {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {:?}", val.username, val.uuid);
                     let mut read = conn.clone();
-                    let mut write_int = conn.clone();
+                    let write_int = conn.clone();
                     let mut write = conn;
                     read.state = protocol::State::Play;
                     write.state = protocol::State::Play;
@@ -356,95 +355,25 @@ impl Server {
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
             let pck = read.read_packet();
-            pck.is_err();
                 match pck {
-                    Ok(pck) => /*handle_packet! {
-                        self pck {
-                            // PluginMessageClientbound_i16 => on_plugin_message_clientbound_i16,
-                            // PluginMessageClientbound => on_plugin_message_clientbound_1,
-                            // JoinGame_WorldNames_IsHard => on_game_join_worldnames_ishard,
-                            // JoinGame_WorldNames => on_game_join_worldnames,
-                            // JoinGame_HashedSeed_Respawn => on_game_join_hashedseed_respawn,
-                            // JoinGame_i32_ViewDistance => on_game_join_i32_viewdistance,
-                            // JoinGame_i32 => on_game_join_i32,
-                            // JoinGame_i8 => on_game_join_i8,
-                            // JoinGame_i8_NoDebug => on_game_join_i8_nodebug,
-                            // Respawn_Gamemode => on_respawn_gamemode,
-                            // Respawn_HashedSeed => on_respawn_hashedseed,
-                            // Respawn_WorldName => on_respawn_worldname,
-                            // Respawn_NBT => on_respawn_nbt,
-                            KeepAliveClientbound_i64 => on_keep_alive_i64,
-                            KeepAliveClientbound_VarInt => on_keep_alive_varint,
-                            KeepAliveClientbound_i32 => on_keep_alive_i32,
-                            // ChunkData_Biomes3D_VarInt => on_chunk_data_biomes3d_varint,
-                            // ChunkData_Biomes3D_bool => on_chunk_data_biomes3d_bool,
-                            // ChunkData => on_chunk_data,
-                            // ChunkData_Biomes3D => on_chunk_data_biomes3d,
-                            // ChunkData_HeightMap => on_chunk_data_heightmap,
-                            // ChunkData_NoEntities => on_chunk_data_no_entities,
-                            // ChunkData_NoEntities_u16 => on_chunk_data_no_entities_u16,
-                            // ChunkData_17 => on_chunk_data_17,
-                            // ChunkDataBulk => on_chunk_data_bulk,
-                            // ChunkDataBulk_17 => on_chunk_data_bulk_17,
-                            // ChunkUnload => on_chunk_unload,
-                            // BlockChange_VarInt => on_block_change_varint,
-                            // BlockChange_u8 => on_block_change_u8,
-                            // MultiBlockChange_Packed => on_multi_block_change_packed,
-                            // MultiBlockChange_VarInt => on_multi_block_change_varint,
-                            // MultiBlockChange_u16 => on_multi_block_change_u16,
-                            // TeleportPlayer_WithConfirm => on_teleport_player_withconfirm,
-                            // TeleportPlayer_NoConfirm => on_teleport_player_noconfirm,
-                            // TeleportPlayer_OnGround => on_teleport_player_onground,
-                            // TimeUpdate => on_time_update,
-                            // ChangeGameState => on_game_state_change,
-                            // UpdateBlockEntity => on_block_entity_update,
-                            // UpdateBlockEntity_Data => on_block_entity_update_data,
-                            // UpdateSign => on_sign_update,
-                            // UpdateSign_u16 => on_sign_update_u16,
-                            // PlayerInfo => on_player_info,
-                            // PlayerInfo_String => on_player_info_string,
-                            // ServerMessage_NoPosition => on_servermessage_noposition,
-                            // ServerMessage_Position => on_servermessage_position,
-                            // ServerMessage_Sender => on_servermessage_sender,
-                            // Disconnect => on_disconnect,
-                            // Entities
-                            // EntityDestroy => on_entity_destroy,
-                            // EntityDestroy_u8 => on_entity_destroy_u8,
-                            // SpawnPlayer_f64_NoMeta => on_player_spawn_f64_nometa,
-                            // SpawnPlayer_f64 => on_player_spawn_f64,
-                            // SpawnPlayer_i32 => on_player_spawn_i32,
-                            // SpawnPlayer_i32_HeldItem => on_player_spawn_i32_helditem,
-                            // SpawnPlayer_i32_HeldItem_String => on_player_spawn_i32_helditem_string,
-                            // EntityTeleport_f64 => on_entity_teleport_f64,
-                            // EntityTeleport_i32 => on_entity_teleport_i32,
-                            // EntityTeleport_i32_i32_NoGround => on_entity_teleport_i32_i32_noground,
-                            // EntityMove_i16 => on_entity_move_i16,
-                            // EntityMove_i8 => on_entity_move_i8,
-                            // EntityMove_i8_i32_NoGround => on_entity_move_i8_i32_noground,
-                            // EntityLook_VarInt => on_entity_look_varint,
-                            // EntityLook_i32_NoGround => on_entity_look_i32_noground,
-                            // EntityLookAndMove_i16 => on_entity_look_and_move_i16,
-                            // EntityLookAndMove_i8 => on_entity_look_and_move_i8,
-                            // EntityLookAndMove_i8_i32_NoGround => on_entity_look_and_move_i8_i32_noground,
-                        }
-                    }*/
+                    Ok(pck) =>
                         match pck {
                             Packet::KeepAliveClientbound_i64(keep_alive) => {
-                                read.write_packet(packet::play::serverbound::KeepAliveServerbound_i64 { // TODO: Fix writing on own Conn
+                                read.write_packet(packet::play::serverbound::KeepAliveServerbound_i64 {
                                     id: keep_alive.id,
-                                });
+                                }).unwrap();
                                 println!("keep alive!");
                             }
                             Packet::KeepAliveClientbound_VarInt(keep_alive) => {
                                 read.write_packet(packet::play::serverbound::KeepAliveServerbound_VarInt {
                                     id: keep_alive.id,
-                                });
+                                }).unwrap();
                                 println!("keep alive!");
                             }
                             Packet::KeepAliveClientbound_i32(keep_alive) => {
                                 read.write_packet(packet::play::serverbound::KeepAliveServerbound_i32 {
                                     id: keep_alive.id,
-                                });
+                                }).unwrap();
                                 println!("keep alive!");
                             }
                             _ => {
@@ -457,7 +386,7 @@ impl Server {
                         if tx.send(Err(err)).is_err() {
                             return;
                         }
-                    }, // TODO: Fix this: thread 'main' panicked at 'Err: IOError(Error { kind: UnexpectedEof, message: "failed to fill whole buffer" })', src/server/mod.rs:679:33
+                    },
                 }
         });
         rx
@@ -480,7 +409,7 @@ impl Server {
     }
 
     pub fn dummy_server(resources: Arc<RwLock<resources::Manager>>) -> Server {
-        let mut server = Server::new(
+        let server = Server::new(
             protocol::SUPPORTED_PROTOCOLS[0],
             vec![],
             protocol::UUID::default(),
@@ -758,9 +687,6 @@ impl Server {
                             Respawn_HashedSeed => on_respawn_hashedseed,
                             Respawn_WorldName => on_respawn_worldname,
                             Respawn_NBT => on_respawn_nbt,
-                            KeepAliveClientbound_i64 => on_keep_alive_i64,
-                            KeepAliveClientbound_VarInt => on_keep_alive_varint,
-                            KeepAliveClientbound_i32 => on_keep_alive_i32,
                             ChunkData_Biomes3D_VarInt => on_chunk_data_biomes3d_varint,
                             ChunkData_Biomes3D_bool => on_chunk_data_biomes3d_bool,
                             ChunkData => on_chunk_data,

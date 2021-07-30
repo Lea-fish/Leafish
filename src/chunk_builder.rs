@@ -9,9 +9,7 @@ use rand::{self, Rng, SeedableRng};
 use std::sync::mpsc;
 use std::sync::{Arc, RwLock};
 use std::thread;
-use rayon::prelude::*;
-use std::time::Instant;
-// use rayon::iter::{IntoParallelRefIterator, IntoParallelRefMutIterator};
+// use rayon::prelude::*;
 
 const NUM_WORKERS: usize = 8;
 
