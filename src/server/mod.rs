@@ -18,7 +18,7 @@ use crate::format;
 use crate::protocol::{self, forge, mojang, packet};
 use crate::render;
 use crate::resources;
-use crate::settings::Stevenkey;
+use crate::settings::Actionkey;
 use crate::shared::{Axis, Position};
 use crate::types::hash::FNVHash;
 use crate::types::Gamemode;
@@ -34,11 +34,11 @@ use std::str::FromStr;
 use std::sync::mpsc;
 use std::sync::{Arc, RwLock};
 use std::thread;
-use steven_protocol::protocol::packet::Packet;
+use leafish_protocol::protocol::packet::Packet;
 use std::sync::mpsc::Sender;
 use std::io::Write;
 use std::borrow::Borrow;
-use steven_protocol::protocol::{VarInt, Serializable};
+use leafish_protocol::protocol::{VarInt, Serializable};
 
 pub mod plugin_messages;
 mod sun;
@@ -952,7 +952,7 @@ impl Server {
         }
     }
 
-    pub fn key_press(&mut self, down: bool, key: Stevenkey) {
+    pub fn key_press(&mut self, down: bool, key: Actionkey) {
         if let Some(player) = self.player {
             if let Some(movement) = self
                 .entities
@@ -1293,7 +1293,7 @@ impl Server {
 
         // Let the server know who we are
         let brand = plugin_messages::Brand {
-            brand: "Steven".into(),
+            brand: "leafish".into(),
         };
         // TODO: refactor with write_plugin_message
         if self.protocol_version >= 47 {

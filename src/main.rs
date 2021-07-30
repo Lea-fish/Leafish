@@ -20,18 +20,18 @@
 use instant::{Duration, Instant};
 use log::{error, info, warn};
 use std::fs;
-extern crate steven_shared as shared;
+extern crate leafish_shared as shared;
 
 use structopt::StructOpt;
 
-extern crate steven_protocol;
+extern crate leafish_protocol;
 
 pub mod ecs;
-use steven_protocol::format;
-use steven_protocol::nbt;
-use steven_protocol::protocol;
+use leafish_protocol::format;
+use leafish_protocol::nbt;
+use leafish_protocol::protocol;
 pub mod gl;
-use steven_protocol::types;
+use leafish_protocol::types;
 pub mod auth;
 pub mod chunk_builder;
 pub mod console;
@@ -53,16 +53,16 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use std::sync::mpsc::Sender;
-use steven_protocol::protocol::packet::Packet;
+use leafish_protocol::protocol::packet::Packet;
 
 const CL_BRAND: console::CVar<String> = console::CVar {
     ty: PhantomData,
     name: "cl_brand",
-    description: "cl_brand has the value of the clients current 'brand'. e.g. \"Steven\" or \
+    description: "cl_brand has the value of the clients current 'brand'. e.g. \"Leafish\" or \
                   \"Vanilla\"",
     mutable: false,
     serializable: false,
-    default: &|| "Steven".to_owned(),
+    default: &|| "Leafish".to_owned(),
 };
 
 pub struct Game {
@@ -190,7 +190,7 @@ impl Game {
 }
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "Stevenarella")]
+#[structopt(name = "leafish")]
 struct Opt {
     /// Server to connect to
     #[structopt(short = "s", long = "server")]
@@ -219,7 +219,7 @@ fn init_config_dir() {
     }
 
     if let Some(mut path) = dirs::config_dir() {
-        path.push("Stevenarella");
+        path.push("leafish");
         if !path.exists() {
             std::fs::create_dir_all(path.clone()).unwrap();
         }
@@ -276,7 +276,7 @@ fn main() {
     log::set_boxed_logger(Box::new(proxy)).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
 
-    info!("Starting steven");
+    info!("Starting leafish");
 
     let (vars, mut vsync) = {
         let mut vars = console::Vars::new();
@@ -297,7 +297,7 @@ fn main() {
     let events_loop = winit::event_loop::EventLoop::new();
 
     let window_builder = winit::window::WindowBuilder::new()
-        .with_title("Stevenarella");
+        .with_title("leafish");
         /*.with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0))*/;
 
     let (context, shader_version, dpi_factor, glutin_window) = {
@@ -729,10 +729,10 @@ fn handle_window_event<T>(
                         }
                         (ElementState::Pressed, Some(key)) => {
                             if game.focused {
-                                if let Some(steven_key) =
-                                    settings::Stevenkey::get_by_keycode(key, &game.vars)
+                                if let Some(action_key) =
+                                    settings::Actionkey::get_by_keycode(key, &game.vars)
                                 {
-                                    game.server.key_press(true, steven_key);
+                                    game.server.key_press(true, action_key);
                                 }
                             } else {
                                 let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
@@ -741,10 +741,10 @@ fn handle_window_event<T>(
                         }
                         (ElementState::Released, Some(key)) => {
                             if game.focused {
-                                if let Some(steven_key) =
-                                    settings::Stevenkey::get_by_keycode(key, &game.vars)
+                                if let Some(action_key) =
+                                    settings::Actionkey::get_by_keycode(key, &game.vars)
                                 {
-                                    game.server.key_press(false, steven_key);
+                                    game.server.key_press(false, action_key);
                                 }
                             } else {
                                 let ctrl_pressed = game.is_ctrl_pressed;

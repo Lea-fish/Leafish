@@ -45,7 +45,7 @@ impl Info {
         let mut parts = vec![];
 
         const LINE_SIZE: f64 = 1.0 / 128.0;
-        let tex = render::Renderer::get_texture(renderer.get_textures_ref(), "steven:solid");
+        let tex = render::Renderer::get_texture(renderer.get_textures_ref(), "leafish:solid");
 
         for bound in bl.get_collision_boxes() {
             let bound = bound.add_v(cgmath::Vector3::new(

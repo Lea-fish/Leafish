@@ -27,7 +27,3 @@ reqwest = { version = "0.11.3", features = [ "blocking" ]}
 [dependencies.leafish_shared]
 path = "../shared"
 version = "0"
-
-[dependencies.std_or_web]
-path = "../std_or_web"
-version = "0"

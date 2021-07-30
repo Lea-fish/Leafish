@@ -25,7 +25,7 @@ impl Logo {
     ) -> Logo {
         let logo_str = {
             let res = resources.read().unwrap();
-            let mut logo = res.open("steven", "logo/logo.txt").unwrap();
+            let mut logo = res.open("leafish", "logo/logo.txt").unwrap();
             let mut logo_str = String::new();
             logo.read_to_string(&mut logo_str).unwrap();
             logo_str
@@ -60,7 +60,7 @@ impl Logo {
                     (170, 170, 170)
                 };
                 ui::ImageBuilder::new()
-                    .texture("steven:solid")
+                    .texture("leafish:solid")
                     .position((x + 2) as f64, (y + 4) as f64)
                     .size(4.0, 8.0)
                     .colour((0, 0, 0, 100))

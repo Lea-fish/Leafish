@@ -16,7 +16,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::mpsc;
 use std::thread;
-use std_or_web::fs;
+use std::fs;
 
 use crate::format;
 use crate::format::{Component, TextComponent};
@@ -126,7 +126,7 @@ impl ServerList {
 
             // Everything is attached to this
             let back = ui::ImageBuilder::new()
-                .texture("steven:solid")
+                .texture("leafish:solid")
                 .position(0.0, offset * 100.0)
                 .size(700.0, 100.0)
                 .colour((0, 0, 0, 100))
@@ -371,7 +371,7 @@ impl super::Screen for ServerList {
         {
             let mut options = options.borrow_mut();
             ui::ImageBuilder::new()
-                .texture("steven:gui/cog")
+                .texture("leafish:gui/cog")
                 .position(0.0, 0.0)
                 .size(40.0, 40.0)
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
@@ -395,7 +395,7 @@ impl super::Screen for ServerList {
         let disconnected = if let Some(ref disconnect_reason) = self.disconnect_reason {
             let (width, height) = ui::Formatted::compute_size(renderer, disconnect_reason, 600.0);
             let background = ui::ImageBuilder::new()
-                .texture("steven:solid")
+                .texture("leafish:solid")
                 .position(0.0, 3.0)
                 .size(
                     width.max(renderer.ui.size_of_string("Disconnected")) + 4.0,

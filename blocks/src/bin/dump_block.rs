@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use std::env;
-use steven_blocks::VanillaIDMap;
+use leafish_blocks::VanillaIDMap;
 
 fn main() {
     let args: Vec<String> = env::args().collect();

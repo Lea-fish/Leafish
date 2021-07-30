@@ -29,7 +29,7 @@ impl SettingsMenu {
 impl super::Screen for SettingsMenu {
     fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let background = ui::ImageBuilder::new()
-            .texture("steven:solid")
+            .texture("leafish:solid")
             .position(0.0, 0.0)
             .size(854.0, 480.0)
             .colour((0, 0, 0, 100))
@@ -229,7 +229,7 @@ impl VideoSettingsMenu {
 impl super::Screen for VideoSettingsMenu {
     fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let background = ui::ImageBuilder::new()
-            .texture("steven:solid")
+            .texture("leafish:solid")
             .position(0.0, 0.0)
             .size(854.0, 480.0)
             .colour((0, 0, 0, 100))
@@ -389,7 +389,7 @@ impl AudioSettingsMenu {
 impl super::Screen for AudioSettingsMenu {
     fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let background = ui::ImageBuilder::new()
-            .texture("steven:solid")
+            .texture("leafish:solid")
             .position(0.0, 0.0)
             .size(854.0, 480.0)
             .colour((0, 0, 0, 100))
@@ -475,7 +475,7 @@ impl SkinSettingsMenu {
 impl super::Screen for SkinSettingsMenu {
     fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let background = ui::ImageBuilder::new()
-            .texture("steven:solid")
+            .texture("leafish:solid")
             .position(0.0, 0.0)
             .size(854.0, 480.0)
             .colour((0, 0, 0, 100))

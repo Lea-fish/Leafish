@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate steven_resources as internal;
+extern crate leafish_resources as internal;
 
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
@@ -21,7 +21,7 @@ use std::path;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std_or_web::fs;
+use std::fs;
 
 use crate::types::hash::FNVHash;
 use crate::ui;
@@ -164,7 +164,7 @@ impl Manager {
                 mui.num_tasks += 1;
                 // Add a ui element for it
                 let background = ui::ImageBuilder::new()
-                    .texture("steven:solid")
+                    .texture("leafish:solid")
                     .position(0.0, -UI_HEIGHT)
                     .size(350.0, UI_HEIGHT)
                     .colour((0, 0, 0, 100))
@@ -173,7 +173,7 @@ impl Manager {
                     .create(ui_container);
 
                 ui::ImageBuilder::new()
-                    .texture("steven:solid")
+                    .texture("leafish:solid")
                     .position(0.0, 0.0)
                     .size(350.0, 10.0)
                     .colour((0, 0, 0, 200))
@@ -194,7 +194,7 @@ impl Manager {
                     .attach(&mut *background.borrow_mut());
 
                 let progress_bar = ui::ImageBuilder::new()
-                    .texture("steven:solid")
+                    .texture("leafish:solid")
                     .position(0.0, 0.0)
                     .size(0.0, 10.0)
                     .colour((0, 255, 0, 255))
@@ -384,7 +384,7 @@ impl Manager {
     fn download_vanilla(&mut self) {
         let loc = format!("./resources-{}", RESOURCES_VERSION);
         let location = path::Path::new(&loc);
-        if fs::metadata(location.join("steven.assets")).is_ok() {
+        if fs::metadata(location.join("leafish.assets")).is_ok() {
             self.load_vanilla();
             return;
         }
@@ -449,7 +449,7 @@ impl Manager {
                 io::copy(&mut file, &mut out).unwrap();
             }
 
-            fs::File::create(location.join("steven.assets")).unwrap(); // Marker file
+            fs::File::create(location.join("leafish.assets")).unwrap(); // Marker file
             send.send(true).unwrap();
 
             fs::remove_file(format!("{}.tmp", RESOURCES_VERSION)).unwrap();

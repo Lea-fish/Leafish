@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub use steven_blocks as block;
+pub use leafish_blocks as block;
 
 use crate::chunk_builder;
 use crate::ecs;

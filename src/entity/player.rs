@@ -5,7 +5,7 @@ use crate::ecs;
 use crate::format;
 use crate::render;
 use crate::render::model::{self, FormatState};
-use crate::settings::Stevenkey;
+use crate::settings::Actionkey;
 use crate::shared::Position as BPosition;
 use crate::types::hash::FNVHash;
 use crate::types::Gamemode;
@@ -542,7 +542,7 @@ pub struct PlayerMovement {
     pub when_last_jump_pressed: Option<Instant>,
     pub when_last_jump_released: Option<Instant>,
     pub did_touch_ground: bool,
-    pub pressed_keys: HashMap<Stevenkey, bool, BuildHasherDefault<FNVHash>>,
+    pub pressed_keys: HashMap<Actionkey, bool, BuildHasherDefault<FNVHash>>,
 }
 
 impl PlayerMovement {
@@ -554,23 +554,23 @@ impl PlayerMovement {
         use std::f64::consts::PI;
         let mut forward = 0.0f64;
         let mut yaw = player_yaw - (PI / 2.0);
-        if self.is_key_pressed(Stevenkey::Forward) || self.is_key_pressed(Stevenkey::Backward) {
+        if self.is_key_pressed(Actionkey::Forward) || self.is_key_pressed(Actionkey::Backward) {
             forward = 1.0;
-            if self.is_key_pressed(Stevenkey::Backward) {
+            if self.is_key_pressed(Actionkey::Backward) {
                 yaw += PI;
             }
         }
-        let change = if self.is_key_pressed(Stevenkey::Left) {
+        let change = if self.is_key_pressed(Actionkey::Left) {
             (PI / 2.0) / (forward.abs() + 1.0)
-        } else if self.is_key_pressed(Stevenkey::Right) {
+        } else if self.is_key_pressed(Actionkey::Right) {
             -(PI / 2.0) / (forward.abs() + 1.0)
         } else {
             0.0
         };
-        if self.is_key_pressed(Stevenkey::Left) || self.is_key_pressed(Stevenkey::Right) {
+        if self.is_key_pressed(Actionkey::Left) || self.is_key_pressed(Actionkey::Right) {
             forward = 1.0;
         }
-        if self.is_key_pressed(Stevenkey::Backward) {
+        if self.is_key_pressed(Actionkey::Backward) {
             yaw -= change;
         } else {
             yaw += change;
@@ -579,7 +579,7 @@ impl PlayerMovement {
         (forward, yaw)
     }
 
-    fn is_key_pressed(&self, key: Stevenkey) -> bool {
+    fn is_key_pressed(&self, key: Actionkey) -> bool {
         self.pressed_keys.get(&key).map_or(false, |v| *v)
     }
 }
@@ -637,7 +637,7 @@ impl ecs::System for MovementHandler {
             movement.flying |= gamemode.always_fly();
 
             // Detect double-tapping jump to toggle creative flight
-            if movement.is_key_pressed(Stevenkey::Jump) {
+            if movement.is_key_pressed(Actionkey::Jump) {
                 if movement.when_last_jump_pressed.is_none() {
                     movement.when_last_jump_pressed = Some(Instant::now());
                     if movement.when_last_jump_released.is_some() {
@@ -674,7 +674,7 @@ impl ecs::System for MovementHandler {
                 (position.position.z as i32) >> 4,
             ) {
                 let (forward, yaw) = movement.calculate_movement(rotation.yaw);
-                let mut speed = if movement.is_key_pressed(Stevenkey::Sprint) {
+                let mut speed = if movement.is_key_pressed(Actionkey::Sprint) {
                     0.2806
                 } else {
                     0.21585
@@ -682,14 +682,14 @@ impl ecs::System for MovementHandler {
                 if movement.flying {
                     speed *= 2.5;
 
-                    if movement.is_key_pressed(Stevenkey::Jump) {
+                    if movement.is_key_pressed(Actionkey::Jump) {
                         position.position.y += speed;
                     }
-                    if movement.is_key_pressed(Stevenkey::Sneak) {
+                    if movement.is_key_pressed(Actionkey::Sneak) {
                         position.position.y -= speed;
                     }
                 } else if gravity.as_ref().map_or(false, |v| v.on_ground) {
-                    if movement.is_key_pressed(Stevenkey::Jump) && velocity.velocity.y.abs() < 0.001
+                    if movement.is_key_pressed(Actionkey::Jump) && velocity.velocity.y.abs() < 0.001
                     {
                         velocity.velocity.y = 0.42;
                     }

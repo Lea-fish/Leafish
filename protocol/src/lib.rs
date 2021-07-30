@@ -8,4 +8,4 @@ pub mod nbt;
 pub mod protocol;
 pub mod types;
 
-use steven_shared as shared;
+use leafish_shared as shared;

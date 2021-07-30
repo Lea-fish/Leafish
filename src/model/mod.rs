@@ -206,7 +206,7 @@ impl Factory {
             let mut m = models.write().unwrap();
             let model = m
                 .models
-                .get(&Key("steven".to_owned(), "missing_block".to_owned()))
+                .get(&Key("leafish".to_owned(), "missing_block".to_owned()))
                 .unwrap()
                 .clone();
             m.models.insert(key, model);

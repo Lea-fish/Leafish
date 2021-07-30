@@ -1008,7 +1008,7 @@ impl TextureManager {
 
     fn add_defaults(&mut self) {
         self.put_texture(
-            "steven",
+            "leafish",
             "missing_texture",
             2,
             2,
@@ -1016,7 +1016,7 @@ impl TextureManager {
                 0, 0, 0, 255, 255, 0, 255, 255, 255, 0, 255, 255, 0, 0, 0, 255,
             ],
         );
-        self.put_texture("steven", "solid", 1, 1, vec![255, 255, 255, 255]);
+        self.put_texture("leafish", "solid", 1, 1, vec![255, 255, 255, 255]);
     }
 
     fn process_skins(
@@ -1048,7 +1048,8 @@ impl TextureManager {
         use std::io::Read;
         use std::io::{Error, ErrorKind};
         use std::path::Path;
-        use std_or_web::fs;
+        // use std_or_web::fs;
+        use std::fs;
         let path = format!("skin-cache/{}/{}.png", &hash[..2], hash);
         let cache_path = Path::new(&path);
         fs::create_dir_all(cache_path.parent().unwrap())?;
@@ -1151,7 +1152,7 @@ impl TextureManager {
         self.add_defaults();
 
         for name in map.keys() {
-            if let Some(n) = name.strip_prefix("steven-dynamic:") {
+            if let Some(n) = name.strip_prefix("leafish-dynamic:") {
                 let (width, height, data) = {
                     let dynamic_texture = match self.dynamic_textures.get(n) {
                         Some(val) => val,
@@ -1162,7 +1163,7 @@ impl TextureManager {
                     (width, height, img.to_rgba8().into_vec())
                 };
                 let new_tex =
-                    self.put_texture("steven-dynamic", n, width as u32, height as u32, data);
+                    self.put_texture("leafish-dynamic", n, width as u32, height as u32, data);
                 self.dynamic_textures.get_mut(n).unwrap().0 = new_tex;
             } else if !self.textures.contains_key(name) {
                 self.load_texture(name);
@@ -1175,7 +1176,7 @@ impl TextureManager {
         if let Some(skin) = self.skins.get(hash) {
             skin.fetch_add(1, Ordering::Relaxed);
         }
-        self.get_texture(&format!("steven-dynamic:skin-{}", hash))
+        self.get_texture(&format!("leafish-dynamic:skin-{}", hash))
     }
 
     pub fn release_skin(&self, url: &str) {
@@ -1210,7 +1211,7 @@ impl TextureManager {
         if !self.skins.contains_key(&hash) {
             return;
         }
-        let name = format!("steven-dynamic:skin-{}", hash);
+        let name = format!("leafish-dynamic:skin-{}", hash);
         let tex = self.get_texture(&name).unwrap();
         let rect = atlas::Rect {
             x: tex.x,
@@ -1320,7 +1321,7 @@ impl TextureManager {
                 interpolate,
                 current_frame: 0,
                 remaining_time: 0.0,
-                texture: self.get_texture("steven:missing_texture").unwrap(),
+                texture: self.get_texture("leafish:missing_texture").unwrap(),
             });
         }
         None
@@ -1375,7 +1376,7 @@ impl TextureManager {
     }
 
     fn insert_texture_dummy(&mut self, plugin: &str, name: &str) -> Texture {
-        let missing = self.get_texture("steven:missing_texture").unwrap();
+        let missing = self.get_texture("leafish:missing_texture").unwrap();
 
         let mut full_name = String::new();
         full_name.push_str(plugin);
@@ -1430,18 +1431,18 @@ impl TextureManager {
                 (width as f32) / (tex.width as f32),
                 (height as f32) / (tex.height as f32),
             );
-            let old_name = mem::replace(&mut tex.name, format!("steven-dynamic:{}", name));
+            let old_name = mem::replace(&mut tex.name, format!("leafish-dynamic:{}", name));
             self.dynamic_textures.insert(name.to_owned(), (tex, img));
             // We need to rename the texture itself so that get_texture calls
             // work with the new name
             let mut old = self.textures.remove(&old_name).unwrap();
-            old.name = format!("steven-dynamic:{}", name);
+            old.name = format!("leafish-dynamic:{}", name);
             t.name = old.name.clone();
             self.textures
-                .insert(format!("steven-dynamic:{}", name), old);
+                .insert(format!("leafish-dynamic:{}", name), old);
             t
         } else {
-            let tex = self.put_texture("steven-dynamic", name, width as u32, height as u32, data);
+            let tex = self.put_texture("leafish-dynamic", name, width as u32, height as u32, data);
             self.dynamic_textures
                 .insert(name.to_owned(), (tex.clone(), img));
             tex

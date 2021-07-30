@@ -160,7 +160,7 @@ pub fn register_vars(vars: &mut console::Vars) {
 }
 
 #[derive(Hash, PartialEq, Eq, Debug)]
-pub enum Stevenkey {
+pub enum Actionkey {
     Forward,
     Backward,
     Left,
@@ -171,22 +171,22 @@ pub enum Stevenkey {
     Jump,
 }
 
-impl Stevenkey {
-    pub fn values() -> Vec<Stevenkey> {
+impl Actionkey {
+    pub fn values() -> Vec<Actionkey> {
         vec![
-            Stevenkey::Forward,
-            Stevenkey::Backward,
-            Stevenkey::Left,
-            Stevenkey::Right,
-            Stevenkey::OpenInv,
-            Stevenkey::Sneak,
-            Stevenkey::Sprint,
-            Stevenkey::Jump,
+            Actionkey::Forward,
+            Actionkey::Backward,
+            Actionkey::Left,
+            Actionkey::Right,
+            Actionkey::OpenInv,
+            Actionkey::Sneak,
+            Actionkey::Sprint,
+            Actionkey::Jump,
         ]
     }
 
-    pub fn get_by_keycode(keycode: VirtualKeyCode, vars: &console::Vars) -> Option<Stevenkey> {
-        for steven_key in Stevenkey::values() {
+    pub fn get_by_keycode(keycode: VirtualKeyCode, vars: &console::Vars) -> Option<Actionkey> {
+        for steven_key in Actionkey::values() {
             if keycode as i64 == *vars.get(steven_key.get_cvar()) {
                 return Some(steven_key);
             }
@@ -196,14 +196,14 @@ impl Stevenkey {
 
     pub fn get_cvar(&self) -> console::CVar<i64> {
         match *self {
-            Stevenkey::Forward => CL_KEYBIND_FORWARD,
-            Stevenkey::Backward => CL_KEYBIND_BACKWARD,
-            Stevenkey::Left => CL_KEYBIND_LEFT,
-            Stevenkey::Right => CL_KEYBIND_RIGHT,
-            Stevenkey::OpenInv => CL_KEYBIND_OPEN_INV,
-            Stevenkey::Sneak => CL_KEYBIND_SNEAK,
-            Stevenkey::Sprint => CL_KEYBIND_SPRINT,
-            Stevenkey::Jump => CL_KEYBIND_JUMP,
+            Actionkey::Forward => CL_KEYBIND_FORWARD,
+            Actionkey::Backward => CL_KEYBIND_BACKWARD,
+            Actionkey::Left => CL_KEYBIND_LEFT,
+            Actionkey::Right => CL_KEYBIND_RIGHT,
+            Actionkey::OpenInv => CL_KEYBIND_OPEN_INV,
+            Actionkey::Sneak => CL_KEYBIND_SNEAK,
+            Actionkey::Sprint => CL_KEYBIND_SPRINT,
+            Actionkey::Jump => CL_KEYBIND_JUMP,
         }
     }
 }

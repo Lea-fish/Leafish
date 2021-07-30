@@ -2,7 +2,7 @@
 #![allow(clippy::identity_op)]
 #![allow(clippy::collapsible_if)]
 
-extern crate steven_shared as shared;
+extern crate leafish_shared as shared;
 
 use crate::shared::{Axis, Direction, Position};
 use cgmath::Point3;
@@ -66,7 +66,7 @@ impl VanillaIDMap {
                 .get(id)
                 .and_then(|v| *v)
                 .unwrap_or(Block::Missing {})
-        // TODO: support modded 1.13.2+ blocks after https://github.com/iceiix/stevenarella/pull/145
+        // TODO: support modded 1.13.2+ blocks after https://github.com/iceiix/leafisharella/pull/145
         } else {
             if let Some(block) = self.hier.get(id).and_then(|v| *v) {
                 block
@@ -5759,13 +5759,13 @@ define_blocks! {
         props {},
         data Some(0),
         offset None,
-        model { ("steven", "missing_block") },
+        model { ("leafish", "missing_block") },
     }
     Missing254 {
         props {},
         data Some(0),
         offset None,
-        model { ("steven", "missing_block") },
+        model { ("leafish", "missing_block") },
     }
     StructureBlock {
         props {
@@ -5784,7 +5784,7 @@ define_blocks! {
     Missing {
         props {},
         data None::<usize>,
-        model { ("steven", "missing_block") },
+        model { ("leafish", "missing_block") },
     }
 }
 

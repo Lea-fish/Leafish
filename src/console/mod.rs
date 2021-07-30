@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::marker::PhantomData;
 use std::sync::{Arc, Mutex};
-use std_or_web::fs;
+use std::fs;
 
 use crate::format::{Color, Component, TextComponent};
 use crate::render;
@@ -308,7 +308,7 @@ impl Console {
         };
         if self.elements.is_none() {
             let background = ui::ImageBuilder::new()
-                .texture("steven:solid")
+                .texture("leafish:solid")
                 .position(0.0, self.position)
                 .size(w, 220.0)
                 .colour((0, 0, 0, 180))

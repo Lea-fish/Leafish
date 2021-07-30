@@ -181,7 +181,7 @@ impl Clouds {
     ) {
         self.offset += delta;
 
-        let tex = super::Renderer::get_texture(&self.textures, "steven:environment/clouds");
+        let tex = super::Renderer::get_texture(&self.textures, "leafish:environment/clouds");
 
         self.program.use_program();
         self.u_perspective_matrix.set_matrix4(perspective_matrix);
