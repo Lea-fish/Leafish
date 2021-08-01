@@ -40,7 +40,7 @@ pub struct World {
 
     render_list: Vec<(i32, i32, i32)>,
 
-    light_updates: VecDeque<LightUpdate>,
+    pub(crate) light_updates: VecDeque<LightUpdate>,
 
     block_entity_actions: VecDeque<BlockEntityAction>,
 
@@ -85,7 +85,7 @@ impl LightType {
     }
 }
 
-struct LightUpdate {
+pub struct LightUpdate {
     ty: LightType,
     pos: Position,
 }
@@ -208,18 +208,22 @@ impl World {
     }
 
     #[allow(clippy::verbose_bit_mask)] // "llvm generates better code" for updates_performed & 0xFFF "on x86"
-    pub fn tick(&mut self, m: &mut ecs::Manager) {
-        use instant::Instant;
-        let start = Instant::now();
+    pub fn tick(&mut self, m: &mut ecs::Manager) { // TODO: Only call this from a separate thread!
+        // use instant::Instant;
+        /*let start = Instant::now();
         let mut updates_performed = 0;
+        println!("light updates {}", self.light_updates.len());
         while !self.light_updates.is_empty() {
             updates_performed += 1;
             self.do_light_update();
-            if (updates_performed & 0xFFF == 0) && start.elapsed().subsec_nanos() >= 5000000 {
+            /*if (updates_performed & 0xFFF == 0) && start.elapsed().subsec_nanos() >= 5000000 {
                 // 5 ms for light updates
                 break;
-            }
-        }
+            }*/
+        }*/
+        /*let diff = Instant::now().duration_since(start);
+        println!("Light updates took {}", diff.as_millis());*/
+        // TODO: Improve this time!
 
         let sign_info: ecs::Key<block_entity::sign::SignInfo> = m.get_key();
 
@@ -262,7 +266,7 @@ impl World {
         }
     }
 
-    fn do_light_update(&mut self) {
+    pub(crate) fn do_light_update(&mut self) {
         use std::cmp;
         if let Some(update) = self.light_updates.pop_front() {
             if update.pos.y < 0
@@ -354,6 +358,7 @@ impl World {
         );
 
         let mut process_queue = VecDeque::with_capacity(self.chunks.len() * 16);
+        println!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
 
         while let Some((from, pos)) = process_queue.pop_front() {
@@ -411,12 +416,69 @@ impl World {
         self.render_list
             .iter()
             .map(|v| {
-                let chunk = self.chunks.get(&CPos(v.0, v.2)).unwrap();
+                let chunk = self.chunks.get(&CPos(v.0, v.2)).unwrap(); // TODO: Handle None
                 let sec = chunk.sections[v.1 as usize].as_ref().unwrap();
                 (*v, &sec.render_buffer)
             })
             .collect()
     }
+    /*
+    thread 'main' panicked at 'called `Option::unwrap()` on a `None` value', src/world/mod.rs:414:62
+stack backtrace:
+   0: rust_begin_unwind
+             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
+   1: core::panicking::panic_fmt
+             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:92:14
+   2: core::panicking::panic
+             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:50:5
+   3: core::option::Option<T>::unwrap
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:386:21
+   4: leafish::world::World::get_render_list::{{closure}}
+             at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:414:29
+   5: core::iter::adapters::map::map_fold::{{closure}}
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:82:28
+   6: core::iter::traits::iterator::Iterator::fold
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2146:21
+   7: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:122:9
+   8: core::iter::traits::iterator::Iterator::for_each
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:776:9
+   9: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:40:17
+  10: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:56:9
+  11: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:36:9
+  12: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:2404:9
+  13: core::iter::traits::iterator::Iterator::collect
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:1788:9
+  14: leafish::world::World::get_render_list
+             at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:411:9
+  15: leafish::chunk_builder::ChunkBuilder::tick
+             at /home/threadexception/IdeaProjects/Leafish/src/chunk_builder.rs:97:30
+  16: leafish::tick_all
+             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:507:5
+  17: leafish::main::{{closure}}
+             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:423:9
+  18: winit::platform_impl::platform::sticky_exit_callback
+             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:746:5
+  19: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run_return
+             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:354:13
+  20: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run
+             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:191:9
+  21: winit::platform_impl::platform::EventLoop<T>::run
+             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:662:56
+  22: winit::event_loop::EventLoop<T>::run
+             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/event_loop.rs:154:9
+  23: leafish::main
+             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:403:5
+  24: core::ops::function::FnOnce::call_once
+             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:227:5
+note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+
+Process finished with exit code 101
+     */
 
     pub fn get_section_mut(&mut self, x: i32, y: i32, z: i32) -> Option<&mut Section> {
         if let Some(chunk) = self.chunks.get_mut(&CPos(x, z)) {

@@ -52,6 +52,7 @@ use std::rc::Rc;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
+use crate::world::World;
 
 const CL_BRAND: console::CVar<String> = console::CVar {
     ty: PhantomData,
@@ -486,11 +487,11 @@ fn tick_all(
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
     game.tick(delta);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff2 took {}", diff.as_millis());*/
-    game.server.tick(&mut game.renderer, delta);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff3 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff2 took {}", diff.as_millis());
+    game.server.tick(&mut game.renderer, delta); // TODO: Improve perf in load screen!
+    let diff = Instant::now().duration_since(now);
+    println!("Diff3 took {}", diff.as_millis());
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
@@ -499,15 +500,16 @@ fn tick_all(
 
     game.renderer.update_camera(physical_width, physical_height);
     let world = game.server.world.clone();
-    let mut world = world.write().unwrap();
-    world.compute_render_list(&mut game.renderer);
-    drop(world);
-    let diff = Instant::now().duration_since(now);
-    println!("Diff5 took {}", diff.as_millis());
+    let mut world_lock = world.write().unwrap();
+    let mut world = world_lock.as_mut().unwrap();
+    world.compute_render_list(&mut game.renderer); // TODO: Improve perf on server!
+    drop(world_lock);
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff5 took {}", diff.as_millis());*/ // readd
     game.chunk_builder
         .tick(game.server.world.clone(), &mut game.renderer, version);
-    let diff = Instant::now().duration_since(now);
-    println!("Diff6 took {}", diff.as_millis());
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff6 took {}", diff.as_millis());*/
 
     game.screen_sys
         .tick(delta, &mut game.renderer, &mut ui_container);
@@ -529,7 +531,7 @@ fn tick_all(
     println!("Diff8 took {}", diff.as_millis());*/
     ui_container.tick(&mut game.renderer, delta, width, height);
     /*let diff = Instant::now().duration_since(now);
-    println!("Diff9 took {}", diff.as_millis());*/
+    println!("Diff9 took {}", diff.as_millis());*/ // readd
     game.renderer.tick(
         game.server.world.clone()/*&mut game.server.world*/,
         delta,
@@ -539,7 +541,7 @@ fn tick_all(
         physical_height,
     );
     /*let diff = Instant::now().duration_since(now);
-    println!("Diff10 took {}", diff.as_millis());*/
+    println!("Diff10 took {}", diff.as_millis());*/ // readd
 
     if fps_cap > 0 && !*vsync {
         let frame_time = now.elapsed();
@@ -550,7 +552,9 @@ fn tick_all(
     }
 }
 // diff 3 is the most significant in the start screen! (and when joining a server)
-// diff 6***,3**,5* are the most significant, when chillin on a server
+// diff 10 has the same impact as diff 3 in the menu! (sometimes at least)
+// diff 3**,5**,10* are the most significant, when chillin on a server
+// diff 10, 3, 5 have the most impact when on server
 // TODO: Reenable: [server/mod.rs:1924][WARN] Block entity at (1371,53,-484) missing id tag: NamedTag("", Compound({"y": Int(53), "Sign": String(""), "x": Int(1371), "z": Int(-484)}))
 
 fn handle_window_event<T>(
@@ -591,11 +595,14 @@ fn handle_window_event<T>(
             if game.focused {
                 window.set_cursor_grab(true).unwrap();
                 window.set_cursor_visible(false);
-                if let Some(player) = game.server.player {
+                if let Some(player) = *game.server.player.clone().write().unwrap() {
                     let rotation = game
                         .server
                         .entities
-                        .get_component_mut(player, game.server.rotation)
+                        .clone()
+                        .write()
+                        .unwrap()
+                        .get_component_mut(player, *game.server.rotation.clone())
                         .unwrap();
                     rotation.yaw -= rx;
                     rotation.pitch -= ry;

@@ -24,6 +24,7 @@ use std::ptr;
 
 use crate::render;
 use crate::world;
+use std::sync::RwLock;
 
 /// Used to reference an entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -119,17 +120,17 @@ pub struct Manager {
     free_entities: Vec<usize>,
     components: Vec<Option<ComponentMem>>,
 
-    component_ids: RefCell<HashMap<TypeId, usize, BuildHasherDefault<FNVHash>>>,
+    component_ids: RwLock<HashMap<TypeId, usize, BuildHasherDefault<FNVHash>>>,
 
-    systems: Option<Vec<Box<dyn System + Send>>>,
-    render_systems: Option<Vec<Box<dyn System + Send>>>,
+    systems: Option<Vec<Box<dyn System + Send + Sync>>>,
+    render_systems: Option<Vec<Box<dyn System + Send + Sync>>>,
 
     changed_entity_components: HashSet<Entity, BuildHasherDefault<FNVHash>>,
 }
 
 impl Manager {
     /// Creates a new manager.
-    pub fn new() -> Manager {
+    pub fn new() -> Self {
         Manager {
             num_components: 0,
             entities: vec![(
@@ -143,7 +144,7 @@ impl Manager {
             free_entities: vec![],
             components: vec![],
 
-            component_ids: RefCell::new(HashMap::with_hasher(BuildHasherDefault::default())),
+            component_ids: RwLock::new(HashMap::with_hasher(BuildHasherDefault::default())),
             systems: Some(vec![]),
             render_systems: Some(vec![]),
 
@@ -160,12 +161,12 @@ impl Manager {
     }
 
     /// Adds a system which will be called every tick
-    pub fn add_system<S: System + Send + 'static>(&mut self, s: S) {
+    pub fn add_system<S: System + Send + Sync + 'static>(&mut self, s: S) {
         self.systems.as_mut().unwrap().push(Box::new(s));
     }
 
     /// Adds a system which will be called every frame
-    pub fn add_render_system<S: System + Send + 'static>(&mut self, s: S) {
+    pub fn add_render_system<S: System + Send + Sync + 'static>(&mut self, s: S) {
         self.render_systems.as_mut().unwrap().push(Box::new(s));
     }
 
@@ -336,7 +337,7 @@ impl Manager {
     /// Gets a key for the component type. Creates one
     /// if the component has never been referenced before.
     pub fn get_key<T: Any>(&self) -> Key<T> {
-        let mut ids = self.component_ids.borrow_mut();
+        let mut ids = self.component_ids.write().unwrap();
         let next_id = ids.len();
         let id = ids.entry(TypeId::of::<T>()).or_insert(next_id);
         Key {
@@ -592,7 +593,7 @@ const COMPONENTS_PER_BLOCK: usize = 64;
 struct ComponentMem {
     data: Vec<Option<(Vec<u8>, BSet, usize)>>,
     component_size: usize,
-    drop_func: Box<dyn Fn(*mut u8) + Send>,
+    drop_func: Box<dyn Fn(*mut u8) + Send + Sync>,
 }
 
 impl ComponentMem {

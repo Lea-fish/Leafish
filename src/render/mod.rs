@@ -296,7 +296,7 @@ impl Renderer {
 
     pub fn tick(
         &mut self,
-        world: Arc<RwLock<World>>/*&mut world::World*/,
+        world: Arc<RwLock<Option<World>>>/*&mut world::World*/,
         delta: f64,
         width: u32,
         height: u32,
@@ -337,7 +337,7 @@ impl Renderer {
         let tmp_world = world.clone();
         let tmp_world = tmp_world.read().unwrap();
 
-        for (pos, info) in tmp_world.get_render_list() {
+        for (pos, info) in tmp_world.as_ref().unwrap().get_render_list() {
             if let Some(solid) = info.solid.as_ref() {
                 if solid.count > 0 {
                     self.chunk_shader
@@ -370,7 +370,7 @@ impl Renderer {
         let mut tmp_world = tmp_world.write().unwrap();
 
         if let Some(clouds) = &mut self.clouds {
-            if tmp_world.copy_cloud_heightmap(&mut clouds.heightmap_data) {
+            if tmp_world.as_mut().unwrap().copy_cloud_heightmap(&mut clouds.heightmap_data) {
                 clouds.dirty = true;
             }
             clouds.draw(
@@ -433,7 +433,7 @@ impl Renderer {
 
         let tmp_world = world.clone();
         let tmp_world = tmp_world.read().unwrap();
-        for (pos, info) in tmp_world.get_render_list().iter().rev() {
+        for (pos, info) in tmp_world.as_ref().unwrap().get_render_list().iter().rev() {
             if let Some(trans) = info.trans.as_ref() {
                 if trans.count > 0 {
                     self.chunk_shader_alpha
