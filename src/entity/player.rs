@@ -158,7 +158,7 @@ impl ecs::System for PlayerRenderer {
     fn update(
         &mut self,
         m: &mut ecs::Manager,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         use std::f32::consts::PI;
@@ -324,7 +324,7 @@ impl ecs::System for PlayerRenderer {
         &mut self,
         m: &mut ecs::Manager,
         e: ecs::Entity,
-        _: &mut world::World,
+        _: &world::World,
         renderer: &mut render::Renderer,
     ) {
         let player_model = m.get_component_mut(e, self.player_model).unwrap();
@@ -518,7 +518,7 @@ impl ecs::System for PlayerRenderer {
         &mut self,
         m: &mut ecs::Manager,
         e: ecs::Entity,
-        _: &mut world::World,
+        _: &world::World,
         renderer: &mut render::Renderer,
     ) {
         let player_model = m.get_component_mut(e, self.player_model).unwrap();
@@ -625,7 +625,7 @@ impl ecs::System for MovementHandler {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, world: &mut world::World, _: &mut render::Renderer) {
+    fn update(&mut self, m: &mut ecs::Manager, world: &world::World, _: &mut render::Renderer) {
         for e in m.find(&self.filter) {
             let movement = m.get_component_mut(e, self.movement).unwrap();
             if movement.flying && m.get_component(e, self.gravity).is_some() {

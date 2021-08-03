@@ -71,7 +71,7 @@ impl ecs::System for SignRenderer {
     fn update(
         &mut self,
         m: &mut ecs::Manager,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         for e in m.find(&self.filter) {
@@ -93,7 +93,7 @@ impl ecs::System for SignRenderer {
         &mut self,
         m: &mut ecs::Manager,
         e: ecs::Entity,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         use cgmath::{Decomposed, Matrix4, Quaternion, Rad, Rotation3, Vector3};
@@ -217,7 +217,7 @@ impl ecs::System for SignRenderer {
         &mut self,
         m: &mut ecs::Manager,
         e: ecs::Entity,
-        _: &mut world::World,
+        _: &world::World,
         renderer: &mut render::Renderer,
     ) {
         let info = m.get_component_mut(e, self.sign_info).unwrap();

@@ -40,56 +40,82 @@ use std::io::Write;
 use leafish_protocol::protocol::{VarInt, Serializable, UUID, Conn};
 use crate::entity::{TargetPosition, TargetRotation};
 use crate::ecs::{Key, Manager};
-use leafish_protocol::protocol::packet::play::serverbound::Player;
 use crate::entity::player::PlayerMovement;
 use std::thread::sleep;
+use std::cell::RefCell;
+use std::ops::{Add, Sub};
+use std::borrow::BorrowMut;
 
 pub mod plugin_messages;
 mod sun;
 pub mod target;
 
-pub struct Server {
-    uuid: protocol::UUID,
-    conn: Option<protocol::Conn>,
-    protocol_version: i32,
-    forge_mods: Vec<forge::ForgeMod>,
-    read_queue: Option<mpsc::Receiver<Result<packet::Packet, protocol::Error>>>,
-    write_queue: Option<mpsc::Sender<(i32, bool, Vec<u8>)>>,
-    pub disconnect_reason: Option<format::Component>,
-    just_disconnected: bool,
+#[derive(Default)]
+pub struct DisconnectData {
 
-    pub world: Arc<RwLock<Option<world::World>>>,
+    pub disconnect_reason: Option<format::Component>, // remove somehow! (interior mut?)
+    just_disconnected: bool, // remove somehow! (interior mut?)
+
+}
+
+struct WorldData {
+
+    world_age: i64, // move to world?
+    world_time: f64, // move to world?
+    world_time_target: f64, // move to world?
+    tick_time: bool, // move to world?
+
+}
+
+impl Default for WorldData {
+    fn default() -> Self {
+        WorldData {
+            world_age: 0,
+            world_time: 0.0,
+            world_time_target: 0.0,
+            tick_time: true,
+        }
+    }
+}
+
+pub struct Server {
+    uuid: protocol::UUID, // const
+    conn: Arc<RwLock<Option<protocol::Conn>>>, // 'const'
+    protocol_version: i32, // const
+    forge_mods: Vec<forge::ForgeMod>, // ?
+    // read_queue: Mutex<Option<mpsc::Receiver<Result<packet::Packet, protocol::Error>>>>, // move to conn
+    // write_queue: Mutex<Option<mpsc::Sender<(i32, bool, Vec<u8>)>>>, // move to conn
+    pub disconnect_data: Arc<RwLock<DisconnectData>>,
+
+    pub world: Arc<world::World>,
     pub entities: Arc<RwLock<ecs::Manager>>,
-    world_age: i64,
-    world_time: f64,
-    world_time_target: f64,
-    tick_time: bool,
+    world_data: Arc<RwLock<WorldData>>,
 
     resources: Arc<RwLock<resources::Manager>>,
-    version: usize,
+    version: RwLock<Option<usize>>,
 
     // Entity accessors
-    game_info: ecs::Key<entity::GameInfo>,
-    player_movement: Arc<ecs::Key<entity::player::PlayerMovement>>,
-    gravity: ecs::Key<entity::Gravity>,
-    position: Arc<ecs::Key<entity::Position>>,
-    target_position: Arc<ecs::Key<entity::TargetPosition>>,
-    velocity: Arc<ecs::Key<entity::Velocity>>,
-    gamemode: Arc<ecs::Key<Gamemode>>,
-    pub rotation: Arc<ecs::Key<entity::Rotation>>,
-    target_rotation: Arc<ecs::Key<entity::TargetRotation>>,
+    game_info: ecs::Key<entity::GameInfo>, // const!
+    player_movement: ecs::Key<entity::player::PlayerMovement>, // const! (rem arc)
+    gravity: ecs::Key<entity::Gravity>, // const!
+    position: ecs::Key<entity::Position>, // const! (rem arc)
+    target_position: ecs::Key<entity::TargetPosition>, // const! (rem arc)
+    velocity: ecs::Key<entity::Velocity>, // const! (rem arc)
+    gamemode: ecs::Key<Gamemode>, // const! (rem arc)
+    pub rotation: ecs::Key<entity::Rotation>, // const! (rem arc)
+    target_rotation: ecs::Key<entity::TargetRotation>, // const! (rem arc)
     //
     pub player: Arc<RwLock<Option<ecs::Entity>>>,
     entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
     players: Arc<RwLock<HashMap<protocol::UUID, PlayerInfo, BuildHasherDefault<FNVHash>>>>,
 
-    tick_timer: f64,
-    entity_tick_timer: f64,
-    pub received_chat_at: Option<Instant>,
+    tick_timer: RwLock<f64>,
+    entity_tick_timer: RwLock<f64>,
+    pub received_chat_at: Arc<RwLock<Option<Instant>>>,
 
-    sun_model: Option<sun::SunModel>,
-    target_info: target::Info,
-    pub light_updates: Sender<bool>,
+    sun_model: RwLock<Option<sun::SunModel>>,
+    target_info: Arc<RwLock<target::Info>>,
+    pub light_updates: Mutex<Sender<bool>>, // move to world!
 }
 
 #[derive(Debug)]
@@ -124,7 +150,7 @@ impl Server {
         protocol_version: i32,
         forge_mods: Vec<forge::ForgeMod>,
         fml_network_version: Option<i64>,
-    ) -> Result<Server, protocol::Error> {
+    ) -> Result<Arc<Server>, protocol::Error> {
         let mut conn = protocol::Conn::new(address, protocol_version)?;
 
         let tag = match fml_network_version {
@@ -169,24 +195,26 @@ impl Server {
                 protocol::packet::Packet::LoginSuccess_String(val) => {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {}", val.username, val.uuid);
-                    let mut read = conn.clone();
-                    let write_int = conn.clone();
-                    let mut write = conn;
-                    read.state = protocol::State::Play;
-                    write.state = protocol::State::Play;
+                    //let mut read = conn.clone();
+                    //let write_int = conn.clone();
+                    //let mut write = conn;
+                    //read.state = protocol::State::Play;
+                    //write.state = protocol::State::Play;
+                    conn.state = protocol::State::Play;
                     let uuid = protocol::UUID::from_str(&val.uuid).unwrap();
-                    let server = Server::connect0(read, protocol_version, forge_mods, uuid, resources, write, write_int);
+                    let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/);
                     return Ok(server);
                 }
                 protocol::packet::Packet::LoginSuccess_UUID(val) => {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {:?}", val.username, val.uuid);
-                    let mut read = conn.clone();
-                    let write_int = conn.clone();
-                    let mut write = conn;
-                    read.state = protocol::State::Play;
-                    write.state = protocol::State::Play;
-                    let server = Server::connect0(read, protocol_version, forge_mods, val.uuid, resources, write, write_int);
+                    // let mut read = conn.clone();
+                    // let write_int = conn.clone();
+                    // let mut write = conn;
+                    // read.state = protocol::State::Play;
+                    // write.state = protocol::State::Play;
+                    conn.state = protocol::State::Play;
+                    let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, val.uuid, resources/*, write, write_int*/);
 
                     return Ok(server);
                 }
@@ -218,35 +246,38 @@ impl Server {
                 },
             )?;
         }
-        let mut write = conn;
+        //let mut write = conn;
 
-        write.enable_encyption(&shared/*, false*/);
-        let mut read = write.clone();
-        let mut write_int = write.clone();
+        conn/*write*/.enable_encyption(&shared/*, false*/);
+        // let mut read = write.clone();
+        // let mut write_int = write.clone();
 
         let uuid;
-        let compression_threshold = read.compression_threshold;
+        let compression_threshold = conn/*read*/.compression_threshold;
         loop {
-            match read.read_packet()? {
+            match conn/*read*/.read_packet()? {
                 protocol::packet::Packet::SetInitialCompression(val) => {
-                    read.set_compresssion(val.threshold.0);
-                    write.set_compresssion(val.threshold.0);
-                    write_int.set_compresssion(val.threshold.0);
+                    // read.set_compresssion(val.threshold.0);
+                    // write.set_compresssion(val.threshold.0);
+                    // write_int.set_compresssion(val.threshold.0);
+                    conn.set_compresssion(val.threshold.0);
                 }
                 protocol::packet::Packet::LoginSuccess_String(val) => {
                     debug!("Login: {} {}", val.username, val.uuid);
                     uuid = protocol::UUID::from_str(&val.uuid).unwrap();
-                    read.state = protocol::State::Play;
-                    write.state = protocol::State::Play;
-                    write_int.state = protocol::State::Play;
+                    // read.state = protocol::State::Play;
+                    // write.state = protocol::State::Play;
+                    // write_int.state = protocol::State::Play;
+                    conn.state = protocol::State::Play;
                     break;
                 }
                 protocol::packet::Packet::LoginSuccess_UUID(val) => {
                     debug!("Login: {} {:?}", val.username, val.uuid);
                     uuid = val.uuid;
-                    read.state = protocol::State::Play;
-                    write.state = protocol::State::Play;
-                    write_int.state = protocol::State::Play;
+                    // read.state = protocol::State::Play;
+                    // write.state = protocol::State::Play;
+                    // write_int.state = protocol::State::Play;
+                    conn.state = protocol::State::Play;
                     break;
                 }
                 protocol::packet::Packet::LoginDisconnect(val) => {
@@ -275,7 +306,7 @@ impl Server {
                                             registries,
                                         } => {
                                             info!("ModList mod_names={:?} channels={:?} registries={:?}", mod_names, channels, registries);
-                                            write_int.write_fml2_handshake_plugin_message(
+                                            conn.write_fml2_handshake_plugin_message(
                                                 req.message_id,
                                                 Some(&ModListReply {
                                                     mod_names,
@@ -290,7 +321,7 @@ impl Server {
                                             snapshot: _,
                                         } => {
                                             info!("ServerRegistry {:?}", name);
-                                            write_int.write_fml2_handshake_plugin_message(
+                                            conn.write_fml2_handshake_plugin_message(
                                                 req.message_id,
                                                 Some(&Acknowledgement),
                                             )?;
@@ -301,7 +332,7 @@ impl Server {
                                                 filename,
                                                 String::from_utf8_lossy(&contents)
                                             );
-                                            write_int.write_fml2_handshake_plugin_message(
+                                            conn.write_fml2_handshake_plugin_message(
                                                 req.message_id,
                                                 Some(&Acknowledgement),
                                             )?;
@@ -322,103 +353,49 @@ impl Server {
             }
         }
 
-        let server = Server::connect0(read, protocol_version, forge_mods, uuid, resources, write, write_int);
+        let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/);
 
         Ok(server)
     }
 
-    fn connect0(mut read: Conn, protocol_version: i32,
+    fn connect0(mut conn: Conn, protocol_version: i32,
                 forge_mods: Vec<forge::ForgeMod>,
                 uuid: protocol::UUID,
                 resources: Arc<RwLock<resources::Manager>>,
-                write: Conn,
-                write_int: Conn) -> Server {
-        let tx = Self::spawn_writer(write_int);
-        read.send = Some(tx.clone());
-        let world = Arc::new(Mutex::new(None));
-        let mut inner_world = world.lock().unwrap();
-        let entities = Arc::new(Mutex::new(None));
-        let mut inner_entities = entities.lock().unwrap();
-        let entity_map = Arc::new(Mutex::new(None));
-        let mut inner_entity_map = entity_map.lock().unwrap();
-        let players = Arc::new(Mutex::new(None));
-        let mut inner_players = players.lock().unwrap();
-        let target_rotation = Arc::new(Mutex::new(None));
-        let mut inner_target_rotation = target_rotation.lock().unwrap();
-        let target_position = Arc::new(Mutex::new(None));
-        let mut inner_target_position = target_position.lock().unwrap();
-        let player = Arc::new(Mutex::new(None));
-        let mut inner_player = player.lock().unwrap();
-        let gamemode = Arc::new(Mutex::new(None));
-        let mut inner_gamemode = gamemode.lock().unwrap();
-        let player_movement = Arc::new(Mutex::new(None));
-        let mut inner_player_movement = player_movement.lock().unwrap();
-        let rotation = Arc::new(Mutex::new(None));
-        let mut inner_rotation = rotation.lock().unwrap();
-        let position = Arc::new(Mutex::new(None));
-        let mut inner_position = position.lock().unwrap();
-        let velocity = Arc::new(Mutex::new(None));
-        let mut inner_velocity = velocity.lock().unwrap();
-        let rx = Self::spawn_reader(read, world.clone(), entities.clone(), players.clone(),
-                                    entity_map.clone(), protocol_version, uuid.clone(), target_rotation.clone(),
-                                    target_position.clone(), player.clone(), gamemode.clone(), player_movement.clone(),
-                                    rotation.clone(), position.clone(), velocity.clone());
-        let light_updater = Self::spawn_light_updater(world.clone());
-        let server = Server::new(
+                // write: Conn,
+                /*write_int: Conn*/) -> Arc<Server> {
+        // let tx = Self::spawn_writer(write_int);
+        // read.send = Some(tx.clone());
+        let server_callback = Arc::new(RwLock::new(None));
+        let inner_server = server_callback.clone();
+        let mut inner_server = inner_server.write().unwrap();
+        let rx = Self::spawn_reader(conn.clone(),
+                                    protocol_version, uuid.clone(), server_callback.clone());
+        let light_updater = Self::spawn_light_updater(server_callback.clone());
+        let conn = Arc::new(RwLock::new(Some(conn)));
+        let server = Arc::new(Server::new(
             protocol_version,
             forge_mods,
             uuid,
             resources,
-            Some(write),
-            Some(rx),
-            Some(tx),
+            conn,
+            /*Some(rx),
+            Some(tx),*/
             light_updater
-        );
+        ));
 
-        let actual_world = server.world.clone();
-        inner_world.replace(actual_world);
-        let actual_entities = server.entities.clone();
-        inner_entities.replace(actual_entities);
-        let actual_entity_map = server.entity_map.clone();
-        inner_entity_map.replace(actual_entity_map);
-        let actual_players = server.players.clone();
-        inner_players.replace(actual_players);
-        let actual_target_rotation = server.target_rotation.clone();
-        inner_target_rotation.replace(actual_target_rotation);
-        let actual_target_position = server.target_position.clone();
-        inner_target_position.replace(actual_target_position);
-        let actual_player = server.player.clone();
-        inner_player.replace(actual_player);
-        let actual_gamemode = server.gamemode.clone();
-        inner_gamemode.replace(actual_gamemode);
-        let actual_player_movement = server.player_movement.clone();
-        inner_player_movement.replace(actual_player_movement);
-        let actual_rotation = server.rotation.clone();
-        inner_rotation.replace(actual_rotation);
-        let actual_position = server.position.clone();
-        inner_position.replace(actual_position);
-        let actual_velocity = server.velocity.clone();
-        inner_velocity.replace(actual_velocity);
-        server
+        let actual_server = server.clone();
+        inner_server.replace(actual_server);
+        server.clone()
     }
 
     fn spawn_reader(
         mut read: protocol::Conn,
-        world: Arc<Mutex<Option<Arc<RwLock<Option<World>>>>>>,
-        entities: Arc<Mutex<Option<Arc<RwLock<ecs::Manager>>>>>,
-        players: Arc<Mutex<Option<Arc<RwLock<HashMap<protocol::UUID, PlayerInfo, BuildHasherDefault<FNVHash>>>>>>>,
-        entity_map: Arc<Mutex<Option<Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>>>>,
         protocol_version: i32,
         uuid: UUID,
-        target_rotation: Arc<Mutex<Option<Arc<ecs::Key<TargetRotation>>>>>,
-        target_position: Arc<Mutex<Option<Arc<ecs::Key<TargetPosition>>>>>,
-        player: Arc<Mutex<Option<Arc<RwLock<Option<ecs::Entity>>>>>>,
-        gamemode: Arc<Mutex<Option<Arc<ecs::Key<Gamemode>>>>>,
-        player_movement: Arc<Mutex<Option<Arc<ecs::Key<PlayerMovement>>>>>,
-        rotation: Arc<Mutex<Option<Arc<ecs::Key<entity::Rotation>>>>>,
-        position: Arc<Mutex<Option<Arc<ecs::Key<entity::Position>>>>>,
-        velocity: Arc<Mutex<Option<Arc<ecs::Key<entity::Velocity>>>>>,
+        server: Arc<RwLock<Option<Arc<Server>>>>,
     ) -> mpsc::Receiver<Result<packet::Packet, protocol::Error>> {
+        let server = server.clone().read().unwrap().as_ref().unwrap().clone();
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
             let pck = read.read_packet();
@@ -426,25 +403,28 @@ impl Server {
                     Ok(pck) =>
                         match pck {
                             Packet::KeepAliveClientbound_i64(keep_alive) => {
+                                println!("pre keep alive!");
                                 read.write_packet(packet::play::serverbound::KeepAliveServerbound_i64 {
                                     id: keep_alive.id,
                                 }).unwrap();
                                 println!("keep alive!");
-                            }
+                            },
                             Packet::KeepAliveClientbound_VarInt(keep_alive) => {
+                                println!("pre keep alive!");
                                 read.write_packet(packet::play::serverbound::KeepAliveServerbound_VarInt {
                                     id: keep_alive.id,
                                 }).unwrap();
                                 println!("keep alive!");
-                            }
+                            },
                             Packet::KeepAliveClientbound_i32(keep_alive) => {
+                                println!("pre keep alive!");
                                 read.write_packet(packet::play::serverbound::KeepAliveServerbound_i32 {
                                     id: keep_alive.id,
                                 }).unwrap();
                                 println!("keep alive!");
-                            }
+                            },
                             Packet::ChunkData_NoEntities(chunk_data) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunk19(
                                         chunk_data.chunk_x,
                                         chunk_data.chunk_z,
@@ -461,12 +441,12 @@ impl Server {
                                     bitmask: chunk_data.bitmask,
                                 }];
                                 let skylight = false;
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunks18(chunk_data.new, skylight, &chunk_meta, chunk_data.data.data)
                                     .unwrap();
                             },
                             Packet::ChunkData_17(chunk_data) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunk17(
                                         chunk_data.chunk_x,
                                         chunk_data.chunk_z,
@@ -479,7 +459,7 @@ impl Server {
                             },
                             Packet::ChunkDataBulk(chunk_data) => {
                                 let new = true;
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunks18(
                                         new,
                                         chunk_data.skylight,
@@ -489,7 +469,7 @@ impl Server {
                                     .unwrap();
                             },
                             Packet::ChunkDataBulk_17(bulk) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunks17(
                                         bulk.chunk_column_count,
                                         bulk.data_length,
@@ -499,10 +479,10 @@ impl Server {
                                     .unwrap();
                             },
                             Packet::BlockChange_VarInt(block_change) => {
-                                Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), block_change.location, block_change.block_id.0);
+                                Server::on_block_change_in_world(server.world.clone(), block_change.location, block_change.block_id.0);
                             },
                             Packet::BlockChange_u8(block_change) => {
-                                Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                Server::on_block_change_in_world(server.world.clone(),
                                                                  crate::shared::Position::new(block_change.x, block_change.y as i32, block_change.z),
                                                                  (block_change.block_id.0 << 4) | (block_change.block_metadata as i32));
                             },
@@ -526,7 +506,7 @@ impl Server {
                                         Position::new(sx + lx as i32, sy + ly as i32, sz + lz as i32),
                                         block,
                                     );*/
-                                    Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), Position::new(sx + lx as i32, sy + ly as i32, sz + lz as i32), block_raw_id as i32);
+                                    Server::on_block_change_in_world(server.world.clone(), Position::new(sx + lx as i32, sy + ly as i32, sz + lz as i32), block_raw_id as i32);
                                 }
                             },Packet::MultiBlockChange_VarInt(block_change) => {
                                 let ox = block_change.chunk_x << 4;
@@ -544,7 +524,7 @@ impl Server {
                                         ),
                                         block,
                                     );*/
-                                    Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), Position::new(
+                                    Server::on_block_change_in_world(server.world.clone(), Position::new(
                                         ox + (record.xz >> 4) as i32,
                                         record.y as i32,
                                         oz + (record.xz & 0xF) as i32,
@@ -576,14 +556,14 @@ impl Server {
                                         Position::new(x, y, z),
                                         block,
                                     );*/
-                                    Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), Position::new(x, y, z), id as i32);
+                                    Server::on_block_change_in_world(server.world.clone(), Position::new(x, y, z), id as i32);
                                 }
                             },
                             Packet::UpdateBlockEntity(block_update) => {
                                 match block_update.nbt {
                                     None => {
                                         // NBT is null, so we need to remove the block entity
-                                        world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                        server.world.clone()
                                             .add_block_entity_action(world::BlockEntityAction::Remove(
                                                 block_update.location,
                                             ));
@@ -613,7 +593,7 @@ impl Server {
                                                 let line4 = format::Component::from_string(
                                                     nbt.1.get("Text4").unwrap().as_str().unwrap(),
                                                 );
-                                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                                server.world.clone()
                                                     .add_block_entity_action(
                                                     world::BlockEntityAction::UpdateSignText(Box::new((
                                                         block_update.location,
@@ -636,7 +616,7 @@ impl Server {
                                 }
                             },
                             Packet::ChunkData_Biomes3D(chunk_data) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunk115(
                                         chunk_data.chunk_x,
                                         chunk_data.chunk_z,
@@ -645,10 +625,10 @@ impl Server {
                                         chunk_data.data.data,
                                     )
                                     .unwrap();
-                                Server::load_block_entities_glob(world.clone().lock().unwrap().as_ref().unwrap().clone(), chunk_data.block_entities.data);
+                                Server::load_block_entities_glob(server.world.clone(), chunk_data.block_entities.data);
                             },
                             Packet::ChunkData_Biomes3D_VarInt(chunk_data) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunk115(
                                         chunk_data.chunk_x,
                                         chunk_data.chunk_z,
@@ -657,10 +637,10 @@ impl Server {
                                         chunk_data.data.data,
                                     )
                                     .unwrap();
-                                Server::load_block_entities_glob(world.clone().lock().unwrap().as_ref().unwrap().clone(), chunk_data.block_entities.data);
+                                Server::load_block_entities_glob(server.world.clone(), chunk_data.block_entities.data);
                             },
                             Packet::ChunkData_Biomes3D_bool(chunk_data) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunk115(
                                         chunk_data.chunk_x,
                                         chunk_data.chunk_z,
@@ -669,10 +649,10 @@ impl Server {
                                         chunk_data.data.data,
                                     )
                                     .unwrap();
-                                Server::load_block_entities_glob(world.clone().lock().unwrap().as_ref().unwrap().clone(), chunk_data.block_entities.data);
+                                Server::load_block_entities_glob(server.world.clone(), chunk_data.block_entities.data);
                             },
                             Packet::ChunkData(chunk_data) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunk19(
                                         chunk_data.chunk_x,
                                         chunk_data.chunk_z,
@@ -681,10 +661,10 @@ impl Server {
                                         chunk_data.data.data,
                                     )
                                     .unwrap();
-                                Server::load_block_entities_glob(world.clone().lock().unwrap().as_ref().unwrap().clone(), chunk_data.block_entities.data);
+                                Server::load_block_entities_glob(server.world.clone(), chunk_data.block_entities.data);
                             },
                             Packet::ChunkData_HeightMap(chunk_data) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .load_chunk19(
                                         chunk_data.chunk_x,
                                         chunk_data.chunk_z,
@@ -693,14 +673,14 @@ impl Server {
                                         chunk_data.data.data,
                                     )
                                     .unwrap();
-                                Server::load_block_entities_glob(world.clone().lock().unwrap().as_ref().unwrap().clone(), chunk_data.block_entities.data);
+                                Server::load_block_entities_glob(server.world.clone(), chunk_data.block_entities.data);
                             },
                             Packet::UpdateSign(mut update_sign) => {
                                 format::convert_legacy(&mut update_sign.line1);
                                 format::convert_legacy(&mut update_sign.line2);
                                 format::convert_legacy(&mut update_sign.line3);
                                 format::convert_legacy(&mut update_sign.line4);
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .add_block_entity_action(world::BlockEntityAction::UpdateSignText(Box::new((
                                         update_sign.location,
                                         update_sign.line1,
@@ -714,7 +694,7 @@ impl Server {
                                 format::convert_legacy(&mut update_sign.line2);
                                 format::convert_legacy(&mut update_sign.line3);
                                 format::convert_legacy(&mut update_sign.line4);
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
+                                server.world.clone()
                                     .add_block_entity_action(world::BlockEntityAction::UpdateSignText(Box::new((
                                         Position::new(update_sign.x, update_sign.y as i32, update_sign.z),
                                         update_sign.line1,
@@ -727,20 +707,20 @@ impl Server {
                                 // TODO: handle UpdateBlockEntity_Data for 1.7, decompress gzipped_nbt
                             },
                             Packet::ChunkUnload(chunk_unload) => {
-                                world.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().as_mut().unwrap()
-                                    .unload_chunk(chunk_unload.x, chunk_unload.z, &mut entities.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap());
+                                server.world.clone()
+                                    .unload_chunk(chunk_unload.x, chunk_unload.z, &mut server.entities.clone().write().unwrap());
                             },
                             Packet::EntityDestroy(entity_destroy) => {
                                 for id in entity_destroy.entity_ids.data {
-                                    if let Some(entity) = entity_map.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().remove(&id.0) {
-                                        entities.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().remove_entity(entity);
+                                    if let Some(entity) = server.entity_map.clone().write().unwrap().remove(&id.0) {
+                                        server.entities.clone().write().unwrap().remove_entity(entity);
                                     }
                                 }
                             },
                             Packet::EntityDestroy_u8(entity_destroy) => {
                                 for id in entity_destroy.entity_ids.data {
-                                    if let Some(entity) = entity_map.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().remove(&id) {
-                                        entities.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().remove_entity(entity);
+                                    if let Some(entity) = server.entity_map.clone().write().unwrap().remove(&id) {
+                                        server.entities.clone().write().unwrap().remove_entity(entity);
                                     }
                                 }
                             },
@@ -845,9 +825,9 @@ impl Server {
                             },*/
                             Packet::EntityMove_i8_i32_NoGround(m) => {
                                 Server::on_entity_move_glob(
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entity_map.clone(),
+                                    server.target_position.clone(),
+                                    server.entities.clone(),
                                     m.entity_id,
                                     f64::from(m.delta_x),
                                     f64::from(m.delta_y),
@@ -856,9 +836,9 @@ impl Server {
                             },
                             Packet::EntityMove_i8(m) => {
                                 Server::on_entity_move_glob(
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entity_map.clone(),
+                                    server.target_position.clone(),
+                                    server.entities.clone(),
                                     m.entity_id.0,
                                     f64::from(m.delta_x),
                                     f64::from(m.delta_y),
@@ -867,9 +847,9 @@ impl Server {
                             },
                             Packet::EntityMove_i16(m) => {
                                 Server::on_entity_move_glob(
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entity_map.clone(),
+                                    server.target_position.clone(),
+                                    server.entities.clone(),
                                     m.entity_id.0,
                                     f64::from(m.delta_x),
                                     f64::from(m.delta_y),
@@ -878,97 +858,97 @@ impl Server {
                             },
                             Packet::EntityLook_VarInt(look) => {
                                 Server::on_entity_look_glob(
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entity_map.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
                                     look.entity_id.0, look.yaw as f64, look.pitch as f64)
                             },
                             Packet::EntityLook_i32_NoGround(look) => {
                                 Server::on_entity_look_glob(
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entity_map.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
                                     look.entity_id, look.yaw as f64, look.pitch as f64)
                             },
                             Packet::JoinGame_HashedSeed_Respawn(join) => {
-                                Server::on_game_join_glob(players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                Server::on_game_join_glob(server.players.clone(),
+                                                          server.player.clone(),
+                                                          server.entity_map.clone(),
+                                                          server.player_movement.clone(),
+                                                          server.entities.clone(),
+                                                          server.gamemode.clone(),
                                 &uuid,
                                 protocol_version,
                                                           &mut read,
                                 join.gamemode, join.entity_id);
                             },
                             Packet::JoinGame_i8(join) => {
-                                Server::on_game_join_glob(players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                Server::on_game_join_glob(server.players.clone(),
+                                                          server.player.clone(),
+                                                          server.entity_map.clone(),
+                                                          server.player_movement.clone(),
+                                                          server.entities.clone(),
+                                                          server.gamemode.clone(),
                                                           &uuid,
                                                           protocol_version,
                                                           &mut read,
                                                           join.gamemode, join.entity_id);
                             },
                             Packet::JoinGame_i8_NoDebug(join) => {
-                                Server::on_game_join_glob(players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                Server::on_game_join_glob(server.players.clone(),
+                                                          server.player.clone(),
+                                                          server.entity_map.clone(),
+                                                          server.player_movement.clone().clone(),
+                                                          server.entities.clone(),
+                                                          server.gamemode.clone(),
                                                           &uuid,
                                                           protocol_version,
                                                           &mut read,
                                                           join.gamemode, join.entity_id);
                             },
                             Packet::JoinGame_i32(join) => {
-                                Server::on_game_join_glob(players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                Server::on_game_join_glob(server.players.clone(),
+                                                          server.player.clone(),
+                                                          server.entity_map.clone(),
+                                                          server.player_movement.clone().clone(),
+                                                          server.entities.clone(),
+                                                          server.gamemode.clone(),
                                                           &uuid,
                                                           protocol_version,
                                                           &mut read,
                                                           join.gamemode, join.entity_id);
                             },
                             Packet::JoinGame_i32_ViewDistance(join) => {
-                                Server::on_game_join_glob(players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                Server::on_game_join_glob(server.players.clone(),
+                                                          server.player.clone(),
+                                                          server.entity_map.clone(),
+                                                          server.player_movement.clone().clone(),
+                                                          server.entities.clone(),
+                                                          server.gamemode.clone(),
                                                           &uuid,
                                                           protocol_version,
                                                           &mut read,
                                                           join.gamemode, join.entity_id);
                             },
                             Packet::JoinGame_WorldNames(join) => {
-                                Server::on_game_join_glob(players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                Server::on_game_join_glob(server.players.clone(),
+                                                          server.player.clone(),
+                                                          server.entity_map.clone(),
+                                                          server.player_movement.clone().clone(),
+                                                          server.entities.clone(),
+                                                          server.gamemode.clone(),
                                                           &uuid,
                                                           protocol_version,
                                                           &mut read,
                                                           join.gamemode, join.entity_id);
                             },
                             Packet::JoinGame_WorldNames_IsHard(join) => {
-                                Server::on_game_join_glob(players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                                          gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                Server::on_game_join_glob(server.players.clone(),
+                                                          server.player.clone(),
+                                                          server.entity_map.clone(),
+                                                          server.player_movement.clone().clone(),
+                                                          server.entities.clone(),
+                                                          server.gamemode.clone(),
                                                           &uuid,
                                                           protocol_version,
                                                           &mut read,
@@ -976,11 +956,11 @@ impl Server {
                             },
                             Packet::TeleportPlayer_WithConfirm(teleport) => {
                                 Server::on_teleport_player_glob(
-                                    player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    velocity.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.player.clone(),
+                                    server.target_position.clone(),
+                                    server.entities.clone(),
+                                    server.velocity.clone(),
+                                    server.rotation.clone(),
                                     &mut read,
                                     teleport.x,
                                     teleport.y,
@@ -993,11 +973,11 @@ impl Server {
                             },
                             Packet::TeleportPlayer_NoConfirm(teleport) => {
                                 Server::on_teleport_player_glob(
-                                    player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    velocity.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.player.clone(),
+                                    server.target_position.clone(),
+                                    server.entities.clone(),
+                                    server.velocity.clone(),
+                                    server.rotation.clone(),
                                     &mut read,
                                     teleport.x,
                                     teleport.y,
@@ -1011,11 +991,11 @@ impl Server {
                             Packet::TeleportPlayer_OnGround(teleport) => {
                                 let flags: u8 = 0; // always absolute
                                 Server::on_teleport_player_glob(
-                                    player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    velocity.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.player.clone(),
+                                    server.target_position.clone(),
+                                    server.entities.clone(),
+                                    server.velocity.clone(),
+                                    server.rotation.clone(),
                                     &mut read,
                                     teleport.x,
                                     teleport.eyes_y - 1.62,
@@ -1028,50 +1008,50 @@ impl Server {
                             },
                             Packet::Respawn_Gamemode(respawn) => {
                                 Server::respawn_glob(
-                                    world.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.world.clone(),
+                                    server.player.clone(),
+                                    server.player_movement.clone(),
+                                    server.entities.clone(),
+                                    server.gamemode.clone(),
                                     protocol_version,
                                     respawn.gamemode)
                             },
                             Packet::Respawn_HashedSeed(respawn) => {
                                 Server::respawn_glob(
-                                    world.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.world.clone(),
+                                    server.player.clone(),
+                                    server.player_movement.clone().clone(),
+                                    server.entities.clone(),
+                                    server.gamemode.clone(),
                                     protocol_version,
                                     respawn.gamemode)
                             },
                             Packet::Respawn_NBT(respawn) => {
                                 Server::respawn_glob(
-                                    world.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.world.clone(),
+                                    server.player.clone(),
+                                    server.player_movement.clone().clone(),
+                                    server.entities.clone(),
+                                    server.gamemode.clone(),
                                     protocol_version,
                                     respawn.gamemode)
                             },
                             Packet::Respawn_WorldName(respawn) => {
                                 Server::respawn_glob(
-                                    world.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player_movement.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    gamemode.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    protocol_version,
+                                    server.world.clone(),
+                                    server.player.clone(),
+                                    server.player_movement.clone().clone(),
+                                    server.entities.clone(),
+                                    server.gamemode.clone(),
+                                    server.protocol_version,
                                     respawn.gamemode)
                             },
                             Packet::EntityTeleport_f64(entity_teleport) => {
                                 Server::on_entity_teleport_glob(
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entity_map.clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
                                     entity_teleport.entity_id.0,
                                     entity_teleport.x,
                                     entity_teleport.y,
@@ -1083,10 +1063,10 @@ impl Server {
                             },
                             Packet::EntityTeleport_i32(entity_teleport) => {
                                 Server::on_entity_teleport_glob(
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entity_map.clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
                                     entity_teleport.entity_id.0,
                                     f64::from(entity_teleport.x),
                                     f64::from(entity_teleport.y),
@@ -1099,10 +1079,10 @@ impl Server {
                             Packet::EntityTeleport_i32_i32_NoGround(entity_teleport) => {
                                 let on_ground = true; // TODO: how is this supposed to be set? (for 1.7)
                                 Server::on_entity_teleport_glob(
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entity_map.clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
                                     entity_teleport.entity_id,
                                     f64::from(entity_teleport.x),
                                     f64::from(entity_teleport.y),
@@ -1114,10 +1094,10 @@ impl Server {
                             },
                             Packet::EntityLookAndMove_i8_i32_NoGround(lookmove) => {
                                 Server::on_entity_look_and_move_glob(
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
+                                    server.entity_map.clone(),
                                     lookmove.entity_id,
                                     f64::from(lookmove.delta_x),
                                     f64::from(lookmove.delta_y),
@@ -1128,10 +1108,10 @@ impl Server {
                             },
                             Packet::EntityLookAndMove_i8(lookmove) => {
                                 Server::on_entity_look_and_move_glob(
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
+                                    server.entity_map.clone(),
                                     lookmove.entity_id.0,
                                     f64::from(lookmove.delta_x),
                                     f64::from(lookmove.delta_y),
@@ -1142,10 +1122,10 @@ impl Server {
                             },
                             Packet::EntityLookAndMove_i16(lookmove) => {
                                 Server::on_entity_look_and_move_glob(
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
+                                    server.entity_map.clone(),
                                     lookmove.entity_id.0,
                                     f64::from(lookmove.delta_x),
                                     f64::from(lookmove.delta_y),
@@ -1157,7 +1137,7 @@ impl Server {
                             Packet::SpawnPlayer_i32_HeldItem_String(spawn) => {
                                 // 1.7.10: populate the player list here, since we only now know the UUID
                                 let uuid = protocol::UUID::from_str(&spawn.uuid).unwrap();
-                                players.clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap().entry(uuid.clone()).or_insert(PlayerInfo {
+                                server.players.clone().write().unwrap().entry(uuid.clone()).or_insert(PlayerInfo {
                                     name: spawn.name.clone(),
                                     uuid,
                                     skin_url: None,
@@ -1168,13 +1148,13 @@ impl Server {
                                 });
 
                                 Server::on_player_spawn_glob(
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
+                                    server.entity_map.clone(),
+                                    server.players.clone(),
+                                    server.position.clone(),
+                                    server.rotation.clone(),
                                     spawn.entity_id.0,
                                     protocol::UUID::from_str(&spawn.uuid).unwrap(),
                                     f64::from(spawn.x),
@@ -1186,13 +1166,13 @@ impl Server {
                             },
                             Packet::SpawnPlayer_i32_HeldItem(spawn) => {
                                 Server::on_player_spawn_glob(
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
+                                    server.entity_map.clone(),
+                                    server.players.clone(),
+                                    server.position.clone(),
+                                    server.rotation.clone(),
                                     spawn.entity_id.0,
                                     spawn.uuid,
                                     f64::from(spawn.x),
@@ -1204,13 +1184,13 @@ impl Server {
                             },
                             Packet::SpawnPlayer_i32(spawn) => {
                                 Server::on_player_spawn_glob(
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
+                                    server.entity_map.clone(),
+                                    server.players.clone(),
+                                    server.position.clone(),
+                                    server.rotation.clone(),
                                     spawn.entity_id.0,
                                     spawn.uuid,
                                     f64::from(spawn.x),
@@ -1222,13 +1202,13 @@ impl Server {
                             },
                             Packet::SpawnPlayer_f64(spawn) => {
                                 Server::on_player_spawn_glob(
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
+                                    server.entity_map.clone(),
+                                    server.players.clone(),
+                                    server.position.clone(),
+                                    server.rotation.clone(),
                                     spawn.entity_id.0,
                                     spawn.uuid,
                                     spawn.x,
@@ -1240,13 +1220,13 @@ impl Server {
                             },
                             Packet::SpawnPlayer_f64_NoMeta(spawn) => {
                                 Server::on_player_spawn_glob(
-                                    target_position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    target_rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    entity_map.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    position.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    rotation.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.target_position.clone(),
+                                    server.target_rotation.clone(),
+                                    server.entities.clone(),
+                                    server.entity_map.clone(),
+                                    server.players.clone(),
+                                    server.position.clone(),
+                                    server.rotation.clone(),
                                     spawn.entity_id.0,
                                     spawn.uuid,
                                     spawn.x,
@@ -1259,9 +1239,9 @@ impl Server {
 
                             Packet::PlayerInfo(player_info) => {
                                 Server::on_player_info_glob(
-                                    entities.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    players.clone().lock().unwrap().as_ref().unwrap().clone(),
-                                    player.clone().lock().unwrap().as_ref().unwrap().clone(),
+                                    server.entities.clone(),
+                                    server.players.clone(),
+                                    server.player.clone(),
                                     uuid.clone(),
                                     player_info
                                 )
@@ -1293,14 +1273,15 @@ impl Server {
 
 
 
-
                             _ => {
+                                println!("other packet!");
                                 if tx.send(Ok(pck)).is_err() {
                                     return;
                                 }
                             }
                         },
                     Err(err) => {
+                        println!("error!");
                         if tx.send(Err(err)).is_err() {
                             return;
                         }
@@ -1316,6 +1297,7 @@ impl Server {
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
             let send: (i32, bool, Vec<u8>) = rx.recv().unwrap();
+            println!("sending...!");
             let process_buffer = send.2;
             VarInt(process_buffer.len() as i32 + send.0).write_to(&mut write).unwrap()/*?*/;
             if send.1 && send.0 == 1 {
@@ -1326,32 +1308,27 @@ impl Server {
         tx
     }
 
-    fn spawn_light_updater(world: Arc<Mutex<Option<Arc<RwLock<Option<World>>>>>>) -> Sender<bool> { // TODO: Use fair rwlock!
+    fn spawn_light_updater(server: Arc<RwLock<Option<Arc<Server>>>>) -> Sender<bool> { // TODO: Use fair rwlock!
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
             rx.recv().unwrap();
+            let server = server.clone().read().unwrap().as_ref().unwrap().clone();
             let mut done = false;
             while !done {
                 let start = Instant::now();
                 let mut updates_performed = 0;
-                let world_cloned = world.clone();
-                let mut world_lock = world_cloned.lock().unwrap();
-                let mut world_tmp = world_lock.as_mut().unwrap().write().unwrap();
-                let world = world_tmp.as_mut().unwrap();
-                while !world.light_updates.is_empty() {
+                let world_cloned = server.world.clone();
+                while !world_cloned.light_updates.clone().read().unwrap().is_empty() {
                     updates_performed += 1;
-                    world.do_light_update();
+                    world_cloned.do_light_update();
                     if (updates_performed & 0xFFF == 0) && start.elapsed().subsec_nanos() >= 5000000 {
                         // 5 ms for light updates
                         break;
                     }
                 }
-                if world.light_updates.is_empty() {
+                if world_cloned.light_updates.clone().read().unwrap().is_empty() {
                     done = true;
                 }
-                drop(world_tmp);
-                drop(world_lock);
-                drop(world_cloned);
                 sleep(Duration::from_millis(1));
             }
             while rx.try_recv().is_ok() {}
@@ -1379,21 +1356,19 @@ note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose bac
 
 Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
 */
-    pub fn dummy_server(resources: Arc<RwLock<resources::Manager>>) -> Server {
-        let world_redirect = Arc::new(Mutex::new(None));
-        let world = world_redirect.clone();
-        let mut world = world.lock().unwrap();
-        let server = Server::new(
+    pub fn dummy_server(resources: Arc<RwLock<resources::Manager>>) -> Arc<Server> {
+        let server_callback = Arc::new(RwLock::new(None));
+        let inner_server = server_callback.clone();
+        let mut inner_server = inner_server.write().unwrap();
+        let server = Arc::new(Server::new(
             protocol::SUPPORTED_PROTOCOLS[0],
             vec![],
             protocol::UUID::default(),
             resources,
-            None,
-            None,
-            None,
-            Self::spawn_light_updater(world_redirect.clone())
-        );
-        world.replace(server.world.clone());
+            Arc::new(RwLock::new(None)),
+            Self::spawn_light_updater(server_callback.clone())
+        ));
+        inner_server.replace(server.clone());
         println!("instantiated server!");
         let mut rng = rand::thread_rng();
         // TODO: Fix the following startup bottleneck!
@@ -1401,7 +1376,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             for z in -7 * 16..7 * 16 {
                 let h = 5 + (6.0 * (x as f64 / 16.0).cos() * (z as f64 / 16.0).sin()) as i32;
                 for y in 0..h {
-                    server.world.clone().write().unwrap().as_mut().unwrap().set_block(
+                    server.world.clone().set_block(
                         Position::new(x, y, z),
                         block::Dirt {
                             snowy: false,
@@ -1411,12 +1386,12 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                 }
                 server
                     .world
-                    .clone().write().unwrap().as_mut().unwrap()
+                    .clone()
                     .set_block(Position::new(x, h, z), block::Grass { snowy: false });
 
                 if x * x + z * z > 16 * 16 && rng.gen_bool(1.0 / 80.0) {
                     for i in 0..5 {
-                        server.world.clone().write().unwrap().as_mut().unwrap().set_block(
+                        server.world.clone().set_block(
                             Position::new(x, h + 1 + i, z),
                             block::Log {
                                 axis: Axis::Y,
@@ -1430,8 +1405,6 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                                 continue;
                             }
                             let world = server.world.clone();
-                            let mut world = world.write().unwrap();
-                            let mut world = world.as_mut().unwrap();
                             world.set_block(
                                 Position::new(x + xx, h + 3, z + zz),
                                 block::Leaves {
@@ -1478,7 +1451,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             }
         }
         println!("built server!");
-        server
+        server.clone()
     }
 
     fn new(
@@ -1486,9 +1459,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         forge_mods: Vec<forge::ForgeMod>,
         uuid: protocol::UUID,
         resources: Arc<RwLock<resources::Manager>>,
-        conn: Option<protocol::Conn>,
-        read_queue: Option<mpsc::Receiver<Result<packet::Packet, protocol::Error>>>,
-        write_queue: Option<mpsc::Sender<(i32, bool, Vec<u8>)>>,
+        conn: Arc<RwLock<Option<protocol::Conn>>>,
         light_updater: mpsc::Sender<bool>,
     ) -> Server {
         let mut entities = ecs::Manager::new();
@@ -1504,123 +1475,119 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             conn,
             protocol_version,
             forge_mods,
-            read_queue,
-            write_queue,
-            disconnect_reason: None,
-            just_disconnected: false,
+            disconnect_data: Arc::new(RwLock::new(DisconnectData::default())),
 
-            world: Arc::new(RwLock::new(Some(world::World::new(protocol_version)))),
-            world_age: 0,
-            world_time: 0.0,
-            world_time_target: 0.0,
-            tick_time: true,
-
-            version,
+            world: Arc::new(world::World::new(protocol_version)),
+            world_data: Arc::new(RwLock::new(WorldData::default())),
+            version: RwLock::new(Some(version)),
             resources,
 
             // Entity accessors
             game_info,
-            player_movement: Arc::new(entities.get_key()),
+            player_movement: entities.get_key(),
             gravity: entities.get_key(),
-            position: Arc::new(entities.get_key()),
-            target_position: Arc::new(entities.get_key()),
-            velocity: Arc::new(entities.get_key()),
-            gamemode: Arc::new(entities.get_key()),
-            rotation: Arc::new(entities.get_key()),
-            target_rotation: Arc::new(entities.get_key()),
+            position: entities.get_key(),
+            target_position: entities.get_key(),
+            velocity: entities.get_key(),
+            gamemode: entities.get_key(),
+            rotation: entities.get_key(),
+            target_rotation: entities.get_key(),
             //
             entities: Arc::new(RwLock::new(entities)),
             player: Arc::new(RwLock::new(None)),
             entity_map: Arc::new(RwLock::new(HashMap::with_hasher(BuildHasherDefault::default()))),
             players: Arc::new(RwLock::new(HashMap::with_hasher(BuildHasherDefault::default()))),
 
-            tick_timer: 0.0,
-            entity_tick_timer: 0.0,
-            received_chat_at: None,
-            sun_model: None,
+            tick_timer: RwLock::from(0.0),
+            entity_tick_timer: RwLock::from(0.0),
+            received_chat_at: Arc::new(RwLock::new(None)),
+            sun_model: RwLock::new(None),
 
-            target_info: target::Info::new(),
-            light_updates: light_updater
+            target_info: Arc::new(RwLock::new(target::Info::new())),
+            light_updates: Mutex::from(light_updater)
         }
     }
 
-    pub fn disconnect(&mut self, reason: Option<format::Component>) {
-        self.conn = None;
-        self.disconnect_reason = reason;
+    pub fn disconnect(&self, reason: Option<format::Component>) {
+        self.conn.clone().write().unwrap().take();
+        self.disconnect_data.clone().write().unwrap().disconnect_reason = reason;
         if let Some(player) = self.player.clone().write().unwrap().take() {
             self.entities.clone().write().unwrap().remove_entity(player);
         }
-        self.just_disconnected = true;
+        self.disconnect_data.clone().write().unwrap().just_disconnected = true;
     }
 
     pub fn is_connected(&self) -> bool {
-        self.conn.is_some()
+        self.conn.clone().read().unwrap().is_some()
     }
 
-    pub fn tick(&mut self, renderer: &mut render::Renderer, delta: f64) {
-        let now = Instant::now();
+    pub fn tick(&self, renderer: &mut render::Renderer, delta: f64) {
+        // let now = Instant::now();
         let version = self.resources.read().unwrap().version();
-        if version != self.version {
-            self.version = version;
-            self.world.clone().write().unwrap().as_mut().unwrap().flag_dirty_all();
+        if version != self.version.read().unwrap().as_ref().unwrap().clone() {
+            self.version.write().unwrap().replace(version);
+            self.world.clone().flag_dirty_all();
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diff1 took {}", diff.as_millis());
+        println!("0.1");
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diff1 took {}", diff.as_millis());*/
         // TODO: Check if the world type actually needs a sun
-        if self.sun_model.is_none() {
-            self.sun_model = Some(sun::SunModel::new(renderer));
+        if self.sun_model.read().unwrap().is_none() {
+            self.sun_model.write().unwrap().replace(sun::SunModel::new(renderer));
         }
+        println!("0.2");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff2 took {}", diff.as_millis());*/
 
         // Copy to camera
         if let Some(player) = *self.player.clone().read().unwrap() {
-            let position = self.entities.clone().read().unwrap().get_component(player, *self.position.clone()).unwrap();
-            let rotation = self.entities.clone().read().unwrap().get_component(player, *self.rotation.clone()).unwrap();
+            let position = self.entities.clone().read().unwrap().get_component(player, self.position).unwrap();
+            let rotation = self.entities.clone().read().unwrap().get_component(player, self.rotation).unwrap();
             renderer.camera.pos =
                 cgmath::Point3::from_vec(position.position + cgmath::Vector3::new(0.0, 1.62, 0.0));
             renderer.camera.yaw = rotation.yaw;
             renderer.camera.pitch = rotation.pitch;
         }
+        println!("0.3");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff3 took {}", diff.as_millis());*/
         // println!("entity_tick!");
         self.entity_tick(renderer, delta);
+        println!("0.4");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff4 took {}", diff.as_millis());*/
 
-        self.tick_timer += delta;
-        while self.tick_timer >= 3.0 && self.is_connected() {
+        self.tick_timer.write().unwrap().add(delta);
+        while self.tick_timer.read().unwrap().clone() >= 3.0 && self.is_connected() {
             self.minecraft_tick();
-            self.tick_timer -= 3.0;
+            self.tick_timer.write().unwrap().sub(3.0);
         }
+        println!("0.5");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff5 took {}", diff.as_millis());*/
+        println!("0.55");
 
         self.update_time(renderer, delta);
         /*let diff = Instant::now().duration_since(now);
         println!("Diff6 took {}", diff.as_millis());*/
-
-        if let Some(sun_model) = self.sun_model.as_mut() {
-            sun_model.tick(renderer, self.world_time, self.world_age);
+        println!("0.6");
+        if let Some(sun_model) = self.sun_model.write().unwrap().as_mut() {
+            sun_model.tick(renderer, self.world_data.clone().read().unwrap().world_time, self.world_data.clone().read().unwrap().world_age);
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diff7 took {}", diff.as_millis());
-
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diff7 took {}", diff.as_millis());*/
+        println!("0.7");
         let world = self.world.clone();
-        let mut world = world.write().unwrap();
-        world.as_mut().unwrap().tick(&mut self.entities.clone().write().unwrap());
-        if !world.as_mut().unwrap().light_updates.is_empty() {
-            self.light_updates.send(true);
-        }
-        drop(world);
-        let diff = Instant::now().duration_since(now);
-        println!("Diff8 took {}", diff.as_millis());
+        world.tick(&mut self.entities.clone().write().unwrap());
+        // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
+            self.light_updates.lock().unwrap().send(true);
+        // }
+        println!("0.8");
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diff8 took {}", diff.as_millis());*/
 
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
-            let world = world.read().unwrap();
-            let world = world.as_ref().unwrap();
             if let Some((pos, bl, _, _)) = target::trace_ray(
                 &world/*&self.world*/,
                 4.0,
@@ -1628,13 +1595,14 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                 renderer.view_vector.cast().unwrap(),
                 target::test_block,
             ) {
-                self.target_info.update(renderer, pos, bl);
+                self.target_info.clone().write().unwrap().update(renderer, pos, bl);
             } else {
-                self.target_info.clear(renderer);
+                self.target_info.clone().write().unwrap().clear(renderer);
             }
         } else {
-            self.target_info.clear(renderer);
+            self.target_info.clone().write().unwrap().clear(renderer);
         }
+        println!("0.9");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff9 took {}", diff.as_millis());*/
     }
@@ -1642,7 +1610,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     // When in main menu, diff 8 is the most influencial by far!
 
 
-    fn entity_tick(&mut self, renderer: &mut render::Renderer, delta: f64) {
+    fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64) {
         let world_entity = self.entities.clone().read().unwrap().get_world();
         // Update the game's state for entities to read
         self.entities
@@ -1653,11 +1621,14 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
 
         // Packets modify entities so need to handled here
         // TODO: Find a better solution cuz this kills performance entirely!
-        if let Some(rx) = self.read_queue.take() {
+        /*if let Some(rx) = self.read_queue.take() {
             while let Ok(pck) = rx.try_recv() {
                 match pck {
                     Ok(pck) => handle_packet! {
                         self pck {
+                            KeepAliveClientbound_i64 => on_keep_alive_i64,
+                            KeepAliveClientbound_VarInt => on_keep_alive_varint,
+                            KeepAliveClientbound_i32 => on_keep_alive_i32,
                             PluginMessageClientbound_i16 => on_plugin_message_clientbound_i16,
                             PluginMessageClientbound => on_plugin_message_clientbound_1,
                             // JoinGame_WorldNames_IsHard => on_game_join_worldnames_ishard,
@@ -1732,69 +1703,74 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             }
 
             if self.conn.is_some() {
-                self.read_queue = Some(rx);
-                if self.write_queue.is_some() {
+                self.read_queue.lock().unwrap().replace(rx);
+                if self.write_queue.lock().unwrap().is_some() {
                     let mut tmp = self.conn.take().unwrap();
                     tmp.send = self.write_queue.take();
                     self.conn = Some(tmp);
                 }
             }
-        }
+        }*/
 
-        if self.is_connected() || self.just_disconnected {
+        if self.is_connected() || self.disconnect_data.clone().read().unwrap().just_disconnected {
             // Allow an extra tick when disconnected to clean up
-            self.just_disconnected = false;
-            self.entity_tick_timer += delta;
-            while self.entity_tick_timer >= 3.0 {
+            self.disconnect_data.clone().write().unwrap().just_disconnected = false;
+            self.entity_tick_timer.write().unwrap().add(delta);
+            while self.entity_tick_timer.read().unwrap().clone() >= 3.0 {
                 let world = self.world.clone();
-                let mut world = world.write().unwrap();
-                let mut world = world.as_mut().unwrap();
-                self.entities.clone().write().unwrap().tick(&mut world/*&mut self.world*/, renderer);
-                self.entity_tick_timer -= 3.0;
+                self.entities.clone().write().unwrap().tick(&world/*&mut self.world*/, renderer);
+                self.entity_tick_timer.write().unwrap().sub(3.0);
             }
             let world = self.world.clone();
-            let mut world = world.write().unwrap();
-            let mut world = world.as_mut().unwrap();
             self.entities
                 .clone().write().unwrap()
-                .render_tick(&mut world/*&mut self.world*/, renderer);
+                .render_tick(&world/*&mut self.world*/, renderer);
         }
     }
 
     pub fn remove(&mut self, renderer: &mut render::Renderer) {
         let world = self.world.clone();
-        let mut world = world.write().unwrap();
-        let mut world = world.as_mut().unwrap();
         self.entities
             .clone().write().unwrap()
-            .remove_all_entities(&mut world/*&mut self.world*/, renderer);
-        if let Some(mut sun_model) = self.sun_model.take() {
+            .remove_all_entities(&world/*&mut self.world*/, renderer);
+        if let Some(sun_model) = self.sun_model.write().unwrap().as_mut() {
             sun_model.remove(renderer);
         }
-        self.target_info.clear(renderer);
+        self.target_info.clone().write().unwrap().clear(renderer);
     }
 
-    fn update_time(&mut self, renderer: &mut render::Renderer, delta: f64) {
-        if self.tick_time {
-            self.world_time_target += delta / 3.0;
-            self.world_time_target = (24000.0 + self.world_time_target) % 24000.0;
-            let mut diff = self.world_time_target - self.world_time;
+    fn update_time(&self, renderer: &mut render::Renderer, delta: f64) {
+        if self.world_data.clone().read().unwrap().tick_time {
+            println!("0.551");
+            self.world_data.clone().write().unwrap().world_time_target += delta / 3.0;
+            println!("0.552");
+            let time = self.world_data.clone().read().unwrap().world_time_target;
+            self.world_data.clone().write().unwrap().world_time_target = (24000.0 + time) % 24000.0;
+            println!("0.553");
+            let mut diff = self.world_data.clone().read().unwrap().world_time_target - self.world_data.clone().read().unwrap().world_time;
+            println!("0.554");
             if diff < -12000.0 {
                 diff += 24000.0
             } else if diff > 12000.0 {
                 diff -= 24000.0
             }
-            self.world_time += diff * (1.5 / 60.0) * delta;
-            self.world_time = (24000.0 + self.world_time) % 24000.0;
+            self.world_data.clone().write().unwrap().world_time += diff * (1.5 / 60.0) * delta;
+            println!("0.555");
+            let time = self.world_data.clone().read().unwrap().world_time;
+            self.world_data.clone().write().unwrap().world_time = (24000.0 + time) % 24000.0;
+            println!("0.556");
         } else {
-            self.world_time = self.world_time_target;
+            let time = self.world_data.clone().read().unwrap().world_time_target;
+            self.world_data.clone().write().unwrap().world_time = time;
         }
+        println!("0.557");
         renderer.sky_offset = self.calculate_sky_offset();
+        println!("0.558");
     }
 
     fn calculate_sky_offset(&self) -> f32 {
         use std::f32::consts::PI;
-        let mut offset = ((1.0 + self.world_time as f32) / 24000.0) - 0.25;
+        let mut offset = ((1.0 + self.world_data.clone().read().unwrap().world_time as f32) / 24000.0) - 0.25;
         if offset < 0.0 {
             offset += 1.0;
         } else if offset > 1.0 {
@@ -1815,13 +1791,13 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         offset * 0.8 + 0.2
     }
 
-    pub fn minecraft_tick(&mut self) {
+    pub fn minecraft_tick(&self) {
         use std::f32::consts::PI;
         if let Some(player) = *self.player.clone().write().unwrap() {
             let movement = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(player, *self.player_movement.clone())
+                .get_component_mut(player, self.player_movement)
                 .unwrap();
             let on_ground = self
                 .entities
@@ -1831,11 +1807,11 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             let position = self
                 .entities
                 .clone().read().unwrap()
-                .get_component(player, *self.target_position.clone())
+                .get_component(player, self.target_position)
                 .unwrap();
             let rotation = self.entities
                 .clone().read().unwrap()
-                .get_component(player, *self.rotation.clone()).unwrap();
+                .get_component(player, self.rotation).unwrap();
 
             // Force the server to know when touched the ground
             // otherwise if it happens between ticks the server
@@ -1874,24 +1850,22 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         }
     }
 
-    pub fn key_press(&mut self, down: bool, key: Actionkey) {
+    pub fn key_press(&self, down: bool, key: Actionkey) {
         if let Some(player) = *self.player.clone().write().unwrap() {
             if let Some(movement) = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(player, *self.player_movement.clone())
+                .get_component_mut(player, self.player_movement)
             {
                 movement.pressed_keys.insert(key, down);
             }
         }
     }
 
-    pub fn on_right_click(&mut self, renderer: &mut render::Renderer) {
+    pub fn on_right_click(&self, renderer: &mut render::Renderer) {
         use crate::shared::Direction;
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
-            let world = world.read().unwrap();
-            let world = world.as_ref().unwrap();
             if let Some((pos, _, face, at)) = target::trace_ray(
                 &world/*&self.world*/,
                 4.0,
@@ -1996,8 +1970,8 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         }
     }
 
-    pub fn write_packet<T: protocol::PacketType>(&mut self, p: T) {
-        let _ = self.conn.as_mut().unwrap().write_packet(p); // TODO handle errors
+    pub fn write_packet<T: protocol::PacketType>(&self, p: T) {
+        let _ = self.conn.clone().write().unwrap().as_mut().unwrap().write_packet(p); // TODO handle errors
     }
 
     fn on_keep_alive_i64(
@@ -2096,8 +2070,8 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                         for m in mappings.data {
                             let (namespace, name) = m.name.split_at(1);
                             if namespace == protocol::forge::BLOCK_NAMESPACE {
-                                self.world.clone().write().unwrap().as_mut().unwrap()
-                                    .modded_block_ids
+                                self.world.clone()
+                                    .modded_block_ids.clone().write().unwrap()
                                     .insert(m.id.0 as usize, name.to_string());
                             }
                         }
@@ -2115,7 +2089,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                         debug!("Received FML|HS RegistryData for {}", name);
                         if name == "minecraft:blocks" {
                             for m in ids.data {
-                                self.world.clone().write().unwrap().as_mut().unwrap().modded_block_ids.insert(m.id.0 as usize, m.name);
+                                self.world.clone().modded_block_ids.clone().write().unwrap().insert(m.id.0 as usize, m.name);
                             }
                         }
                         if !has_more {
@@ -2144,14 +2118,13 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
 
     // TODO: remove wrappers and directly call on Conn
     fn write_fmlhs_plugin_message(&mut self, msg: &forge::FmlHs) {
-        let _ = self.conn.as_mut().unwrap().write_fmlhs_plugin_message(msg); // TODO handle errors
+        let _ = self.conn.clone().write().unwrap().as_mut().unwrap().write_fmlhs_plugin_message(msg); // TODO handle errors
     }
 
     fn write_plugin_message(&mut self, channel: &str, data: &[u8]) {
         let _ = self
             .conn
-            .as_mut()
-            .unwrap()
+            .clone().write().unwrap().as_mut().unwrap()
             .write_plugin_message(channel, data); // TODO handle errors
     }
 
@@ -2206,12 +2179,12 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         *self
             .entities
             .clone().write().unwrap()
-            .get_component_mut(player, *self.gamemode.clone())
+            .get_component_mut(player, self.gamemode)
             .unwrap() = gamemode;
         // TODO: Temp
         self.entities
             .clone().write().unwrap()
-            .get_component_mut(player, *self.player_movement.clone())
+            .get_component_mut(player, self.player_movement)
             .unwrap()
             .flying = gamemode.can_fly();
 
@@ -2235,9 +2208,9 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         players: Arc<RwLock<HashMap<protocol::UUID, PlayerInfo, BuildHasherDefault<FNVHash>>>>,
         internal_player: Arc<RwLock<Option<ecs::Entity>>>,
         entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
-        player_movement: Arc<Key<PlayerMovement>>,
+        player_movement: Key<PlayerMovement>,
         entities: Arc<RwLock<Manager>>,
-        gamemode_key: Arc<Key<Gamemode>>,
+        gamemode_key: Key<Gamemode>,
         uuid: &protocol::UUID,
         protocol_version: i32,
         read: &mut protocol::Conn,
@@ -2253,12 +2226,12 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         }
         *entities
             .clone().write().unwrap()
-            .get_component_mut(player, *gamemode_key.clone())
+            .get_component_mut(player, gamemode_key)
             .unwrap() = gamemode;
         // TODO: Temp
         entities
             .clone().write().unwrap()
-            .get_component_mut(player, *player_movement.clone())
+            .get_component_mut(player, player_movement)
             .unwrap()
             .flying = gamemode.can_fly();
 
@@ -2315,25 +2288,26 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     }*/
 
     fn respawn_glob(
-        world: Arc<RwLock<Option<World>>>,
+        world: Arc<World>,
         internal_player: Arc<RwLock<Option<ecs::Entity>>>,
-        player_movement: Arc<Key<PlayerMovement>>,
+        player_movement: Key<PlayerMovement>,
         entities: Arc<RwLock<Manager>>,
-        gamemode_key: Arc<Key<Gamemode>>,
+        gamemode_key: Key<Gamemode>,
         protocol_version: i32,
         gamemode_u8: u8) {
-        world.clone().write().unwrap().replace(world::World::new(protocol_version));
+        // world.clone().replace(world::World::new(protocol_version));
+        world.clone().reset(protocol_version);
         let gamemode = Gamemode::from_int((gamemode_u8 & 0x7) as i32);
 
         if let Some(player) = *internal_player.clone().write().unwrap() {
             *entities
                 .clone().write().unwrap()
-                .get_component_mut(player, *gamemode_key.clone())
+                .get_component_mut(player, gamemode_key)
                 .unwrap() = gamemode;
             // TODO: Temp
             entities
                 .clone().write().unwrap()
-                .get_component_mut(player, *player_movement.clone())
+                .get_component_mut(player, player_movement)
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
@@ -2344,29 +2318,30 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     }
 
     fn on_time_update(&mut self, time_update: packet::play::clientbound::TimeUpdate) {
-        self.world_age = time_update.time_of_day;
-        self.world_time_target = (time_update.time_of_day % 24000) as f64;
-        if self.world_time_target < 0.0 {
-            self.world_time_target = -self.world_time_target;
-            self.tick_time = false;
+        self.world_data.clone().write().unwrap().world_age = time_update.time_of_day;
+        self.world_data.clone().write().unwrap().world_time_target = (time_update.time_of_day % 24000) as f64;
+        if self.world_data.clone().read().unwrap().world_time_target < 0.0 {
+            self.world_data.clone().write().unwrap().world_time_target = -self.world_data.clone().read().unwrap().world_time_target;
+            self.world_data.clone().write().unwrap().tick_time = false;
         } else {
-            self.tick_time = true;
+            self.world_data.clone().write().unwrap().tick_time = true;
         }
     }
 
     fn on_game_state_change(&mut self, game_state: packet::play::clientbound::ChangeGameState) {
+        println!("game state change!");
         if game_state.reason == 3 {
             if let Some(player) = *self.player.write().unwrap() {
                 let gamemode = Gamemode::from_int(game_state.value as i32);
                 *self
                     .entities
                     .clone().write().unwrap()
-                    .get_component_mut(player, *self.gamemode.clone())
+                    .get_component_mut(player, self.gamemode)
                     .unwrap() = gamemode;
                 // TODO: Temp
                 self.entities
                     .clone().write().unwrap()
-                    .get_component_mut(player, *self.player_movement.clone())
+                    .get_component_mut(player, self.player_movement)
                     .unwrap()
                     .flying = gamemode.can_fly();
             }
@@ -2458,12 +2433,12 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             let target_position = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *self.target_position.clone())
+                .get_component_mut(*entity, self.target_position)
                 .unwrap();
             let target_rotation = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *self.target_rotation.clone())
+                .get_component_mut(*entity, self.target_rotation)
                 .unwrap();
             target_position.position.x = x;
             target_position.position.y = y;
@@ -2475,8 +2450,8 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
 
     fn on_entity_teleport_glob(
         entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
-        target_position: Arc<Key<TargetPosition>>,
-        target_rotation: Arc<Key<TargetRotation>>,
+        target_position: Key<TargetPosition>,
+        target_rotation: Key<TargetRotation>,
         entities: Arc<RwLock<Manager>>,
         entity_id: i32,
         x: f64,
@@ -2490,11 +2465,11 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         if let Some(entity) = entity_map.clone().read().unwrap().get(&entity_id) {
             let target_position = entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *target_position.clone())
+                .get_component_mut(*entity, target_position)
                 .unwrap();
             let target_rotation = entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *target_rotation.clone())
+                .get_component_mut(*entity, target_rotation)
                 .unwrap();
             target_position.position.x = x;
             target_position.position.y = y;
@@ -2542,7 +2517,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             let position = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *self.target_position.clone())
+                .get_component_mut(*entity, self.target_position)
                 .unwrap();
             position.position.x += delta_x;
             position.position.y += delta_y;
@@ -2551,13 +2526,13 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     }
 
     fn on_entity_move_glob(entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
-                           target_position: Arc<Key<TargetPosition>>,
+                           target_position: Key<TargetPosition>,
                            entities: Arc<RwLock<Manager>>,
                            entity_id: i32, delta_x: f64, delta_y: f64, delta_z: f64) {
         if let Some(entity) = entity_map.clone().read().unwrap().get(&entity_id) {
             let position = entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *target_position.clone())
+                .get_component_mut(*entity, target_position)
                 .unwrap();
             position.position.x += delta_x;
             position.position.y += delta_y;
@@ -2571,7 +2546,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             let rotation = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *self.target_rotation.clone())
+                .get_component_mut(*entity, self.target_rotation)
                 .unwrap();
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
             rotation.pitch = -(pitch / 256.0) * PI * 2.0;
@@ -2579,14 +2554,14 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     }
 
     fn on_entity_look_glob(entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
-                           target_rotation: Arc<Key<TargetRotation>>,
+                           target_rotation: Key<TargetRotation>,
                            entities: Arc<RwLock<Manager>>,
                            entity_id: i32, yaw: f64, pitch: f64) {
         use std::f64::consts::PI;
         if let Some(entity) = entity_map.clone().read().unwrap().get(&entity_id) {
             let rotation = entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *target_rotation.clone())
+                .get_component_mut(*entity, target_rotation)
                 .unwrap();
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
             rotation.pitch = -(pitch / 256.0) * PI * 2.0;
@@ -2664,12 +2639,12 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             let position = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *self.target_position.clone())
+                .get_component_mut(*entity, self.target_position)
                 .unwrap();
             let rotation = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *self.target_rotation.clone())
+                .get_component_mut(*entity, self.target_rotation)
                 .unwrap();
             position.position.x += delta_x;
             position.position.y += delta_y;
@@ -2680,8 +2655,8 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     }
 
     fn on_entity_look_and_move_glob(
-        target_position: Arc<Key<TargetPosition>>,
-        target_rotation: Arc<Key<TargetRotation>>,
+        target_position: Key<TargetPosition>,
+        target_rotation: Key<TargetRotation>,
         entities: Arc<RwLock<Manager>>,
         entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
         entity_id: i32,
@@ -2695,11 +2670,11 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         if let Some(entity) = entity_map.clone().read().unwrap().get(&entity_id) {
             let position = entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *target_position.clone())
+                .get_component_mut(*entity, target_position)
                 .unwrap();
             let rotation = entities
                 .clone().write().unwrap()
-                .get_component_mut(*entity, *target_rotation.clone())
+                .get_component_mut(*entity, target_rotation)
                 .unwrap();
             position.position.x += delta_x;
             position.position.y += delta_y;
@@ -2815,22 +2790,22 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         let position = self
             .entities
             .clone().write().unwrap()
-            .get_component_mut(entity, *self.position.clone())
+            .get_component_mut(entity, self.position)
             .unwrap();
         let target_position = self
             .entities
             .clone().write().unwrap()
-            .get_component_mut(entity, *self.target_position.clone())
+            .get_component_mut(entity, self.target_position)
             .unwrap();
         let rotation = self
             .entities
             .clone().write().unwrap()
-            .get_component_mut(entity, *self.rotation.clone())
+            .get_component_mut(entity, self.rotation)
             .unwrap();
         let target_rotation = self
             .entities
             .clone().write().unwrap()
-            .get_component_mut(entity, *self.target_rotation.clone())
+            .get_component_mut(entity, self.target_rotation)
             .unwrap();
         position.position.x = x;
         position.position.y = y;
@@ -2854,13 +2829,13 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     }
 
     fn on_player_spawn_glob(
-        target_position_key: Arc<Key<TargetPosition>>,
-        target_rotation_key: Arc<Key<TargetRotation>>,
+        target_position_key: Key<TargetPosition>,
+        target_rotation_key: Key<TargetRotation>,
         entities: Arc<RwLock<Manager>>,
         entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
         players: Arc<RwLock<HashMap<protocol::UUID, PlayerInfo, BuildHasherDefault<FNVHash>>>>,
-        position_key: Arc<Key<entity::Position>>,
-        rotation_key: Arc<Key<entity::Rotation>>,
+        position_key: Key<entity::Position>,
+        rotation_key: Key<entity::Rotation>,
         entity_id: i32,
         uuid: protocol::UUID,
         x: f64,
@@ -2879,19 +2854,19 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         );
         let position = entities
             .clone().write().unwrap()
-            .get_component_mut(entity, *position_key)
+            .get_component_mut(entity, position_key)
             .unwrap();
         let target_position = entities
             .clone().write().unwrap()
-            .get_component_mut(entity, *target_position_key.clone())
+            .get_component_mut(entity, target_position_key)
             .unwrap();
         let rotation = entities
             .clone().write().unwrap()
-            .get_component_mut(entity, *rotation_key.clone())
+            .get_component_mut(entity, rotation_key)
             .unwrap();
         let target_rotation = entities
             .clone().write().unwrap()
-            .get_component_mut(entity, *target_rotation_key.clone())
+            .get_component_mut(entity, target_rotation_key)
             .unwrap();
         position.position.x = x;
         position.position.y = y;
@@ -3030,10 +3005,10 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
 
     fn on_teleport_player_glob(
         internal_player: Arc<RwLock<Option<ecs::Entity>>>,
-        target_position: Arc<Key<TargetPosition>>,
+        target_position: Key<TargetPosition>,
         entities: Arc<RwLock<Manager>>,
-        velocity_key: Arc<Key<entity::Velocity>>,
-        rotation_key: Arc<Key<entity::Rotation>>,
+        velocity_key: Key<entity::Velocity>,
+        rotation_key: Key<entity::Rotation>,
         read: &mut protocol::Conn,
         x: f64,
         y: f64,
@@ -3047,15 +3022,15 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         if let Some(player) = *internal_player.clone().write().unwrap() {
             let position = entities
                 .clone().write().unwrap()
-                .get_component_mut(player, *target_position.clone())
+                .get_component_mut(player, target_position)
                 .unwrap();
             let rotation = entities
                 .clone().write().unwrap()
-                .get_component_mut(player, *rotation_key.clone())
+                .get_component_mut(player, rotation_key)
                 .unwrap();
             let velocity = entities
                 .clone().write().unwrap()
-                .get_component_mut(player, *velocity_key.clone())
+                .get_component_mut(player, velocity_key)
                 .unwrap();
 
             position.position.x =
@@ -3095,6 +3070,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         }
     }
 
+    // TODO: Move to world!
     fn on_block_entity_update(
         &mut self,
         block_update: packet::play::clientbound::UpdateBlockEntity,
@@ -3102,7 +3078,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         match block_update.nbt {
             None => {
                 // NBT is null, so we need to remove the block entity
-                self.world.clone().write().unwrap().as_mut().unwrap()
+                self.world.clone()
                     .add_block_entity_action(world::BlockEntityAction::Remove(
                         block_update.location,
                     ));
@@ -3132,7 +3108,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                         let line4 = format::Component::from_string(
                             nbt.1.get("Text4").unwrap().as_str().unwrap(),
                         );
-                        self.world.clone().write().unwrap().as_mut().unwrap().add_block_entity_action(
+                        self.world.clone().add_block_entity_action(
                             world::BlockEntityAction::UpdateSignText(Box::new((
                                 block_update.location,
                                 line1,
@@ -3155,13 +3131,13 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     }
 
     fn on_block_entity_update_glob(
-        world: Arc<RwLock<Option<World>>>,
+        world: Arc<World>,
         block_update: packet::play::clientbound::UpdateBlockEntity,
     ) {
         match block_update.nbt {
             None => {
                 // NBT is null, so we need to remove the block entity
-                world.clone().write().unwrap().as_mut().unwrap()
+                world.clone()
                     .add_block_entity_action(world::BlockEntityAction::Remove(
                         block_update.location,
                     ));
@@ -3191,7 +3167,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                         let line4 = format::Component::from_string(
                             nbt.1.get("Text4").unwrap().as_str().unwrap(),
                         );
-                        world.clone().write().unwrap().as_mut().unwrap().add_block_entity_action(
+                        world.clone().add_block_entity_action(
                             world::BlockEntityAction::UpdateSignText(Box::new((
                                 block_update.location,
                                 line1,
@@ -3501,7 +3477,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         _sender: Option<protocol::UUID>,
     ) {
         info!("Received chat message: {}", message);
-        self.received_chat_at = Some(Instant::now());
+        self.received_chat_at.clone().write().unwrap().replace(Instant::now());
     }
 
     fn load_block_entities(&mut self, block_entities: Vec<Option<crate::nbt::NamedTag>>) {
@@ -3533,7 +3509,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         }
     }
 
-    fn load_block_entities_glob(world: Arc<RwLock<Option<World>>>, block_entities: Vec<Option<crate::nbt::NamedTag>>) {
+    fn load_block_entities_glob(world: Arc<World>, block_entities: Vec<Option<crate::nbt::NamedTag>>) {
         for block_entity in block_entities.into_iter().flatten() {
             let x = block_entity.1.get("x").unwrap().as_int().unwrap();
             let y = block_entity.1.get("y").unwrap().as_int().unwrap();
@@ -3722,15 +3698,14 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         Server::on_block_change_in_world(self.world.clone(), location, id);
     }
 
-    fn on_block_change_in_world(world_cont: Arc<RwLock<Option<World>>>, location: Position, id: i32) {
+    fn on_block_change_in_world(world_cont: Arc<World>, location: Position, id: i32) {
         let world = world_cont.clone();
-        let world = world.read().unwrap();
-        let modded_block_ids = &world.as_ref().unwrap().modded_block_ids;
-        let block = world.as_ref().unwrap()
+        let modded_block_ids = world.modded_block_ids.clone();
+        let block = world
             .id_map
             .by_vanilla_id(id as usize, modded_block_ids);
         drop(world);
-        world_cont.clone().write().unwrap().as_mut().unwrap().set_block(
+        world_cont.clone().set_block(
             location,
             block,
         )

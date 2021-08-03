@@ -53,6 +53,12 @@ use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use crate::world::World;
+use std::sync::atomic::AtomicBool;
+use cgmath::num_traits::real::Real;
+use crate::server::Server;
+use leafish_protocol::protocol::Error;
+use std::any::Any;
+use leafish_protocol::format::Component;
 
 const CL_BRAND: console::CVar<String> = console::CVar {
     ty: PhantomData,
@@ -72,12 +78,11 @@ pub struct Game {
     vars: Rc<console::Vars>,
     should_close: bool,
 
-    server: server::Server,
+    server: Arc<server::Server>,
     focused: bool,
     chunk_builder: chunk_builder::ChunkBuilder,
 
-    connect_reply: Option<mpsc::Receiver<Result<server::Server, protocol::Error>>>,
-    // connect_send: Sender<Vec<u8>>,
+    connect_error: Option<Error>,
 
     dpi_factor: f64,
     last_mouse_x: f64,
@@ -116,8 +121,8 @@ impl Game {
                 }
             };
         println!("connecting...?!?!");
-        let (tx, rx) = mpsc::channel();
-        self.connect_reply = Some(rx);
+        // let (tx, rx) = mpsc::channel();
+        // self.connect_reply = Some(rx);
         let address = address.to_owned();
         let resources = self.resource_manager.clone();
         let profile = mojang::Profile {
@@ -125,23 +130,31 @@ impl Game {
             id: self.vars.get(auth::CL_UUID).clone(),
             access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
         };
-        thread::spawn(move || {
-            tx.send(server::Server::connect(
+        let result = thread::spawn(move || {
+            server::Server::connect(
                 resources,
                 profile,
                 &address,
                 protocol_version,
                 forge_mods,
                 fml_network_version,
-            ))
-            .unwrap();
-            println!("after internal connect!");
-        });
+            )
+        }).join().unwrap();
+        match result {
+            Ok(srv) => {
+                self.server = srv;
+            }
+            Err(err) => {
+                self.connect_error = Some(err);
+                // self.server.disconnect_reason = Some(Component::from_string(&*err.to_string()));
+            }
+        }
         println!("after connect!");
     }
 
     pub fn tick(&mut self, delta: f64) {
-        if let Some(disconnect_reason) = self.server.disconnect_reason.take() {
+        println!("tick!");
+        if let Some(disconnect_reason) = self.server.disconnect_data.clone().write().unwrap().disconnect_reason.take() {
             self.screen_sys
                 .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason))));
         }
@@ -153,8 +166,9 @@ impl Game {
             }
             self.focused = false;
         }
+        println!("1");
 
-        let mut clear_reply = false;
+        /*let mut clear_reply = false;
         if let Some(ref recv) = self.connect_reply {
             if let Ok(server) = recv.try_recv() { // TODO: Add sender!
                 clear_reply = true;
@@ -184,7 +198,7 @@ impl Game {
         }
         if clear_reply {
             self.connect_reply = None;
-        }
+        }*/
     }
 }
 
@@ -274,7 +288,7 @@ fn main() {
     log::set_boxed_logger(Box::new(proxy)).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
 
-    info!("Starting leafish");
+    info!("Starting Leafish...");
 
     let (vars, mut vsync) = {
         let mut vars = console::Vars::new();
@@ -355,10 +369,9 @@ fn main() {
         opt.default_protocol_version
             .unwrap_or_else(|| "".to_string()),
     );
-    println!("start3");
     // under here, we have the bottleneck!
     let mut game = Game {
-        server: server::Server::dummy_server(resource_manager.clone()),
+        server: Arc::from(server::Server::dummy_server(resource_manager.clone())),
         focused: false,
         renderer,
         screen_sys,
@@ -367,7 +380,7 @@ fn main() {
         vars,
         should_close: false,
         chunk_builder: chunk_builder::ChunkBuilder::new(resource_manager, textures),
-        connect_reply: None,
+        connect_error: None,
         dpi_factor,
         last_mouse_x: 0.0,
         last_mouse_y: 0.0,
@@ -379,7 +392,6 @@ fn main() {
         default_protocol_version,
     };
     game.renderer.camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
-    println!("start4");
     if opt.network_debug {
         protocol::enable_network_debug();
     }
@@ -487,23 +499,25 @@ fn tick_all(
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
     game.tick(delta);
-    let diff = Instant::now().duration_since(now);
-    println!("Diff2 took {}", diff.as_millis());
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff2 took {}", diff.as_millis());*/
+    println!("1.5");
     game.server.tick(&mut game.renderer, delta); // TODO: Improve perf in load screen!
-    let diff = Instant::now().duration_since(now);
-    println!("Diff3 took {}", diff.as_millis());
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff3 took {}", diff.as_millis());*/
+    println!("2");
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
         return;
     }
+    println!("3");
 
     game.renderer.update_camera(physical_width, physical_height);
+    println!("4");
     let world = game.server.world.clone();
-    let mut world_lock = world.write().unwrap();
-    let mut world = world_lock.as_mut().unwrap();
     world.compute_render_list(&mut game.renderer); // TODO: Improve perf on server!
-    drop(world_lock);
+    println!("5");
     /*let diff = Instant::now().duration_since(now);
     println!("Diff5 took {}", diff.as_millis());*/ // readd
     game.chunk_builder
@@ -602,7 +616,7 @@ fn handle_window_event<T>(
                         .clone()
                         .write()
                         .unwrap()
-                        .get_component_mut(player, *game.server.rotation.clone())
+                        .get_component_mut(player, game.server.rotation)
                         .unwrap();
                     rotation.yaw -= rx;
                     rotation.pitch -= ry;

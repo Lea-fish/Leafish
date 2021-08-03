@@ -82,7 +82,7 @@ pub trait System {
     fn update(
         &mut self,
         m: &mut Manager,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     );
 
@@ -90,7 +90,7 @@ pub trait System {
         &mut self,
         _m: &mut Manager,
         _e: Entity,
-        _world: &mut world::World,
+        _world: &world::World,
         _renderer: &mut render::Renderer,
     ) {
     }
@@ -99,7 +99,7 @@ pub trait System {
         &mut self,
         _m: &mut Manager,
         _e: Entity,
-        _world: &mut world::World,
+        _world: &world::World,
         _renderer: &mut render::Renderer,
     ) {
     }
@@ -171,7 +171,7 @@ impl Manager {
     }
 
     /// Ticks all tick systems
-    pub fn tick(&mut self, world: &mut world::World, renderer: &mut render::Renderer) {
+    pub fn tick(&mut self, world: &world::World, renderer: &mut render::Renderer) {
         self.process_entity_changes(world, renderer);
         let mut systems = self.systems.take().unwrap();
         for sys in &mut systems {
@@ -182,7 +182,7 @@ impl Manager {
     }
 
     /// Ticks all render systems
-    pub fn render_tick(&mut self, world: &mut world::World, renderer: &mut render::Renderer) {
+    pub fn render_tick(&mut self, world: &world::World, renderer: &mut render::Renderer) {
         self.process_entity_changes(world, renderer);
         let mut systems = self.render_systems.take().unwrap();
         for sys in &mut systems {
@@ -194,7 +194,7 @@ impl Manager {
 
     fn process_entity_changes(
         &mut self,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         let changes = self.changed_entity_components.clone();
@@ -310,7 +310,7 @@ impl Manager {
     /// Deallocates all entities/components excluding the world entity
     pub fn remove_all_entities(
         &mut self,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         for (id, e) in self.entities[1..].iter_mut().enumerate() {
@@ -401,7 +401,7 @@ impl Manager {
         e: Entity,
         old_set: &BSet,
         new_set: &BSet,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         let mut systems = self.systems.take().unwrap();
@@ -419,7 +419,7 @@ impl Manager {
         e: Entity,
         old_set: &BSet,
         new_set: &BSet,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         let mut systems = self.render_systems.take().unwrap();
@@ -482,7 +482,7 @@ impl Manager {
         e: Entity,
         old_set: &BSet,
         new_set: &BSet,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         let mut systems = self.systems.take().unwrap();
@@ -500,7 +500,7 @@ impl Manager {
         e: Entity,
         old_set: &BSet,
         new_set: &BSet,
-        world: &mut world::World,
+        world: &world::World,
         renderer: &mut render::Renderer,
     ) {
         let mut systems = self.render_systems.take().unwrap();

@@ -13,6 +13,7 @@ pub mod material;
 pub use self::material::Material;
 
 pub use self::Block::*;
+use std::sync::{Arc, RwLock};
 
 pub trait WorldAccess {
     fn get_block(&self, pos: Position) -> Block;
@@ -59,7 +60,7 @@ impl VanillaIDMap {
     pub fn by_vanilla_id(
         &self,
         id: usize,
-        modded_block_ids: &HashMap<usize, String>, // TODO: remove and add to constructor, but have to mutate in Server
+        modded_block_ids: Arc<RwLock<HashMap<usize, String>>>, // TODO: remove and add to constructor, but have to mutate in Server
     ) -> Block {
         if self.protocol_version >= 404 {
             self.flat
@@ -73,7 +74,7 @@ impl VanillaIDMap {
             } else {
                 let data = id & 0xf;
 
-                if let Some(name) = modded_block_ids.get(&(id >> 4)) {
+                if let Some(name) = modded_block_ids.clone().read().unwrap().get(&(id >> 4)) {
                     if let Some(blocks_by_data) = self.modded.get(name) {
                         blocks_by_data[data].unwrap_or(Block::Missing {})
                     } else {

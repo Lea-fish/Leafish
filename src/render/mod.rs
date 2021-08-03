@@ -296,7 +296,7 @@ impl Renderer {
 
     pub fn tick(
         &mut self,
-        world: Arc<RwLock<Option<World>>>/*&mut world::World*/,
+        world: Arc<World>/*&mut world::World*/,
         delta: f64,
         width: u32,
         height: u32,
@@ -335,10 +335,9 @@ impl Renderer {
         self.chunk_shader.light_level.set_float(self.light_level);
         self.chunk_shader.sky_offset.set_float(self.sky_offset);
         let tmp_world = world.clone();
-        let tmp_world = tmp_world.read().unwrap();
 
-        for (pos, info) in tmp_world.as_ref().unwrap().get_render_list() {
-            if let Some(solid) = info.solid.as_ref() {
+        for (pos, info) in tmp_world.get_render_list() {
+            if let Some(solid) = info.clone().read().unwrap().solid.as_ref() {
                 if solid.count > 0 {
                     self.chunk_shader
                         .offset
@@ -367,10 +366,9 @@ impl Renderer {
         );
 
         let tmp_world = world.clone();
-        let mut tmp_world = tmp_world.write().unwrap();
 
         if let Some(clouds) = &mut self.clouds {
-            if tmp_world.as_mut().unwrap().copy_cloud_heightmap(&mut clouds.heightmap_data) {
+            if tmp_world.copy_cloud_heightmap(&mut clouds.heightmap_data) {
                 clouds.dirty = true;
             }
             clouds.draw(
@@ -432,9 +430,8 @@ impl Renderer {
         );
 
         let tmp_world = world.clone();
-        let tmp_world = tmp_world.read().unwrap();
-        for (pos, info) in tmp_world.as_ref().unwrap().get_render_list().iter().rev() {
-            if let Some(trans) = info.trans.as_ref() {
+        for (pos, info) in tmp_world.get_render_list().iter().rev() {
+            if let Some(trans) = info.clone().read().unwrap().trans.as_ref() {
                 if trans.count > 0 {
                     self.chunk_shader_alpha
                         .offset
@@ -481,24 +478,26 @@ impl Renderer {
         }
     }
 
-    pub fn update_chunk_solid(&mut self, buffer: &mut ChunkBuffer, data: &[u8], count: usize) {
+    pub fn update_chunk_solid(&mut self, buffer: Arc<RwLock<ChunkBuffer>>, data: &[u8], count: usize) {
         self.ensure_element_buffer(count);
         if count == 0 {
-            if buffer.solid.is_some() {
-                buffer.solid = None;
+            if buffer.clone().read().unwrap().solid.is_some() {
+                buffer.clone().write().unwrap().solid = None;
             }
             return;
         }
-        let new = buffer.solid.is_none();
-        if buffer.solid.is_none() {
-            buffer.solid = Some(ChunkRenderInfo {
+        let new = buffer.clone().read().unwrap().solid.is_none();
+        if buffer.clone().read().unwrap().solid.is_none() {
+            buffer.clone().write().unwrap().solid = Some(ChunkRenderInfo {
                 array: gl::VertexArray::new(),
                 buffer: gl::Buffer::new(),
                 buffer_size: 0,
                 count: 0,
             });
         }
-        let info = buffer.solid.as_mut().unwrap();
+        let info = buffer.clone();
+        let mut info = info.write().unwrap();
+        let info = info.solid.as_mut().unwrap();
 
         info.array.bind();
         self.chunk_shader.position.enable();
@@ -537,24 +536,26 @@ impl Renderer {
         info.count = count;
     }
 
-    pub fn update_chunk_trans(&mut self, buffer: &mut ChunkBuffer, data: &[u8], count: usize) {
+    pub fn update_chunk_trans(&mut self, buffer: Arc<RwLock<ChunkBuffer>>, data: &[u8], count: usize) {
         self.ensure_element_buffer(count);
         if count == 0 {
-            if buffer.trans.is_some() {
-                buffer.trans = None;
+            if buffer.clone().read().unwrap().trans.is_some() {
+                buffer.clone().write().unwrap().trans = None;
             }
             return;
         }
-        let new = buffer.trans.is_none();
-        if buffer.trans.is_none() {
-            buffer.trans = Some(ChunkRenderInfo {
+        let new = buffer.clone().read().unwrap().trans.is_none();
+        if buffer.clone().read().unwrap().trans.is_none() {
+            buffer.clone().write().unwrap().trans = Some(ChunkRenderInfo {
                 array: gl::VertexArray::new(),
                 buffer: gl::Buffer::new(),
                 buffer_size: 0,
                 count: 0,
             });
         }
-        let info = buffer.trans.as_mut().unwrap();
+        let info = buffer.clone();
+        let mut info = info.write().unwrap();
+        let info = info.trans.as_mut().unwrap();
 
         info.array.bind();
         self.chunk_shader_alpha.position.enable();

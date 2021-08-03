@@ -54,31 +54,29 @@ impl ChunkBuilder {
 
     pub fn tick(
         &mut self,
-        world: Arc<RwLock<Option<World>>>,
+        world: Arc<World>,
         renderer: &mut render::Renderer,
         version: usize,
     ) {
-        {
-            if version != self.resource_version {
-                self.resource_version = version;
-                self.models.write().unwrap().version_change();
-            }
+        if version != self.resource_version {
+            self.resource_version = version;
+            self.models.write().unwrap().version_change();
         }
 
             while let Ok((id, mut val)) = self.built_recv.try_recv() {
-                world.clone().write().unwrap().as_mut().unwrap().reset_building_flag(val.position);
+                world.clone().reset_building_flag(val.position);
 
                 if let Some(sec) =
-                world.clone().write().unwrap().as_mut().unwrap().get_section_mut(val.position.0, val.position.1, val.position.2)
+                world.clone().get_section_mut(val.position.0, val.position.1, val.position.2)
                 {
-                    sec.cull_info = val.cull_info;
+                    sec.clone().write().unwrap().cull_info = val.cull_info;
                     renderer.update_chunk_solid(
-                        &mut sec.render_buffer,
+                        sec.clone().read().unwrap().render_buffer.clone(),
                         &val.solid_buffer,
                         val.solid_count,
                     );
                     renderer.update_chunk_trans(
-                        &mut sec.render_buffer,
+                        sec.clone().read().unwrap().render_buffer.clone(),
                         &val.trans_buffer,
                         val.trans_count,
                     );
@@ -93,17 +91,15 @@ impl ChunkBuilder {
                 return;
             }
         let tmp_world = world.clone();
-        let tmp_world = tmp_world.read().unwrap();
-        let dirty_sections = tmp_world.as_ref().unwrap()
+        let dirty_sections = tmp_world
             .get_render_list()
             .iter()//.par_iter()// .iter()//.par_iter_mut() // .par_iter()// .iter()
             .map(|v| v.0)
-            .filter(|v| tmp_world.as_ref().unwrap().is_section_dirty(*v))
+            .filter(|v| tmp_world.is_section_dirty(*v))
             .collect::<Vec<_>>();
-        drop(tmp_world);
         // the following code is the performance bottleneck
         for (x, y, z) in dirty_sections.clone() {
-            world.clone().write().unwrap().as_mut().unwrap().set_building_flag((x, y, z));
+            tmp_world.set_building_flag((x, y, z));
         }
         for (x, y, z) in dirty_sections {
             let t_id = self.free_builders.pop().unwrap();
@@ -125,7 +121,7 @@ impl ChunkBuilder {
 }
 
 struct BuildReq {
-    world: Arc<RwLock<Option<World>>>,
+    world: Arc<World>,
     position: (i32, i32, i32),
     solid_buffer: Vec<u8>,
     trans_buffer: Vec<u8>,
@@ -166,7 +162,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
         mut trans_buffer,
     } = work;
     let (cx, cy, cz) = (position.0 << 4, position.1 << 4, position.2 << 4);
-    let mut snapshot = world.clone().read().unwrap().as_ref().unwrap().capture_snapshot(cx - 2, cy - 2, cz - 2, 20, 20, 20); // this is the bottleneck!
+    let mut snapshot = world.clone().capture_snapshot(cx - 2, cy - 2, cz - 2, 20, 20, 20); // this is the bottleneck!
     snapshot.make_relative(-2, -2, -2);
 
     let mut rng = rand_pcg::Pcg32::from_seed([

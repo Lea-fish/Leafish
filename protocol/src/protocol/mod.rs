@@ -669,7 +669,7 @@ impl Lengthable for i32 {
 
 use num_traits::cast::{cast, NumCast};
 use trust_dns_resolver::Resolver;
-use std::sync::{RwLock, Arc};
+use std::sync::{RwLock, Arc, Mutex};
 
 /// `FixedPoint5` has the 5 least-significant bits for the fractional
 /// part, upper for integer part: https://wiki.vg/Data_types#Fixed-point_numbers
@@ -1042,11 +1042,11 @@ pub struct Conn {
     pub protocol_version: i32,
     pub state: State,
 
-    read_cipher: Option<Arc<RwLock<Aes128Cfb>>>,
-    write_cipher: Option<Arc<RwLock<Aes128Cfb>>>,
+    read_cipher: Arc<RwLock<Option<Aes128Cfb>>>,
+    write_cipher: Arc<RwLock<Option<Aes128Cfb>>>,
 
     pub compression_threshold: i32,
-    pub send: Option<Sender<(i32, bool, Vec<u8>)>>,
+    pub send: Arc<Mutex<Option<bool>>>,
 }
 
 lazy_static! {
@@ -1101,10 +1101,10 @@ impl Conn {
             direction: Direction::Serverbound,
             state: State::Handshaking,
             protocol_version,
-            read_cipher: None,
-            write_cipher: None,
+            read_cipher: Arc::new(RwLock::new(None)),
+            write_cipher: Arc::new(RwLock::new(None)),
             compression_threshold: -1,
-            send: None,
+            send: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -1137,20 +1137,13 @@ impl Conn {
             buf = new;
         }
         // let mut send_buf = Vec::new();
-        if self.send.is_some()/* && false*/ {
-            // VarInt(buf.len() as i32 + extra).write_to(&mut send_buf/*self*/)?;
-            /*if self.compression_threshold >= 0 && extra == 1 {
-                VarInt(0).write_to(&mut send_buf/*self*/)?;
-            }*/
-            // send_buf.append(&mut buf);
-            self.send.as_ref().unwrap()/*.clone()*/.send((extra, self.compression_threshold >= 0, buf)).unwrap();
-        }else {
-            VarInt(buf.len() as i32 + extra).write_to(/*&mut */self)?;
-            if self.compression_threshold >= 0 && extra == 1 {
-                VarInt(0).write_to(/*&mut */self)?;
-            }
-            self.write_all(&buf).unwrap();
+        let lock = self.send.clone();
+        let lock = lock.lock();
+        VarInt(buf.len() as i32 + extra).write_to(/*&mut */self)?;
+        if self.compression_threshold >= 0 && extra == 1 {
+            VarInt(0).write_to(/*&mut */self)?;
         }
+        self.write_all(&buf).unwrap();
         // self.write_all(&send_buf/*&buf*/)?;
         // self.write_buffer(buffer/*buf*/);
 
@@ -1460,10 +1453,10 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
     }
 
     pub fn enable_encyption(&mut self, key: &[u8]/*, _decrypt: bool*/) {
-        let read_cipher = Arc::new(RwLock::new(Aes128Cfb::new_var(key, key).unwrap()));
-        let write_cipher = Arc::new(RwLock::new(Aes128Cfb::new_var(key, key).unwrap()));
-        self.read_cipher = Some(read_cipher);
-        self.write_cipher = Some(write_cipher);
+        let read_cipher = Aes128Cfb::new_var(key, key).unwrap();
+        let write_cipher = Aes128Cfb::new_var(key, key).unwrap();
+        self.read_cipher.clone().write().unwrap().replace(read_cipher);
+        self.write_cipher.clone().write().unwrap().replace(write_cipher);
     }
 
     pub fn set_compresssion(&mut self, threshold: i32) {
@@ -1677,11 +1670,11 @@ pub struct StatusPlayer {
 
 impl Read for Conn {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.read_cipher.as_ref() {
+        match self.read_cipher.clone().write().unwrap().as_mut() {
             Option::None => self.stream.read(buf),
             Option::Some(cipher) => {
                 let ret = self.stream.read(buf)?;
-                cipher.clone().write().unwrap().decrypt(&mut buf[..ret]);
+                cipher.decrypt(&mut buf[..ret]);
 
                 Ok(ret)
             }
@@ -1691,13 +1684,13 @@ impl Read for Conn {
 
 impl Write for Conn {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.write_cipher.as_ref() {
+        match self.write_cipher.clone().write().unwrap().as_mut() {
             Option::None => self.stream.write(buf),
             Option::Some(cipher) => {
                 let mut data = vec![0; buf.len()];
                 data[..buf.len()].clone_from_slice(&buf[..]);
 
-                cipher.clone().write().unwrap().encrypt(&mut data);
+                cipher.encrypt(&mut data);
 
                 self.stream.write_all(&data)?;
                 Ok(buf.len())
@@ -1712,24 +1705,6 @@ impl Write for Conn {
 
 impl Clone for Conn {
     fn clone(&self) -> Self {
-        let send;
-        if self.send.is_none() {
-            send = None;
-        }else {
-            send = Some(self.send.as_ref().unwrap().clone());
-        }
-        let read_cipher;
-        if self.read_cipher.is_none() {
-            read_cipher = None;
-        }else {
-            read_cipher = Some(self.read_cipher.as_ref().unwrap().clone());
-        }
-        let write_cipher;
-        if self.write_cipher.is_none() {
-            write_cipher = None;
-        }else {
-            write_cipher = Some(self.write_cipher.as_ref().unwrap().clone());
-        }
         Conn {
             stream: self.stream.try_clone().unwrap(),
             host: self.host.clone(),
@@ -1737,10 +1712,10 @@ impl Clone for Conn {
             direction: self.direction,
             state: self.state,
             protocol_version: self.protocol_version,
-            read_cipher,
-            write_cipher,
+            read_cipher: self.read_cipher.clone(),
+            write_cipher: self.write_cipher.clone(),
             compression_threshold: self.compression_threshold,
-            send,
+            send: self.send.clone(),
         }
     }
 }

@@ -30,23 +30,24 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::hash::BuildHasherDefault;
 use std::io::Read;
+use std::sync::{Arc, RwLock};
 
 pub mod biome;
 mod storage;
 
 #[derive(Default)]
 pub struct World {
-    chunks: HashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>,
+    chunks: Arc<RwLock<HashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>>,
 
-    render_list: Vec<(i32, i32, i32)>,
+    render_list: Arc<RwLock<Vec<(i32, i32, i32)>>>,
 
-    pub(crate) light_updates: VecDeque<LightUpdate>,
+    pub(crate) light_updates: Arc<RwLock<VecDeque<LightUpdate>>>,
 
-    block_entity_actions: VecDeque<BlockEntityAction>,
+    block_entity_actions: Arc<RwLock<VecDeque<BlockEntityAction>>>,
 
     protocol_version: i32,
-    pub modded_block_ids: HashMap<usize, String>,
-    pub id_map: block::VanillaIDMap,
+    pub modded_block_ids: Arc<RwLock<HashMap<usize, String>>>,
+    pub id_map: Arc<block::VanillaIDMap>,
 }
 
 #[derive(Clone, Debug)]
@@ -77,7 +78,7 @@ impl LightType {
             LightType::Sky => world.get_sky_light(pos),
         }
     }
-    fn set_light(self, world: &mut World, pos: Position, light: u8) {
+    fn set_light(self, world: &World, pos: Position, light: u8) {
         match self {
             LightType::Block => world.set_block_light(pos, light),
             LightType::Sky => world.set_sky_light(pos, light),
@@ -92,7 +93,7 @@ pub struct LightUpdate {
 
 impl World {
     pub fn new(protocol_version: i32) -> World {
-        let id_map = block::VanillaIDMap::new(protocol_version);
+        let id_map = Arc::new(block::VanillaIDMap::new(protocol_version));
         World {
             protocol_version,
             id_map,
@@ -100,26 +101,39 @@ impl World {
         }
     }
 
-    pub fn is_chunk_loaded(&self, x: i32, z: i32) -> bool {
-        self.chunks.contains_key(&CPos(x, z))
+    pub fn reset(&self, protocol_version: i32) {
+        if self.protocol_version != protocol_version {
+            println!("Can't switch protocol version, when resetting the world :(");
+        }
+        self.modded_block_ids.clone().write().unwrap().clear();
+        self.light_updates.clone().write().unwrap().clear();
+        self.render_list.clone().write().unwrap().clear();
+        self.block_entity_actions.clone().write().unwrap().clear();
+        self.chunks.clone().write().unwrap().clear();
     }
 
-    pub fn set_block(&mut self, pos: Position, b: block::Block) {
+    pub fn is_chunk_loaded(&self, x: i32, z: i32) -> bool {
+        self.chunks.clone().read().unwrap().contains_key(&CPos(x, z))
+    }
+
+    pub fn set_block(&self, pos: Position, b: block::Block) {
         if self.set_block_raw(pos, b) {
             self.update_block(pos);
         }
     }
 
-    fn set_block_raw(&mut self, pos: Position, b: block::Block) -> bool {
+    fn set_block_raw(&self, pos: Position, b: block::Block) -> bool {
         let cpos = CPos(pos.x >> 4, pos.z >> 4);
-        let chunk = self.chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
+        let chunks = self.chunks.clone();
+        let mut chunks = chunks.write().unwrap();
+        let chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         if chunk.set_block(pos.x & 0xF, pos.y, pos.z & 0xF, b) {
             if chunk.block_entities.contains_key(&pos) {
-                self.block_entity_actions
+                self.block_entity_actions.clone().write().unwrap()
                     .push_back(BlockEntityAction::Remove(pos));
             }
             if block_entity::BlockEntityType::get_block_entity(b).is_some() {
-                self.block_entity_actions
+                self.block_entity_actions.clone().write().unwrap()
                     .push_back(BlockEntityAction::Create(pos));
             }
             true
@@ -128,7 +142,7 @@ impl World {
         }
     }
 
-    pub fn update_block(&mut self, pos: Position) {
+    pub fn update_block(&self, pos: Position) {
         for yy in -1..2 {
             for zz in -1..2 {
                 for xx in -1..2 {
@@ -146,7 +160,7 @@ impl World {
         }
     }
 
-    fn update_range(&mut self, x1: i32, y1: i32, z1: i32, x2: i32, y2: i32, z2: i32) {
+    fn update_range(&self, x1: i32, y1: i32, z1: i32, x2: i32, y2: i32, z2: i32) {
         for by in y1..y2 {
             for bz in z1..z2 {
                 for bx in x1..x2 {
@@ -167,48 +181,52 @@ impl World {
     }
 
     pub fn get_block(&self, pos: Position) -> block::Block {
-        match self.chunks.get(&CPos(pos.x >> 4, pos.z >> 4)) {
+        match self.chunks.clone().read().unwrap().get(&CPos(pos.x >> 4, pos.z >> 4)) {
             Some(chunk) => chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF),
             None => block::Missing {},
         }
     }
 
-    fn set_block_light(&mut self, pos: Position, light: u8) {
+    fn set_block_light(&self, pos: Position, light: u8) {
         let cpos = CPos(pos.x >> 4, pos.z >> 4);
-        let chunk = self.chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
+        let chunks = self.chunks.clone();
+        let mut chunks = chunks.write().unwrap();
+        let chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         chunk.set_block_light(pos.x & 0xF, pos.y, pos.z & 0xF, light);
     }
 
     pub fn get_block_light(&self, pos: Position) -> u8 {
-        match self.chunks.get(&CPos(pos.x >> 4, pos.z >> 4)) {
+        match self.chunks.clone().read().unwrap().get(&CPos(pos.x >> 4, pos.z >> 4)) {
             Some(chunk) => chunk.get_block_light(pos.x & 0xF, pos.y, pos.z & 0xF),
             None => 0,
         }
     }
 
-    fn set_sky_light(&mut self, pos: Position, light: u8) {
+    fn set_sky_light(&self, pos: Position, light: u8) {
         let cpos = CPos(pos.x >> 4, pos.z >> 4);
-        let chunk = self.chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
+        let chunks = self.chunks.clone();
+        let mut chunks = chunks.write().unwrap();
+        let chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         chunk.set_sky_light(pos.x & 0xF, pos.y, pos.z & 0xF, light);
     }
 
     pub fn get_sky_light(&self, pos: Position) -> u8 {
-        match self.chunks.get(&CPos(pos.x >> 4, pos.z >> 4)) {
+        match self.chunks.clone().read().unwrap().get(&CPos(pos.x >> 4, pos.z >> 4)) {
             Some(chunk) => chunk.get_sky_light(pos.x & 0xF, pos.y, pos.z & 0xF),
             None => 15,
         }
     }
 
-    fn update_light(&mut self, pos: Position, ty: LightType) {
-        self.light_updates.push_back(LightUpdate { ty, pos });
+    fn update_light(&self, pos: Position, ty: LightType) {
+        self.light_updates.clone().write().unwrap().push_back(LightUpdate { ty, pos });
     }
 
-    pub fn add_block_entity_action(&mut self, action: BlockEntityAction) {
-        self.block_entity_actions.push_back(action);
+    pub fn add_block_entity_action(&self, action: BlockEntityAction) {
+        self.block_entity_actions.clone().write().unwrap().push_back(action);
     }
 
     #[allow(clippy::verbose_bit_mask)] // "llvm generates better code" for updates_performed & 0xFFF "on x86"
-    pub fn tick(&mut self, m: &mut ecs::Manager) { // TODO: Only call this from a separate thread!
+    pub fn tick(&self, m: &mut ecs::Manager) { // TODO: Only call this from a separate thread!
         // use instant::Instant;
         /*let start = Instant::now();
         let mut updates_performed = 0;
@@ -227,17 +245,17 @@ impl World {
 
         let sign_info: ecs::Key<block_entity::sign::SignInfo> = m.get_key();
 
-        while let Some(action) = self.block_entity_actions.pop_front() {
+        while let Some(action) = self.block_entity_actions.clone().write().unwrap().pop_front() {
             match action {
                 BlockEntityAction::Remove(pos) => {
-                    if let Some(chunk) = self.chunks.get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
+                    if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
                             m.remove_entity(entity);
                         }
                     }
                 }
                 BlockEntityAction::Create(pos) => {
-                    if let Some(chunk) = self.chunks.get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
+                    if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
                         // Remove existing entity
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
                             m.remove_entity(entity);
@@ -253,7 +271,7 @@ impl World {
                 }
                 BlockEntityAction::UpdateSignText(bx) => {
                     let (pos, line1, line2, line3, line4) = *bx;
-                    if let Some(chunk) = self.chunks.get(&CPos(pos.x >> 4, pos.z >> 4)) {
+                    if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(pos.x >> 4, pos.z >> 4)) {
                         if let Some(entity) = chunk.block_entities.get(&pos) {
                             if let Some(sign) = m.get_component_mut(*entity, sign_info) {
                                 sign.lines = [line1, line2, line3, line4];
@@ -266,9 +284,13 @@ impl World {
         }
     }
 
-    pub(crate) fn do_light_update(&mut self) {
+    pub(crate) fn do_light_update(&self) {
         use std::cmp;
-        if let Some(update) = self.light_updates.pop_front() {
+        let update = self.light_updates.clone();
+        let mut _update = update.write().unwrap();
+        let update = _update.pop_front();
+        drop(_update);
+        if let Some(update) = update {
             if update.pos.y < 0
                 || update.pos.y > 255
                 || !self.is_chunk_loaded(update.pos.x >> 4, update.pos.z >> 4)
@@ -323,9 +345,9 @@ impl World {
         }
     }
 
-    pub fn copy_cloud_heightmap(&mut self, data: &mut [u8]) -> bool {
+    pub fn copy_cloud_heightmap(&self, data: &mut [u8]) -> bool {
         let mut dirty = false;
-        for c in self.chunks.values_mut() {
+        for c in self.chunks.clone().write().unwrap().values_mut() {
             if c.heightmap_dirty {
                 dirty = true;
                 c.heightmap_dirty = false;
@@ -341,8 +363,8 @@ impl World {
         dirty
     }
 
-    pub fn compute_render_list(&mut self, renderer: &mut render::Renderer) {
-        self.render_list.clear();
+    pub fn compute_render_list(&self, renderer: &mut render::Renderer) {
+        self.render_list.clone().write().unwrap().clear();
 
         let mut valid_dirs = [false; 6];
         for dir in Direction::all() {
@@ -357,18 +379,20 @@ impl World {
             ((renderer.camera.pos.z as i32) >> 4),
         );
 
-        let mut process_queue = VecDeque::with_capacity(self.chunks.len() * 16);
-        println!("processqueue size {}", self.chunks.len() * 16);
+        let mut process_queue = VecDeque::with_capacity(self.chunks.clone().read().unwrap().len() * 16);
+        // println!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
 
         while let Some((from, pos)) = process_queue.pop_front() {
             let (exists, cull) = if let Some((sec, rendered_on)) =
                 self.get_render_section_mut(pos.0, pos.1, pos.2)
             {
-                if *rendered_on == renderer.frame_id {
+                if rendered_on == renderer.frame_id {
                     continue;
                 }
-                *rendered_on = renderer.frame_id;
+                if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.0, pos.2)) {
+                    chunk.sections_rendered_on[pos.1 as usize] = renderer.frame_id;
+                }
 
                 let min = cgmath::Point3::new(
                     pos.0 as f32 * 16.0,
@@ -384,14 +408,14 @@ impl World {
                 }
                 (
                     sec.is_some(),
-                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.cull_info),
+                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.clone().read().unwrap().cull_info),
                 )
             } else {
                 continue;
             };
 
             if exists {
-                self.render_list.push(pos);
+                self.render_list.clone().write().unwrap().push(pos);
             }
 
             for dir in Direction::all() {
@@ -399,7 +423,7 @@ impl World {
                 let opos = (pos.0 + ox, pos.1 + oy, pos.2 + oz);
                 if let Some((_, rendered_on)) = self.get_render_section_mut(opos.0, opos.1, opos.2)
                 {
-                    if *rendered_on == renderer.frame_id {
+                    if rendered_on == renderer.frame_id {
                         continue;
                     }
                     if from == Direction::Invalid
@@ -412,13 +436,17 @@ impl World {
         }
     }
 
-    pub fn get_render_list(&self) -> Vec<((i32, i32, i32), &render::ChunkBuffer)> {
-        self.render_list
+    pub fn get_render_list(&self) -> Vec<((i32, i32, i32), Arc<RwLock<render::ChunkBuffer>>)> {
+        self.render_list.clone().read().unwrap()
             .iter()
             .map(|v| {
-                let chunk = self.chunks.get(&CPos(v.0, v.2)).unwrap(); // TODO: Handle None
+                let chunks = self.chunks.clone();
+                let chunks = chunks.read().unwrap();
+                let chunk = chunks.get(&CPos(v.0, v.2)).unwrap(); // TODO: Handle None
                 let sec = chunk.sections[v.1 as usize].as_ref().unwrap();
-                (*v, &sec.render_buffer)
+                let sec = sec.clone();
+                let sec = sec.read().unwrap();
+                (*v, sec.render_buffer.clone())
             })
             .collect()
     }
@@ -480,41 +508,41 @@ note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose bac
 Process finished with exit code 101
      */
 
-    pub fn get_section_mut(&mut self, x: i32, y: i32, z: i32) -> Option<&mut Section> {
-        if let Some(chunk) = self.chunks.get_mut(&CPos(x, z)) {
-            if let Some(sec) = chunk.sections[y as usize].as_mut() {
-                return Some(sec);
+    pub fn get_section_mut(&self, x: i32, y: i32, z: i32) -> Option<Arc<RwLock<Section>>> {
+        if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(x, z)) {
+            if let Some(sec) = chunk.sections[y as usize].as_ref() {
+                return Some(sec.clone());
             }
         }
         None
     }
 
     fn get_render_section_mut(
-        &mut self,
+        &self,
         x: i32,
         y: i32,
         z: i32,
-    ) -> Option<(Option<&mut Section>, &mut u32)> {
+    ) -> Option<(Option<Arc<RwLock<Section>>>, u32)> {
         if !(0..=15).contains(&y) {
             return None;
         }
-        if let Some(chunk) = self.chunks.get_mut(&CPos(x, z)) {
-            let rendered = &mut chunk.sections_rendered_on[y as usize];
-            if let Some(sec) = chunk.sections[y as usize].as_mut() {
-                return Some((Some(sec), rendered));
+        if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(x, z)) {
+            let rendered = &chunk.sections_rendered_on[y as usize];
+            if let Some(sec) = chunk.sections[y as usize].as_ref() {
+                return Some((Some(sec.clone()), rendered.clone()));
             }
-            return Some((None, rendered));
+            return Some((None, rendered.clone()));
         }
         None
     }
 
-    pub fn get_dirty_chunk_sections(&mut self) -> Vec<(i32, i32, i32)> {
+    pub fn get_dirty_chunk_sections(&self) -> Vec<(i32, i32, i32)> {
         let mut out = vec![];
-        for chunk in self.chunks.values_mut() {
+        for chunk in self.chunks.clone().write().unwrap().values_mut() {
             for sec in &mut chunk.sections {
                 if let Some(sec) = sec.as_mut() {
-                    if !sec.building && sec.dirty {
-                        out.push((chunk.position.0, sec.y as i32, chunk.position.1));
+                    if !sec.clone().read().unwrap().building && sec.clone().read().unwrap().dirty {
+                        out.push((chunk.position.0, sec.clone().read().unwrap().y as i32, chunk.position.1));
                     }
                 }
             }
@@ -522,45 +550,45 @@ Process finished with exit code 101
         out
     }
 
-    fn set_dirty(&mut self, x: i32, y: i32, z: i32) {
-        if let Some(chunk) = self.chunks.get_mut(&CPos(x, z)) {
+    fn set_dirty(&self, x: i32, y: i32, z: i32) {
+        if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(x, z)) {
             if let Some(sec) = chunk.sections.get_mut(y as usize).and_then(|v| v.as_mut()) {
-                sec.dirty = true;
+                sec.clone().write().unwrap().dirty = true;
             }
         }
     }
 
     pub fn is_section_dirty(&self, pos: (i32, i32, i32)) -> bool {
-        if let Some(chunk) = self.chunks.get(&CPos(pos.0, pos.2)) {
+        if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(pos.0, pos.2)) {
             if let Some(sec) = chunk.sections[pos.1 as usize].as_ref() {
-                return sec.dirty && !sec.building;
+                return sec.clone().read().unwrap().dirty && !sec.clone().read().unwrap().building;
             }
         }
         false
     }
 
-    pub fn set_building_flag(&mut self, pos: (i32, i32, i32)) {
-        if let Some(chunk) = self.chunks.get_mut(&CPos(pos.0, pos.2)) {
-            if let Some(sec) = chunk.sections[pos.1 as usize].as_mut() {
-                sec.building = true;
-                sec.dirty = false;
+    pub fn set_building_flag(&self, pos: (i32, i32, i32)) {
+        if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(pos.0, pos.2)) {
+            if let Some(sec) = chunk.sections[pos.1 as usize].as_ref() {
+                sec.clone().write().unwrap().building = true;
+                sec.clone().write().unwrap().dirty = false;
             }
         }
     }
 
-    pub fn reset_building_flag(&mut self, pos: (i32, i32, i32)) {
-        if let Some(chunk) = self.chunks.get_mut(&CPos(pos.0, pos.2)) {
-            if let Some(section) = chunk.sections[pos.1 as usize].as_mut() {
-                section.building = false;
+    pub fn reset_building_flag(&self, pos: (i32, i32, i32)) {
+        if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(pos.0, pos.2)) {
+            if let Some(section) = chunk.sections[pos.1 as usize].as_ref() {
+                section.clone().write().unwrap().building = false;
             }
         }
     }
 
-    pub fn flag_dirty_all(&mut self) {
-        for chunk in self.chunks.values_mut() {
-            for sec in &mut chunk.sections {
-                if let Some(sec) = sec.as_mut() {
-                    sec.dirty = true;
+    pub fn flag_dirty_all(&self) {
+        for chunk in self.chunks.clone().write().unwrap().values() {
+            for sec in &chunk.sections {
+                if let Some(sec) = sec.as_ref() {
+                    sec.clone().write().unwrap().dirty = true;
                 }
             }
         }
@@ -594,7 +622,9 @@ Process finished with exit code 101
 
         for cx in cx1..cx2 {
             for cz in cz1..cz2 {
-                let chunk = match self.chunks.get(&CPos(cx, cz)) {
+                let chunks = self.chunks.clone();
+                let chunks = chunks.read().unwrap();
+                let chunk = match chunks.get(&CPos(cx, cz)) {
                     Some(val) => val,
                     None => continue,
                 };
@@ -620,18 +650,18 @@ Process finished with exit code 101
                                 let oz = zz + (cz << 4);
                                 match section.as_ref() {
                                     Some(sec) => {
-                                        snapshot.set_block(ox, oy, oz, sec.get_block(xx, yy, zz));
+                                        snapshot.set_block(ox, oy, oz, sec.clone().read().unwrap().get_block(xx, yy, zz));
                                         snapshot.set_block_light(
                                             ox,
                                             oy,
                                             oz,
-                                            sec.get_block_light(xx, yy, zz),
+                                            sec.clone().read().unwrap().get_block_light(xx, yy, zz),
                                         );
                                         snapshot.set_sky_light(
                                             ox,
                                             oy,
                                             oz,
-                                            sec.get_sky_light(xx, yy, zz),
+                                            sec.clone().read().unwrap().get_sky_light(xx, yy, zz),
                                         );
                                     }
                                     None => {
@@ -655,8 +685,8 @@ Process finished with exit code 101
         snapshot
     }
 
-    pub fn unload_chunk(&mut self, x: i32, z: i32, m: &mut ecs::Manager) {
-        if let Some(chunk) = self.chunks.remove(&CPos(x, z)) {
+    pub fn unload_chunk(&self, x: i32, z: i32, m: &mut ecs::Manager) {
+        if let Some(chunk) = self.chunks.clone().write().unwrap().remove(&CPos(x, z)) {
             for entity in chunk.block_entities.values() {
                 m.remove_entity(*entity);
             }
@@ -664,7 +694,7 @@ Process finished with exit code 101
     }
 
     pub fn load_chunks18(
-        &mut self,
+        &self,
         new: bool,
         skylight: bool,
         chunk_metas: &[crate::protocol::packet::ChunkMeta],
@@ -682,7 +712,7 @@ Process finished with exit code 101
         Ok(())
     }
 
-    fn dirty_chunks_by_bitmask(&mut self, x: i32, z: i32, mask: u16) {
+    fn dirty_chunks_by_bitmask(&self, x: i32, z: i32, mask: u16) {
         for i in 0..16 {
             if mask & (1 << i) == 0 {
                 continue;
@@ -711,7 +741,7 @@ Process finished with exit code 101
     }
 
     pub fn load_chunk18(
-        &mut self,
+        &self,
         x: i32,
         z: i32,
         new: bool,
@@ -724,36 +754,38 @@ Process finished with exit code 101
         let cpos = CPos(x, z);
         {
             if new {
-                self.chunks.insert(cpos, Chunk::new(cpos));
-            } else if !self.chunks.contains_key(&cpos) {
+                self.chunks.clone().write().unwrap().insert(cpos, Chunk::new(cpos));
+            } else if !self.chunks.clone().read().unwrap().contains_key(&cpos) {
                 return Ok(());
             }
-            let chunk = self.chunks.get_mut(&cpos).unwrap();
+            let chunks = self.chunks.clone();
+            let mut chunks = chunks.write().unwrap();
+            let chunk = chunks.get_mut(&cpos).unwrap();
 
             for i in 0..16 {
                 if chunk.sections[i].is_none() {
                     let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
                     fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
                     if !fill_sky || mask & (1 << i) != 0 {
-                        chunk.sections[i] = Some(Section::new(i as u8, fill_sky));
+                        chunk.sections[i] = Some(Arc::new(RwLock::new(Section::new(i as u8, fill_sky))));
                     }
                 }
                 if mask & (1 << i) == 0 {
                     continue;
                 }
-                let section = chunk.sections[i as usize].as_mut().unwrap();
-                section.dirty = true;
+                let section = chunk.sections[i as usize].as_ref().unwrap();
+                section.clone().write().unwrap().dirty = true;
 
                 for bi in 0..4096 {
                     let id = data.read_u16::<byteorder::LittleEndian>()?;
-                    section.blocks.set(
+                    section.clone().write().unwrap().blocks.set(
                         bi,
                         self.id_map
-                            .by_vanilla_id(id as usize, &self.modded_block_ids),
+                            .by_vanilla_id(id as usize, self.modded_block_ids.clone()),
                     );
 
                     // Spawn block entities
-                    let b = section.blocks.get(bi);
+                    let b = section.clone().write().unwrap().blocks.get(bi);
                     if block_entity::BlockEntityType::get_block_entity(b).is_some() {
                         let pos = Position::new(
                             (bi & 0xF) as i32,
@@ -765,10 +797,10 @@ Process finished with exit code 101
                             chunk.position.1 << 4,
                         );
                         if chunk.block_entities.contains_key(&pos) {
-                            self.block_entity_actions
+                            self.block_entity_actions.clone().write().unwrap()
                                 .push_back(BlockEntityAction::Remove(pos))
                         }
-                        self.block_entity_actions
+                        self.block_entity_actions.clone().write().unwrap()
                             .push_back(BlockEntityAction::Create(pos))
                     }
                 }
@@ -780,7 +812,7 @@ Process finished with exit code 101
                 }
                 let section = chunk.sections[i as usize].as_mut().unwrap();
 
-                data.read_exact(&mut section.block_light.data)?;
+                data.read_exact(&mut section.clone().write().unwrap().block_light.data)?;
             }
 
             for i in 0..16 {
@@ -789,7 +821,7 @@ Process finished with exit code 101
                 }
                 let section = chunk.sections[i as usize].as_mut().unwrap();
 
-                data.read_exact(&mut section.sky_light.data)?;
+                data.read_exact(&mut section.clone().write().unwrap().sky_light.data)?;
             }
 
             if new {
@@ -804,7 +836,7 @@ Process finished with exit code 101
     }
 
     pub fn load_chunks17(
-        &mut self,
+        &self,
         chunk_column_count: u16,
         data_length: i32,
         skylight: bool,
@@ -838,7 +870,7 @@ Process finished with exit code 101
     }
 
     pub fn load_chunk17(
-        &mut self,
+        &self,
         x: i32,
         z: i32,
         new: bool,
@@ -864,7 +896,7 @@ Process finished with exit code 101
 
     #[allow(clippy::needless_range_loop)]
     fn load_uncompressed_chunk17(
-        &mut self,
+        &self,
         x: i32,
         z: i32,
         new: bool,
@@ -876,11 +908,13 @@ Process finished with exit code 101
         let cpos = CPos(x, z);
         {
             if new {
-                self.chunks.insert(cpos, Chunk::new(cpos));
-            } else if !self.chunks.contains_key(&cpos) {
+                self.chunks.clone().write().unwrap().insert(cpos, Chunk::new(cpos));
+            } else if !self.chunks.clone().read().unwrap().contains_key(&cpos) {
                 return Ok(());
             }
-            let chunk = self.chunks.get_mut(&cpos).unwrap();
+            let chunks = self.chunks.clone();
+            let mut chunks = chunks.write().unwrap();
+            let chunk = chunks.get_mut(&cpos).unwrap();
 
             // Block type array - whole byte per block
             let mut block_types = [[0u8; 4096]; 16];
@@ -889,14 +923,14 @@ Process finished with exit code 101
                     let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
                     fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
                     if !fill_sky || mask & (1 << i) != 0 {
-                        chunk.sections[i] = Some(Section::new(i as u8, fill_sky));
+                        chunk.sections[i] = Some(Arc::new(RwLock::new(Section::new(i as u8, fill_sky))));
                     }
                 }
                 if mask & (1 << i) == 0 {
                     continue;
                 }
                 let section = chunk.sections[i as usize].as_mut().unwrap();
-                section.dirty = true;
+                section.clone().write().unwrap().dirty = true;
 
                 data.read_exact(&mut block_types[i])?;
             }
@@ -937,7 +971,7 @@ Process finished with exit code 101
                 }
                 let section = chunk.sections[i as usize].as_mut().unwrap();
 
-                data.read_exact(&mut section.block_light.data)?;
+                data.read_exact(&mut section.clone().write().unwrap().block_light.data)?;
             }
 
             // Sky light array - half byte per block - only if 'skylight' is true
@@ -948,7 +982,7 @@ Process finished with exit code 101
                     }
                     let section = chunk.sections[i as usize].as_mut().unwrap();
 
-                    data.read_exact(&mut section.sky_light.data)?;
+                    data.read_exact(&mut section.clone().write().unwrap().sky_light.data)?;
                 }
             }
 
@@ -992,14 +1026,14 @@ Process finished with exit code 101
                     let id = ((block_add[i].get(bi) as u16) << 12)
                         | ((block_types[i][bi] as u16) << 4)
                         | (block_meta[i].get(bi) as u16);
-                    section.blocks.set(
+                    section.clone().write().unwrap().blocks.set(
                         bi,
                         self.id_map
-                            .by_vanilla_id(id as usize, &self.modded_block_ids),
+                            .by_vanilla_id(id as usize, self.modded_block_ids.clone()),
                     );
 
                     // Spawn block entities
-                    let b = section.blocks.get(bi);
+                    let b = section.clone().read().unwrap().blocks.get(bi);
                     if block_entity::BlockEntityType::get_block_entity(b).is_some() {
                         let pos = Position::new(
                             (bi & 0xF) as i32,
@@ -1011,10 +1045,10 @@ Process finished with exit code 101
                             chunk.position.1 << 4,
                         );
                         if chunk.block_entities.contains_key(&pos) {
-                            self.block_entity_actions
+                            self.block_entity_actions.clone().write().unwrap()
                                 .push_back(BlockEntityAction::Remove(pos))
                         }
-                        self.block_entity_actions
+                        self.block_entity_actions.clone().write().unwrap()
                             .push_back(BlockEntityAction::Create(pos))
                     }
                 }
@@ -1032,7 +1066,7 @@ Process finished with exit code 101
     }
 
     pub fn load_chunk19(
-        &mut self,
+        &self,
         x: i32,
         z: i32,
         new: bool,
@@ -1043,7 +1077,7 @@ Process finished with exit code 101
     }
 
     pub fn load_chunk115(
-        &mut self,
+        &self,
         x: i32,
         z: i32,
         new: bool,
@@ -1055,7 +1089,7 @@ Process finished with exit code 101
 
     #[allow(clippy::or_fun_call)]
     fn load_chunk19_or_115(
-        &mut self,
+        &self,
         read_biomes: bool,
         x: i32,
         z: i32,
@@ -1072,25 +1106,27 @@ Process finished with exit code 101
         let cpos = CPos(x, z);
         {
             if new {
-                self.chunks.insert(cpos, Chunk::new(cpos));
-            } else if !self.chunks.contains_key(&cpos) {
+                self.chunks.clone().write().unwrap().insert(cpos, Chunk::new(cpos));
+            } else if !self.chunks.clone().read().unwrap().contains_key(&cpos) {
                 return Ok(());
             }
-            let chunk = self.chunks.get_mut(&cpos).unwrap();
+            let chunks = self.chunks.clone();
+            let mut chunks = chunks.write().unwrap();
+            let chunk = chunks.get_mut(&cpos).unwrap();
 
             for i in 0..16 {
                 if chunk.sections[i].is_none() {
                     let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
                     fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
                     if !fill_sky || mask & (1 << i) != 0 {
-                        chunk.sections[i] = Some(Section::new(i as u8, fill_sky));
+                        chunk.sections[i] = Some(Arc::new(RwLock::new(Section::new(i as u8, fill_sky))));
                     }
                 }
                 if mask & (1 << i) == 0 {
                     continue;
                 }
                 let section = chunk.sections[i as usize].as_mut().unwrap();
-                section.dirty = true;
+                section.clone().write().unwrap().dirty = true;
 
                 if self.protocol_version >= 451 {
                     let _block_count = data.read_u16::<byteorder::LittleEndian>()?;
@@ -1108,7 +1144,7 @@ Process finished with exit code 101
                         let id = VarInt::read_from(&mut data)?.0;
                         let bl = self
                             .id_map
-                            .by_vanilla_id(id as usize, &self.modded_block_ids);
+                            .by_vanilla_id(id as usize, self.modded_block_ids.clone());
                         mappings.insert(i as usize, bl);
                     }
                 }
@@ -1119,16 +1155,16 @@ Process finished with exit code 101
 
                 for bi in 0..4096 {
                     let id = m.get(bi);
-                    section.blocks.set(
+                    section.clone().write().unwrap().blocks.set(
                         bi,
                         mappings
                             .get(&id)
                             .cloned()
                             // TODO: fix or_fun_call, but do not re-borrow self
-                            .unwrap_or(self.id_map.by_vanilla_id(id, &self.modded_block_ids)),
+                            .unwrap_or(self.id_map.by_vanilla_id(id, self.modded_block_ids.clone())),
                     );
                     // Spawn block entities
-                    let b = section.blocks.get(bi);
+                    let b = section.clone().read().unwrap().blocks.get(bi);
                     if block_entity::BlockEntityType::get_block_entity(b).is_some() {
                         let pos = Position::new(
                             (bi & 0xF) as i32,
@@ -1140,10 +1176,10 @@ Process finished with exit code 101
                             chunk.position.1 << 4,
                         );
                         if chunk.block_entities.contains_key(&pos) {
-                            self.block_entity_actions
+                            self.block_entity_actions.clone().write().unwrap()
                                 .push_back(BlockEntityAction::Remove(pos))
                         }
-                        self.block_entity_actions
+                        self.block_entity_actions.clone().write().unwrap()
                             .push_back(BlockEntityAction::Create(pos))
                     }
                 }
@@ -1151,8 +1187,8 @@ Process finished with exit code 101
                 if self.protocol_version >= 451 {
                     // Skylight in update skylight packet for 1.14+
                 } else {
-                    data.read_exact(&mut section.block_light.data)?;
-                    data.read_exact(&mut section.sky_light.data)?;
+                    data.read_exact(&mut section.clone().write().unwrap().block_light.data)?;
+                    data.read_exact(&mut section.clone().write().unwrap().sky_light.data)?;
                 }
             }
 
@@ -1167,14 +1203,14 @@ Process finished with exit code 101
         Ok(())
     }
 
-    fn flag_section_dirty(&mut self, x: i32, y: i32, z: i32) {
+    fn flag_section_dirty(&self, x: i32, y: i32, z: i32) {
         if !(0..=15).contains(&y) {
             return;
         }
         let cpos = CPos(x, z);
-        if let Some(chunk) = self.chunks.get_mut(&cpos) {
+        if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&cpos) {
             if let Some(sec) = chunk.sections[y as usize].as_mut() {
-                sec.dirty = true;
+                sec.clone().write().unwrap().dirty = true;
             }
         }
     }
@@ -1254,7 +1290,7 @@ pub struct CPos(i32, i32);
 pub struct Chunk {
     position: CPos,
 
-    sections: [Option<Section>; 16],
+    sections: [Option<Arc<RwLock<Section>>>; 16],
     sections_rendered_on: [u32; 16],
     biomes: [u8; 16 * 16],
 
@@ -1269,8 +1305,22 @@ impl Chunk {
         Chunk {
             position: pos,
             sections: [
-                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-                None, None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None
             ],
             sections_rendered_on: [0; 16],
             biomes: [0; 16 * 16],
@@ -1308,11 +1358,11 @@ impl Chunk {
                 return false;
             }
             let fill_sky = self.sections.iter().skip(s_idx).all(|v| v.is_none());
-            self.sections[s_idx] = Some(Section::new(s_idx as u8, fill_sky));
+            self.sections[s_idx] = Some(Arc::new(RwLock::new(Section::new(s_idx as u8, fill_sky))));
         }
         {
             let section = self.sections[s_idx as usize].as_mut().unwrap();
-            if !section.set_block(x, y & 0xF, z, b) {
+            if !section.clone().write().unwrap().set_block(x, y & 0xF, z, b) {
                 return false;
             }
         }
@@ -1345,7 +1395,7 @@ impl Chunk {
             return block::Missing {};
         }
         match self.sections[s_idx as usize].as_ref() {
-            Some(sec) => sec.get_block(x, y & 0xF, z),
+            Some(sec) => sec.clone().read().unwrap().get_block(x, y & 0xF, z),
             None => block::Air {},
         }
     }
@@ -1356,7 +1406,7 @@ impl Chunk {
             return 0;
         }
         match self.sections[s_idx as usize].as_ref() {
-            Some(sec) => sec.get_block_light(x, y & 0xF, z),
+            Some(sec) => sec.clone().read().unwrap().get_block_light(x, y & 0xF, z),
             None => 0,
         }
     }
@@ -1372,10 +1422,10 @@ impl Chunk {
                 return;
             }
             let fill_sky = self.sections.iter().skip(s_idx).all(|v| v.is_none());
-            self.sections[s_idx] = Some(Section::new(s_idx as u8, fill_sky));
+            self.sections[s_idx] = Some(Arc::new(RwLock::new(Section::new(s_idx as u8, fill_sky))));
         }
         if let Some(sec) = self.sections[s_idx].as_mut() {
-            sec.set_block_light(x, y & 0xF, z, light)
+            sec.clone().write().unwrap().set_block_light(x, y & 0xF, z, light)
         }
     }
 
@@ -1385,7 +1435,7 @@ impl Chunk {
             return 15;
         }
         match self.sections[s_idx as usize].as_ref() {
-            Some(sec) => sec.get_sky_light(x, y & 0xF, z),
+            Some(sec) => sec.clone().read().unwrap().get_sky_light(x, y & 0xF, z),
             None => 15,
         }
     }
@@ -1401,10 +1451,10 @@ impl Chunk {
                 return;
             }
             let fill_sky = self.sections.iter().skip(s_idx).all(|v| v.is_none());
-            self.sections[s_idx] = Some(Section::new(s_idx as u8, fill_sky));
+            self.sections[s_idx] = Some(Arc::new(RwLock::new(Section::new(s_idx as u8, fill_sky))));
         }
         if let Some(sec) = self.sections[s_idx as usize].as_mut() {
-            sec.set_sky_light(x, y & 0xF, z, light)
+            sec.clone().write().unwrap().set_sky_light(x, y & 0xF, z, light)
         }
     }
 
@@ -1415,7 +1465,7 @@ impl Chunk {
 
 pub struct Section {
     pub cull_info: chunk_builder::CullInfo,
-    pub render_buffer: render::ChunkBuffer,
+    pub render_buffer: Arc<RwLock<render::ChunkBuffer>>,
 
     y: u8,
 
@@ -1432,7 +1482,7 @@ impl Section {
     fn new(y: u8, fill_sky: bool) -> Section {
         let mut section = Section {
             cull_info: chunk_builder::CullInfo::all_vis(),
-            render_buffer: render::ChunkBuffer::new(),
+            render_buffer: Arc::new(RwLock::new(render::ChunkBuffer::new())),
             y,
 
             blocks: storage::BlockStorage::new(4096),
