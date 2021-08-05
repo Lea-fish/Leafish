@@ -163,7 +163,7 @@ impl super::Screen for SettingsMenu {
                     .attach(&mut *disconnect_button);
                 disconnect_button.add_text(txt);
                 disconnect_button.add_click_func(|_, game| {
-                    game.server.disconnect(None);
+                    game.server.as_ref().unwrap().disconnect(None);
                     game.screen_sys
                         .replace_screen(Box::new(super::ServerList::new(None)));
                     true
@@ -177,6 +177,7 @@ impl super::Screen for SettingsMenu {
             _buttons: buttons,
         });
     }
+
     fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
         self.elements = None;
     }

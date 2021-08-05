@@ -15,7 +15,6 @@
 use crate::types::bit::Set as BSet;
 use crate::types::hash::FNVHash;
 use std::any::{Any, TypeId};
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::hash::BuildHasherDefault;
 use std::marker::PhantomData;

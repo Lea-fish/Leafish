@@ -42,9 +42,8 @@ use crate::entity::{TargetPosition, TargetRotation};
 use crate::ecs::{Key, Manager};
 use crate::entity::player::PlayerMovement;
 use std::thread::sleep;
-use std::cell::RefCell;
 use std::ops::{Add, Sub};
-use std::borrow::BorrowMut;
+use rayon::prelude::*;
 
 pub mod plugin_messages;
 mod sun;
@@ -358,7 +357,7 @@ impl Server {
         Ok(server)
     }
 
-    fn connect0(mut conn: Conn, protocol_version: i32,
+    fn connect0(conn: Conn, protocol_version: i32,
                 forge_mods: Vec<forge::ForgeMod>,
                 uuid: protocol::UUID,
                 resources: Arc<RwLock<resources::Manager>>,
@@ -1291,6 +1290,7 @@ impl Server {
         rx
     }
 
+    /*
     fn spawn_writer(
         mut write: protocol::Conn
     ) -> Sender<(i32, bool, Vec<u8>)> {
@@ -1306,7 +1306,7 @@ impl Server {
             write.write_all(&process_buffer).expect("Failed to write data to the connection!");
         });
         tx
-    }
+    }*/
 
     fn spawn_light_updater(server: Arc<RwLock<Option<Arc<Server>>>>) -> Sender<bool> { // TODO: Use fair rwlock!
         let (tx, rx) = mpsc::channel();
@@ -1372,7 +1372,9 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         println!("instantiated server!");
         let mut rng = rand::thread_rng();
         // TODO: Fix the following startup bottleneck!
-        for x in -7 * 16..7 * 16 {
+        // (-7 * 16..7 * 16).into_par_iter().sum();
+
+        for x in (-7 * 16)..(7 * 16) { // TODO: Use par iters
             for z in -7 * 16..7 * 16 {
                 let h = 5 + (6.0 * (x as f64 / 16.0).cos() * (z as f64 / 16.0).sin()) as i32;
                 for y in 0..h {

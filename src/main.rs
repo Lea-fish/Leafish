@@ -49,16 +49,9 @@ use crate::protocol::mojang;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
-use crate::world::World;
-use std::sync::atomic::AtomicBool;
-use cgmath::num_traits::real::Real;
-use crate::server::Server;
 use leafish_protocol::protocol::Error;
-use std::any::Any;
-use leafish_protocol::format::Component;
 
 const CL_BRAND: console::CVar<String> = console::CVar {
     ty: PhantomData,
@@ -78,7 +71,7 @@ pub struct Game {
     vars: Rc<console::Vars>,
     should_close: bool,
 
-    server: Arc<server::Server>,
+    server: Option<Arc<server::Server>>,
     focused: bool,
     chunk_builder: chunk_builder::ChunkBuilder,
 
@@ -142,7 +135,7 @@ impl Game {
         }).join().unwrap();
         match result {
             Ok(srv) => {
-                self.server = srv;
+                self.server = Some(srv);
             }
             Err(err) => {
                 self.connect_error = Some(err);
@@ -152,21 +145,23 @@ impl Game {
         println!("after connect!");
     }
 
-    pub fn tick(&mut self, delta: f64) {
+    pub fn tick(&mut self/*, delta: f64*/) {
         println!("tick!");
-        if let Some(disconnect_reason) = self.server.disconnect_data.clone().write().unwrap().disconnect_reason.take() {
-            self.screen_sys
-                .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason))));
+        if self.server.is_some() {
+            if let Some(disconnect_reason) = self.server.as_ref().unwrap().disconnect_data.clone().write().unwrap().disconnect_reason.take() {
+                self.screen_sys
+                    .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason))));
+            }
         }
 
-        if !self.server.is_connected() { // TODO: Try moving this somewhere else, such that this check only gets performed, when in main menu!
+        /* // Removed dummy server and thus no camera is needed anymore!
+        if !self.server.is_connected() {
             self.renderer.camera.yaw += 0.005 * delta;
             if self.renderer.camera.yaw > ::std::f64::consts::PI * 2.0 {
                 self.renderer.camera.yaw = 0.0;
             }
             self.focused = false;
-        }
-        println!("1");
+        }*/
 
         /*let mut clear_reply = false;
         if let Some(ref recv) = self.connect_reply {
@@ -371,7 +366,7 @@ fn main() {
     );
     // under here, we have the bottleneck!
     let mut game = Game {
-        server: Arc::from(server::Server::dummy_server(resource_manager.clone())),
+        server: None,// Arc::from(server::Server::dummy_server(resource_manager.clone())),
         focused: false,
         renderer,
         screen_sys,
@@ -455,7 +450,6 @@ fn main() {
     });
 }
 
-// #[inline] // tested but didn't really help!
 fn tick_all(
     window: &winit::window::Window,
     game: &mut Game,
@@ -498,11 +492,13 @@ fn tick_all(
     }
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
-    game.tick(delta);
+    game.tick(/*delta*/);
     /*let diff = Instant::now().duration_since(now);
     println!("Diff2 took {}", diff.as_millis());*/
     println!("1.5");
-    game.server.tick(&mut game.renderer, delta); // TODO: Improve perf in load screen!
+    if game.server.is_some() {
+        game.server.as_ref().unwrap().tick(&mut game.renderer, delta); // TODO: Improve perf in load screen!
+    }
     /*let diff = Instant::now().duration_since(now);
     println!("Diff3 took {}", diff.as_millis());*/
     println!("2");
@@ -513,17 +509,19 @@ fn tick_all(
     }
     println!("3");
 
-    game.renderer.update_camera(physical_width, physical_height);
-    println!("4");
-    let world = game.server.world.clone();
-    world.compute_render_list(&mut game.renderer); // TODO: Improve perf on server!
-    println!("5");
-    /*let diff = Instant::now().duration_since(now);
+    if game.server.is_some() {
+        game.renderer.update_camera(physical_width, physical_height);
+        println!("4");
+        let world = game.server.as_ref().unwrap().world.clone();
+        world.compute_render_list(&mut game.renderer); // TODO: Improve perf on server!
+        println!("5");
+        /*let diff = Instant::now().duration_since(now);
     println!("Diff5 took {}", diff.as_millis());*/ // readd
-    game.chunk_builder
-        .tick(game.server.world.clone(), &mut game.renderer, version);
-    /*let diff = Instant::now().duration_since(now);
+        game.chunk_builder
+            .tick(game.server.as_ref().unwrap().world.clone(), &mut game.renderer, version);
+        /*let diff = Instant::now().duration_since(now);
     println!("Diff6 took {}", diff.as_millis());*/
+    }
 
     game.screen_sys
         .tick(delta, &mut game.renderer, &mut ui_container);
@@ -546,8 +544,24 @@ fn tick_all(
     ui_container.tick(&mut game.renderer, delta, width, height);
     /*let diff = Instant::now().duration_since(now);
     println!("Diff9 took {}", diff.as_millis());*/ // readd
+    let world = if let Some(server) = game.server.as_ref() {
+        Some(server.world.clone())
+    }else {
+        None
+    };
+    /*
+    if game.server.is_some() {
+        game.renderer.tick(
+            world/*&mut game.server.world*/,
+            delta,
+            width as u32,
+            height as u32,
+            physical_width,
+            physical_height,
+        );
+    }*/
     game.renderer.tick(
-        game.server.world.clone()/*&mut game.server.world*/,
+        world/*&mut game.server.world*/,
         delta,
         width as u32,
         height as u32,
@@ -609,14 +623,14 @@ fn handle_window_event<T>(
             if game.focused {
                 window.set_cursor_grab(true).unwrap();
                 window.set_cursor_visible(false);
-                if let Some(player) = *game.server.player.clone().write().unwrap() {
+                if let Some(player) = *game.server.as_ref().unwrap().player.clone().write().unwrap() {
                     let rotation = game
-                        .server
+                        .server.as_ref().unwrap()
                         .entities
                         .clone()
                         .write()
                         .unwrap()
-                        .get_component_mut(player, game.server.rotation)
+                        .get_component_mut(player, game.server.as_ref().unwrap().rotation)
                         .unwrap();
                     rotation.yaw -= rx;
                     rotation.pitch -= ry;
@@ -661,7 +675,7 @@ fn handle_window_event<T>(
                         let (width, height) =
                             physical_size.to_logical::<f64>(game.dpi_factor).into();
 
-                        if game.server.is_connected()
+                        if game.server.is_some() && game.server.as_ref().unwrap().is_connected()
                             && !game.focused
                             && !game.screen_sys.is_current_closable()
                         {
@@ -682,8 +696,8 @@ fn handle_window_event<T>(
                         }
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
-                        if game.focused {
-                            game.server.on_right_click(&mut game.renderer);
+                        if game.focused && game.server.is_some() {
+                            game.server.as_ref().unwrap().on_right_click(&mut game.renderer);
                         }
                     }
                     (_, _) => (),
@@ -750,7 +764,9 @@ fn handle_window_event<T>(
                                 if let Some(action_key) =
                                     settings::Actionkey::get_by_keycode(key, &game.vars)
                                 {
-                                    game.server.key_press(true, action_key);
+                                    if game.server.is_some() {
+                                        game.server.as_ref().unwrap().key_press(true, action_key);
+                                    }
                                 }
                             } else {
                                 let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
@@ -762,7 +778,9 @@ fn handle_window_event<T>(
                                 if let Some(action_key) =
                                     settings::Actionkey::get_by_keycode(key, &game.vars)
                                 {
-                                    game.server.key_press(false, action_key);
+                                    if game.server.is_some() {
+                                        game.server.as_ref().unwrap().key_press(false, action_key);
+                                    }
                                 }
                             } else {
                                 let ctrl_pressed = game.is_ctrl_pressed;

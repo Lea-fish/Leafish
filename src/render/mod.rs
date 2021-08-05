@@ -296,7 +296,7 @@ impl Renderer {
 
     pub fn tick(
         &mut self,
-        world: Arc<World>/*&mut world::World*/,
+        world: Option<Arc<World>>/*&mut world::World*/,
         delta: f64,
         width: u32,
         height: u32,
@@ -305,8 +305,10 @@ impl Renderer {
     ) {
         self.update_textures(delta);
 
-        let trans = self.trans.as_mut().unwrap();
-        trans.main.bind();
+        if self.trans.is_some() {
+            let trans = self.trans.as_mut().unwrap();
+            trans.main.bind();
+        }
 
         gl::active_texture(0);
         self.gl_texture.bind(gl::TEXTURE_2D_ARRAY);
@@ -322,38 +324,39 @@ impl Renderer {
         );
         gl::clear(gl::ClearFlags::Color | gl::ClearFlags::Depth);
 
-        // Chunk rendering
-        self.chunk_shader.program.use_program();
+        if world.is_some() {
+            // Chunk rendering
+            self.chunk_shader.program.use_program();
 
-        self.chunk_shader
-            .perspective_matrix
-            .set_matrix4(&self.perspective_matrix);
-        self.chunk_shader
-            .camera_matrix
-            .set_matrix4(&self.camera_matrix);
-        self.chunk_shader.texture.set_int(0);
-        self.chunk_shader.light_level.set_float(self.light_level);
-        self.chunk_shader.sky_offset.set_float(self.sky_offset);
-        let tmp_world = world.clone();
+            self.chunk_shader
+                .perspective_matrix
+                .set_matrix4(&self.perspective_matrix);
+            self.chunk_shader
+                .camera_matrix
+                .set_matrix4(&self.camera_matrix);
+            self.chunk_shader.texture.set_int(0);
+            self.chunk_shader.light_level.set_float(self.light_level);
+            self.chunk_shader.sky_offset.set_float(self.sky_offset);
 
-        for (pos, info) in tmp_world.get_render_list() {
-            if let Some(solid) = info.clone().read().unwrap().solid.as_ref() {
-                if solid.count > 0 {
-                    self.chunk_shader
-                        .offset
-                        .set_int3(pos.0, pos.1 * 4096, pos.2);
-                    solid.array.bind();
-                    gl::draw_elements(
-                        gl::TRIANGLES,
-                        solid.count as i32,
-                        self.element_buffer_type,
-                        0,
-                    );
+            let tmp_world = world.as_ref().unwrap().clone();
+
+            for (pos, info) in tmp_world.get_render_list() {
+                if let Some(solid) = info.clone().read().unwrap().solid.as_ref() {
+                    if solid.count > 0 {
+                        self.chunk_shader
+                            .offset
+                            .set_int3(pos.0, pos.1 * 4096, pos.2);
+                        solid.array.bind();
+                        gl::draw_elements(
+                            gl::TRIANGLES,
+                            solid.count as i32,
+                            self.element_buffer_type,
+                            0,
+                        );
+                    }
                 }
             }
         }
-
-        drop(tmp_world);
 
         // Line rendering
         // Model rendering
@@ -365,43 +368,46 @@ impl Renderer {
             self.sky_offset,
         );
 
-        let tmp_world = world.clone();
+        if world.is_some() {
+            let tmp_world = world.as_ref().unwrap().clone();
 
-        if let Some(clouds) = &mut self.clouds {
-            if tmp_world.copy_cloud_heightmap(&mut clouds.heightmap_data) {
-                clouds.dirty = true;
+            if let Some(clouds) = &mut self.clouds {
+                if tmp_world.copy_cloud_heightmap(&mut clouds.heightmap_data) {
+                    clouds.dirty = true;
+                }
+                clouds.draw(
+                    &self.camera.pos,
+                    &self.perspective_matrix,
+                    &self.camera_matrix,
+                    self.light_level,
+                    self.sky_offset,
+                    delta,
+                );
             }
-            clouds.draw(
-                &self.camera.pos,
-                &self.perspective_matrix,
-                &self.camera_matrix,
-                self.light_level,
-                self.sky_offset,
-                delta,
-            );
         }
 
-        drop(tmp_world);
+        if self.trans.is_some() {
+            // Trans chunk rendering
+            self.chunk_shader_alpha.program.use_program();
+            self.chunk_shader_alpha
+                .perspective_matrix
+                .set_matrix4(&self.perspective_matrix);
+            self.chunk_shader_alpha
+                .camera_matrix
+                .set_matrix4(&self.camera_matrix);
+            self.chunk_shader_alpha.texture.set_int(0);
+            self.chunk_shader_alpha
+                .light_level
+                .set_float(self.light_level);
+            self.chunk_shader_alpha
+                .sky_offset
+                .set_float(self.sky_offset);
 
-        // Trans chunk rendering
-        self.chunk_shader_alpha.program.use_program();
-        self.chunk_shader_alpha
-            .perspective_matrix
-            .set_matrix4(&self.perspective_matrix);
-        self.chunk_shader_alpha
-            .camera_matrix
-            .set_matrix4(&self.camera_matrix);
-        self.chunk_shader_alpha.texture.set_int(0);
-        self.chunk_shader_alpha
-            .light_level
-            .set_float(self.light_level);
-        self.chunk_shader_alpha
-            .sky_offset
-            .set_float(self.sky_offset);
-
-        // Copy the depth buffer
-        trans.main.bind_read();
-        trans.trans.bind_draw();
+            // Copy the depth buffer
+            let trans = self.trans.as_mut().unwrap();
+            trans.main.bind_read();
+            trans.trans.bind_draw();
+        }
         gl::blit_framebuffer(
             0,
             0,
@@ -417,11 +423,14 @@ impl Renderer {
 
         gl::enable(gl::BLEND);
         gl::depth_mask(false);
-        trans.trans.bind();
-        gl::clear_color(0.0, 0.0, 0.0, 1.0);
+        if self.trans.is_some() {
+            let trans = self.trans.as_mut().unwrap();
+            trans.trans.bind();
+        }
+        gl::clear_color(0.0, 0.0, 0.0, 1.0); // clear color
         gl::clear(gl::ClearFlags::Color);
-        gl::clear_buffer(gl::COLOR, 0, &mut [0.0, 0.0, 0.0, 1.0]);
-        gl::clear_buffer(gl::COLOR, 1, &mut [0.0, 0.0, 0.0, 0.0]);
+        gl::clear_buffer(gl::COLOR, 0, &mut [0.0, 0.0, 0.0, 1.0]); // clear color
+        gl::clear_buffer(gl::COLOR, 1, &mut [0.0, 0.0, 0.0, 0.0]); // clear color
         gl::blend_func_separate(
             gl::ONE_FACTOR,
             gl::ONE_FACTOR,
@@ -429,20 +438,22 @@ impl Renderer {
             gl::ONE_MINUS_SRC_ALPHA,
         );
 
-        let tmp_world = world.clone();
-        for (pos, info) in tmp_world.get_render_list().iter().rev() {
-            if let Some(trans) = info.clone().read().unwrap().trans.as_ref() {
-                if trans.count > 0 {
-                    self.chunk_shader_alpha
-                        .offset
-                        .set_int3(pos.0, pos.1 * 4096, pos.2);
-                    trans.array.bind();
-                    gl::draw_elements(
-                        gl::TRIANGLES,
-                        trans.count as i32,
-                        self.element_buffer_type,
-                        0,
-                    );
+        if world.is_some() {
+            let tmp_world = world.unwrap().clone();
+            for (pos, info) in tmp_world.get_render_list().iter().rev() {
+                if let Some(trans) = info.clone().read().unwrap().trans.as_ref() {
+                    if trans.count > 0 {
+                        self.chunk_shader_alpha
+                            .offset
+                            .set_int3(pos.0, pos.1 * 4096, pos.2);
+                        trans.array.bind();
+                        gl::draw_elements(
+                            gl::TRIANGLES,
+                            trans.count as i32,
+                            self.element_buffer_type,
+                            0,
+                        );
+                    }
                 }
             }
         }
@@ -452,7 +463,10 @@ impl Renderer {
         gl::disable(gl::DEPTH_TEST);
         gl::clear(gl::ClearFlags::Color);
         gl::disable(gl::BLEND);
-        trans.draw(&self.trans_shader);
+        if self.trans.is_some() {
+            let trans = self.trans.as_mut().unwrap();
+            trans.draw(&self.trans_shader);
+        }
 
         gl::enable(gl::DEPTH_TEST);
         gl::depth_mask(true);

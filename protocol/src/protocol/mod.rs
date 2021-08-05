@@ -45,7 +45,6 @@ use std::io;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::mpsc::Sender;
 
 pub const SUPPORTED_PROTOCOLS: [i32; 24] = [
     754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 452, 451, 404, 340, 316, 315, 210,
