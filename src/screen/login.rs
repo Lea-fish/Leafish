@@ -185,7 +185,7 @@ impl super::Screen for Login {
             let refresh = elements.refresh;
             let profile = elements.profile.clone();
             thread::spawn(move || {
-                if refresh {
+                if refresh && (username.is_empty() || password.is_empty()) {
                     tx.send(profile.refresh(&client_token)).unwrap();
                 } else {
                     tx.send(mojang::Profile::login(&username, &password, &client_token))

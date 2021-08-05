@@ -146,7 +146,6 @@ impl Game {
     }
 
     pub fn tick(&mut self/*, delta: f64*/) {
-        println!("tick!");
         if self.server.is_some() {
             if let Some(disconnect_reason) = self.server.as_ref().unwrap().disconnect_data.clone().write().unwrap().disconnect_reason.take() {
                 self.screen_sys
@@ -421,6 +420,7 @@ fn main() {
         } = event
         {
             glutin_window.resize(physical_size);
+            // TODO: Fix window resizing!
         }
 
         if !handle_window_event(&winit_window, &mut game, &mut ui_container, event) {
@@ -495,26 +495,21 @@ fn tick_all(
     game.tick(/*delta*/);
     /*let diff = Instant::now().duration_since(now);
     println!("Diff2 took {}", diff.as_millis());*/
-    println!("1.5");
     if game.server.is_some() {
         game.server.as_ref().unwrap().tick(&mut game.renderer, delta); // TODO: Improve perf in load screen!
     }
     /*let diff = Instant::now().duration_since(now);
     println!("Diff3 took {}", diff.as_millis());*/
-    println!("2");
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
         return;
     }
-    println!("3");
 
     if game.server.is_some() {
         game.renderer.update_camera(physical_width, physical_height);
-        println!("4");
         let world = game.server.as_ref().unwrap().world.clone();
         world.compute_render_list(&mut game.renderer); // TODO: Improve perf on server!
-        println!("5");
         /*let diff = Instant::now().duration_since(now);
     println!("Diff5 took {}", diff.as_millis());*/ // readd
         game.chunk_builder
