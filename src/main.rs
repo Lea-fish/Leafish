@@ -148,6 +148,7 @@ impl Game {
     pub fn tick(&mut self/*, delta: f64*/) {
         if self.server.is_some() {
             if let Some(disconnect_reason) = self.server.as_ref().unwrap().disconnect_data.clone().write().unwrap().disconnect_reason.take() {
+                self.server = None;
                 self.screen_sys
                     .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason))));
             }

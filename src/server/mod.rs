@@ -44,6 +44,7 @@ use crate::entity::player::PlayerMovement;
 use std::thread::sleep;
 use std::ops::{Add, Sub};
 use rayon::prelude::*;
+use leafish_protocol::protocol::packet::Packet::ConfirmTransactionServerbound;
 
 pub mod plugin_messages;
 mod sun;
@@ -368,8 +369,7 @@ impl Server {
         let server_callback = Arc::new(RwLock::new(None));
         let inner_server = server_callback.clone();
         let mut inner_server = inner_server.write().unwrap();
-        let rx = Self::spawn_reader(conn.clone(),
-                                    protocol_version, uuid.clone(), server_callback.clone());
+        Self::spawn_reader(conn.clone(), protocol_version, uuid.clone(), server_callback.clone());
         let light_updater = Self::spawn_light_updater(server_callback.clone());
         let conn = Arc::new(RwLock::new(Some(conn)));
         let server = Arc::new(Server::new(
@@ -393,10 +393,11 @@ impl Server {
         protocol_version: i32,
         uuid: UUID,
         server: Arc<RwLock<Option<Arc<Server>>>>,
-    ) -> mpsc::Receiver<Result<packet::Packet, protocol::Error>> {
-        let server = server.clone().read().unwrap().as_ref().unwrap().clone();
-        let (tx, rx) = mpsc::channel();
+    ) {
         thread::spawn(move || loop {
+            while server.clone().try_read().is_err() {
+            }
+            let server = server.clone().read().unwrap().as_ref().unwrap().clone();
             let pck = read.read_packet();
                 match pck {
                     Ok(pck) =>
@@ -507,7 +508,8 @@ impl Server {
                                     );*/
                                     Server::on_block_change_in_world(server.world.clone(), Position::new(sx + lx as i32, sy + ly as i32, sz + lz as i32), block_raw_id as i32);
                                 }
-                            },Packet::MultiBlockChange_VarInt(block_change) => {
+                            },
+                            Packet::MultiBlockChange_VarInt(block_change) => {
                                 let ox = block_change.chunk_x << 4;
                                 let oz = block_change.chunk_z << 4;
                                 for record in block_change.records.data {
@@ -1246,6 +1248,13 @@ impl Server {
                                 )
                                 // Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), block_change.location, block_change.block_id.0);
                             },
+                            Packet::ConfirmTransaction(transaction) => {
+                                read.write_packet(packet::play::serverbound::ConfirmTransactionServerbound {
+                                    id: 0, // TODO: Use current container id, if the id of the transaction is not 0.
+                                    action_number: transaction.action_number,
+                                    accepted: true,
+                                });
+                            },
                             /*
                             Packet::BlockChange_VarInt(block_change) => {
                                 Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), block_change.location, block_change.block_id.0);
@@ -1264,30 +1273,22 @@ impl Server {
                             },
                             Packet::BlockChange_VarInt(block_change) => {
                                 Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), block_change.location, block_change.block_id.0);
-                            },
-                            Packet::BlockChange_VarInt(block_change) => {
-                                Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), block_change.location, block_change.block_id.0);
                             },*/
-
-
-
-
+                            Packet::PluginMessageClientbound_i16(plugin_message) => {
+                                Server::on_plugin_message_clientbound_i16_glob(server.clone(), plugin_message);
+                            },
+                            Packet::PluginMessageClientbound(plugin_message) => {
+                                Server::on_plugin_message_clientbound_1_glob(server.clone(), plugin_message);
+                            },
                             _ => {
                                 println!("other packet!");
-                                if tx.send(Ok(pck)).is_err() {
-                                    return;
-                                }
                             }
                         },
                     Err(err) => {
-                        println!("error!");
-                        if tx.send(Err(err)).is_err() {
-                            return;
-                        }
+                        panic!("An error occurred while reading a packet!");
                     },
                 }
         });
-        rx
     }
 
     /*
@@ -1312,6 +1313,8 @@ impl Server {
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
             rx.recv().unwrap();
+            while server.clone().try_read().is_err() {
+            }
             let server = server.clone().read().unwrap().as_ref().unwrap().clone();
             let mut done = false;
             while !done {
@@ -1530,14 +1533,12 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             self.version.write().unwrap().replace(version);
             self.world.clone().flag_dirty_all();
         }
-        println!("0.1");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff1 took {}", diff.as_millis());*/
         // TODO: Check if the world type actually needs a sun
         if self.sun_model.read().unwrap().is_none() {
             self.sun_model.write().unwrap().replace(sun::SunModel::new(renderer));
         }
-        println!("0.2");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff2 took {}", diff.as_millis());*/
 
@@ -1550,12 +1551,10 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             renderer.camera.yaw = rotation.yaw;
             renderer.camera.pitch = rotation.pitch;
         }
-        println!("0.3");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff3 took {}", diff.as_millis());*/
         // println!("entity_tick!");
         self.entity_tick(renderer, delta);
-        println!("0.4");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff4 took {}", diff.as_millis());*/
 
@@ -1564,27 +1563,22 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             self.minecraft_tick();
             self.tick_timer.write().unwrap().sub(3.0);
         }
-        println!("0.5");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff5 took {}", diff.as_millis());*/
-        println!("0.55");
 
         self.update_time(renderer, delta);
         /*let diff = Instant::now().duration_since(now);
         println!("Diff6 took {}", diff.as_millis());*/
-        println!("0.6");
         if let Some(sun_model) = self.sun_model.write().unwrap().as_mut() {
             sun_model.tick(renderer, self.world_data.clone().read().unwrap().world_time, self.world_data.clone().read().unwrap().world_age);
         }
         /*let diff = Instant::now().duration_since(now);
         println!("Diff7 took {}", diff.as_millis());*/
-        println!("0.7");
         let world = self.world.clone();
         world.tick(&mut self.entities.clone().write().unwrap());
         // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
             self.light_updates.lock().unwrap().send(true);
         // }
-        println!("0.8");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff8 took {}", diff.as_millis());*/
 
@@ -1743,29 +1737,22 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
 
     fn update_time(&self, renderer: &mut render::Renderer, delta: f64) {
         if self.world_data.clone().read().unwrap().tick_time {
-            println!("0.551");
             self.world_data.clone().write().unwrap().world_time_target += delta / 3.0;
-            println!("0.552");
             let time = self.world_data.clone().read().unwrap().world_time_target;
             self.world_data.clone().write().unwrap().world_time_target = (24000.0 + time) % 24000.0;
-            println!("0.553");
             let mut diff = self.world_data.clone().read().unwrap().world_time_target - self.world_data.clone().read().unwrap().world_time;
-            println!("0.554");
             if diff < -12000.0 {
                 diff += 24000.0
             } else if diff > 12000.0 {
                 diff -= 24000.0
             }
             self.world_data.clone().write().unwrap().world_time += diff * (1.5 / 60.0) * delta;
-            println!("0.555");
             let time = self.world_data.clone().read().unwrap().world_time;
             self.world_data.clone().write().unwrap().world_time = (24000.0 + time) % 24000.0;
-            println!("0.556");
         } else {
             let time = self.world_data.clone().read().unwrap().world_time_target;
             self.world_data.clone().write().unwrap().world_time = time;
         }
-        println!("0.557");
         renderer.sky_offset = self.calculate_sky_offset();
         println!("0.558");
     }
@@ -2118,12 +2105,127 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         }
     }
 
+    fn on_plugin_message_clientbound_i16_glob(
+        server: Arc<Server>,
+        msg: packet::play::clientbound::PluginMessageClientbound_i16,
+    ) {
+        Server::on_plugin_message_clientbound_glob(server, &msg.channel, msg.data.data.as_slice())
+    }
+
+    fn on_plugin_message_clientbound_1_glob(
+        server: Arc<Server>,
+        msg: packet::play::clientbound::PluginMessageClientbound,
+    ) {
+        Server::on_plugin_message_clientbound_glob(server, &msg.channel, &msg.data)
+    }
+
+    fn on_plugin_message_clientbound_glob(server: Arc<Server>, channel: &str, data: &[u8]) {
+        if protocol::is_network_debug() {
+            debug!(
+                "Received plugin message: channel={}, data={:?}",
+                channel, data
+            );
+        }
+
+        match channel {
+            "REGISTER" => {}   // TODO
+            "UNREGISTER" => {} // TODO
+            "FML|HS" => {
+                let msg = crate::protocol::Serializable::read_from(&mut std::io::Cursor::new(data))
+                    .unwrap();
+                //debug!("FML|HS msg={:?}", msg);
+
+                use forge::FmlHs::*;
+                use forge::Phase::*;
+                match msg {
+                    ServerHello {
+                        fml_protocol_version,
+                        override_dimension,
+                    } => {
+                        debug!(
+                            "Received FML|HS ServerHello {} {:?}",
+                            fml_protocol_version, override_dimension
+                        );
+
+                        server.write_plugin_message("REGISTER", b"FML|HS\0FML\0FML|MP\0FML\0FORGE");
+                        server.write_fmlhs_plugin_message(&ClientHello {
+                            fml_protocol_version,
+                        });
+                        // Send stashed mods list received from ping packet, client matching server
+                        let mods = crate::protocol::LenPrefixed::<
+                            crate::protocol::VarInt,
+                            forge::ForgeMod,
+                        >::new(server.forge_mods.clone());
+                        server.write_fmlhs_plugin_message(&ModList { mods });
+                    }
+                    ModList { mods } => {
+                        debug!("Received FML|HS ModList: {:?}", mods);
+
+                        server.write_fmlhs_plugin_message(&HandshakeAck {
+                            phase: WaitingServerData,
+                        });
+                    }
+                    ModIdData {
+                        mappings,
+                        block_substitutions: _,
+                        item_substitutions: _,
+                    } => {
+                        debug!("Received FML|HS ModIdData");
+                        for m in mappings.data {
+                            let (namespace, name) = m.name.split_at(1);
+                            if namespace == protocol::forge::BLOCK_NAMESPACE {
+                                server.world.clone()
+                                    .modded_block_ids.clone().write().unwrap()
+                                    .insert(m.id.0 as usize, name.to_string());
+                            }
+                        }
+                        server.write_fmlhs_plugin_message(&HandshakeAck {
+                            phase: WaitingServerComplete,
+                        });
+                    }
+                    RegistryData {
+                        has_more,
+                        name,
+                        ids,
+                        substitutions: _,
+                        dummies: _,
+                    } => {
+                        debug!("Received FML|HS RegistryData for {}", name);
+                        if name == "minecraft:blocks" {
+                            for m in ids.data {
+                                server.world.clone().modded_block_ids.clone().write().unwrap().insert(m.id.0 as usize, m.name);
+                            }
+                        }
+                        if !has_more {
+                            server.write_fmlhs_plugin_message(&HandshakeAck {
+                                phase: WaitingServerComplete,
+                            });
+                        }
+                    }
+                    HandshakeAck { phase } => match phase {
+                        WaitingCAck => {
+                            server.write_fmlhs_plugin_message(&HandshakeAck {
+                                phase: PendingComplete,
+                            });
+                        }
+                        Complete => {
+                            debug!("FML|HS handshake complete!");
+                        }
+                        _ => unimplemented!(),
+                    },
+                    _ => (),
+                }
+            }
+            _ => (),
+        }
+    }
+
     // TODO: remove wrappers and directly call on Conn
-    fn write_fmlhs_plugin_message(&mut self, msg: &forge::FmlHs) {
+    fn write_fmlhs_plugin_message(&self, msg: &forge::FmlHs) {
         let _ = self.conn.clone().write().unwrap().as_mut().unwrap().write_fmlhs_plugin_message(msg); // TODO handle errors
     }
 
-    fn write_plugin_message(&mut self, channel: &str, data: &[u8]) {
+    fn write_plugin_message(&self, channel: &str, data: &[u8]) {
         let _ = self
             .conn
             .clone().write().unwrap().as_mut().unwrap()
@@ -2137,37 +2239,37 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         self.on_game_join(join.gamemode, join.entity_id)
     }
 
-    fn on_game_join_worldnames(&mut self, join: packet::play::clientbound::JoinGame_WorldNames) {
+    fn on_game_join_worldnames(&self, join: packet::play::clientbound::JoinGame_WorldNames) {
         self.on_game_join(join.gamemode, join.entity_id)
     }
 
     fn on_game_join_hashedseed_respawn(
-        &mut self,
+        &self,
         join: packet::play::clientbound::JoinGame_HashedSeed_Respawn,
     ) {
         self.on_game_join(join.gamemode, join.entity_id)
     }
 
     fn on_game_join_i32_viewdistance(
-        &mut self,
+        &self,
         join: packet::play::clientbound::JoinGame_i32_ViewDistance,
     ) {
         self.on_game_join(join.gamemode, join.entity_id)
     }
 
-    fn on_game_join_i32(&mut self, join: packet::play::clientbound::JoinGame_i32) {
+    fn on_game_join_i32(&self, join: packet::play::clientbound::JoinGame_i32) {
         self.on_game_join(join.gamemode, join.entity_id)
     }
 
-    fn on_game_join_i8(&mut self, join: packet::play::clientbound::JoinGame_i8) {
+    fn on_game_join_i8(&self, join: packet::play::clientbound::JoinGame_i8) {
         self.on_game_join(join.gamemode, join.entity_id)
     }
 
-    fn on_game_join_i8_nodebug(&mut self, join: packet::play::clientbound::JoinGame_i8_NoDebug) {
+    fn on_game_join_i8_nodebug(&self, join: packet::play::clientbound::JoinGame_i8_NoDebug) {
         self.on_game_join(join.gamemode, join.entity_id)
     }
 
-    fn on_game_join(&mut self, gamemode: u8, entity_id: i32) {
+    fn on_game_join(&self, gamemode: u8, entity_id: i32) {
         let gamemode = Gamemode::from_int((gamemode & 0x7) as i32);
         let player = entity::player::create_local(&mut self.entities.clone().write().unwrap());
         if let Some(info) = self.players.clone().read().unwrap().get(&self.uuid) {
@@ -2191,7 +2293,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             .flying = gamemode.can_fly();
 
         self.entity_map.clone().write().unwrap().insert(entity_id, player);
-        self.player = Arc::new(RwLock::new(Some(player)));
+        self.player.clone().write().unwrap().replace(player);
 
         // Let the server know who we are
         let brand = plugin_messages::Brand {
