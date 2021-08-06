@@ -12,6 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::hash::BuildHasherDefault;
+use std::io::{Cursor, Read};
+use std::sync::{Arc, RwLock};
+
+use cgmath::prelude::*;
+use flate2::read::ZlibDecoder;
 pub use leafish_blocks as block;
 
 use crate::chunk_builder;
@@ -21,23 +30,16 @@ use crate::format;
 use crate::protocol;
 use crate::render;
 use crate::shared::{Direction, Position};
-use crate::types::hash::FNVHash;
 use crate::types::{bit, nibble};
-use cgmath::prelude::*;
-use flate2::read::ZlibDecoder;
-use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::collections::VecDeque;
-use std::hash::BuildHasherDefault;
-use std::io::Read;
-use std::sync::{Arc, RwLock};
+use crate::types::hash::FNVHash;
+use byteorder::ReadBytesExt;
 
 pub mod biome;
 mod storage;
 
 #[derive(Default)]
 pub struct World {
-    chunks: Arc<RwLock<HashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>>,
+    pub chunks: Arc<RwLock<HashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>>,
 
     render_list: Arc<RwLock<Vec<(i32, i32, i32)>>>,
 
@@ -693,6 +695,322 @@ Process finished with exit code 101
         }
     }
 
+    /*
+     x: i32,
+        z: i32,
+        new: bool,
+        mask: u16,
+        mask_add: u16,
+        compressed_data: Vec<u8>,
+     */
+    /*
+    read_biomes: bool,
+        x: i32,
+        z: i32,
+        new: bool,
+        mask: u16,
+        data: Vec<u8>,
+     */
+    pub fn load_chunk(&self,
+                      x: i32,
+                      z: i32,
+                      new: bool,
+                      skylight: bool,
+                      read_biomes: bool,
+                      mask: u16,
+                      mask_add: u16,
+                      data: &mut Cursor<Vec<u8>>,
+                      version: u8) -> Result<(), protocol::Error> {
+        use byteorder::ReadBytesExt;
+        use std::io::Cursor;
+
+        let cpos = CPos(x, z);
+        {
+            if new {
+                // let curr = self.chunks.clone().read().unwrap().get(&cpos); // TODO: Fix lighting with something similar to bixilon's light accessor!
+                self.chunks.clone().write().unwrap().insert(cpos, Chunk::new(cpos));
+            } else if !self.chunks.clone().read().unwrap().contains_key(&cpos) {
+                return Ok(());
+            }
+            let chunks = self.chunks.clone();
+            let mut chunks = chunks.write().unwrap();
+            let chunk = chunks.get_mut(&cpos).unwrap();
+
+            // Block type array - whole byte per block  // 17
+            let mut block_types: [[u8; 4096]; 16] = [[0u8; 4096]; 16];; // 17
+            for i in 0..16 {
+                if chunk.sections[i].is_none() {
+                    let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
+                    fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
+                    if !fill_sky || mask & (1 << i) != 0 {
+                        chunk.sections[i] = Some(Arc::new(RwLock::new(Section::new(i as u8, fill_sky))));
+                    }
+                }
+                if mask & (1 << i) == 0 {
+                    continue;
+                }
+                let section = chunk.sections[i as usize].as_ref().unwrap();
+                section.clone().write().unwrap().dirty = true;
+
+                if version == 17 {
+                    data.read_exact(&mut block_types[i])?;
+                } else if version == 18 {
+                    self.prep_section_18(chunk, section.clone(), data, i);
+                } else if version == 19 {
+                    self.prep_section_19(chunk, section.clone(), data, i);
+                }
+            }
+            if version == 17 {
+                self.finish_17(chunk, mask, mask_add, skylight, data, block_types);
+            }else if version != 19 {
+                self.read_light(chunk, mask, skylight, data);
+            }
+
+            if new && read_biomes { // read biomes is always true (as param) except for load_chunk_19
+                data.read_exact(&mut chunk.biomes)?;
+            }
+
+            chunk.calculate_heightmap();
+        }
+
+        self.dirty_chunks_by_bitmask(x, z, mask);
+        Ok(())
+    }
+
+    fn prep_section_19(&self, chunk: &Chunk, section: Arc<RwLock<Section>>, data: &mut Cursor<Vec<u8>>, section_id: usize) {
+        use crate::protocol::{LenPrefixed, Serializable, VarInt};
+        if self.protocol_version >= 451 {
+            let _block_count = data.read_u16::<byteorder::LittleEndian>().unwrap();
+            // TODO: use block_count
+        }
+
+        let mut bit_size = data.read_u8().unwrap();
+        let mut mappings: HashMap<usize, block::Block, BuildHasherDefault<FNVHash>> =
+            HashMap::with_hasher(BuildHasherDefault::default());
+        if bit_size == 0 {
+            bit_size = 13;
+        } else {
+            let count = VarInt::read_from(data).unwrap().0;
+            for i in 0..count {
+                let id = VarInt::read_from(data).unwrap().0;
+                let bl = self
+                    .id_map
+                    .by_vanilla_id(id as usize, self.modded_block_ids.clone());
+                mappings.insert(i as usize, bl);
+            }
+        }
+
+        let bits = LenPrefixed::<VarInt, u64>::read_from(data).unwrap().data;
+        let padded = self.protocol_version >= 736;
+        let m = bit::Map::from_raw(bits, bit_size as usize, padded);
+
+        for bi in 0..4096 {
+            let id = m.get(bi);
+            section.clone().write().unwrap().blocks.set(
+                bi,
+                mappings
+                    .get(&id)
+                    .cloned()
+                    // TODO: fix or_fun_call, but do not re-borrow self
+                    .unwrap_or(self.id_map.by_vanilla_id(id, self.modded_block_ids.clone())),
+            );
+            // Spawn block entities
+            let b = section.clone().read().unwrap().blocks.get(bi);
+            if block_entity::BlockEntityType::get_block_entity(b).is_some() {
+                let pos = Position::new(
+                    (bi & 0xF) as i32,
+                    (bi >> 8) as i32,
+                    ((bi >> 4) & 0xF) as i32,
+                ) + (
+                    chunk.position.0 << 4,
+                    (section_id << 4) as i32,
+                    chunk.position.1 << 4,
+                );
+                if chunk.block_entities.contains_key(&pos) {
+                    self.block_entity_actions.clone().write().unwrap()
+                        .push_back(BlockEntityAction::Remove(pos))
+                }
+                self.block_entity_actions.clone().write().unwrap()
+                    .push_back(BlockEntityAction::Create(pos))
+            }
+        }
+        if self.protocol_version >= 451 {
+            // Skylight in update skylight packet for 1.14+
+        } else {
+            data.read_exact(&mut section.clone().write().unwrap().block_light.data).unwrap();
+            data.read_exact(&mut section.clone().write().unwrap().sky_light.data).unwrap();
+        }
+    }
+
+    fn prep_section_18(&self, chunk: &Chunk, section: Arc<RwLock<Section>>, data: &mut Cursor<Vec<u8>>, section_id: usize) {
+        for bi in 0..4096 {
+            let id = data.read_u16::<byteorder::LittleEndian>().unwrap();
+            section.clone().write().unwrap().blocks.set(
+                bi,
+                self.id_map
+                    .by_vanilla_id(id as usize, self.modded_block_ids.clone()),
+            );
+
+            // Spawn block entities
+            let b = section.clone().write().unwrap().blocks.get(bi);
+            if block_entity::BlockEntityType::get_block_entity(b).is_some() {
+                let pos = Position::new(
+                    (bi & 0xF) as i32,
+                    (bi >> 8) as i32,
+                    ((bi >> 4) & 0xF) as i32,
+                ) + (
+                    chunk.position.0 << 4,
+                    (section_id << 4) as i32,
+                    chunk.position.1 << 4,
+                );
+                if chunk.block_entities.contains_key(&pos) {
+                    self.block_entity_actions.clone().write().unwrap()
+                        .push_back(BlockEntityAction::Remove(pos))
+                }
+                self.block_entity_actions.clone().write().unwrap()
+                    .push_back(BlockEntityAction::Create(pos))
+            }
+        }
+    }
+
+    fn read_light(&self, chunk: &Chunk, mask: u16, skylight: bool, data: &mut Cursor<Vec<u8>>) {
+        // Block light array - half byte per block
+        for i in 0..16 {
+            if mask & (1 << i) == 0 {
+                continue;
+            }
+            let section = chunk.sections[i as usize].as_ref().unwrap();
+
+            data.read_exact(&mut section.clone().write().unwrap().block_light.data).unwrap();
+        }
+
+        // Sky light array - half byte per block - only if 'skylight' is true
+        if skylight {
+            for i in 0..16 {
+                if mask & (1 << i) == 0 {
+                    continue;
+                }
+                let section = chunk.sections[i as usize].as_ref().unwrap();
+
+                data.read_exact(&mut section.clone().write().unwrap().sky_light.data).unwrap();
+            }
+        }
+    }
+
+    fn finish_17(&self, chunk: &Chunk, mask: u16, mask_add: u16, skylight: bool, data: &mut Cursor<Vec<u8>>, block_types: [[u8; 4096]; 16]) {
+        // Block metadata array - half byte per block
+        let mut block_meta: [nibble::Array; 16] = [
+            // TODO: cleanup this initialization
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+        ];
+
+        for i in 0..16 {
+            if mask & (1 << i) == 0 {
+                continue;
+            }
+
+            data.read_exact(&mut block_meta[i].data).unwrap();
+        }
+
+        self.read_light(chunk, mask, skylight, data);
+
+        // Add array - half byte per block - uses secondary bitmask
+        let mut block_add: [nibble::Array; 16] = [
+            // TODO: cleanup this initialization
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+            nibble::Array::new(16 * 16 * 16),
+        ];
+
+        for i in 0..16 {
+            if mask_add & (1 << i) == 0 {
+                continue;
+            }
+            data.read_exact(&mut block_add[i].data).unwrap();
+        }
+
+        // Now that we have the block types, metadata, and add, combine to initialize the blocks
+        for i in 0..16 {
+            if mask & (1 << i) == 0 {
+                continue;
+            }
+
+            let section = chunk.sections[i as usize].as_ref().unwrap();
+
+            for bi in 0..4096 {
+                let id = ((block_add[i].get(bi) as u16) << 12)
+                    | ((block_types[i][bi] as u16) << 4)
+                    | (block_meta[i].get(bi) as u16);
+                section.clone().write().unwrap().blocks.set(
+                    bi,
+                    self.id_map
+                        .by_vanilla_id(id as usize, self.modded_block_ids.clone()),
+                );
+
+                // Spawn block entities
+                let b = section.clone().read().unwrap().blocks.get(bi);
+                if block_entity::BlockEntityType::get_block_entity(b).is_some() {
+                    let pos = Position::new(
+                        (bi & 0xF) as i32,
+                        (bi >> 8) as i32,
+                        ((bi >> 4) & 0xF) as i32,
+                    ) + (
+                        chunk.position.0 << 4,
+                        (i << 4) as i32,
+                        chunk.position.1 << 4,
+                    );
+                    if chunk.block_entities.contains_key(&pos) {
+                        self.block_entity_actions.clone().write().unwrap()
+                            .push_back(BlockEntityAction::Remove(pos))
+                    }
+                    self.block_entity_actions.clone().write().unwrap()
+                        .push_back(BlockEntityAction::Create(pos))
+                }
+            }
+        }
+    }
+
+    /*
+    pub fn load_chunks(&self,
+                       skylight: bool,
+                       chunk_column_count: u16, // 17
+                       data_length: i32, // 17
+                       new: bool, // 18, 19
+                       read_biomes: bool, // 19
+                       chunk_metas: &[crate::protocol::packet::ChunkMeta], // 18
+                       mask: u16, // 19
+                       data: Vec<u8>) -> Result<(), protocol::Error> { // Vec<u8> | &[u8]
+
+    }*/
+
     pub fn load_chunks18(
         &self,
         new: bool,
@@ -745,11 +1063,11 @@ Process finished with exit code 101
         x: i32,
         z: i32,
         new: bool,
-        _skylight: bool,
+        _skylight: bool, // unused!
         mask: u16,
         data: &mut std::io::Cursor<Vec<u8>>,
     ) -> Result<(), protocol::Error> {
-        use byteorder::ReadBytesExt;
+        /*use byteorder::ReadBytesExt;
 
         let cpos = CPos(x, z);
         {
@@ -832,7 +1150,8 @@ Process finished with exit code 101
         }
 
         self.dirty_chunks_by_bitmask(x, z, mask);
-        Ok(())
+        Ok(())*/
+        self.load_chunk(x, z, new, true, new, mask, 0, data, 18)
     }
 
     pub fn load_chunks17(
@@ -905,6 +1224,7 @@ Process finished with exit code 101
         mask_add: u16,
         data: &mut std::io::Cursor<Vec<u8>>,
     ) -> Result<(), protocol::Error> {
+        /*
         let cpos = CPos(x, z);
         {
             if new {
@@ -1062,7 +1382,40 @@ Process finished with exit code 101
         }
 
         self.dirty_chunks_by_bitmask(x, z, mask);
-        Ok(())
+        Ok(())*/
+        self.load_chunk(x, z, new, skylight, new, mask, mask_add, data, 17)
+    }
+
+    pub fn load_light_with_loc(&self, x: i32, z: i32, block_light_mask: i32, sky_light: bool, sky_light_mask: i32, data: &mut Cursor<Vec<u8>>) {
+        // println!("x {} z {}", x, z);
+        // TODO: Insert chunks with light data only or cache them until the real data arrives!
+        /*let cpos = CPos(x, z);
+        let chunks = self.chunks.clone();
+        let mut chunks = chunks.write().unwrap();
+        let chunk = chunks.get_mut(&cpos).unwrap(); // TODO: Fix this panic!
+        self.load_light(chunk, block_light_mask, sky_light, sky_light_mask, data);*/
+    }
+
+    fn load_light(&self, chunk: &mut Chunk, block_light_mask: i32, sky_light: bool, sky_light_mask: i32, data: &mut Cursor<Vec<u8>>) {
+        for i in 0..16 {
+            if block_light_mask & (1 << i) == 0 {
+                continue;
+            }
+            let section = chunk.sections[i as usize].as_mut().unwrap();
+
+            data.read_exact(&mut section.clone().write().unwrap().block_light.data).unwrap();
+        }
+
+        if sky_light {
+            for i in 0..16 {
+                if sky_light_mask & (1 << i) == 0 {
+                    continue;
+                }
+                let section = chunk.sections[i as usize].as_mut().unwrap();
+
+                data.read_exact(&mut section.clone().write().unwrap().sky_light.data).unwrap();
+            }
+        }
     }
 
     pub fn load_chunk19(
@@ -1097,6 +1450,7 @@ Process finished with exit code 101
         mask: u16,
         data: Vec<u8>,
     ) -> Result<(), protocol::Error> {
+        /*
         use crate::protocol::{LenPrefixed, Serializable, VarInt};
         use byteorder::ReadBytesExt;
         use std::io::Cursor;
@@ -1201,6 +1555,8 @@ Process finished with exit code 101
 
         self.dirty_chunks_by_bitmask(x, z, mask);
         Ok(())
+        */
+        self.load_chunk(x, z, new, true, read_biomes, mask, 0, &mut Cursor::new(data), 19)
     }
 
     fn flag_section_dirty(&self, x: i32, y: i32, z: i32) {

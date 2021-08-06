@@ -146,6 +146,8 @@ impl ServerList {
                     game.screen_sys
                         .replace_screen(Box::new(super::connecting::Connecting::new(&address)));
                     game.connect_to(&address);
+                    game.screen_sys.pop_screen();
+                    game.focused = true;
                     true
                 });
             }

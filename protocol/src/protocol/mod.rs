@@ -1417,6 +1417,8 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             Direction::Serverbound => Direction::Clientbound,
         };
 
+        // println!("received packet with id {} dir {:?}", id, dir);
+
         if is_network_debug() {
             debug!(
                 "about to parse id={:x}, dir={:?} state={:?}",

@@ -439,7 +439,7 @@ fn main() {
             &mut vsync,
         );
         let dist = Instant::now().checked_duration_since(start);
-        println!("Ticking took {}", dist.unwrap().as_millis());
+        // println!("Ticking took {}", dist.unwrap().as_millis());
         // TODO: Fix: skins werden durchgemischt von verschiedenen spielern
         glutin_window
             .swap_buffers()

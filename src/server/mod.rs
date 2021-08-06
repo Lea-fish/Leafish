@@ -36,7 +36,7 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use leafish_protocol::protocol::packet::Packet;
 use std::sync::mpsc::Sender;
-use std::io::Write;
+use std::io::{Write, Cursor};
 use leafish_protocol::protocol::{VarInt, Serializable, UUID, Conn};
 use crate::entity::{TargetPosition, TargetRotation};
 use crate::ecs::{Key, Manager};
@@ -617,6 +617,7 @@ impl Server {
                                 }
                             },
                             Packet::ChunkData_Biomes3D(chunk_data) => {
+                                // println!("data x {} z {}", chunk_data.chunk_x, chunk_data.chunk_z);
                                 server.world.clone()
                                     .load_chunk115(
                                         chunk_data.chunk_x,
@@ -1255,10 +1256,19 @@ impl Server {
                                     accepted: true,
                                 });
                             },
-                            /*
-                            Packet::BlockChange_VarInt(block_change) => {
-                                Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), block_change.location, block_change.block_id.0);
+                            // unknown: 37, 23, 50, 60, 70, 68, 89, 76
+                            Packet::UpdateLight_NoTrust(update_light) => { // 37 (1.15.2)
+                                server.world.clone().load_light_with_loc(update_light.chunk_x.0, update_light.chunk_z.0,
+                                                                         update_light.block_light_mask.0, true,
+                                                                         update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));
                             },
+                            Packet::UpdateLight_WithTrust(update_light) => {
+                                // TODO: Add specific stuff!
+                                server.world.clone().load_light_with_loc(update_light.chunk_x.0, update_light.chunk_z.0,
+                                                                         update_light.block_light_mask.0, true,
+                                                                         update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));
+                            },
+                            /*
                             Packet::BlockChange_VarInt(block_change) => {
                                 Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), block_change.location, block_change.block_id.0);
                             },
@@ -1558,10 +1568,10 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         /*let diff = Instant::now().duration_since(now);
         println!("Diff4 took {}", diff.as_millis());*/
 
-        self.tick_timer.write().unwrap().add(delta);
+        *self.tick_timer.write().unwrap() += delta;
         while self.tick_timer.read().unwrap().clone() >= 3.0 && self.is_connected() {
             self.minecraft_tick();
-            self.tick_timer.write().unwrap().sub(3.0);
+            *self.tick_timer.write().unwrap() -= 3.0;
         }
         /*let diff = Instant::now().duration_since(now);
         println!("Diff5 took {}", diff.as_millis());*/
@@ -1598,7 +1608,6 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         } else {
             self.target_info.clone().write().unwrap().clear(renderer);
         }
-        println!("0.9");
         /*let diff = Instant::now().duration_since(now);
         println!("Diff9 took {}", diff.as_millis());*/
     }
@@ -1711,11 +1720,11 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         if self.is_connected() || self.disconnect_data.clone().read().unwrap().just_disconnected {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().unwrap().just_disconnected = false;
-            self.entity_tick_timer.write().unwrap().add(delta);
+            *self.entity_tick_timer.write().unwrap() += delta;
             while self.entity_tick_timer.read().unwrap().clone() >= 3.0 {
                 let world = self.world.clone();
                 self.entities.clone().write().unwrap().tick(&world/*&mut self.world*/, renderer);
-                self.entity_tick_timer.write().unwrap().sub(3.0);
+                *self.entity_tick_timer.write().unwrap() -= 3.0;
             }
             let world = self.world.clone();
             self.entities
@@ -1754,7 +1763,6 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             self.world_data.clone().write().unwrap().world_time = time;
         }
         renderer.sky_offset = self.calculate_sky_offset();
-        println!("0.558");
     }
 
     fn calculate_sky_offset(&self) -> f32 {
@@ -1846,6 +1854,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                 .clone().write().unwrap()
                 .get_component_mut(player, self.player_movement)
             {
+                println!("pressing movement key!");
                 movement.pressed_keys.insert(key, down);
             }
         }
