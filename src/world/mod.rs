@@ -33,6 +33,7 @@ use crate::shared::{Direction, Position};
 use crate::types::{bit, nibble};
 use crate::types::hash::FNVHash;
 use byteorder::ReadBytesExt;
+use instant::Instant;
 
 pub mod biome;
 mod storage;
@@ -366,6 +367,7 @@ impl World {
     }
 
     pub fn compute_render_list(&self, renderer: &mut render::Renderer) {
+        let start_rec = Instant::now();
         self.render_list.clone().write().unwrap().clear();
 
         let mut valid_dirs = [false; 6];
@@ -384,7 +386,10 @@ impl World {
         let mut process_queue = VecDeque::with_capacity(self.chunks.clone().read().unwrap().len() * 16);
         // println!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
+        let diff = Instant::now().duration_since(start_rec);
+        println!("Delay took {}", diff.as_millis());
 
+        // TODO: Improve the performance of the following by moving this to another thread!
         while let Some((from, pos)) = process_queue.pop_front() {
             let (exists, cull) = if let Some((sec, rendered_on)) =
                 self.get_render_section_mut(pos.0, pos.1, pos.2)
@@ -528,7 +533,7 @@ Process finished with exit code 101
         if !(0..=15).contains(&y) {
             return None;
         }
-        if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(x, z)) {
+        if let Some(chunk) = self.chunks.clone().write().unwrap().get(&CPos(x, z)) {
             let rendered = &chunk.sections_rendered_on[y as usize];
             if let Some(sec) = chunk.sections[y as usize].as_ref() {
                 return Some((Some(sec.clone()), rendered.clone()));
@@ -540,9 +545,9 @@ Process finished with exit code 101
 
     pub fn get_dirty_chunk_sections(&self) -> Vec<(i32, i32, i32)> {
         let mut out = vec![];
-        for chunk in self.chunks.clone().write().unwrap().values_mut() {
-            for sec in &mut chunk.sections {
-                if let Some(sec) = sec.as_mut() {
+        for chunk in self.chunks.clone().write().unwrap().values() {
+            for sec in &chunk.sections {
+                if let Some(sec) = sec.as_ref() {
                     if !sec.clone().read().unwrap().building && sec.clone().read().unwrap().dirty {
                         out.push((chunk.position.0, sec.clone().read().unwrap().y as i32, chunk.position.1));
                     }
@@ -553,8 +558,8 @@ Process finished with exit code 101
     }
 
     fn set_dirty(&self, x: i32, y: i32, z: i32) {
-        if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(x, z)) {
-            if let Some(sec) = chunk.sections.get_mut(y as usize).and_then(|v| v.as_mut()) {
+        if let Some(chunk) = self.chunks.clone().write().unwrap().get(&CPos(x, z)) {
+            if let Some(sec) = chunk.sections.get(y as usize).and_then(|v| v.as_ref()) {
                 sec.clone().write().unwrap().dirty = true;
             }
         }
@@ -721,9 +726,6 @@ Process finished with exit code 101
                       mask_add: u16,
                       data: &mut Cursor<Vec<u8>>,
                       version: u8) -> Result<(), protocol::Error> {
-        use byteorder::ReadBytesExt;
-        use std::io::Cursor;
-
         let cpos = CPos(x, z);
         {
             if new {
@@ -737,7 +739,7 @@ Process finished with exit code 101
             let chunk = chunks.get_mut(&cpos).unwrap();
 
             // Block type array - whole byte per block  // 17
-            let mut block_types: [[u8; 4096]; 16] = [[0u8; 4096]; 16];; // 17
+            let mut block_types: [[u8; 4096]; 16] = [[0u8; 4096]; 16]; // 17
             for i in 0..16 {
                 if chunk.sections[i].is_none() {
                     let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
@@ -1173,8 +1175,6 @@ Process finished with exit code 101
         // Chunk metadata
         let mut metadata = std::io::Cursor::new(metadata);
         for _i in 0..chunk_column_count {
-            use byteorder::ReadBytesExt;
-
             let x = metadata.read_i32::<byteorder::BigEndian>()?;
             let z = metadata.read_i32::<byteorder::BigEndian>()?;
             let mask = metadata.read_u16::<byteorder::BigEndian>()?;
@@ -1564,8 +1564,8 @@ Process finished with exit code 101
             return;
         }
         let cpos = CPos(x, z);
-        if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&cpos) {
-            if let Some(sec) = chunk.sections[y as usize].as_mut() {
+        if let Some(chunk) = self.chunks.clone().write().unwrap().get(&cpos) {
+            if let Some(sec) = chunk.sections[y as usize].as_ref() {
                 sec.clone().write().unwrap().dirty = true;
             }
         }

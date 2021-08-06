@@ -296,7 +296,7 @@ impl Renderer {
 
     pub fn tick(
         &mut self,
-        world: Option<Arc<World>>/*&mut world::World*/,
+        world: Option<Arc<World>>,
         delta: f64,
         width: u32,
         height: u32,

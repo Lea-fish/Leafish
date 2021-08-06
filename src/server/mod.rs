@@ -36,16 +36,14 @@ use std::sync::{Arc, RwLock};
 use std::thread;
 use leafish_protocol::protocol::packet::Packet;
 use std::sync::mpsc::Sender;
-use std::io::{Write, Cursor};
-use leafish_protocol::protocol::{VarInt, Serializable, UUID, Conn};
+use std::io::Cursor;
+use leafish_protocol::protocol::{UUID, Conn};
 use crate::entity::{TargetPosition, TargetRotation};
 use crate::ecs::{Key, Manager};
 use crate::entity::player::PlayerMovement;
 use std::thread::sleep;
-use std::ops::{Add, Sub};
-use rayon::prelude::*;
-use leafish_protocol::protocol::packet::Packet::ConfirmTransactionServerbound;
-use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8, ClientSettings_u8_Handsfree, ClientSettings};
+// use rayon::prelude::*;
+use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Handsfree, ClientSettings};
 
 pub mod plugin_messages;
 mod sun;
@@ -80,12 +78,10 @@ impl Default for WorldData {
 }
 
 pub struct Server {
-    uuid: protocol::UUID, // const
-    conn: Arc<RwLock<Option<protocol::Conn>>>, // 'const'
-    protocol_version: i32, // const
-    forge_mods: Vec<forge::ForgeMod>, // ?
-    // read_queue: Mutex<Option<mpsc::Receiver<Result<packet::Packet, protocol::Error>>>>, // move to conn
-    // write_queue: Mutex<Option<mpsc::Sender<(i32, bool, Vec<u8>)>>>, // move to conn
+    uuid: protocol::UUID,
+    conn: Arc<RwLock<Option<protocol::Conn>>>,
+    protocol_version: i32,
+    forge_mods: Vec<forge::ForgeMod>,
     pub disconnect_data: Arc<RwLock<DisconnectData>>,
 
     pub world: Arc<world::World>,
@@ -96,15 +92,15 @@ pub struct Server {
     version: RwLock<Option<usize>>,
 
     // Entity accessors
-    game_info: ecs::Key<entity::GameInfo>, // const!
-    player_movement: ecs::Key<entity::player::PlayerMovement>, // const! (rem arc)
-    gravity: ecs::Key<entity::Gravity>, // const!
-    position: ecs::Key<entity::Position>, // const! (rem arc)
-    target_position: ecs::Key<entity::TargetPosition>, // const! (rem arc)
-    velocity: ecs::Key<entity::Velocity>, // const! (rem arc)
-    gamemode: ecs::Key<Gamemode>, // const! (rem arc)
-    pub rotation: ecs::Key<entity::Rotation>, // const! (rem arc)
-    target_rotation: ecs::Key<entity::TargetRotation>, // const! (rem arc)
+    game_info: ecs::Key<entity::GameInfo>,
+    player_movement: ecs::Key<entity::player::PlayerMovement>,
+    gravity: ecs::Key<entity::Gravity>,
+    position: ecs::Key<entity::Position>,
+    target_position: ecs::Key<entity::TargetPosition>,
+    velocity: ecs::Key<entity::Velocity>,
+    gamemode: ecs::Key<Gamemode>,
+    pub rotation: ecs::Key<entity::Rotation>,
+    target_rotation: ecs::Key<entity::TargetRotation>,
     //
     pub player: Arc<RwLock<Option<ecs::Entity>>>,
     entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
@@ -196,11 +192,6 @@ impl Server {
                 protocol::packet::Packet::LoginSuccess_String(val) => {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {}", val.username, val.uuid);
-                    //let mut read = conn.clone();
-                    //let write_int = conn.clone();
-                    //let mut write = conn;
-                    //read.state = protocol::State::Play;
-                    //write.state = protocol::State::Play;
                     conn.state = protocol::State::Play;
                     let uuid = protocol::UUID::from_str(&val.uuid).unwrap();
                     let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/);
@@ -209,11 +200,6 @@ impl Server {
                 protocol::packet::Packet::LoginSuccess_UUID(val) => {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {:?}", val.username, val.uuid);
-                    // let mut read = conn.clone();
-                    // let write_int = conn.clone();
-                    // let mut write = conn;
-                    // read.state = protocol::State::Play;
-                    // write.state = protocol::State::Play;
                     conn.state = protocol::State::Play;
                     let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, val.uuid, resources/*, write, write_int*/);
 
@@ -247,37 +233,25 @@ impl Server {
                 },
             )?;
         }
-        //let mut write = conn;
 
-        conn/*write*/.enable_encyption(&shared/*, false*/);
-        // let mut read = write.clone();
-        // let mut write_int = write.clone();
+        conn.enable_encyption(&shared);
 
         let uuid;
-        let compression_threshold = conn/*read*/.compression_threshold;
+        let compression_threshold = conn.compression_threshold;
         loop {
-            match conn/*read*/.read_packet()? {
+            match conn.read_packet()? {
                 protocol::packet::Packet::SetInitialCompression(val) => {
-                    // read.set_compresssion(val.threshold.0);
-                    // write.set_compresssion(val.threshold.0);
-                    // write_int.set_compresssion(val.threshold.0);
                     conn.set_compresssion(val.threshold.0);
                 }
                 protocol::packet::Packet::LoginSuccess_String(val) => {
                     debug!("Login: {} {}", val.username, val.uuid);
                     uuid = protocol::UUID::from_str(&val.uuid).unwrap();
-                    // read.state = protocol::State::Play;
-                    // write.state = protocol::State::Play;
-                    // write_int.state = protocol::State::Play;
                     conn.state = protocol::State::Play;
                     break;
                 }
                 protocol::packet::Packet::LoginSuccess_UUID(val) => {
                     debug!("Login: {} {:?}", val.username, val.uuid);
                     uuid = val.uuid;
-                    // read.state = protocol::State::Play;
-                    // write.state = protocol::State::Play;
-                    // write_int.state = protocol::State::Play;
                     conn.state = protocol::State::Play;
                     break;
                 }
@@ -362,11 +336,7 @@ impl Server {
     fn connect0(conn: Conn, protocol_version: i32,
                 forge_mods: Vec<forge::ForgeMod>,
                 uuid: protocol::UUID,
-                resources: Arc<RwLock<resources::Manager>>,
-                // write: Conn,
-                /*write_int: Conn*/) -> Arc<Server> {
-        // let tx = Self::spawn_writer(write_int);
-        // read.send = Some(tx.clone());
+                resources: Arc<RwLock<resources::Manager>>) -> Arc<Server> {
         let server_callback = Arc::new(RwLock::new(None));
         let inner_server = server_callback.clone();
         let mut inner_server = inner_server.write().unwrap();
@@ -379,8 +349,6 @@ impl Server {
             uuid,
             resources,
             conn,
-            /*Some(rx),
-            Some(tx),*/
             light_updater
         ));
 
@@ -727,105 +695,6 @@ impl Server {
                                     }
                                 }
                             },
-                            /*
-                            Packet::PlayerInfo(player_info) => {
-                                use crate::protocol::packet::PlayerDetail::*;
-                                for detail in player_info.inner.players {
-                                    match detail {
-                                        Add {
-                                            name,
-                                            uuid,
-                                            properties,
-                                            display,
-                                            gamemode,
-                                            ping,
-                                        } => {
-                                            let players = players.clone().lock().unwrap().as_ref().unwrap().clone();
-                                            let mut players = players.write().unwrap();
-                                            let info = players.entry(uuid.clone()).or_insert(PlayerInfo {
-                                                name: name.clone(),
-                                                uuid,
-                                                skin_url: None,
-
-                                                display_name: display.clone(),
-                                                ping: ping.0,
-                                                gamemode: Gamemode::from_int(gamemode.0),
-                                            });
-                                            // Re-set the props of the player in case of dodgy server implementations
-                                            info.name = name;
-                                            info.display_name = display;
-                                            info.ping = ping.0;
-                                            info.gamemode = Gamemode::from_int(gamemode.0);
-                                            for prop in properties {
-                                                if prop.name != "textures" {
-                                                    continue;
-                                                }
-                                                // Ideally we would check the signature of the blob to
-                                                // verify it was from Mojang and not faked by the server
-                                                // but this requires the public key which is distributed
-                                                // authlib. We could download authlib on startup and extract
-                                                // the key but this seems like overkill compared to just
-                                                // whitelisting Mojang's texture servers instead.
-                                                let skin_blob_result = &base64::decode(&prop.value);
-                                                let skin_blob = match skin_blob_result {
-                                                    Ok(val) => val,
-                                                    Err(err) => {
-                                                        error!("Failed to decode skin blob, {:?}", err);
-                                                        continue;
-                                                    }
-                                                };
-                                                let skin_blob: serde_json::Value = match serde_json::from_slice(&skin_blob)
-                                                {
-                                                    Ok(val) => val,
-                                                    Err(err) => {
-                                                        error!("Failed to parse skin blob, {:?}", err);
-                                                        continue;
-                                                    }
-                                                };
-                                                if let Some(skin_url) = skin_blob
-                                                    .pointer("/textures/SKIN/url")
-                                                    .and_then(|v| v.as_str())
-                                                {
-                                                    info.skin_url = Some(skin_url.to_owned());
-                                                }
-                                            }
-
-                                            // Refresh our own skin when the server sends it to us.
-                                            // The join game packet can come before this packet meaning
-                                            // we may not have the skin in time for spawning ourselves.
-                                            // This isn't an issue for other players because this packet
-                                            // must come before the spawn player packet.
-                                            if info.uuid == uuid {
-                                                let model = entities
-                                                    .clone().lock().unwrap().as_ref().unwrap().clone().write().unwrap()
-                                                    .get_component_mut_direct::<entity::player::PlayerModel>(
-                                                        self.player.unwrap(),
-                                                    )
-                                                    .unwrap();
-                                                model.set_skin(info.skin_url.clone());
-                                            }
-                                        }
-                                        UpdateGamemode { uuid, gamemode } => {
-                                            if let Some(info) = self.players.clone().write().unwrap().get_mut(&uuid) {
-                                                info.gamemode = Gamemode::from_int(gamemode.0);
-                                            }
-                                        }
-                                        UpdateLatency { uuid, ping } => {
-                                            if let Some(info) = self.players.clone().write().unwrap().get_mut(&uuid) {
-                                                info.ping = ping.0;
-                                            }
-                                        }
-                                        UpdateDisplayName { uuid, display } => {
-                                            if let Some(info) = self.players.clone().write().unwrap().get_mut(&uuid) {
-                                                info.display_name = display;
-                                            }
-                                        }
-                                        Remove { uuid } => {
-                                            self.players.clone().write().unwrap().remove(&uuid);
-                                        }
-                                    }
-                                }
-                            },*/
                             Packet::EntityMove_i8_i32_NoGround(m) => {
                                 Server::on_entity_move_glob(
                                     server.entity_map.clone(),
@@ -1248,14 +1117,13 @@ impl Server {
                                     uuid.clone(),
                                     player_info
                                 )
-                                // Server::on_block_change_in_world(world.clone().lock().unwrap().as_ref().unwrap().clone(), block_change.location, block_change.block_id.0);
                             },
                             Packet::ConfirmTransaction(transaction) => {
                                 read.write_packet(packet::play::serverbound::ConfirmTransactionServerbound {
                                     id: 0, // TODO: Use current container id, if the id of the transaction is not 0.
                                     action_number: transaction.action_number,
                                     accepted: true,
-                                });
+                                }).unwrap();
                             },
                             // unknown: 37, 23, 50, 60, 70, 68, 89, 76
                             Packet::UpdateLight_NoTrust(update_light) => { // 37 (1.15.2)
@@ -1292,7 +1160,7 @@ impl Server {
                                 Server::on_plugin_message_clientbound_1_glob(server.clone(), plugin_message);
                             },
                             _ => {
-                                println!("other packet!");
+                                // println!("other packet!");
                             }
                         },
                     Err(err) => {
@@ -1301,24 +1169,6 @@ impl Server {
                 }
         });
     }
-
-    /*
-    fn spawn_writer(
-        mut write: protocol::Conn
-    ) -> Sender<(i32, bool, Vec<u8>)> {
-        let (tx, rx) = mpsc::channel();
-        thread::spawn(move || loop {
-            let send: (i32, bool, Vec<u8>) = rx.recv().unwrap();
-            println!("sending...!");
-            let process_buffer = send.2;
-            VarInt(process_buffer.len() as i32 + send.0).write_to(&mut write).unwrap()/*?*/;
-            if send.1 && send.0 == 1 {
-                VarInt(0).write_to(&mut write).unwrap()/*?*/;
-            }
-            write.write_all(&process_buffer).expect("Failed to write data to the connection!");
-        });
-        tx
-    }*/
 
     fn spawn_light_updater(server: Arc<RwLock<Option<Arc<Server>>>>) -> Sender<bool> { // TODO: Use fair rwlock!
         let (tx, rx) = mpsc::channel();
@@ -1350,26 +1200,6 @@ impl Server {
         tx
     }
 
-    /*
-    Diff7 took 1
-[model/mod.rs:226][ERROR] Error missing block state for minecraft:bed
-[model/mod.rs:196][ERROR] Error loading model minecraft:bed
-thread '<unnamed>' panicked at 'called `Result::unwrap()` on an `Err` value: RecvError', src/server/mod.rs:1307:56
-stack backtrace:
-   0: rust_begin_unwind
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/std/src/panicking.rs:515:5
-   1: core::panicking::panic_fmt
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/panicking.rs:92:14
-   2: core::result::unwrap_failed
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/result.rs:1355:5
-   3: core::result::Result<T,E>::unwrap
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/result.rs:1037:23
-   4: leafish::server::Server::spawn_writer::{{closure}}
-             at /home/threadexception/IdeaProjects/Leafish/src/server/mod.rs:1307:46
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-
-Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
-*/
     pub fn dummy_server(resources: Arc<RwLock<resources::Manager>>) -> Arc<Server> {
         let server_callback = Arc::new(RwLock::new(None));
         let inner_server = server_callback.clone();
@@ -1564,7 +1394,6 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         }
         /*let diff = Instant::now().duration_since(now);
         println!("Diff3 took {}", diff.as_millis());*/
-        // println!("entity_tick!");
         self.entity_tick(renderer, delta);
         /*let diff = Instant::now().duration_since(now);
         println!("Diff4 took {}", diff.as_millis());*/
@@ -1588,7 +1417,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         let world = self.world.clone();
         world.tick(&mut self.entities.clone().write().unwrap());
         // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
-            self.light_updates.lock().unwrap().send(true);
+            self.light_updates.lock().unwrap().send(true).unwrap();
         // }
         /*let diff = Instant::now().duration_since(now);
         println!("Diff8 took {}", diff.as_millis());*/
@@ -1612,8 +1441,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         /*let diff = Instant::now().duration_since(now);
         println!("Diff9 took {}", diff.as_millis());*/
     }
-    // diff 8 is to be investigated!
-    // When in main menu, diff 8 is the most influencial by far!
+    // diff 4 is to be investigated!
 
 
     fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64) {
@@ -1855,7 +1683,6 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                 .clone().write().unwrap()
                 .get_component_mut(player, self.player_movement)
             {
-                println!("pressing movement key!");
                 movement.pressed_keys.insert(key, down);
             }
         }
@@ -1866,7 +1693,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
             if let Some((pos, _, face, at)) = target::trace_ray(
-                &world/*&self.world*/,
+                &world,
                 4.0,
                 renderer.camera.pos.to_vec(),
                 renderer.view_vector.cast().unwrap(),
@@ -1973,6 +1800,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         let _ = self.conn.clone().write().unwrap().as_mut().unwrap().write_packet(p); // TODO handle errors
     }
 
+    /*
     fn on_keep_alive_i64(
         &mut self,
         keep_alive: packet::play::clientbound::KeepAliveClientbound_i64,
@@ -2113,7 +1941,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             }
             _ => (),
         }
-    }
+    }*/
 
     fn on_plugin_message_clientbound_i16_glob(
         server: Arc<Server>,
@@ -2360,9 +2188,9 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         // TODO: refactor with write_plugin_message
         // TODO: Try sending ClientSettings right here! (leafishish)
         if protocol_version >= 47 {
-            read.write_packet(brand.into_message());
+            read.write_packet(brand.into_message()).unwrap();
         } else {
-            read.write_packet(brand.into_message17());
+            read.write_packet(brand.into_message17()).unwrap();
         }
         if protocol_version <= 48 { // 1 snapshot after 1.8
             read.write_packet(ClientSettings_u8_Handsfree {
@@ -2371,7 +2199,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                 chat_mode: 0, // TODO: Make this configurable!
                 chat_colors: true, // TODO: Make this configurable!
                 displayed_skin_parts: 127, // TODO: Make this configurable!
-            });
+            }).unwrap();
         }else {
             read.write_packet(ClientSettings {
                 locale: "en_us".to_string(), // TODO: Make this configurable!
@@ -2380,7 +2208,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                 chat_colors: true, // TODO: Make this configurable!
                 displayed_skin_parts: 127, // TODO: Make this configurable!
                 main_hand: Default::default() // TODO: Make this configurable!
-            });
+            }).unwrap();
         }
     }
 
@@ -2454,7 +2282,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         self.world_data.clone().write().unwrap().world_age = time_update.time_of_day;
         self.world_data.clone().write().unwrap().world_time_target = (time_update.time_of_day % 24000) as f64;
         if self.world_data.clone().read().unwrap().world_time_target < 0.0 {
-            self.world_data.clone().write().unwrap().world_time_target = -self.world_data.clone().read().unwrap().world_time_target;
+            self.world_data.clone().write().unwrap().world_time_target *= -1.0;
             self.world_data.clone().write().unwrap().tick_time = false;
         } else {
             self.world_data.clone().write().unwrap().tick_time = true;
@@ -3198,7 +3026,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             }
 
             if let Some(teleport_id) = teleport_id {
-                read.write_packet(packet::play::serverbound::TeleportConfirm { teleport_id });
+                read.write_packet(packet::play::serverbound::TeleportConfirm { teleport_id }).unwrap();
             }
         }
     }

@@ -439,7 +439,7 @@ fn main() {
             &mut vsync,
         );
         let dist = Instant::now().checked_duration_since(start);
-        // println!("Ticking took {}", dist.unwrap().as_millis());
+        println!("Ticking took {}", dist.unwrap().as_millis());
         // TODO: Fix: skins werden durchgemischt von verschiedenen spielern
         glutin_window
             .swap_buffers()
@@ -481,8 +481,8 @@ fn tick_all(
         }
     };
     *last_resource_version = version;
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff1 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff1 took {}", diff.as_millis());
 
     let vsync_changed = *game.vars.get(settings::R_VSYNC);
     if *vsync != vsync_changed {
@@ -494,13 +494,13 @@ fn tick_all(
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
     game.tick(/*delta*/);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff2 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff2 took {}", diff.as_millis());
     if game.server.is_some() {
         game.server.as_ref().unwrap().tick(&mut game.renderer, delta); // TODO: Improve perf in load screen!
     }
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff3 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff3 took {}", diff.as_millis());
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
@@ -511,18 +511,18 @@ fn tick_all(
         game.renderer.update_camera(physical_width, physical_height);
         let world = game.server.as_ref().unwrap().world.clone();
         world.compute_render_list(&mut game.renderer); // TODO: Improve perf on server!
-        /*let diff = Instant::now().duration_since(now);
-    println!("Diff5 took {}", diff.as_millis());*/ // readd
+        let diff = Instant::now().duration_since(now);
+        println!("Diff5 took {}", diff.as_millis()); // readd
         game.chunk_builder
             .tick(game.server.as_ref().unwrap().world.clone(), &mut game.renderer, version);
-        /*let diff = Instant::now().duration_since(now);
-    println!("Diff6 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diff6 took {}", diff.as_millis());
     }
 
     game.screen_sys
         .tick(delta, &mut game.renderer, &mut ui_container);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff7 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff7 took {}", diff.as_millis());
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {
         if Instant::now().duration_since(received_chat_at).as_secs() < 5 {
@@ -535,11 +535,11 @@ fn tick_all(
         .lock()
         .unwrap()
         .tick(&mut ui_container, &game.renderer, delta, width);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff8 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff8 took {}", diff.as_millis());
     ui_container.tick(&mut game.renderer, delta, width, height);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff9 took {}", diff.as_millis());*/ // readd
+    let diff = Instant::now().duration_since(now);
+    println!("Diff9 took {}", diff.as_millis()); // readd
     let world = if let Some(server) = game.server.as_ref() {
         Some(server.world.clone())
     }else {
@@ -564,8 +564,8 @@ fn tick_all(
         physical_width,
         physical_height,
     );
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff10 took {}", diff.as_millis());*/ // readd
+    let diff = Instant::now().duration_since(now);
+    println!("Diff10 took {}", diff.as_millis()); // readd
 
     if fps_cap > 0 && !*vsync {
         let frame_time = now.elapsed();
@@ -575,10 +575,8 @@ fn tick_all(
         }
     }
 }
-// diff 3 is the most significant in the start screen! (and when joining a server)
-// diff 10 has the same impact as diff 3 in the menu! (sometimes at least)
-// diff 3**,5**,10* are the most significant, when chillin on a server
-// diff 10, 3, 5 have the most impact when on server
+// 5 has the most impact
+// 10 the second most/the most
 // TODO: Reenable: [server/mod.rs:1924][WARN] Block entity at (1371,53,-484) missing id tag: NamedTag("", Compound({"y": Int(53), "Sign": String(""), "x": Int(1371), "z": Int(-484)}))
 
 fn handle_window_event<T>(
