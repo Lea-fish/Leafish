@@ -45,6 +45,7 @@ use std::thread::sleep;
 use std::ops::{Add, Sub};
 use rayon::prelude::*;
 use leafish_protocol::protocol::packet::Packet::ConfirmTransactionServerbound;
+use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8, ClientSettings_u8_Handsfree, ClientSettings};
 
 pub mod plugin_messages;
 mod sun;
@@ -1295,7 +1296,7 @@ impl Server {
                             }
                         },
                     Err(err) => {
-                        panic!("An error occurred while reading a packet!");
+                        panic!("An error occurred while reading a packet: {}", err);
                     },
                 }
         });
@@ -2315,6 +2316,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         } else {
             self.write_packet(brand.into_message17());
         }
+        // self.write_packet(Packet::ClientSettings())
     }
 
     fn on_game_join_glob(
@@ -2361,6 +2363,24 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
             read.write_packet(brand.into_message());
         } else {
             read.write_packet(brand.into_message17());
+        }
+        if protocol_version <= 48 { // 1 snapshot after 1.8
+            read.write_packet(ClientSettings_u8_Handsfree {
+                locale: "en_us".to_string(), // TODO: Make this configurable!
+                view_distance: 8, // TODO: Make this configurable!
+                chat_mode: 0, // TODO: Make this configurable!
+                chat_colors: true, // TODO: Make this configurable!
+                displayed_skin_parts: 127, // TODO: Make this configurable!
+            });
+        }else {
+            read.write_packet(ClientSettings {
+                locale: "en_us".to_string(), // TODO: Make this configurable!
+                view_distance: 8, // TODO: Make this configurable!
+                chat_mode: Default::default(), // TODO: Make this configurable!
+                chat_colors: true, // TODO: Make this configurable!
+                displayed_skin_parts: 127, // TODO: Make this configurable!
+                main_hand: Default::default() // TODO: Make this configurable!
+            });
         }
     }
 
