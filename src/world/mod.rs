@@ -38,6 +38,10 @@ use instant::Instant;
 pub mod biome;
 mod storage;
 
+use rayon::prelude::*;
+use crate::render::Renderer;
+use collision::Frustum;
+
 #[derive(Default)]
 pub struct World {
     pub chunks: Arc<RwLock<HashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>>,
@@ -366,31 +370,92 @@ impl World {
         dirty
     }
 
-    pub fn compute_render_list(&self, renderer: &mut render::Renderer) {
+    pub fn compute_render_list(&self, renderer: /*&mut */Arc<RwLock<render::Renderer>>) {
         let start_rec = Instant::now();
-        self.render_list.clone().write().unwrap().clear();
+        self.render_list.clone().write().unwrap().clear(); // TODO: Sync with the main thread somehow!
+        // renderer.clone().read().unwrap()
 
         let mut valid_dirs = [false; 6];
         for dir in Direction::all() {
             let (ox, oy, oz) = dir.get_offset();
             let dir_vec = cgmath::Vector3::new(ox as f32, oy as f32, oz as f32);
-            valid_dirs[dir.index()] = renderer.view_vector.dot(dir_vec) > -0.9;
+            valid_dirs[dir.index()] = renderer.clone().read().unwrap().view_vector.dot(dir_vec) > -0.9;
         }
 
         let start = (
-            ((renderer.camera.pos.x as i32) >> 4),
-            ((renderer.camera.pos.y as i32) >> 4),
-            ((renderer.camera.pos.z as i32) >> 4),
+            ((renderer.clone().read().unwrap().camera.pos.x as i32) >> 4),
+            ((renderer.clone().read().unwrap().camera.pos.y as i32) >> 4),
+            ((renderer.clone().read().unwrap().camera.pos.z as i32) >> 4),
         );
 
         let mut process_queue = VecDeque::with_capacity(self.chunks.clone().read().unwrap().len() * 16);
         // println!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
         let diff = Instant::now().duration_since(start_rec);
+        println!("locked: {}", !renderer.clone().try_write().is_ok());
         println!("Delay took {}", diff.as_millis());
+        let frustum = renderer.clone().read().unwrap().frustum.clone();
+        let frame_id = renderer.clone().read().unwrap().frame_id.clone();
+        println!("locked1.0001: {}", !renderer.clone().try_write().is_ok());
+        self.do_render_queue(Arc::new(RwLock::new(process_queue)),
+                             frustum, frame_id, valid_dirs);
+        println!("locked1.1111: {}", !renderer.clone().try_write().is_ok());
 
         // TODO: Improve the performance of the following by moving this to another thread!
-        while let Some((from, pos)) = process_queue.pop_front() {
+        /*
+        process_queue.par_iter().for_each(|(from, pos)| {
+            let (exists, cull) = if let Some((sec, rendered_on)) =
+            self.get_render_section_mut(pos.0, pos.1, pos.2)
+            {
+                if rendered_on == renderer.frame_id {
+                    return;
+                }
+                if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.0, pos.2)) {
+                    chunk.sections_rendered_on[pos.1 as usize] = renderer.frame_id;
+                }
+
+                let min = cgmath::Point3::new(
+                    pos.0 as f32 * 16.0,
+                    -pos.1 as f32 * 16.0,
+                    pos.2 as f32 * 16.0,
+                );
+                let bounds =
+                    collision::Aabb3::new(min, min + cgmath::Vector3::new(16.0, -16.0, 16.0));
+                if renderer.frustum.contains(&bounds) == collision::Relation::Out
+                    && *from != Direction::Invalid
+                {
+                    return;
+                }
+                (
+                    sec.is_some(),
+                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.clone().read().unwrap().cull_info),
+                )
+            } else {
+                return;
+            };
+
+            if exists {
+                self.render_list.clone().write().unwrap().push(*pos);
+            }
+
+            for dir in Direction::all() {
+                let (ox, oy, oz) = dir.get_offset();
+                let opos = (pos.0 + ox, pos.1 + oy, pos.2 + oz);
+                if let Some((_, rendered_on)) = self.get_render_section_mut(opos.0, opos.1, opos.2)
+                {
+                    if rendered_on == renderer.frame_id {
+                        continue;
+                    }
+                    if *from == Direction::Invalid
+                        || (valid_dirs[dir.index()] && cull.is_visible(*from, dir))
+                    {
+                        process_queue.push_back((dir.opposite(), opos));
+                    }
+                }
+            }
+        });*/
+
+        /*while let Some((from, pos)) = process_queue.pop_front() { // TODO: Use par iters
             let (exists, cull) = if let Some((sec, rendered_on)) =
                 self.get_render_section_mut(pos.0, pos.1, pos.2)
             {
@@ -440,12 +505,84 @@ impl World {
                     }
                 }
             }
+        }*/
+    }
+
+    fn do_render_queue(&self, process_queue: Arc<RwLock<VecDeque<(Direction, (i32, i32, i32))>>>,
+                       frustum: Arc<RwLock<Option<Frustum<f32>>>>, frame_id: u32, valid_dirs: [bool; 6]) {
+        let out = Arc::new(RwLock::new(VecDeque::new())); // TODO: Add Arc!
+        /*let tmp_renderer = renderer.clone();
+        let tmp_renderer = tmp_renderer.read().unwrap();
+        let frame_id = tmp_renderer.frame_id.clone();*/
+        // let frame_id = renderer.clone().read().unwrap().frame_id.clone();
+        // let frustum = renderer.clone().read().unwrap().frustum.clone().read().unwrap().as_ref().unwrap();
+        let tmp_frustum = frustum.clone();
+        let tmp_frustum = tmp_frustum.read().unwrap();
+        let tmp_frustum = tmp_frustum.as_ref().unwrap();
+        println!("rendering {} elems", process_queue.clone().read().unwrap().len());
+        process_queue.clone().read().unwrap().par_iter().for_each(|(from, pos)| {
+            let (exists, cull) = if let Some((sec, rendered_on)) =
+            self.get_render_section_mut(pos.0, pos.1, pos.2)
+            {
+                if rendered_on == frame_id {
+                    return;
+                }
+                if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.0, pos.2)) {
+                    chunk.sections_rendered_on[pos.1 as usize] = frame_id;
+                }
+
+                let min = cgmath::Point3::new(
+                    pos.0 as f32 * 16.0,
+                    -pos.1 as f32 * 16.0,
+                    pos.2 as f32 * 16.0,
+                );
+                let bounds =
+                    collision::Aabb3::new(min, min + cgmath::Vector3::new(16.0, -16.0, 16.0));
+                if tmp_frustum/*renderer.clone().read().unwrap().frustum*/.contains(&bounds) == collision::Relation::Out
+                    && *from != Direction::Invalid
+                {
+                    return;
+                }
+                (
+                    sec.is_some(),
+                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.clone().read().unwrap().cull_info),
+                )
+            } else {
+                return;
+            };
+
+            if exists {
+                self.render_list.clone().write().unwrap().push(*pos);
+            }
+
+            for dir in Direction::all() {
+                let (ox, oy, oz) = dir.get_offset();
+                let opos = (pos.0 + ox, pos.1 + oy, pos.2 + oz);
+                if let Some((_, rendered_on)) = self.get_render_section_mut(opos.0, opos.1, opos.2)
+                {
+                    if rendered_on == frame_id {
+                        continue;
+                    }
+                    if *from == Direction::Invalid
+                        || (valid_dirs[dir.index()] && cull.is_visible(*from, dir))
+                    {
+                        out.clone().write().unwrap()/*process_queue*/.push_back((dir.opposite(), opos));
+                    }
+                }
+            }
+        });
+        if !out.clone().read().unwrap().is_empty() {
+            println!("do next!");
+            self.do_render_queue(out.clone(), frustum.clone(), frame_id, valid_dirs);
+        }else {
+            println!("finished!");
         }
     }
 
     pub fn get_render_list(&self) -> Vec<((i32, i32, i32), Arc<RwLock<render::ChunkBuffer>>)> {
         self.render_list.clone().read().unwrap()
             .iter()
+            // .par_iter()
             .map(|v| {
                 let chunks = self.chunks.clone();
                 let chunks = chunks.read().unwrap();
@@ -533,7 +670,7 @@ Process finished with exit code 101
         if !(0..=15).contains(&y) {
             return None;
         }
-        if let Some(chunk) = self.chunks.clone().write().unwrap().get(&CPos(x, z)) {
+        if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(x, z)) {
             let rendered = &chunk.sections_rendered_on[y as usize];
             if let Some(sec) = chunk.sections[y as usize].as_ref() {
                 return Some((Some(sec.clone()), rendered.clone()));
@@ -545,7 +682,7 @@ Process finished with exit code 101
 
     pub fn get_dirty_chunk_sections(&self) -> Vec<(i32, i32, i32)> {
         let mut out = vec![];
-        for chunk in self.chunks.clone().write().unwrap().values() {
+        for chunk in self.chunks.clone().read().unwrap().values() {
             for sec in &chunk.sections {
                 if let Some(sec) = sec.as_ref() {
                     if !sec.clone().read().unwrap().building && sec.clone().read().unwrap().dirty {
@@ -558,7 +695,7 @@ Process finished with exit code 101
     }
 
     fn set_dirty(&self, x: i32, y: i32, z: i32) {
-        if let Some(chunk) = self.chunks.clone().write().unwrap().get(&CPos(x, z)) {
+        if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(x, z)) {
             if let Some(sec) = chunk.sections.get(y as usize).and_then(|v| v.as_ref()) {
                 sec.clone().write().unwrap().dirty = true;
             }
@@ -592,7 +729,7 @@ Process finished with exit code 101
     }
 
     pub fn flag_dirty_all(&self) {
-        for chunk in self.chunks.clone().write().unwrap().values() {
+        for chunk in self.chunks.clone().read().unwrap().values() {
             for sec in &chunk.sections {
                 if let Some(sec) = sec.as_ref() {
                     sec.clone().write().unwrap().dirty = true;
@@ -1564,7 +1701,7 @@ Process finished with exit code 101
             return;
         }
         let cpos = CPos(x, z);
-        if let Some(chunk) = self.chunks.clone().write().unwrap().get(&cpos) {
+        if let Some(chunk) = self.chunks.clone().read().unwrap().get(&cpos) {
             if let Some(sec) = chunk.sections[y as usize].as_ref() {
                 sec.clone().write().unwrap().dirty = true;
             }

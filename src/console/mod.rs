@@ -17,7 +17,7 @@ use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
 use std::fs;
 
 use crate::format::{Color, Component, TextComponent};
@@ -282,7 +282,7 @@ impl Console {
     pub fn tick(
         &mut self,
         ui_container: &mut ui::Container,
-        renderer: &render::Renderer,
+        renderer: /*&*/Arc<RwLock<render::Renderer>>,
         delta: f64,
         width: f64,
     ) {
@@ -330,6 +330,8 @@ impl Console {
             elements.lines.clear();
 
             let mut offset = 0.0;
+            let renderer = renderer.clone();
+            let renderer = &*renderer.read().unwrap();
             for line in self.history.iter().rev() {
                 if offset >= 210.0 {
                     break;

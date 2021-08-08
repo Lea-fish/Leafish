@@ -35,7 +35,7 @@ use std::sync::{mpsc, Mutex};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use leafish_protocol::protocol::packet::Packet;
-use std::sync::mpsc::Sender;
+use std::sync::mpsc::{Sender, Receiver};
 use std::io::Cursor;
 use leafish_protocol::protocol::{UUID, Conn};
 use crate::entity::{TargetPosition, TargetRotation};
@@ -44,6 +44,7 @@ use crate::entity::player::PlayerMovement;
 use std::thread::sleep;
 // use rayon::prelude::*;
 use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Handsfree, ClientSettings};
+use crate::render::Renderer;
 
 pub mod plugin_messages;
 mod sun;
@@ -113,6 +114,10 @@ pub struct Server {
     sun_model: RwLock<Option<sun::SunModel>>,
     target_info: Arc<RwLock<target::Info>>,
     pub light_updates: Mutex<Sender<bool>>, // move to world!
+    pub render_list_computer: Mutex<Sender<bool>>,
+    pub window_size: Arc<RwLock<(u32, u32)>>,
+    // pub ticker: Mutex<Receiver<bool>>,
+    // pub delta: Arc<RwLock<f64>>,
 }
 
 #[derive(Debug)]
@@ -147,6 +152,7 @@ impl Server {
         protocol_version: i32,
         forge_mods: Vec<forge::ForgeMod>,
         fml_network_version: Option<i64>,
+        renderer: Arc<RwLock<Renderer>>,
     ) -> Result<Arc<Server>, protocol::Error> {
         let mut conn = protocol::Conn::new(address, protocol_version)?;
 
@@ -194,14 +200,14 @@ impl Server {
                     debug!("Login: {} {}", val.username, val.uuid);
                     conn.state = protocol::State::Play;
                     let uuid = protocol::UUID::from_str(&val.uuid).unwrap();
-                    let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/);
+                    let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/, renderer.clone());
                     return Ok(server);
                 }
                 protocol::packet::Packet::LoginSuccess_UUID(val) => {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {:?}", val.username, val.uuid);
                     conn.state = protocol::State::Play;
-                    let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, val.uuid, resources/*, write, write_int*/);
+                    let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, val.uuid, resources/*, write, write_int*/, renderer.clone());
 
                     return Ok(server);
                 }
@@ -328,7 +334,7 @@ impl Server {
             }
         }
 
-        let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/);
+        let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/, renderer.clone());
 
         Ok(server)
     }
@@ -336,12 +342,17 @@ impl Server {
     fn connect0(conn: Conn, protocol_version: i32,
                 forge_mods: Vec<forge::ForgeMod>,
                 uuid: protocol::UUID,
-                resources: Arc<RwLock<resources::Manager>>) -> Arc<Server> {
+                resources: Arc<RwLock<resources::Manager>>,
+                renderer: Arc<RwLock<Renderer>>) -> Arc<Server> {
         let server_callback = Arc::new(RwLock::new(None));
         let inner_server = server_callback.clone();
         let mut inner_server = inner_server.write().unwrap();
         Self::spawn_reader(conn.clone(), server_callback.clone());
         let light_updater = Self::spawn_light_updater(server_callback.clone());
+        let window_size = Arc::new(RwLock::new((0, 0)));
+        let render_list_computer = Self::spawn_render_list_computer(server_callback.clone(), renderer.clone(), window_size.clone());
+        // let delta = Arc::new(RwLock::from(0.0));
+        // let ticker = Self::spawn_ticker(server_callback.clone(), renderer.clone(), render_list_computer.1, delta.clone());
         let conn = Arc::new(RwLock::new(Some(conn)));
         let server = Arc::new(Server::new(
             protocol_version,
@@ -349,11 +360,16 @@ impl Server {
             uuid,
             resources,
             conn,
-            light_updater
+            light_updater,
+            render_list_computer.0.clone(),
+           window_size.clone(),
+           // ticker,
+           // delta.clone()
         ));
 
         let actual_server = server.clone();
         inner_server.replace(actual_server);
+        render_list_computer.0.send(true);
         server.clone()
     }
 
@@ -603,8 +619,7 @@ impl Server {
         let (tx, rx) = mpsc::channel();
         thread::spawn(move || loop {
             rx.recv().unwrap();
-            while server.clone().try_read().is_err() {
-            }
+            while server.clone().try_read().is_err() {}
             let server = server.clone().read().unwrap().as_ref().unwrap().clone();
             let mut done = false;
             while !done {
@@ -622,24 +637,72 @@ impl Server {
                 if world_cloned.light_updates.clone().read().unwrap().is_empty() {
                     done = true;
                 }
-                sleep(Duration::from_millis(1));
+                // sleep(Duration::from_millis(1));
             }
             while rx.try_recv().is_ok() {}
         });
         tx
     }
 
-    pub fn dummy_server(resources: Arc<RwLock<resources::Manager>>) -> Arc<Server> {
+    fn spawn_render_list_computer(server: Arc<RwLock<Option<Arc<Server>>>>, renderer: Arc<RwLock<Renderer>>,
+                                  window_size: Arc<RwLock<(u32, u32)>>) -> (Sender<bool>, mpsc::Receiver<bool>) { // TODO: Use fair rwlock!
+        let (tx, rx) = mpsc::channel();
+        let (etx, erx) = mpsc::channel();
+        thread::spawn(move || loop {
+            rx.recv().unwrap();
+            while server.clone().try_read().is_err() {}
+            let server = server.clone().read().unwrap().as_ref().unwrap().clone();
+            /*{
+                let window_size = window_size.clone();
+                let window_size = window_size.read().unwrap();
+                if window_size.0 == 0 || window_size.1 == 0 {
+                    return;
+                }
+                renderer.clone().write().unwrap().update_camera(window_size.0, window_size.1);
+            }*/
+            let world = server.world.clone();
+            world.compute_render_list(renderer.clone());
+            println!("locked1.2write: {}", !renderer.clone().try_write().is_ok());
+            println!("locked1.2read: {}", !renderer.clone().try_read().is_ok());
+            while rx.try_recv().is_ok() {}
+            etx.send(true);
+        });
+        (tx, erx)
+    }
+
+    /*
+    fn spawn_ticker(server: Arc<RwLock<Option<Arc<Server>>>>, renderer: Arc<RwLock<Renderer>>, erx: mpsc::Receiver<bool>, delta: Arc<RwLock<f64>>) -> mpsc::Receiver<bool> { // TODO: Use fair rwlock!
+        let (tx, rx) = mpsc::channel();
+        thread::spawn(move || loop {
+            erx.recv().unwrap();
+            while server.clone().try_read().is_err() {}
+            let server = server.clone().read().unwrap().as_ref().unwrap().clone();
+            server.tick(renderer.clone(), *delta.clone().read().unwrap());
+            while erx.try_recv().is_ok() {}
+            tx.send(true);
+        });
+        rx
+    }*/
+
+    pub fn dummy_server(resources: Arc<RwLock<resources::Manager>>, renderer: Arc<RwLock<Renderer>>) -> Arc<Server> {
         let server_callback = Arc::new(RwLock::new(None));
         let inner_server = server_callback.clone();
         let mut inner_server = inner_server.write().unwrap();
+        let window_size = Arc::new(RwLock::new((0, 0)));
+        let render_list = Self::spawn_render_list_computer(server_callback.clone(), renderer.clone(),
+                                                           window_size.clone());
+        // let delta = Arc::new(RwLock::new(0.0));
         let server = Arc::new(Server::new(
             protocol::SUPPORTED_PROTOCOLS[0],
             vec![],
             protocol::UUID::default(),
             resources,
             Arc::new(RwLock::new(None)),
-            Self::spawn_light_updater(server_callback.clone())
+            Self::spawn_light_updater(server_callback.clone()),
+                render_list.0,
+           // Self::spawn_ticker(server_callback.clone(), renderer.clone(), render_list.1, delta.clone()),
+            // delta.clone(),
+            window_size.clone(),
         ));
         inner_server.replace(server.clone());
         println!("instantiated server!");
@@ -736,6 +799,10 @@ impl Server {
         resources: Arc<RwLock<resources::Manager>>,
         conn: Arc<RwLock<Option<protocol::Conn>>>,
         light_updater: mpsc::Sender<bool>,
+        render_list_computer: mpsc::Sender<bool>,
+        window_size: Arc<RwLock<(u32, u32)>>,
+        // ticker: mpsc::Receiver<bool>,
+        // delta: Arc<RwLock<f64>>,
     ) -> Server {
         let mut entities = ecs::Manager::new();
         entity::add_systems(&mut entities);
@@ -779,7 +846,11 @@ impl Server {
             sun_model: RwLock::new(None),
 
             target_info: Arc::new(RwLock::new(target::Info::new())),
-            light_updates: Mutex::from(light_updater)
+            light_updates: Mutex::from(light_updater),
+            render_list_computer: Mutex::from(render_list_computer),
+            // ticker: Mutex::new(ticker),
+            // delta: delta.clone()
+            window_size
         }
     }
 
@@ -796,21 +867,25 @@ impl Server {
         self.conn.clone().read().unwrap().is_some()
     }
 
-    pub fn tick(&self, renderer: &mut render::Renderer, delta: f64) {
-        // let now = Instant::now();
+    pub fn tick(&self, renderer: /*&mut */Arc<RwLock<render::Renderer>>, delta: f64) {
+        let now = Instant::now();
+        println!("locked1.5: {}", !renderer.clone().try_write().is_ok());
         let version = self.resources.read().unwrap().version();
         if version != self.version.read().unwrap().as_ref().unwrap().clone() {
             self.version.write().unwrap().replace(version);
             self.world.clone().flag_dirty_all();
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff1 took {}", diff.as_millis());*/
+        println!("locked2: {}", !renderer.clone().try_write().is_ok());
+        let renderer = renderer.clone();
+        let mut renderer = &mut renderer.write().unwrap();
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii1 took {}", diff.as_millis());
         // TODO: Check if the world type actually needs a sun
         if self.sun_model.read().unwrap().is_none() {
             self.sun_model.write().unwrap().replace(sun::SunModel::new(renderer));
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff2 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii2 took {}", diff.as_millis());
 
         // Copy to camera
         if let Some(player) = *self.player.clone().read().unwrap() {
@@ -821,35 +896,35 @@ impl Server {
             renderer.camera.yaw = rotation.yaw;
             renderer.camera.pitch = rotation.pitch;
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff3 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii3 took {}", diff.as_millis());
         self.entity_tick(renderer, delta);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff4 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii4 took {}", diff.as_millis());
 
         *self.tick_timer.write().unwrap() += delta;
         while self.tick_timer.read().unwrap().clone() >= 3.0 && self.is_connected() {
             self.minecraft_tick();
             *self.tick_timer.write().unwrap() -= 3.0;
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff5 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii5 took {}", diff.as_millis());
 
         self.update_time(renderer, delta);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff6 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii6 took {}", diff.as_millis());
         if let Some(sun_model) = self.sun_model.write().unwrap().as_mut() {
             sun_model.tick(renderer, self.world_data.clone().read().unwrap().world_time, self.world_data.clone().read().unwrap().world_age);
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff7 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii7 took {}", diff.as_millis());
         let world = self.world.clone();
         world.tick(&mut self.entities.clone().write().unwrap());
         // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
             self.light_updates.lock().unwrap().send(true).unwrap();
         // }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff8 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii8 took {}", diff.as_millis());
 
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
@@ -867,8 +942,8 @@ impl Server {
         } else {
             self.target_info.clone().write().unwrap().clear(renderer);
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff9 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii9 took {}", diff.as_millis());
     }
     // diff 4 is to be investigated!
 
@@ -978,6 +1053,7 @@ impl Server {
         if self.is_connected() || self.disconnect_data.clone().read().unwrap().just_disconnected {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().unwrap().just_disconnected = false;
+            // TODO: Investigate this entity shit!
             *self.entity_tick_timer.write().unwrap() += delta;
             while self.entity_tick_timer.read().unwrap().clone() >= 3.0 {
                 let world = self.world.clone();
@@ -1117,10 +1193,12 @@ impl Server {
         }
     }
 
-    pub fn on_right_click(&self, renderer: &mut render::Renderer) {
+    pub fn on_right_click(&self, renderer: /*&mut */Arc<RwLock<render::Renderer>>) {
         use crate::shared::Direction;
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
+            let renderer = renderer.clone();
+            let mut renderer = &mut renderer.write().unwrap();
             if let Some((pos, _, face, at)) = target::trace_ray(
                 &world,
                 4.0,

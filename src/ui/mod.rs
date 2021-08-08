@@ -20,6 +20,7 @@ use clipboard::{ClipboardContext, ClipboardProvider};
 use std::cell::{RefCell, RefMut};
 use std::rc::{Rc, Weak};
 use winit::event::VirtualKeyCode;
+use std::sync::{Arc, RwLock};
 
 const SCALED_WIDTH: f64 = 854.0;
 const SCALED_HEIGHT: f64 = 480.0;
@@ -304,11 +305,15 @@ impl Container {
         }
     }
 
-    pub fn tick(&mut self, renderer: &mut render::Renderer, delta: f64, width: f64, height: f64) {
+    pub fn tick(&mut self, renderer: /*&mut */Arc<RwLock<render::Renderer>>, delta: f64, width: f64, height: f64) {
         let (sw, sh) = match self.mode {
             Mode::Scaled => (SCALED_WIDTH / width, SCALED_HEIGHT / height),
             Mode::Unscaled(scale) => (scale, scale),
         };
+        println!("locked-1read {}", renderer.clone().try_read().is_err());
+        println!("locked-1write {}", renderer.clone().try_write().is_err());
+        let renderer = renderer.clone();
+        let mut renderer = &mut renderer.write().unwrap();
 
         if self.last_sw != sw
             || self.last_sh != sh

@@ -28,7 +28,7 @@ use image::{GenericImage, GenericImageView};
 use log::{error, trace};
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Mutex};
 
 use crate::types::hash::FNVHash;
 use std::hash::BuildHasherDefault;
@@ -36,6 +36,7 @@ use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::mpsc;
 use std::thread;
 use crate::world::World;
+use std::time::Instant;
 
 const ATLAS_SIZE: usize = 1024;
 
@@ -67,7 +68,7 @@ pub struct Renderer {
     pub camera: Camera,
     perspective_matrix: cgmath::Matrix4<f32>,
     camera_matrix: cgmath::Matrix4<f32>,
-    pub frustum: collision::Frustum<f32>,
+    pub frustum: Arc<RwLock<Option<collision::Frustum<f32>>>>,
     pub view_vector: cgmath::Vector3<f32>,
 
     pub frame_id: u32,
@@ -80,8 +81,8 @@ pub struct Renderer {
     // Light renderering
     pub light_level: f32,
     pub sky_offset: f32,
-    skin_request: mpsc::Sender<String>,
-    skin_reply: mpsc::Receiver<(String, Option<image::DynamicImage>)>,
+    skin_request: Mutex<mpsc::Sender<String>>,
+    skin_reply: Mutex<mpsc::Receiver<(String, Option<image::DynamicImage>)>>,
 }
 
 #[derive(Default)]
@@ -222,7 +223,7 @@ impl Renderer {
             },
             perspective_matrix: cgmath::Matrix4::identity(),
             camera_matrix: cgmath::Matrix4::identity(),
-            frustum: collision::Frustum::from_matrix4(cgmath::Matrix4::identity()).unwrap(),
+            frustum: Arc::new(RwLock::new(Some(collision::Frustum::from_matrix4(cgmath::Matrix4::identity()).unwrap()))),
             view_vector: cgmath::Vector3::zero(),
 
             frame_id: 1,
@@ -231,14 +232,16 @@ impl Renderer {
 
             light_level: 0.8,
             sky_offset: 1.0,
-            skin_request: skin_req,
-            skin_reply,
+            skin_request: Mutex::new(skin_req),
+            skin_reply: Mutex::new(skin_reply),
         }
     }
 
+    // TODO: Improve perf!
     pub fn update_camera(&mut self, width: u32, height: u32) {
         use std::f64::consts::PI as PI64;
         // Not a sane place to put this but it works
+        let now = Instant::now();
         {
             let rm = self.resources.read().unwrap();
             if rm.version() != self.resource_version {
@@ -253,6 +256,8 @@ impl Renderer {
                     .rebuild_models(self.resource_version, &self.textures);
             }
         }
+        /*let diff = Instant::now().duration_since(now);
+        println!("Camera diff 1 took {}", diff.as_millis());*/ // readd
 
         if self.height != height || self.width != width {
             self.width = width;
@@ -270,6 +275,8 @@ impl Renderer {
             });
 
             self.init_trans(width, height);
+            /*let diff = Instant::now().duration_since(now);
+            println!("Camera diff 2 took {}", diff.as_millis());*/ // readd
         }
 
         self.view_vector = cgmath::Vector3::new(
@@ -290,8 +297,13 @@ impl Renderer {
             cgmath::Vector3::new(0.0, -1.0, 0.0),
         );
         self.camera_matrix = camera_matrix * cgmath::Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
-        self.frustum =
-            collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();
+        /*self.frustum =
+            collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();*/
+        let diff = Instant::now().duration_since(now);
+        println!("Camera diff 2.8 took {}", diff.as_millis()); // readd
+        self.frustum.clone().write().unwrap().replace(collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap());
+        let diff = Instant::now().duration_since(now);
+        println!("Camera diff 3 took {}", diff.as_millis()); // readd
     }
 
     pub fn tick(
@@ -303,11 +315,16 @@ impl Renderer {
         physical_width: u32,
         physical_height: u32,
     ) {
+        let now = Instant::now();
         self.update_textures(delta);
+        let diff = Instant::now().duration_since(now);
+        println!("Render diff 1 | {}", diff.as_millis());
 
         if self.trans.is_some() {
-            let trans = self.trans.as_mut().unwrap();
+            let trans = self.trans.as_ref().unwrap();
             trans.main.bind();
+            let diff = Instant::now().duration_since(now);
+            println!("Render diff 2 | {}", diff.as_millis());
         }
 
         gl::active_texture(0);
@@ -323,6 +340,8 @@ impl Renderer {
             1.0,
         );
         gl::clear(gl::ClearFlags::Color | gl::ClearFlags::Depth);
+        let diff = Instant::now().duration_since(now);
+        println!("Render diff 3 | {}", diff.as_millis());
 
         if world.is_some() {
             // Chunk rendering
@@ -356,17 +375,21 @@ impl Renderer {
                     }
                 }
             }
+            let diff = Instant::now().duration_since(now);
+            println!("Render diff 4 | {}", diff.as_millis());
         }
 
         // Line rendering
         // Model rendering
         self.model.draw(
-            &self.frustum,
+            self.frustum.clone()/*&self.frustum*/,
             &self.perspective_matrix,
             &self.camera_matrix,
             self.light_level,
             self.sky_offset,
         );
+        let diff = Instant::now().duration_since(now);
+        println!("Render diff 5 | {}", diff.as_millis());
 
         if world.is_some() {
             let tmp_world = world.as_ref().unwrap().clone();
@@ -384,6 +407,8 @@ impl Renderer {
                     delta,
                 );
             }
+            let diff = Instant::now().duration_since(now);
+            println!("Render diff 6 | {}", diff.as_millis());
         }
 
         if self.trans.is_some() {
@@ -404,7 +429,7 @@ impl Renderer {
                 .set_float(self.sky_offset);
 
             // Copy the depth buffer
-            let trans = self.trans.as_mut().unwrap();
+            let trans = self.trans.as_ref().unwrap();
             trans.main.bind_read();
             trans.trans.bind_draw();
         }
@@ -424,7 +449,7 @@ impl Renderer {
         gl::enable(gl::BLEND);
         gl::depth_mask(false);
         if self.trans.is_some() {
-            let trans = self.trans.as_mut().unwrap();
+            let trans = self.trans.as_ref().unwrap();
             trans.trans.bind();
         }
         gl::clear_color(0.0, 0.0, 0.0, 1.0); // clear color
@@ -437,6 +462,8 @@ impl Renderer {
             gl::ZERO_FACTOR,
             gl::ONE_MINUS_SRC_ALPHA,
         );
+        let diff = Instant::now().duration_since(now);
+        println!("Render diff 7 | {}", diff.as_millis());
 
         if world.is_some() {
             let tmp_world = world.unwrap().clone();
@@ -456,6 +483,8 @@ impl Renderer {
                     }
                 }
             }
+            let diff = Instant::now().duration_since(now);
+            println!("Render diff 8 | {}", diff.as_millis());
         }
 
         gl::check_framebuffer_status();
@@ -479,6 +508,8 @@ impl Renderer {
         gl::check_gl_error();
 
         self.frame_id = self.frame_id.wrapping_add(1);
+        let diff = Instant::now().duration_since(now);
+        println!("Render diff 9 | {}", diff.as_millis());
     }
 
     fn ensure_element_buffer(&mut self, size: usize) {
@@ -667,7 +698,7 @@ impl Renderer {
     fn update_textures(&mut self, delta: f64) {
         {
             let mut tex = self.textures.write().unwrap();
-            while let Ok((hash, img)) = self.skin_reply.try_recv() {
+            while let Ok((hash, img)) = self.skin_reply.lock().unwrap().try_recv() {
                 if let Some(img) = img {
                     tex.update_skin(hash, img);
                 }
@@ -1215,7 +1246,7 @@ impl TextureManager {
         };
         self.put_dynamic(&format!("skin-{}", hash), img);
         self.skins.insert(hash.to_owned(), AtomicIsize::new(0));
-        renderer.skin_request.send(hash.to_owned()).unwrap();
+        renderer.skin_request.lock().unwrap().send(hash.to_owned()).unwrap();
     }
 
     fn update_skin(&mut self, hash: String, img: image::DynamicImage) {

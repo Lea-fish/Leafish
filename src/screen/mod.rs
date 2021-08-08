@@ -26,6 +26,7 @@ pub use self::settings_menu::{AudioSettingsMenu, SettingsMenu, VideoSettingsMenu
 
 use crate::render;
 use crate::ui;
+use std::sync::{Arc, RwLock};
 
 pub trait Screen {
     // Called once
@@ -99,9 +100,11 @@ impl ScreenSystem {
     pub fn tick(
         &mut self,
         delta: f64,
-        renderer: &mut render::Renderer,
+        renderer: /*&mut */Arc<RwLock<render::Renderer>>,
         ui_container: &mut ui::Container,
     ) {
+        let renderer = renderer.clone();
+        let mut renderer = &mut renderer.write().unwrap();
         for screen in &mut self.remove_queue {
             if screen.active {
                 screen.screen.on_deactive(renderer, ui_container);

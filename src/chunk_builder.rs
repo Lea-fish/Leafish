@@ -55,7 +55,7 @@ impl ChunkBuilder {
     pub fn tick(
         &mut self,
         world: Arc<World>,
-        renderer: &mut render::Renderer,
+        renderer: /*&mut */Arc<RwLock<render::Renderer>>,
         version: usize,
     ) {
         if version != self.resource_version {
@@ -63,6 +63,8 @@ impl ChunkBuilder {
             self.models.write().unwrap().version_change();
         }
 
+        let renderer = renderer.clone();
+        let mut renderer = renderer.write().unwrap();
             while let Ok((id, mut val)) = self.built_recv.try_recv() {
                 world.clone().reset_building_flag(val.position);
 

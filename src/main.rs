@@ -64,7 +64,7 @@ const CL_BRAND: console::CVar<String> = console::CVar {
 };
 
 pub struct Game {
-    renderer: render::Renderer,
+    renderer: Arc<RwLock<render::Renderer>>,
     screen_sys: screen::ScreenSystem,
     resource_manager: Arc<RwLock<resources::Manager>>,
     console: Arc<Mutex<console::Console>>,
@@ -123,6 +123,7 @@ impl Game {
             id: self.vars.get(auth::CL_UUID).clone(),
             access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
         };
+        let renderer = self.renderer.clone();
         let result = thread::spawn(move || {
             server::Server::connect(
                 resources,
@@ -131,6 +132,7 @@ impl Game {
                 protocol_version,
                 forge_mods,
                 fml_network_version,
+                renderer,
             )
         }).join().unwrap();
         match result {
@@ -368,7 +370,7 @@ fn main() {
     let mut game = Game {
         server: None,// Arc::from(server::Server::dummy_server(resource_manager.clone())),
         focused: false,
-        renderer,
+        renderer: Arc::new(RwLock::new(renderer)),
         screen_sys,
         resource_manager: resource_manager.clone(),
         console: con,
@@ -386,7 +388,7 @@ fn main() {
         is_fullscreen: false,
         default_protocol_version,
     };
-    game.renderer.camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
+    game.renderer.clone().write().unwrap().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {
         protocol::enable_network_debug();
     }
@@ -468,6 +470,9 @@ fn tick_all(
     let physical_size = window.inner_size();
     let (physical_width, physical_height) = physical_size.into();
     let (width, height) = physical_size.to_logical::<f64>(game.dpi_factor).into();
+    /*if game.server.is_some() {
+        *game.server.as_ref().unwrap().clone().delta.clone().write().unwrap() = delta;
+    }*/
 
     let version = {
         let try_res = game.resource_manager.try_write();
@@ -497,30 +502,36 @@ fn tick_all(
     let diff = Instant::now().duration_since(now);
     println!("Diff2 took {}", diff.as_millis());
     if game.server.is_some() {
-        game.server.as_ref().unwrap().tick(&mut game.renderer, delta); // TODO: Improve perf in load screen!
+        game.server.as_ref().unwrap().tick(/*&mut */game.renderer.clone()/*.write().unwrap()*/, delta); // TODO: Improve perf in load screen!
+        // game.server.as_ref().unwrap().clone().ticker.lock().unwrap().recv(); // TODO: Improve perf of computer (relations are inefficiently aligned)
     }
     let diff = Instant::now().duration_since(now);
     println!("Diff3 took {}", diff.as_millis());
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
+        /*if game.server.is_some() {
+            *game.server.as_ref().unwrap().window_size.clone().write().unwrap() = (physical_width, physical_height);
+        }*/
         return;
     }
 
     if game.server.is_some() {
-        game.renderer.update_camera(physical_width, physical_height);
-        let world = game.server.as_ref().unwrap().world.clone();
-        world.compute_render_list(&mut game.renderer); // TODO: Improve perf on server!
+        // game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height); // TODO: Move this to an extra thread!
+        // *game.server.as_ref().unwrap().window_size.clone().write().unwrap() = (physical_width, physical_height);
+        // let world = game.server.as_ref().unwrap().world.clone();
+        // world.compute_render_list(/*&mut */game.renderer.clone()); // TODO: Improve perf on server!
+        // game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true); // old
         let diff = Instant::now().duration_since(now);
         println!("Diff5 took {}", diff.as_millis()); // readd
         game.chunk_builder
-            .tick(game.server.as_ref().unwrap().world.clone(), &mut game.renderer, version);
+            .tick(game.server.as_ref().unwrap().world.clone(), /*&mut */game.renderer.clone(), version);
         let diff = Instant::now().duration_since(now);
         println!("Diff6 took {}", diff.as_millis());
     }
 
     game.screen_sys
-        .tick(delta, &mut game.renderer, &mut ui_container);
+        .tick(delta, /*&mut */game.renderer.clone(), &mut ui_container);
     let diff = Instant::now().duration_since(now);
     println!("Diff7 took {}", diff.as_millis());
     /* TODO: open console for chat messages
@@ -534,10 +545,10 @@ fn tick_all(
     game.console
         .lock()
         .unwrap()
-        .tick(&mut ui_container, &game.renderer, delta, width);
+        .tick(&mut ui_container, /*&*/game.renderer.clone(), delta, width);
     let diff = Instant::now().duration_since(now);
     println!("Diff8 took {}", diff.as_millis());
-    ui_container.tick(&mut game.renderer, delta, width, height);
+    ui_container.tick(/*&mut */game.renderer.clone(), delta, width, height);
     let diff = Instant::now().duration_since(now);
     println!("Diff9 took {}", diff.as_millis()); // readd
     let world = if let Some(server) = game.server.as_ref() {
@@ -556,7 +567,10 @@ fn tick_all(
             physical_height,
         );
     }*/
-    game.renderer.tick(
+    if game.server.is_some() {
+        game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height); // TODO: Move this to an extra thread!
+    }
+    game.renderer.clone().write().unwrap().tick(
         world/*&mut game.server.world*/,
         delta,
         width as u32,
@@ -564,6 +578,9 @@ fn tick_all(
         physical_width,
         physical_height,
     );
+    if game.server.is_some() {
+        game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true);
+    }
     let diff = Instant::now().duration_since(now);
     println!("Diff10 took {}", diff.as_millis()); // readd
 
@@ -691,7 +708,7 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
                         if game.focused && game.server.is_some() {
-                            game.server.as_ref().unwrap().on_right_click(&mut game.renderer);
+                            game.server.as_ref().unwrap().on_right_click(/*&mut */game.renderer.clone());
                         }
                     }
                     (_, _) => (),
