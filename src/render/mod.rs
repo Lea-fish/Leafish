@@ -299,11 +299,11 @@ impl Renderer {
         self.camera_matrix = camera_matrix * cgmath::Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
         /*self.frustum =
             collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();*/
-        let diff = Instant::now().duration_since(now);
-        println!("Camera diff 2.8 took {}", diff.as_millis()); // readd
+        /*let diff = Instant::now().duration_since(now);
+        println!("Camera diff 2.8 took {}", diff.as_millis());*/ // readd
         self.frustum = collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();
-        let diff = Instant::now().duration_since(now);
-        println!("Camera diff 3 took {}", diff.as_millis()); // readd
+        /*let diff = Instant::now().duration_since(now);
+        println!("Camera diff 3 took {}", diff.as_millis());*/ // readd
     }
 
     pub fn tick(
@@ -315,16 +315,16 @@ impl Renderer {
         physical_width: u32,
         physical_height: u32,
     ) {
-        let now = Instant::now();
+        // let now = Instant::now();
         self.update_textures(delta);
-        let diff = Instant::now().duration_since(now);
-        println!("Render diff 1 | {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 1 | {}", diff.as_millis());*/
 
         if self.trans.is_some() {
             let trans = self.trans.as_ref().unwrap();
             trans.main.bind();
-            let diff = Instant::now().duration_since(now);
-            println!("Render diff 2 | {}", diff.as_millis());
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 2 | {}", diff.as_millis());*/
         }
 
         gl::active_texture(0);
@@ -340,8 +340,8 @@ impl Renderer {
             1.0,
         );
         gl::clear(gl::ClearFlags::Color | gl::ClearFlags::Depth);
-        let diff = Instant::now().duration_since(now);
-        println!("Render diff 3 | {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 3 | {}", diff.as_millis());*/
 
         if world.is_some() {
             // Chunk rendering
@@ -375,8 +375,8 @@ impl Renderer {
                     }
                 }
             }
-            let diff = Instant::now().duration_since(now);
-            println!("Render diff 4 | {}", diff.as_millis());
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 4 | {}", diff.as_millis());*/
         }
 
         // Line rendering
@@ -388,8 +388,8 @@ impl Renderer {
             self.light_level,
             self.sky_offset,
         );
-        let diff = Instant::now().duration_since(now);
-        println!("Render diff 5 | {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 5 | {}", diff.as_millis());*/
 
         if world.is_some() {
             let tmp_world = world.as_ref().unwrap().clone();
@@ -407,8 +407,8 @@ impl Renderer {
                     delta,
                 );
             }
-            let diff = Instant::now().duration_since(now);
-            println!("Render diff 6 | {}", diff.as_millis());
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 6 | {}", diff.as_millis());*/
         }
 
         if self.trans.is_some() {
@@ -462,8 +462,8 @@ impl Renderer {
             gl::ZERO_FACTOR,
             gl::ONE_MINUS_SRC_ALPHA,
         );
-        let diff = Instant::now().duration_since(now);
-        println!("Render diff 7 | {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 7 | {}", diff.as_millis());*/
 
         if world.is_some() {
             let tmp_world = world.unwrap().clone();
@@ -483,8 +483,8 @@ impl Renderer {
                     }
                 }
             }
-            let diff = Instant::now().duration_since(now);
-            println!("Render diff 8 | {}", diff.as_millis());
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 8 | {}", diff.as_millis());*/
         }
 
         gl::check_framebuffer_status();
@@ -508,8 +508,8 @@ impl Renderer {
         gl::check_gl_error();
 
         self.frame_id = self.frame_id.wrapping_add(1);
-        let diff = Instant::now().duration_since(now);
-        println!("Render diff 9 | {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 9 | {}", diff.as_millis());*/
     }
 
     fn ensure_element_buffer(&mut self, size: usize) {

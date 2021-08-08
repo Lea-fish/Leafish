@@ -310,8 +310,6 @@ impl Container {
             Mode::Scaled => (SCALED_WIDTH / width, SCALED_HEIGHT / height),
             Mode::Unscaled(scale) => (scale, scale),
         };
-        println!("locked-1read {}", renderer.clone().try_read().is_err());
-        println!("locked-1write {}", renderer.clone().try_write().is_err());
         let renderer = renderer.clone();
         let mut renderer = &mut renderer.write().unwrap();
 

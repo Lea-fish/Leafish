@@ -83,6 +83,7 @@ pub trait System {
         m: &mut Manager,
         world: &world::World,
         renderer: &mut render::Renderer,
+        focused: bool,
     );
 
     fn entity_added(
@@ -170,22 +171,22 @@ impl Manager {
     }
 
     /// Ticks all tick systems
-    pub fn tick(&mut self, world: &world::World, renderer: &mut render::Renderer) {
+    pub fn tick(&mut self, world: &world::World, renderer: &mut render::Renderer, focused: bool) {
         self.process_entity_changes(world, renderer);
         let mut systems = self.systems.take().unwrap();
         for sys in &mut systems {
-            sys.update(self, world, renderer);
+            sys.update(self, world, renderer, focused);
         }
         self.systems = Some(systems);
         self.process_entity_changes(world, renderer);
     }
 
     /// Ticks all render systems
-    pub fn render_tick(&mut self, world: &world::World, renderer: &mut render::Renderer) {
+    pub fn render_tick(&mut self, world: &world::World, renderer: &mut render::Renderer, focused: bool) {
         self.process_entity_changes(world, renderer);
         let mut systems = self.render_systems.take().unwrap();
         for sys in &mut systems {
-            sys.update(self, world, renderer);
+            sys.update(self, world, renderer, focused);
         }
         self.render_systems = Some(systems);
         self.process_entity_changes(world, renderer);

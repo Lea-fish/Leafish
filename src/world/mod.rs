@@ -392,14 +392,11 @@ impl World {
         // println!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
         let diff = Instant::now().duration_since(start_rec);
-        println!("locked: {}", !renderer.clone().try_write().is_ok());
         println!("Delay took {}", diff.as_millis());
         let frustum = renderer.clone().read().unwrap().frustum.clone();
         let frame_id = renderer.clone().read().unwrap().frame_id.clone();
-        println!("locked1.0001: {}", !renderer.clone().try_write().is_ok());
         self.do_render_queue(Arc::new(RwLock::new(process_queue)),
                              frustum, frame_id, valid_dirs);
-        println!("locked1.1111: {}", !renderer.clone().try_write().is_ok());
 
         // TODO: Improve the performance of the following by moving this to another thread!
         /*

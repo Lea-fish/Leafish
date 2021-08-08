@@ -73,6 +73,7 @@ impl ecs::System for SignRenderer {
         m: &mut ecs::Manager,
         world: &world::World,
         renderer: &mut render::Renderer,
+        _: bool,
     ) {
         for e in m.find(&self.filter) {
             let position = *m.get_component(e, self.position).unwrap();

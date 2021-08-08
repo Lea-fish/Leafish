@@ -664,8 +664,6 @@ impl Server {
             }*/
             let world = server.world.clone();
             world.compute_render_list(renderer.clone());
-            println!("locked1.2write: {}", !renderer.clone().try_write().is_ok());
-            println!("locked1.2read: {}", !renderer.clone().try_read().is_ok());
             while rx.try_recv().is_ok() {}
             etx.send(true);
         });
@@ -872,25 +870,23 @@ impl Server {
         self.conn.clone().read().unwrap().is_some()
     }
 
-    pub fn tick(&self, renderer: /*&mut */Arc<RwLock<render::Renderer>>, delta: f64) {
-        let now = Instant::now();
-        println!("locked1.5: {}", !renderer.clone().try_write().is_ok());
+    pub fn tick(&self, renderer: /*&mut */Arc<RwLock<render::Renderer>>, delta: f64, focused: bool) {
+        // let now = Instant::now();
         let version = self.resources.read().unwrap().version();
         if version != self.version.read().unwrap().as_ref().unwrap().clone() {
             self.version.write().unwrap().replace(version);
             self.world.clone().flag_dirty_all();
         }
-        println!("locked2: {}", !renderer.clone().try_write().is_ok());
         let renderer = renderer.clone();
         let mut renderer = &mut renderer.write().unwrap();
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii1 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii1 took {}", diff.as_millis());*/
         // TODO: Check if the world type actually needs a sun
         if self.sun_model.read().unwrap().is_none() {
             self.sun_model.write().unwrap().replace(sun::SunModel::new(renderer));
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii2 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii2 took {}", diff.as_millis());*/
 
         // Copy to camera
         if let Some(player) = *self.player.clone().read().unwrap() {
@@ -901,35 +897,35 @@ impl Server {
             renderer.camera.yaw = rotation.yaw;
             renderer.camera.pitch = rotation.pitch;
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii3 took {}", diff.as_millis());
-        self.entity_tick(renderer, delta);
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii4 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii3 took {}", diff.as_millis());*/
+        self.entity_tick(renderer, delta, focused);
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii4 took {}", diff.as_millis());*/
 
         *self.tick_timer.write().unwrap() += delta;
         while self.tick_timer.read().unwrap().clone() >= 3.0 && self.is_connected() {
             self.minecraft_tick();
             *self.tick_timer.write().unwrap() -= 3.0;
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii5 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii5 took {}", diff.as_millis());*/
 
         self.update_time(renderer, delta);
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii6 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii6 took {}", diff.as_millis());*/
         if let Some(sun_model) = self.sun_model.write().unwrap().as_mut() {
             sun_model.tick(renderer, self.world_data.clone().read().unwrap().world_time, self.world_data.clone().read().unwrap().world_age);
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii7 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii7 took {}", diff.as_millis());*/
         let world = self.world.clone();
         world.tick(&mut self.entities.clone().write().unwrap());
         // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
             self.light_updates.lock().unwrap().send(true).unwrap();
         // }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii8 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii8 took {}", diff.as_millis());*/
 
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
@@ -947,13 +943,13 @@ impl Server {
         } else {
             self.target_info.clone().write().unwrap().clear(renderer);
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii9 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diffiii9 took {}", diff.as_millis());*/
     }
     // diff 4 is to be investigated!
 
 
-    fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64) {
+    fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64, focused: bool) {
         let world_entity = self.entities.clone().read().unwrap().get_world();
         // Update the game's state for entities to read
         self.entities
@@ -1062,13 +1058,13 @@ impl Server {
             *self.entity_tick_timer.write().unwrap() += delta;
             while self.entity_tick_timer.read().unwrap().clone() >= 3.0 {
                 let world = self.world.clone();
-                self.entities.clone().write().unwrap().tick(&world/*&mut self.world*/, renderer);
+                self.entities.clone().write().unwrap().tick(&world/*&mut self.world*/, renderer, focused);
                 *self.entity_tick_timer.write().unwrap() -= 3.0;
             }
             let world = self.world.clone();
             self.entities
                 .clone().write().unwrap()
-                .render_tick(&world/*&mut self.world*/, renderer);
+                .render_tick(&world/*&mut self.world*/, renderer, focused);
         }
     }
 

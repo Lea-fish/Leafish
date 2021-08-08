@@ -160,6 +160,7 @@ impl ecs::System for PlayerRenderer {
         m: &mut ecs::Manager,
         world: &world::World,
         renderer: &mut render::Renderer,
+        _: bool,
     ) {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
@@ -625,7 +626,7 @@ impl ecs::System for MovementHandler {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, world: &world::World, _: &mut render::Renderer) {
+    fn update(&mut self, m: &mut ecs::Manager, world: &world::World, _: &mut render::Renderer, focused: bool) {
         for e in m.find(&self.filter) {
             let movement = m.get_component_mut(e, self.movement).unwrap();
             if movement.flying && m.get_component(e, self.gravity).is_some() {
@@ -635,6 +636,15 @@ impl ecs::System for MovementHandler {
             }
             let gamemode = m.get_component(e, self.gamemode).unwrap();
             movement.flying |= gamemode.always_fly();
+            if !focused {
+                movement.pressed_keys.insert(Actionkey::Backward, false);
+                movement.pressed_keys.insert(Actionkey::Forward, false);
+                movement.pressed_keys.insert(Actionkey::Right, false);
+                movement.pressed_keys.insert(Actionkey::Left, false);
+                movement.pressed_keys.insert(Actionkey::Jump, false);
+                movement.pressed_keys.insert(Actionkey::Sneak, false);
+                movement.pressed_keys.insert(Actionkey::Sprint, false);
+            }
 
             // Detect double-tapping jump to toggle creative flight
             if movement.is_key_pressed(Actionkey::Jump) {

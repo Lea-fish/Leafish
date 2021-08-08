@@ -502,7 +502,7 @@ fn tick_all(
     let diff = Instant::now().duration_since(now);
     println!("Diff2 took {}", diff.as_millis());
     if game.server.is_some() {
-        game.server.as_ref().unwrap().tick(/*&mut */game.renderer.clone()/*.write().unwrap()*/, delta); // TODO: Improve perf in load screen!
+        game.server.as_ref().unwrap().tick(/*&mut */game.renderer.clone()/*.write().unwrap()*/, delta, game.focused); // TODO: Improve perf in load screen!
         // game.server.as_ref().unwrap().clone().ticker.lock().unwrap().recv(); // TODO: Improve perf of computer (relations are inefficiently aligned)
     }
     let diff = Instant::now().duration_since(now);
