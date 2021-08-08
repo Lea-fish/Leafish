@@ -115,6 +115,7 @@ pub struct Server {
     target_info: Arc<RwLock<target::Info>>,
     pub light_updates: Mutex<Sender<bool>>, // move to world!
     pub render_list_computer: Mutex<Sender<bool>>,
+    pub render_list_computer_notify: Mutex<Receiver<bool>>,
     pub window_size: Arc<RwLock<(u32, u32)>>,
     // pub ticker: Mutex<Receiver<bool>>,
     // pub delta: Arc<RwLock<f64>>,
@@ -362,6 +363,7 @@ impl Server {
             conn,
             light_updater,
             render_list_computer.0.clone(),
+           render_list_computer.1,
            window_size.clone(),
            // ticker,
            // delta.clone()
@@ -700,6 +702,7 @@ impl Server {
             Arc::new(RwLock::new(None)),
             Self::spawn_light_updater(server_callback.clone()),
                 render_list.0,
+           render_list.1,
            // Self::spawn_ticker(server_callback.clone(), renderer.clone(), render_list.1, delta.clone()),
             // delta.clone(),
             window_size.clone(),
@@ -800,6 +803,7 @@ impl Server {
         conn: Arc<RwLock<Option<protocol::Conn>>>,
         light_updater: mpsc::Sender<bool>,
         render_list_computer: mpsc::Sender<bool>,
+        render_list_computer_notify: mpsc::Receiver<bool>,
         window_size: Arc<RwLock<(u32, u32)>>,
         // ticker: mpsc::Receiver<bool>,
         // delta: Arc<RwLock<f64>>,
@@ -848,6 +852,7 @@ impl Server {
             target_info: Arc::new(RwLock::new(target::Info::new())),
             light_updates: Mutex::from(light_updater),
             render_list_computer: Mutex::from(render_list_computer),
+            render_list_computer_notify: Mutex::from(render_list_computer_notify),
             // ticker: Mutex::new(ticker),
             // delta: delta.clone()
             window_size

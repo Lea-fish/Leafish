@@ -240,7 +240,7 @@ impl Manager {
 
     pub fn draw(
         &mut self,
-        frustum: Arc<RwLock<Option<Frustum<f32>>>>,
+        frustum: Frustum<f32>,
         perspective_matrix: &Matrix4<f32>,
         camera_matrix: &Matrix4<f32>,
         light_level: f32,
@@ -268,7 +268,7 @@ impl Manager {
 
             for model in collection.models.values() {
                 if model.radius > 0.0
-                    && frustum.clone().read().unwrap().as_ref().unwrap().contains(&Sphere { // TODO: Possibly move the frustum read
+                    && frustum.contains(&Sphere { // TODO: Possibly move the frustum read
                         center: Point3::new(model.x, -model.y, model.z),
                         radius: model.radius,
                     }) == collision::Relation::Out

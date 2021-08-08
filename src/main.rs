@@ -522,6 +522,7 @@ fn tick_all(
         // let world = game.server.as_ref().unwrap().world.clone();
         // world.compute_render_list(/*&mut */game.renderer.clone()); // TODO: Improve perf on server!
         // game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true); // old
+        game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height); // TODO: Move this to an extra thread!
         let diff = Instant::now().duration_since(now);
         println!("Diff5 took {}", diff.as_millis()); // readd
         game.chunk_builder
@@ -567,8 +568,9 @@ fn tick_all(
             physical_height,
         );
     }*/
+    // TODO: Wait for rendering list to finish!
     if game.server.is_some() {
-        game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height); // TODO: Move this to an extra thread!
+        game.server.as_ref().unwrap().clone().render_list_computer_notify.lock().unwrap().recv();
     }
     game.renderer.clone().write().unwrap().tick(
         world/*&mut game.server.world*/,

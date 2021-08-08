@@ -509,7 +509,7 @@ impl World {
     }
 
     fn do_render_queue(&self, process_queue: Arc<RwLock<VecDeque<(Direction, (i32, i32, i32))>>>,
-                       frustum: Arc<RwLock<Option<Frustum<f32>>>>, frame_id: u32, valid_dirs: [bool; 6]) {
+                       frustum: Frustum<f32>, frame_id: u32, valid_dirs: [bool; 6]) {
         let out = Arc::new(RwLock::new(VecDeque::new())); // TODO: Add Arc!
         /*let tmp_renderer = renderer.clone();
         let tmp_renderer = tmp_renderer.read().unwrap();
@@ -517,8 +517,6 @@ impl World {
         // let frame_id = renderer.clone().read().unwrap().frame_id.clone();
         // let frustum = renderer.clone().read().unwrap().frustum.clone().read().unwrap().as_ref().unwrap();
         let tmp_frustum = frustum.clone();
-        let tmp_frustum = tmp_frustum.read().unwrap();
-        let tmp_frustum = tmp_frustum.as_ref().unwrap();
         println!("rendering {} elems", process_queue.clone().read().unwrap().len());
         process_queue.clone().read().unwrap().par_iter().for_each(|(from, pos)| {
             let (exists, cull) = if let Some((sec, rendered_on)) =

@@ -68,7 +68,7 @@ pub struct Renderer {
     pub camera: Camera,
     perspective_matrix: cgmath::Matrix4<f32>,
     camera_matrix: cgmath::Matrix4<f32>,
-    pub frustum: Arc<RwLock<Option<collision::Frustum<f32>>>>,
+    pub frustum: collision::Frustum<f32>,
     pub view_vector: cgmath::Vector3<f32>,
 
     pub frame_id: u32,
@@ -223,7 +223,7 @@ impl Renderer {
             },
             perspective_matrix: cgmath::Matrix4::identity(),
             camera_matrix: cgmath::Matrix4::identity(),
-            frustum: Arc::new(RwLock::new(Some(collision::Frustum::from_matrix4(cgmath::Matrix4::identity()).unwrap()))),
+            frustum: collision::Frustum::from_matrix4(cgmath::Matrix4::identity()).unwrap(),
             view_vector: cgmath::Vector3::zero(),
 
             frame_id: 1,
@@ -301,7 +301,7 @@ impl Renderer {
             collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();*/
         let diff = Instant::now().duration_since(now);
         println!("Camera diff 2.8 took {}", diff.as_millis()); // readd
-        self.frustum.clone().write().unwrap().replace(collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap());
+        self.frustum = collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();
         let diff = Instant::now().duration_since(now);
         println!("Camera diff 3 took {}", diff.as_millis()); // readd
     }
