@@ -311,7 +311,7 @@ impl Container {
             Mode::Unscaled(scale) => (scale, scale),
         };
         let renderer = renderer.clone();
-        let mut renderer = &mut renderer.write().unwrap();
+        let renderer = &mut renderer.write().unwrap();
 
         if self.last_sw != sw
             || self.last_sh != sh

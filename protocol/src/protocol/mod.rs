@@ -1137,7 +1137,7 @@ impl Conn {
         }
         // let mut send_buf = Vec::new();
         let lock = self.send.clone();
-        let lock = lock.lock();
+        let _lock = lock.lock();
         VarInt(buf.len() as i32 + extra).write_to(/*&mut */self)?;
         if self.compression_threshold >= 0 && extra == 1 {
             VarInt(0).write_to(/*&mut */self)?;

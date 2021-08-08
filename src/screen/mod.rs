@@ -104,7 +104,7 @@ impl ScreenSystem {
         ui_container: &mut ui::Container,
     ) {
         let renderer = renderer.clone();
-        let mut renderer = &mut renderer.write().unwrap();
+        let renderer = &mut renderer.write().unwrap();
         for screen in &mut self.remove_queue {
             if screen.active {
                 screen.screen.on_deactive(renderer, ui_container);
