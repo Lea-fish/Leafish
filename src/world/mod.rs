@@ -372,7 +372,7 @@ impl World {
 
     pub fn compute_render_list(&self, renderer: /*&mut */Arc<RwLock<render::Renderer>>) {
         let start_rec = Instant::now();
-        self.render_list.clone().write().unwrap().clear(); // TODO: Sync with the main thread somehow!
+        // self.render_list.clone().write().unwrap().clear(); // TODO: Sync with the main thread somehow!
         // renderer.clone().read().unwrap()
 
         let mut valid_dirs = [false; 6];
@@ -388,6 +388,7 @@ impl World {
             ((renderer.clone().read().unwrap().camera.pos.z as i32) >> 4),
         );
 
+        let mut render_queue = Arc::new(RwLock::new(Vec::new()));
         let mut process_queue = VecDeque::with_capacity(self.chunks.clone().read().unwrap().len() * 16);
         // println!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
@@ -396,7 +397,11 @@ impl World {
         let frustum = renderer.clone().read().unwrap().frustum.clone();
         let frame_id = renderer.clone().read().unwrap().frame_id.clone();
         self.do_render_queue(Arc::new(RwLock::new(process_queue)),
-                             frustum, frame_id, valid_dirs);
+                             frustum, frame_id, valid_dirs, render_queue.clone());
+        let render_list_write = self.render_list.clone();
+        let mut render_list_write = render_list_write.write().unwrap();
+        render_list_write.clear();
+        render_list_write.extend(render_queue.clone().read().unwrap().iter());
 
         // TODO: Improve the performance of the following by moving this to another thread!
         /*
@@ -506,7 +511,7 @@ impl World {
     }
 
     fn do_render_queue(&self, process_queue: Arc<RwLock<VecDeque<(Direction, (i32, i32, i32))>>>,
-                       frustum: Frustum<f32>, frame_id: u32, valid_dirs: [bool; 6]) {
+                       frustum: Frustum<f32>, frame_id: u32, valid_dirs: [bool; 6], render_queue: Arc<RwLock<Vec<(i32, i32, i32)>>>) {
         let out = Arc::new(RwLock::new(VecDeque::new())); // TODO: Add Arc!
         /*let tmp_renderer = renderer.clone();
         let tmp_renderer = tmp_renderer.read().unwrap();
@@ -547,7 +552,8 @@ impl World {
             };
 
             if exists {
-                self.render_list.clone().write().unwrap().push(*pos);
+                // self.render_list.clone().write().unwrap().push(*pos);
+                render_queue.clone().write().unwrap().push(*pos);
             }
 
             for dir in Direction::all() {
@@ -568,7 +574,7 @@ impl World {
         });
         if !out.clone().read().unwrap().is_empty() {
             println!("do next!");
-            self.do_render_queue(out.clone(), frustum.clone(), frame_id, valid_dirs);
+            self.do_render_queue(out.clone(), frustum.clone(), frame_id, valid_dirs, render_queue);
         }else {
             println!("finished!");
         }

@@ -562,10 +562,10 @@ fn tick_all(
             physical_height,
         );
     }*/
-    // TODO: Wait for rendering list to finish!
+    /*// TODO: Wait for rendering list to finish! (to fix delayed chunk displaying when turning) (but also preserve the good performance)
     if game.server.is_some() {
-        game.server.as_ref().unwrap().clone().render_list_computer_notify.lock().unwrap().recv().unwrap();
-    }
+        // game.server.as_ref().unwrap().clone().render_list_computer_notify.lock().unwrap().recv().unwrap();
+    }*/
     game.renderer.clone().write().unwrap().tick(
         world,
         delta,
