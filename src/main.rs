@@ -423,7 +423,7 @@ fn main() {
         } = event
         {
             glutin_window.resize(physical_size);
-            // TODO: Fix window resizing!
+            // TODO: Fix window resizing (when in login screen).
         }
 
         if !handle_window_event(&winit_window, &mut game, &mut ui_container, event) {
@@ -502,27 +502,21 @@ fn tick_all(
     let diff = Instant::now().duration_since(now);
     println!("Diff2 took {}", diff.as_millis());
     if game.server.is_some() {
-        game.server.as_ref().unwrap().tick(/*&mut */game.renderer.clone()/*.write().unwrap()*/, delta, game.focused); // TODO: Improve perf in load screen!
-        // game.server.as_ref().unwrap().clone().ticker.lock().unwrap().recv(); // TODO: Improve perf of computer (relations are inefficiently aligned)
+        game.server.as_ref().unwrap().tick(game.renderer.clone(), delta, game.focused); // TODO: Improve perf in load screen!
     }
     let diff = Instant::now().duration_since(now);
     println!("Diff3 took {}", diff.as_millis());
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
-        /*if game.server.is_some() {
-            *game.server.as_ref().unwrap().window_size.clone().write().unwrap() = (physical_width, physical_height);
-        }*/
         return;
     }
 
     if game.server.is_some() {
-        // game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height); // TODO: Move this to an extra thread!
-        // *game.server.as_ref().unwrap().window_size.clone().write().unwrap() = (physical_width, physical_height);
         // let world = game.server.as_ref().unwrap().world.clone();
         // world.compute_render_list(/*&mut */game.renderer.clone()); // TODO: Improve perf on server!
         // game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true); // old
-        game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height); // TODO: Move this to an extra thread!
+        game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height);
         let diff = Instant::now().duration_since(now);
         println!("Diff5 took {}", diff.as_millis()); // readd
         game.chunk_builder
@@ -573,7 +567,7 @@ fn tick_all(
         game.server.as_ref().unwrap().clone().render_list_computer_notify.lock().unwrap().recv();
     }
     game.renderer.clone().write().unwrap().tick(
-        world/*&mut game.server.world*/,
+        world,
         delta,
         width as u32,
         height as u32,
@@ -594,8 +588,6 @@ fn tick_all(
         }
     }
 }
-// 5 has the most impact
-// 10 the second most/the most
 // TODO: Reenable: [server/mod.rs:1924][WARN] Block entity at (1371,53,-484) missing id tag: NamedTag("", Compound({"y": Int(53), "Sign": String(""), "x": Int(1371), "z": Int(-484)}))
 
 fn handle_window_event<T>(
@@ -710,7 +702,7 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
                         if game.focused && game.server.is_some() {
-                            game.server.as_ref().unwrap().on_right_click(/*&mut */game.renderer.clone());
+                            game.server.as_ref().unwrap().on_right_click(game.renderer.clone());
                         }
                     }
                     (_, _) => (),

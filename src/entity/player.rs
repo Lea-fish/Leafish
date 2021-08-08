@@ -637,6 +637,7 @@ impl ecs::System for MovementHandler {
             let gamemode = m.get_component(e, self.gamemode).unwrap();
             movement.flying |= gamemode.always_fly();
             if !focused {
+                // TODO: Check if the game was *just* unfocused!
                 movement.pressed_keys.insert(Actionkey::Backward, false);
                 movement.pressed_keys.insert(Actionkey::Forward, false);
                 movement.pressed_keys.insert(Actionkey::Right, false);

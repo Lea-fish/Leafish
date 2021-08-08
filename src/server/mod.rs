@@ -1058,13 +1058,13 @@ impl Server {
             *self.entity_tick_timer.write().unwrap() += delta;
             while self.entity_tick_timer.read().unwrap().clone() >= 3.0 {
                 let world = self.world.clone();
-                self.entities.clone().write().unwrap().tick(&world/*&mut self.world*/, renderer, focused);
+                self.entities.clone().write().unwrap().tick(&world, renderer, focused);
                 *self.entity_tick_timer.write().unwrap() -= 3.0;
             }
             let world = self.world.clone();
             self.entities
                 .clone().write().unwrap()
-                .render_tick(&world/*&mut self.world*/, renderer, focused);
+                .render_tick(&world, renderer, focused);
         }
     }
 
@@ -1072,7 +1072,7 @@ impl Server {
         let world = self.world.clone();
         self.entities
             .clone().write().unwrap()
-            .remove_all_entities(&world/*&mut self.world*/, renderer);
+            .remove_all_entities(&world, renderer);
         if let Some(sun_model) = self.sun_model.write().unwrap().as_mut() {
             sun_model.remove(renderer);
         }
@@ -1363,7 +1363,7 @@ impl Server {
             "FML|HS" => {
                 let msg = crate::protocol::Serializable::read_from(&mut std::io::Cursor::new(data))
                     .unwrap();
-                //debug!("FML|HS msg={:?}", msg);
+                // debug!("FML|HS msg={:?}", msg);
 
                 use forge::FmlHs::*;
                 use forge::Phase::*;
@@ -1536,7 +1536,24 @@ impl Server {
         } else {
             self.write_packet(brand.into_message17());
         }
-        // self.write_packet(Packet::ClientSettings())
+        if self.protocol_version <= 48 { // 1 snapshot after 1.8
+            self.write_packet(ClientSettings_u8_Handsfree {
+                locale: "en_us".to_string(), // TODO: Make this configurable!
+                view_distance: 8, // TODO: Make this configurable!
+                chat_mode: 0, // TODO: Make this configurable!
+                chat_colors: true, // TODO: Make this configurable!
+                displayed_skin_parts: 127, // TODO: Make this configurable!
+            });
+        }else {
+            self.write_packet(ClientSettings {
+                locale: "en_us".to_string(), // TODO: Make this configurable!
+                view_distance: 8, // TODO: Make this configurable!
+                chat_mode: Default::default(), // TODO: Make this configurable!
+                chat_colors: true, // TODO: Make this configurable!
+                displayed_skin_parts: 127, // TODO: Make this configurable!
+                main_hand: Default::default() // TODO: Make this configurable!
+            });
+        }
     }
 
     fn on_respawn_hashedseed(&self, respawn: packet::play::clientbound::Respawn_HashedSeed) {

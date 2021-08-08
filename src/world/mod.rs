@@ -533,7 +533,7 @@ impl World {
                 );
                 let bounds =
                     collision::Aabb3::new(min, min + cgmath::Vector3::new(16.0, -16.0, 16.0));
-                if tmp_frustum/*renderer.clone().read().unwrap().frustum*/.contains(&bounds) == collision::Relation::Out
+                if tmp_frustum.contains(&bounds) == collision::Relation::Out
                     && *from != Direction::Invalid
                 {
                     return;
@@ -740,7 +740,6 @@ Process finished with exit code 101
             block_light: nibble::Array::new((w * h * d) as usize),
             sky_light: nibble::Array::new((w * h * d) as usize),
             biomes: vec![0; (w * d) as usize],
-
             x,
             y,
             z,
@@ -832,22 +831,6 @@ Process finished with exit code 101
         }
     }
 
-    /*
-     x: i32,
-        z: i32,
-        new: bool,
-        mask: u16,
-        mask_add: u16,
-        compressed_data: Vec<u8>,
-     */
-    /*
-    read_biomes: bool,
-        x: i32,
-        z: i32,
-        new: bool,
-        mask: u16,
-        data: Vec<u8>,
-     */
     pub fn load_chunk(&self,
                       x: i32,
                       z: i32,
@@ -1201,90 +1184,6 @@ Process finished with exit code 101
         mask: u16,
         data: &mut std::io::Cursor<Vec<u8>>,
     ) -> Result<(), protocol::Error> {
-        /*use byteorder::ReadBytesExt;
-
-        let cpos = CPos(x, z);
-        {
-            if new {
-                self.chunks.clone().write().unwrap().insert(cpos, Chunk::new(cpos));
-            } else if !self.chunks.clone().read().unwrap().contains_key(&cpos) {
-                return Ok(());
-            }
-            let chunks = self.chunks.clone();
-            let mut chunks = chunks.write().unwrap();
-            let chunk = chunks.get_mut(&cpos).unwrap();
-
-            for i in 0..16 {
-                if chunk.sections[i].is_none() {
-                    let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
-                    fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
-                    if !fill_sky || mask & (1 << i) != 0 {
-                        chunk.sections[i] = Some(Arc::new(RwLock::new(Section::new(i as u8, fill_sky))));
-                    }
-                }
-                if mask & (1 << i) == 0 {
-                    continue;
-                }
-                let section = chunk.sections[i as usize].as_ref().unwrap();
-                section.clone().write().unwrap().dirty = true;
-
-                for bi in 0..4096 {
-                    let id = data.read_u16::<byteorder::LittleEndian>()?;
-                    section.clone().write().unwrap().blocks.set(
-                        bi,
-                        self.id_map
-                            .by_vanilla_id(id as usize, self.modded_block_ids.clone()),
-                    );
-
-                    // Spawn block entities
-                    let b = section.clone().write().unwrap().blocks.get(bi);
-                    if block_entity::BlockEntityType::get_block_entity(b).is_some() {
-                        let pos = Position::new(
-                            (bi & 0xF) as i32,
-                            (bi >> 8) as i32,
-                            ((bi >> 4) & 0xF) as i32,
-                        ) + (
-                            chunk.position.0 << 4,
-                            (i << 4) as i32,
-                            chunk.position.1 << 4,
-                        );
-                        if chunk.block_entities.contains_key(&pos) {
-                            self.block_entity_actions.clone().write().unwrap()
-                                .push_back(BlockEntityAction::Remove(pos))
-                        }
-                        self.block_entity_actions.clone().write().unwrap()
-                            .push_back(BlockEntityAction::Create(pos))
-                    }
-                }
-            }
-
-            for i in 0..16 {
-                if mask & (1 << i) == 0 {
-                    continue;
-                }
-                let section = chunk.sections[i as usize].as_mut().unwrap();
-
-                data.read_exact(&mut section.clone().write().unwrap().block_light.data)?;
-            }
-
-            for i in 0..16 {
-                if mask & (1 << i) == 0 {
-                    continue;
-                }
-                let section = chunk.sections[i as usize].as_mut().unwrap();
-
-                data.read_exact(&mut section.clone().write().unwrap().sky_light.data)?;
-            }
-
-            if new {
-                data.read_exact(&mut chunk.biomes)?;
-            }
-
-            chunk.calculate_heightmap();
-        }
-
-        self.dirty_chunks_by_bitmask(x, z, mask);
-        Ok(())*/
         self.load_chunk(x, z, new, true, new, mask, 0, data, 18)
     }
 
@@ -1356,165 +1255,6 @@ Process finished with exit code 101
         mask_add: u16,
         data: &mut std::io::Cursor<Vec<u8>>,
     ) -> Result<(), protocol::Error> {
-        /*
-        let cpos = CPos(x, z);
-        {
-            if new {
-                self.chunks.clone().write().unwrap().insert(cpos, Chunk::new(cpos));
-            } else if !self.chunks.clone().read().unwrap().contains_key(&cpos) {
-                return Ok(());
-            }
-            let chunks = self.chunks.clone();
-            let mut chunks = chunks.write().unwrap();
-            let chunk = chunks.get_mut(&cpos).unwrap();
-
-            // Block type array - whole byte per block
-            let mut block_types = [[0u8; 4096]; 16];
-            for i in 0..16 {
-                if chunk.sections[i].is_none() {
-                    let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
-                    fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
-                    if !fill_sky || mask & (1 << i) != 0 {
-                        chunk.sections[i] = Some(Arc::new(RwLock::new(Section::new(i as u8, fill_sky))));
-                    }
-                }
-                if mask & (1 << i) == 0 {
-                    continue;
-                }
-                let section = chunk.sections[i as usize].as_mut().unwrap();
-                section.clone().write().unwrap().dirty = true;
-
-                data.read_exact(&mut block_types[i])?;
-            }
-
-            // Block metadata array - half byte per block
-            let mut block_meta: [nibble::Array; 16] = [
-                // TODO: cleanup this initialization
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-            ];
-
-            for i in 0..16 {
-                if mask & (1 << i) == 0 {
-                    continue;
-                }
-
-                data.read_exact(&mut block_meta[i].data)?;
-            }
-
-            // Block light array - half byte per block
-            for i in 0..16 {
-                if mask & (1 << i) == 0 {
-                    continue;
-                }
-                let section = chunk.sections[i as usize].as_mut().unwrap();
-
-                data.read_exact(&mut section.clone().write().unwrap().block_light.data)?;
-            }
-
-            // Sky light array - half byte per block - only if 'skylight' is true
-            if skylight {
-                for i in 0..16 {
-                    if mask & (1 << i) == 0 {
-                        continue;
-                    }
-                    let section = chunk.sections[i as usize].as_mut().unwrap();
-
-                    data.read_exact(&mut section.clone().write().unwrap().sky_light.data)?;
-                }
-            }
-
-            // Add array - half byte per block - uses secondary bitmask
-            let mut block_add: [nibble::Array; 16] = [
-                // TODO: cleanup this initialization
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-                nibble::Array::new(16 * 16 * 16),
-            ];
-
-            for i in 0..16 {
-                if mask_add & (1 << i) == 0 {
-                    continue;
-                }
-                data.read_exact(&mut block_add[i].data)?;
-            }
-
-            // Now that we have the block types, metadata, and add, combine to initialize the blocks
-            for i in 0..16 {
-                if mask & (1 << i) == 0 {
-                    continue;
-                }
-
-                let section = chunk.sections[i as usize].as_mut().unwrap();
-
-                for bi in 0..4096 {
-                    let id = ((block_add[i].get(bi) as u16) << 12)
-                        | ((block_types[i][bi] as u16) << 4)
-                        | (block_meta[i].get(bi) as u16);
-                    section.clone().write().unwrap().blocks.set(
-                        bi,
-                        self.id_map
-                            .by_vanilla_id(id as usize, self.modded_block_ids.clone()),
-                    );
-
-                    // Spawn block entities
-                    let b = section.clone().read().unwrap().blocks.get(bi);
-                    if block_entity::BlockEntityType::get_block_entity(b).is_some() {
-                        let pos = Position::new(
-                            (bi & 0xF) as i32,
-                            (bi >> 8) as i32,
-                            ((bi >> 4) & 0xF) as i32,
-                        ) + (
-                            chunk.position.0 << 4,
-                            (i << 4) as i32,
-                            chunk.position.1 << 4,
-                        );
-                        if chunk.block_entities.contains_key(&pos) {
-                            self.block_entity_actions.clone().write().unwrap()
-                                .push_back(BlockEntityAction::Remove(pos))
-                        }
-                        self.block_entity_actions.clone().write().unwrap()
-                            .push_back(BlockEntityAction::Create(pos))
-                    }
-                }
-            }
-
-            if new {
-                data.read_exact(&mut chunk.biomes)?;
-            }
-
-            chunk.calculate_heightmap();
-        }
-
-        self.dirty_chunks_by_bitmask(x, z, mask);
-        Ok(())*/
         self.load_chunk(x, z, new, skylight, new, mask, mask_add, data, 17)
     }
 
@@ -1582,112 +1322,6 @@ Process finished with exit code 101
         mask: u16,
         data: Vec<u8>,
     ) -> Result<(), protocol::Error> {
-        /*
-        use crate::protocol::{LenPrefixed, Serializable, VarInt};
-        use byteorder::ReadBytesExt;
-        use std::io::Cursor;
-
-        let mut data = Cursor::new(data);
-
-        let cpos = CPos(x, z);
-        {
-            if new {
-                self.chunks.clone().write().unwrap().insert(cpos, Chunk::new(cpos));
-            } else if !self.chunks.clone().read().unwrap().contains_key(&cpos) {
-                return Ok(());
-            }
-            let chunks = self.chunks.clone();
-            let mut chunks = chunks.write().unwrap();
-            let chunk = chunks.get_mut(&cpos).unwrap();
-
-            for i in 0..16 {
-                if chunk.sections[i].is_none() {
-                    let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
-                    fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
-                    if !fill_sky || mask & (1 << i) != 0 {
-                        chunk.sections[i] = Some(Arc::new(RwLock::new(Section::new(i as u8, fill_sky))));
-                    }
-                }
-                if mask & (1 << i) == 0 {
-                    continue;
-                }
-                let section = chunk.sections[i as usize].as_mut().unwrap();
-                section.clone().write().unwrap().dirty = true;
-
-                if self.protocol_version >= 451 {
-                    let _block_count = data.read_u16::<byteorder::LittleEndian>()?;
-                    // TODO: use block_count
-                }
-
-                let mut bit_size = data.read_u8()?;
-                let mut mappings: HashMap<usize, block::Block, BuildHasherDefault<FNVHash>> =
-                    HashMap::with_hasher(BuildHasherDefault::default());
-                if bit_size == 0 {
-                    bit_size = 13;
-                } else {
-                    let count = VarInt::read_from(&mut data)?.0;
-                    for i in 0..count {
-                        let id = VarInt::read_from(&mut data)?.0;
-                        let bl = self
-                            .id_map
-                            .by_vanilla_id(id as usize, self.modded_block_ids.clone());
-                        mappings.insert(i as usize, bl);
-                    }
-                }
-
-                let bits = LenPrefixed::<VarInt, u64>::read_from(&mut data)?.data;
-                let padded = self.protocol_version >= 736;
-                let m = bit::Map::from_raw(bits, bit_size as usize, padded);
-
-                for bi in 0..4096 {
-                    let id = m.get(bi);
-                    section.clone().write().unwrap().blocks.set(
-                        bi,
-                        mappings
-                            .get(&id)
-                            .cloned()
-                            // TODO: fix or_fun_call, but do not re-borrow self
-                            .unwrap_or(self.id_map.by_vanilla_id(id, self.modded_block_ids.clone())),
-                    );
-                    // Spawn block entities
-                    let b = section.clone().read().unwrap().blocks.get(bi);
-                    if block_entity::BlockEntityType::get_block_entity(b).is_some() {
-                        let pos = Position::new(
-                            (bi & 0xF) as i32,
-                            (bi >> 8) as i32,
-                            ((bi >> 4) & 0xF) as i32,
-                        ) + (
-                            chunk.position.0 << 4,
-                            (i << 4) as i32,
-                            chunk.position.1 << 4,
-                        );
-                        if chunk.block_entities.contains_key(&pos) {
-                            self.block_entity_actions.clone().write().unwrap()
-                                .push_back(BlockEntityAction::Remove(pos))
-                        }
-                        self.block_entity_actions.clone().write().unwrap()
-                            .push_back(BlockEntityAction::Create(pos))
-                    }
-                }
-
-                if self.protocol_version >= 451 {
-                    // Skylight in update skylight packet for 1.14+
-                } else {
-                    data.read_exact(&mut section.clone().write().unwrap().block_light.data)?;
-                    data.read_exact(&mut section.clone().write().unwrap().sky_light.data)?;
-                }
-            }
-
-            if read_biomes && new {
-                data.read_exact(&mut chunk.biomes)?;
-            }
-
-            chunk.calculate_heightmap();
-        }
-
-        self.dirty_chunks_by_bitmask(x, z, mask);
-        Ok(())
-        */
         self.load_chunk(x, z, new, true, read_biomes, mask, 0, &mut Cursor::new(data), 19)
     }
 
