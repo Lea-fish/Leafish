@@ -91,7 +91,7 @@ pub struct Game {
 impl Game {
     pub fn connect_to(&mut self, address: &str) {
         let (protocol_version, forge_mods, fml_network_version) =
-            match protocol::Conn::new(&address, self.default_protocol_version)
+            match protocol::Conn::new(address, self.default_protocol_version)
                 .and_then(|conn| conn.do_status())
             {
                 Ok(res) => {
@@ -426,13 +426,13 @@ fn main() {
             // TODO: Fix window resizing (when in login screen).
         }
 
-        if !handle_window_event(&winit_window, &mut game, &mut ui_container, event) {
+        if !handle_window_event(winit_window, &mut game, &mut ui_container, event) {
             return;
         }
 
         let start = Instant::now();
         tick_all(
-            &winit_window,
+            winit_window,
             &mut game,
             &mut ui_container,
             &mut last_frame,

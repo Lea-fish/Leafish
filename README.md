@@ -59,7 +59,7 @@ Support for older protocols will _not_ be dropped as newer protocols are added.
 
 ## Dependencies
 
-Requires Rust stable version 1.53.0 or newer.
+Requires Rust stable version 1.54.0 or newer.
 
 **Debian/Ubuntu**
 
