@@ -132,7 +132,7 @@ macro_rules! state_packets {
                                 }
                             )+
 
-                            Result::Ok(())
+                            Ok(())
                         }
                     }
                 )*
@@ -161,10 +161,10 @@ macro_rules! state_packets {
                                                     packet.$field = Serializable::read_from(&mut buf)?;
                                                 }
                                             )+
-                                            Result::Ok(Option::Some(Packet::$name(packet)))
+                                            Ok(Option::Some(Packet::$name(packet)))
                                         },
                                     )*
-                                        _ => Result::Ok(Option::None)
+                                        _ => Ok(Option::None)
                                     }
                                 }
                             )+
@@ -243,11 +243,11 @@ impl Serializable for Option<nbt::NamedTag> {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<Option<nbt::NamedTag>, Error> {
         let ty = buf.read_u8()?;
         if ty == 0 {
-            Result::Ok(None)
+            Ok(None)
         } else {
             let name = nbt::read_string(buf)?;
             let tag = nbt::Tag::read_from(buf)?;
-            Result::Ok(Some(nbt::NamedTag(name, tag)))
+            Ok(Some(nbt::NamedTag(name, tag)))
         }
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
@@ -259,7 +259,7 @@ impl Serializable for Option<nbt::NamedTag> {
             }
             None => buf.write_u8(0)?,
         }
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -268,13 +268,13 @@ where
     T: Serializable,
 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<Option<T>, Error> {
-        Result::Ok(Some(T::read_from(buf)?))
+        Ok(Some(T::read_from(buf)?))
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         if self.is_some() {
             self.as_ref().unwrap().write_to(buf)?;
         }
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -286,13 +286,13 @@ impl Serializable for String {
         let mut bytes = Vec::<u8>::new();
         buf.take(len as u64).read_to_end(&mut bytes)?;
         let ret = String::from_utf8(bytes).unwrap();
-        Result::Ok(ret)
+        Ok(ret)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         let bytes = self.as_bytes();
         VarInt(bytes.len() as i32).write_to(buf)?;
         buf.write_all(bytes)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -302,123 +302,123 @@ impl Serializable for format::Component {
         let mut bytes = Vec::<u8>::new();
         buf.take(len as u64).read_to_end(&mut bytes)?;
         let ret = String::from_utf8(bytes).unwrap();
-        Result::Ok(Self::from_string(&ret[..]))
+        Ok(Self::from_string(&ret[..]))
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         let val = serde_json::to_string(&self.to_value()).unwrap();
         let bytes = val.as_bytes();
         VarInt(bytes.len() as i32).write_to(buf)?;
         buf.write_all(bytes)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for () {
     fn read_from<R: io::Read>(_: &mut R) -> Result<(), Error> {
-        Result::Ok(())
+        Ok(())
     }
     fn write_to<W: io::Write>(&self, _: &mut W) -> Result<(), Error> {
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for bool {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<bool, Error> {
-        Result::Ok(buf.read_u8()? != 0)
+        Ok(buf.read_u8()? != 0)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_u8(if *self { 1 } else { 0 })?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for i8 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<i8, Error> {
-        Result::Ok(buf.read_i8()?)
+        Ok(buf.read_i8()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_i8(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for i16 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<i16, Error> {
-        Result::Ok(buf.read_i16::<BigEndian>()?)
+        Ok(buf.read_i16::<BigEndian>()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_i16::<BigEndian>(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for i32 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<i32, Error> {
-        Result::Ok(buf.read_i32::<BigEndian>()?)
+        Ok(buf.read_i32::<BigEndian>()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_i32::<BigEndian>(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for i64 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<i64, Error> {
-        Result::Ok(buf.read_i64::<BigEndian>()?)
+        Ok(buf.read_i64::<BigEndian>()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_i64::<BigEndian>(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for u8 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<u8, Error> {
-        Result::Ok(buf.read_u8()?)
+        Ok(buf.read_u8()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_u8(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for u16 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<u16, Error> {
-        Result::Ok(buf.read_u16::<BigEndian>()?)
+        Ok(buf.read_u16::<BigEndian>()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_u16::<BigEndian>(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for u64 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<u64, Error> {
-        Result::Ok(buf.read_u64::<BigEndian>()?)
+        Ok(buf.read_u64::<BigEndian>()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_u64::<BigEndian>(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for f32 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<f32, Error> {
-        Result::Ok(buf.read_f32::<BigEndian>()?)
+        Ok(buf.read_f32::<BigEndian>()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_f32::<BigEndian>(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
 impl Serializable for f64 {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<f64, Error> {
-        Result::Ok(buf.read_f64::<BigEndian>()?)
+        Ok(buf.read_f64::<BigEndian>()?)
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_f64::<BigEndian>(*self)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -464,7 +464,7 @@ impl Default for UUID {
 
 impl Serializable for UUID {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<UUID, Error> {
-        Result::Ok(UUID(
+        Ok(UUID(
             buf.read_u64::<BigEndian>()?,
             buf.read_u64::<BigEndian>()?,
         ))
@@ -472,7 +472,7 @@ impl Serializable for UUID {
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         buf.write_u64::<BigEndian>(self.0)?;
         buf.write_u64::<BigEndian>(self.1)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -506,7 +506,7 @@ impl Serializable for Biomes3D {
             *item = b;
         }
 
-        Result::Ok(Biomes3D { data })
+        Ok(Biomes3D { data })
     }
     fn write_to<W: io::Write>(&self, _buf: &mut W) -> Result<(), Error> {
         unimplemented!()
@@ -540,7 +540,7 @@ impl<L: Lengthable, V: Serializable> Serializable for LenPrefixed<L, V> {
         for _ in 0..len {
             data.push(Serializable::read_from(buf)?);
         }
-        Result::Ok(LenPrefixed {
+        Ok(LenPrefixed {
             len: len_data,
             data,
         })
@@ -553,7 +553,7 @@ impl<L: Lengthable, V: Serializable> Serializable for LenPrefixed<L, V> {
         for val in data {
             val.write_to(buf)?;
         }
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -593,7 +593,7 @@ impl<L: Lengthable> Serializable for LenPrefixedBytes<L> {
         let len: usize = len_data.into_len();
         let mut data: Vec<u8> = Vec::with_capacity(len);
         buf.take(len as u64).read_to_end(&mut data)?;
-        Result::Ok(LenPrefixedBytes {
+        Ok(LenPrefixedBytes {
             len: len_data,
             data,
         })
@@ -603,7 +603,7 @@ impl<L: Lengthable> Serializable for LenPrefixedBytes<L> {
         let len_data: L = L::from_len(self.data.len());
         len_data.write_to(buf)?;
         buf.write_all(&self.data[..])?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -789,14 +789,14 @@ impl Serializable for VarInt {
             val |= (b & PART) << (size * 7);
             size += 1;
             if size > 5 {
-                return Result::Err(Error::Err("VarInt too big".to_owned()));
+                return Err(Error::Err("VarInt too big".to_owned()));
             }
             if (b & 0x80) == 0 {
                 break;
             }
         }
 
-        Result::Ok(VarInt(val as i32))
+        Ok(VarInt(val as i32))
     }
 
     /// Encodes a `VarInt` into the Writer
@@ -806,7 +806,7 @@ impl Serializable for VarInt {
         loop {
             if (val & !PART) == 0 {
                 buf.write_u8(val as u8)?;
-                return Result::Ok(());
+                return Ok(());
             }
             buf.write_u8(((val & PART) | 0x80) as u8)?;
             val >>= 7;
@@ -852,7 +852,7 @@ impl Serializable for VarShort {
             low
         };
 
-        Result::Ok(VarShort(val as i32))
+        Ok(VarShort(val as i32))
     }
 
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
@@ -915,14 +915,14 @@ impl Serializable for VarLong {
             val |= (b & PART) << (size * 7);
             size += 1;
             if size > 10 {
-                return Result::Err(Error::Err("VarLong too big".to_owned()));
+                return Err(Error::Err("VarLong too big".to_owned()));
             }
             if (b & 0x80) == 0 {
                 break;
             }
         }
 
-        Result::Ok(VarLong(val as i64))
+        Ok(VarLong(val as i64))
     }
 
     /// Encodes a `VarLong` into the Writer
@@ -932,7 +932,7 @@ impl Serializable for VarLong {
         loop {
             if (val & !PART) == 0 {
                 buf.write_u8(val as u8)?;
-                return Result::Ok(());
+                return Ok(());
             }
             buf.write_u8(((val & PART) | 0x80) as u8)?;
             val >>= 7;
@@ -967,7 +967,7 @@ impl Serializable for Position {
             | (((self.z as u64) & 0x3FFFFFF) << 12);
 
         buf.write_u64::<BigEndian>(pos)?;
-        Result::Ok(())
+        Ok(())
     }
 }
 
@@ -1093,7 +1093,7 @@ impl Conn {
 
         let stream = TcpStream::connect(&*address)?;
         let parts = address.split(':').collect::<Vec<&str>>();
-        Result::Ok(Conn {
+        Ok(Conn {
             stream: /*Arc::new(RwLock::new(*/stream/*))*/,
             host: parts[0].to_owned(),
             port: parts[1].parse().unwrap(),
@@ -1142,7 +1142,7 @@ impl Conn {
         if self.compression_threshold >= 0 && extra == 1 {
             VarInt(0).write_to(/*&mut */self)?;
         }
-        self.write_all(&buf).unwrap();
+        self.write_all(&buf)?;
         // self.write_all(&send_buf/*&buf*/)?;
         // self.write_buffer(buffer/*buf*/);
 
@@ -1210,15 +1210,15 @@ stack backtrace:
   12: core::ops::function::FnOnce::call_once
              at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:227:5
 note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-thread '<unnamed>' panicked at 'called `Result::unwrap()` on an `Err` value: RecvError', src/server/mod.rs:468:43
+thread '<unnamed>' panicked at 'called `unwrap()` on an `Err` value: RecvError', src/server/mod.rs:468:43
 stack backtrace:
    0: rust_begin_unwind
              at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
    1: core::panicking::panic_fmt
              at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:92:14
-   2: core::result::unwrap_failed
+   2: core::unwrap_failed
              at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/result.rs:1355:5
-   3: core::result::Result<T,E>::unwrap
+   3: core::Result<T,E>::unwrap
              at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1037:23
    4: stevenarella::server::Server::spawn_writer::{{closure}}
              at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:468:33
@@ -1264,15 +1264,15 @@ stack backtrace:
   12: core::ops::function::FnOnce::call_once
              at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:227:5
 note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-thread '<unnamed>' panicked at 'called `Result::unwrap()` on an `Err` value: RecvError', src/server/mod.rs:469:56
+thread '<unnamed>' panicked at 'called `unwrap()` on an `Err` value: RecvError', src/server/mod.rs:469:56
 stack backtrace:
    0: rust_begin_unwind
              at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
    1: core::panicking::panic_fmt
              at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:92:14
-   2: core::result::unwrap_failed
+   2: core::unwrap_failed
              at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/result.rs:1355:5
-   3: core::result::Result<T,E>::unwrap
+   3: core::Result<T,E>::unwrap
              at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1037:23
    4: stevenarella::server::Server::spawn_writer::{{closure}}
              at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:469:46
@@ -1440,16 +1440,16 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
                 if ibuf.len() != pos {
                     debug!("pos = {:?}", pos);
                     debug!("ibuf = {:?}", ibuf);
-                    return Result::Err(Error::Err(format!(
+                    return Err(Error::Err(format!(
                         "Failed to read all of packet 0x{:X}, \
                                                            had {} bytes left",
                         id,
                         ibuf.len() - pos
                     )));
                 }
-                Result::Ok(val)
+                Ok(val)
             }
-            None => Result::Err(Error::Err("missing packet".to_owned())),
+            None => Err(Error::Err("missing packet".to_owned())),
         }
     }
 
