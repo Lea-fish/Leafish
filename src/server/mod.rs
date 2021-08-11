@@ -31,7 +31,7 @@ use rand::{self, Rng};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;
-use std::sync::{mpsc, Mutex};
+use std::sync::{mpsc, Mutex, PoisonError, RwLockReadGuard};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use leafish_protocol::protocol::packet::Packet;
@@ -820,7 +820,11 @@ impl Server {
     }
 
     pub fn is_connected(&self) -> bool {
-        self.conn.clone().read().unwrap().is_some()
+        let tmp = self.conn.clone();
+        match tmp.clone().read() {
+            Ok(val) => val.is_some(),
+            Err(_) => false
+        }
     }
 
     pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, focused: bool) {

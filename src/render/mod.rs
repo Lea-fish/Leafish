@@ -19,6 +19,7 @@ pub mod shaders;
 pub mod clouds;
 pub mod model;
 pub mod ui;
+pub mod hud;
 
 use crate::gl;
 use crate::resources;

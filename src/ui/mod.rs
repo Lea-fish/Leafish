@@ -895,10 +895,6 @@ impl UIElement for Image {
         &mut self.data
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
-        self.super_tick(renderer);
-    }
-
     fn get_size(&self) -> (f64, f64) {
         (self.width, self.height)
     }
@@ -907,6 +903,10 @@ impl UIElement for Image {
         self.last_texture != self.texture
             || self.last_colour != self.colour
             || self.last_texture_coords != self.texture_coords
+    }
+
+    fn tick(&mut self, renderer: &mut render::Renderer) {
+        self.super_tick(renderer);
     }
 }
 
@@ -948,16 +948,16 @@ impl UIElement for Batch {
         &mut self.data
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
-        self.super_tick(renderer);
-    }
-
     fn get_size(&self) -> (f64, f64) {
         (self.width, self.height)
     }
 
     fn is_dirty(&self) -> bool {
         false
+    }
+
+    fn tick(&mut self, renderer: &mut render::Renderer) {
+        self.super_tick(renderer);
     }
 }
 
@@ -1052,13 +1052,6 @@ impl UIElement for Text {
         &mut self.data
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
-        self.super_tick(renderer);
-        if self.is_dirty() {
-            self.width = renderer.ui.size_of_string(&self.text);
-        }
-    }
-
     fn get_size(&self) -> (f64, f64) {
         (
             (self.width + 2.0) * self.scale_x,
@@ -1072,6 +1065,13 @@ impl UIElement for Text {
             || self.last_scale_x != self.scale_x
             || self.last_scale_y != self.scale_y
             || self.last_rotation != self.rotation
+    }
+
+    fn tick(&mut self, renderer: &mut render::Renderer) {
+        self.super_tick(renderer);
+        if self.is_dirty() {
+            self.width = renderer.ui.size_of_string(&self.text);
+        }
     }
 }
 
@@ -1154,15 +1154,6 @@ impl UIElement for Formatted {
         &mut self.data
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
-        self.super_tick(renderer);
-        if self.is_dirty() {
-            let (w, h) = Self::compute_size(renderer, &self.text, self.max_width);
-            self.width = w;
-            self.height = h;
-        }
-    }
-
     fn get_size(&self) -> (f64, f64) {
         (
             (self.width + 2.0) * self.scale_x,
@@ -1175,6 +1166,15 @@ impl UIElement for Formatted {
             || self.last_scale_x != self.scale_x
             || self.last_scale_y != self.scale_y
             || self.last_max_width != self.max_width
+    }
+
+    fn tick(&mut self, renderer: &mut render::Renderer) {
+        self.super_tick(renderer);
+        if self.is_dirty() {
+            let (w, h) = Self::compute_size(renderer, &self.text, self.max_width);
+            self.width = w;
+            self.height = h;
+        }
     }
 }
 

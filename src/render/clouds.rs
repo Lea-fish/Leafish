@@ -35,7 +35,7 @@ pub struct Clouds {
 }
 
 impl Clouds {
-    pub fn new(greg: &glsl::Registry, textures: Arc<RwLock<super::TextureManager>>) -> Clouds {
+    pub fn new(greg: &glsl::Registry, textures: Arc<RwLock<super::TextureManager>>) -> Self {
         let program = gl::Program::new();
 
         let vertex = greg.get("clouds_vertex");

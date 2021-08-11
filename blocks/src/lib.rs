@@ -67,7 +67,7 @@ impl VanillaIDMap {
                 .get(id)
                 .and_then(|v| *v)
                 .unwrap_or(Block::Missing {})
-        // TODO: support modded 1.13.2+ blocks after https://github.com/iceiix/leafisharella/pull/145
+        // TODO: support modded 1.13.2+ blocks after https://github.com/iceiix/stevenarella/pull/145
         } else {
             if let Some(block) = self.hier.get(id).and_then(|v| *v) {
                 block

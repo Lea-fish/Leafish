@@ -14,7 +14,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::mpsc;
+use std::sync::{mpsc, RwLock, Arc};
 use std::thread;
 use std::fs;
 
@@ -26,6 +26,7 @@ use crate::ui;
 
 use instant::Duration;
 use rand::Rng;
+use crate::render::hud::{Hud, HudContext};
 
 pub struct ServerList {
     elements: Option<UIElements>,
@@ -145,8 +146,10 @@ impl ServerList {
                 backr.add_click_func(move |_, game| {
                     game.screen_sys
                         .replace_screen(Box::new(super::connecting::Connecting::new(&address)));
-                    game.connect_to(&address);
+                    let hud_context = Arc::new(RwLock::new(HudContext::new()));
+                    game.connect_to(&address, hud_context.clone());
                     game.screen_sys.pop_screen();
+                    game.screen_sys.add_screen(Box::new(Hud::new(hud_context.clone())));
                     game.focused = true;
                     true
                 });

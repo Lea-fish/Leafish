@@ -52,6 +52,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use leafish_protocol::protocol::Error;
+use crate::render::hud::{HudContext, Hud};
 
 const CL_BRAND: console::CVar<String> = console::CVar {
     ty: PhantomData,
@@ -89,7 +90,7 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn connect_to(&mut self, address: &str) {
+    pub fn connect_to(&mut self, address: &str, hud_context: Arc<RwLock<HudContext>>) {
         let (protocol_version, forge_mods, fml_network_version) =
             match protocol::Conn::new(address, self.default_protocol_version)
                 .and_then(|conn| conn.do_status())
@@ -307,7 +308,7 @@ fn main() {
 
     let window_builder = winit::window::WindowBuilder::new()
         .with_title("Leafish")
-        /*.with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0))*/;
+        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)); // Why are we using this particular value here?
 
     let (context, shader_version, dpi_factor, glutin_window) = {
         let glutin_window = glutin::ContextBuilder::new()
@@ -399,9 +400,11 @@ fn main() {
         return;
     }
 
-    if opt.server.is_some() {
-        game.connect_to(&opt.server.unwrap());
-    }
+    /*if opt.server.is_some() { // TODO: Readd?
+        let hud_context = Arc::new(RwLock::new(HudContext::new()));
+        game.connect_to(&opt.server.unwrap(), hud_context.clone());
+        screen_sys.add_screen(Box::new(Hud::new(hud_context.clone())));
+    }*/
 
     let mut last_resource_version = 0;
 
@@ -501,6 +504,7 @@ fn tick_all(
     game.tick(/*delta*/);
     let diff = Instant::now().duration_since(now);
     println!("Diff2 took {}", diff.as_millis());
+    // TODO: Fix this: Sometimes the game deadlocks after this and diff3 is not reached when joining a server.
     if game.server.is_some() {
         game.server.as_ref().unwrap().tick(game.renderer.clone(), delta, game.focused); // TODO: Improve perf in load screen!
     }
@@ -546,6 +550,7 @@ fn tick_all(
     ui_container.tick(/*&mut */game.renderer.clone(), delta, width, height);
     let diff = Instant::now().duration_since(now);
     println!("Diff9 took {}", diff.as_millis()); // readd
+    // TODO: Improve perf of diff 9 in the menu!
     let world = if let Some(server) = game.server.as_ref() {
         Some(server.world.clone())
     }else {
@@ -738,7 +743,7 @@ fn handle_window_event<T>(
                                 window.set_cursor_grab(false).unwrap();
                                 window.set_cursor_visible(true);
                                 game.focused = false;
-                                game.screen_sys.replace_screen(Box::new(
+                                game.screen_sys.add_screen(Box::new(
                                     screen::SettingsMenu::new(game.vars.clone(), true),
                                 ));
                             } else if game.screen_sys.is_current_closable() {

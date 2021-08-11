@@ -164,6 +164,7 @@ impl super::Screen for SettingsMenu {
                 disconnect_button.add_text(txt);
                 disconnect_button.add_click_func(|_, game| {
                     game.server.as_ref().unwrap().disconnect(None);
+                    game.screen_sys.pop_screen();
                     game.screen_sys
                         .replace_screen(Box::new(super::ServerList::new(None)));
                     true

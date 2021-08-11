@@ -140,6 +140,7 @@ impl UIState {
         state
     }
 
+    // This gets called all the time (no matter what)
     pub fn tick(&mut self, width: u32, height: u32) {
         {
             let version = self.resources.read().unwrap().version();
