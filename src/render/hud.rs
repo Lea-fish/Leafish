@@ -21,15 +21,18 @@ use byteorder::{NativeEndian, WriteBytesExt};
 use image::GenericImageView;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use crate::render::ui::UIState;
+use crate::render::ui::{UIState, UIText};
 use crate::ui;
-use crate::ui::{Container, ImageRef};
+use crate::ui::{Container, ImageRef, FormattedRef, VAttach, HAttach, Text};
 use crate::screen::settings_menu::UIElements;
 use crate::screen::{Screen, AudioSettingsMenu};
 use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use leafish_protocol::format::{TextComponent, Component};
+use std::rc::Rc;
+use std::cell::RefCell;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
@@ -54,11 +57,10 @@ pub struct HudContext {
     armor: u8,
     dirty_armor: bool,
     exp: f32,
-    exp_level: u32,
+    exp_level: i32,
     dirty_exp: bool,
     breath: i16,
-    dirty_breath: bool,
-    random: ThreadRng,
+    dirty_breath: bool
 
 }
 
@@ -70,52 +72,70 @@ impl HudContext {
             wither: false,
             poison: false,
             regen: false,
-            absorbtion: 17.0,
+            absorbtion: 0.0,
             last_health_update: 0,
             last_health: 0.0,
-            health: 3.0,
-            max_health: 60.0,
-            dirty_health: true,
+            health: 20.0,
+            max_health: 20.0,
+            dirty_health: false,
             hunger: false,
             saturation: 0,
             last_food_update: 0,
             last_food: 0,
-            food: 17,
-            dirty_food: true,
-            armor: 11,
-            dirty_armor: true,
-            exp: 0.65, // 0.0 - 1.0
+            food: 20,
+            dirty_food: false,
+            armor: 0,
+            dirty_armor: false,
+            exp: 0.0, // 0.0 - 1.0
             exp_level: 0,
-            dirty_exp: true,
-            breath: 242, // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble
-            dirty_breath: true,
-            random: rand::thread_rng(),
+            dirty_exp: false,
+            breath: -1, // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble
+            dirty_breath: false
         }
     }
+    // TODO: Implement effects!
 
-    pub fn update_health(&mut self, health: f32) {
+    pub fn update_health_and_food(&mut self, health: f32, food: u8, saturation: u8) {
         let start = SystemTime::now();
         let time = start
             .duration_since(UNIX_EPOCH).unwrap().as_millis();
-        self.last_health = self.health;
         self.last_health_update = time;
+        self.last_health = self.health;
         self.health = health;
-        self.dirty_health = true;
-        self.dirty_armor = true;
-    }
-
-    pub fn update_food(&mut self, food: u8) {
-        let start = SystemTime::now();
-        let time = start
-            .duration_since(UNIX_EPOCH).unwrap().as_millis();
-        self.last_food_update = self.last_food_update;
+        self.last_food_update = time;
+        self.last_food = self.food;
         self.food = food;
         self.dirty_food = true;
+        self.dirty_health = true;
+        self.dirty_armor = true; // We have to redraw the armor too, because it depends on the number of hearts and absorbtion.
+    }
+
+    pub fn update_max_health(&mut self, max_health: f32) {
+        self.max_health = max_health;
+        self.dirty_health = true;
+        self.dirty_armor = true; // We have to redraw the armor too, because it depends on the number of hearts and absorbtion.
+    }
+
+    pub fn update_absorbtion(&mut self, absorbtion: f32) {
+        self.absorbtion = absorbtion;
+        self.dirty_health = true;
+        self.dirty_armor = true; // We have to redraw the armor too, because it depends on the number of hearts and absorbtion.
     }
 
     pub fn update_armor(&mut self, armor: u8) {
         self.armor = armor;
         self.dirty_armor = true;
+    }
+
+    pub fn update_breath(&mut self, breath: i16) {
+        self.breath = breath;
+        self.dirty_breath = true;
+    }
+
+    pub fn update_exp(&mut self, exp: f32, level: i32) {
+        self.exp = exp;
+        self.exp_level = level;
+        self.dirty_exp = true;
     }
 
 }
@@ -128,7 +148,9 @@ pub struct Hud {
     food_elements: Vec<ImageRef>,
     breath_elements: Vec<ImageRef>,
     exp_elements: Vec<ImageRef>,
+    exp_text_elements: Vec<Rc<RefCell<Text>>>,
     hud_context: Arc<RwLock<HudContext>>,
+    random: ThreadRng,
 
 }
 
@@ -142,7 +164,9 @@ impl Hud {
             food_elements: vec![],
             breath_elements: vec![],
             exp_elements: vec![],
+            exp_text_elements: vec![],
             hud_context: hud_context.clone(),
+            random: rand::thread_rng(),
         }
     }
 
@@ -172,6 +196,7 @@ impl Screen for Hud {
         self.elements.clear();
         self.health_elements.clear();
         self.exp_elements.clear();
+        self.exp_text_elements.clear();
         self.food_elements.clear();
         self.armor_elements.clear();
         self.breath_elements.clear();
@@ -183,7 +208,6 @@ impl Screen for Hud {
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
     ) -> Option<Box<dyn Screen>> {
-        println!("ticking hud...");
         if self.hud_context.clone().read().unwrap().dirty_health {
             self.health_elements.clear();
             self.render_health(renderer, ui_container);
@@ -198,6 +222,7 @@ impl Screen for Hud {
         }
         if self.hud_context.clone().read().unwrap().dirty_exp {
             self.exp_elements.clear();
+            self.exp_text_elements.clear();
             self.render_exp(renderer, ui_container);
         }
         if self.hud_context.clone().read().unwrap().dirty_breath {
@@ -218,7 +243,7 @@ impl Hud {
 
     fn icon_scale(renderer: &Renderer) -> f32 {
         let icon_scale = if renderer.height > 500 {
-            renderer.height as f32 / 35.0/*25.0*/
+            renderer.height as f32 / 38.88
         }else {
             renderer.height as f32 / 27.5/*25.0*/
         };
@@ -271,7 +296,7 @@ impl Hud {
 
             if hp <= 4.0 {
                 // Creates the jittery effect when player has less than 2.5 hearts
-                y += icon_scale / 9.0 * (self.hud_context.write().unwrap().random.gen_range(0..2) as f32);
+                y += icon_scale / 9.0 * (self.random.gen_range(0..2) as f32);
                 redirty_health = true;
             }
 
@@ -445,9 +470,9 @@ impl Hud {
     }
 
     fn render_exp(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer);
-        let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 * -1.0;
-        let y_offset = icon_scale as f64 / 9.0 * 25.0;
+        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let x_offset = icon_scale / 9.0 * 182.0 / 2.0 * -1.0;
+        let y_offset = icon_scale / 9.0 * 25.0;
         let hud_context = self.hud_context.clone();
         let hud_context = self.hud_context.read().unwrap();
         let max_exp = if hud_context.exp_level >= 30 {
@@ -462,23 +487,74 @@ impl Hud {
                 .texture_coords((0.0 / 256.0, 64.0 / 256.0, 182.0 / 256.0, 5.0 / 256.0))
                 .position(0.0 as f64, y_offset as f64)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                .size(icon_scale as f64 / 9.0 * 182.0, icon_scale as f64 / 9.0 * 5.0)
+                .size(icon_scale / 9.0 * 182.0, icon_scale / 9.0 * 5.0)
                 .texture("minecraft:gui/icons")
                 .create(ui_container);
             self.exp_elements.push(image);
 
             let scaled_length = hud_context.exp * 182.0;
             if scaled_length > 0.0 {
-                let shift = icon_scale / 9.0 * (((182.0) - scaled_length) / 2.0);
+                let shift = icon_scale / 9.0 * (((182.0) - scaled_length as f64) / 2.0);
                 let image = ui::ImageBuilder::new()
                     .texture_coords((0.0 / 256.0, 69.0 / 256.0, scaled_length as f64 / 256.0, 5.0 / 256.0))
-                    .position(shift as f64 * -1.0, y_offset as f64)
+                    .position(shift * -1.0, y_offset as f64)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                    .size(icon_scale as f64 / 9.0 * scaled_length as f64, icon_scale as f64 / 9.0 * 5.0)
+                    .size(icon_scale / 9.0 * scaled_length as f64, icon_scale / 9.0 * 5.0)
                     .texture("minecraft:gui/icons")
                     .create(ui_container);
                 self.exp_elements.push(image);
             }
+        }
+        if hud_context.exp_level > 0 {
+            let level_str = format!("{}", hud_context.exp_level);
+            let text_size = renderer.ui.size_of_string(&level_str);
+            let scale = icon_scale / 9.0 / text_size * 11.0;
+            let y = icon_scale / 9.0 * 27.0;
+            self.exp_text_elements.push(ui::TextBuilder::new()
+                .alignment(VAttach::Bottom, HAttach::Center)
+                .scale_x(scale)
+                .scale_y(scale)
+                .position((icon_scale / 9.0 * 1.0), y)
+                .text(&level_str)
+                .colour((0, 0, 0, 255))
+                .shadow(false)
+                .create(ui_container));
+            self.exp_text_elements.push(ui::TextBuilder::new()
+                .alignment(VAttach::Bottom, HAttach::Center)
+                .scale_x(scale)
+                .scale_y(scale)
+                .position(-(icon_scale / 9.0 * 1.0), y)
+                .text(&level_str)
+                .colour((0, 0, 0, 1))
+                .shadow(false)
+                .create(ui_container));
+            self.exp_text_elements.push(ui::TextBuilder::new()
+                .alignment(VAttach::Bottom, HAttach::Center)
+                .scale_x(scale)
+                .scale_y(scale)
+                .position(0.0, y + (icon_scale / 9.0 * 1.0))
+                .text(&level_str)
+                .colour((0, 0, 0, 255))
+                .shadow(false)
+                .create(ui_container));
+            self.exp_text_elements.push(ui::TextBuilder::new()
+                .alignment(VAttach::Bottom, HAttach::Center)
+                .scale_x(scale)
+                .scale_y(scale)
+                .position(0.0, y - (icon_scale / 9.0 * 1.0))
+                .text(&level_str)
+                .colour((0, 0, 0, 255))
+                .shadow(false)
+                .create(ui_container));
+            self.exp_text_elements.push(ui::TextBuilder::new()
+                .alignment(VAttach::Bottom, HAttach::Center)
+                .scale_x(scale)
+                .scale_y(scale)
+                .position(0.0, y)
+                .text(&level_str)
+                .colour((128, 255, 32, 255))
+                .shadow(false)
+                .create(ui_container));
         }
         drop(hud_context);
         self.hud_context.write().unwrap().dirty_exp = false;

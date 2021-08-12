@@ -134,6 +134,7 @@ impl Game {
                 forge_mods,
                 fml_network_version,
                 renderer,
+                hud_context.clone(),
             )
         }).join().unwrap();
         match result {

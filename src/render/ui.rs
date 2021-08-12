@@ -307,8 +307,8 @@ impl UIState {
         }
     }
 
-    pub fn new_text(&mut self, val: &str, x: f64, y: f64, r: u8, g: u8, b: u8) -> UIText {
-        self.new_text_scaled(val, x, y, 1.0, 1.0, r, g, b)
+    pub fn new_text(&mut self, val: &str, x: f64, y: f64, r: u8, g: u8, b: u8, shadow: bool) -> UIText {
+        self.new_text_scaled(val, x, y, 1.0, 1.0, r, g, b, shadow)
     }
 
     pub fn new_text_scaled(
@@ -321,8 +321,9 @@ impl UIState {
         r: u8,
         g: u8,
         b: u8,
+        shadow: bool,
     ) -> UIText {
-        self.create_text(val, x, y, sx, sy, 0.0, r, g, b)
+        self.create_text(val, x, y, sx, sy, 0.0, r, g, b, shadow)
     }
 
     pub fn new_text_rotated(
@@ -336,8 +337,9 @@ impl UIState {
         r: u8,
         g: u8,
         b: u8,
+        shadow: bool,
     ) -> UIText {
-        self.create_text(val, x, y, sx, sy, rotation, r, g, b)
+        self.create_text(val, x, y, sx, sy, rotation, r, g, b, shadow)
     }
 
     fn create_text(
@@ -351,6 +353,7 @@ impl UIState {
         r: u8,
         g: u8,
         b: u8,
+        shadow: bool,
     ) -> UIText {
         let mut elements = Vec::new();
         let mut offset = 0.0;
@@ -379,22 +382,24 @@ impl UIState {
                 dy = (16.0 * 0.5) + (tmpy * c + tmpx * s);
             }
 
-            let mut shadow = UIElement::new(
-                &texture,
-                x + dsx * sx,
-                y + dsy * sy,
-                w * sx,
-                16.0 * sy,
-                0.0,
-                0.0,
-                1.0,
-                1.0,
-            );
-            shadow.r = ((r as f64) * 0.25) as u8;
-            shadow.g = ((g as f64) * 0.25) as u8;
-            shadow.b = ((b as f64) * 0.25) as u8;
-            shadow.rotation = rotation;
-            elements.push(shadow);
+            if shadow {
+                let mut shadow = UIElement::new(
+                    &texture,
+                    x + dsx * sx,
+                    y + dsy * sy,
+                    w * sx,
+                    16.0 * sy,
+                    0.0,
+                    0.0,
+                    1.0,
+                    1.0,
+                );
+                shadow.r = ((r as f64) * 0.25) as u8;
+                shadow.g = ((g as f64) * 0.25) as u8;
+                shadow.b = ((b as f64) * 0.25) as u8;
+                shadow.rotation = rotation;
+                elements.push(shadow);
+            }
 
             let mut text = UIElement::new(
                 &texture,

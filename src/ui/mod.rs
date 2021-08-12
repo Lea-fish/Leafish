@@ -305,7 +305,7 @@ impl Container {
         }
     }
 
-    pub fn tick(&mut self, renderer: /*&mut */Arc<RwLock<render::Renderer>>, delta: f64, width: f64, height: f64) {
+    pub fn tick(&mut self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, width: f64, height: f64) {
         let (sw, sh) = match self.mode {
             Mode::Scaled => (SCALED_WIDTH / width, SCALED_HEIGHT / height),
             Mode::Unscaled(scale) => (scale, scale),
@@ -971,6 +971,7 @@ element! {
         pub scale_y: f64,
         pub colour: (u8, u8, u8, u8),
         pub rotation: f64,
+        pub shadow: bool,
         priv last_text: String,
         priv last_scale_x: f64,
         priv last_scale_y: f64,
@@ -990,6 +991,7 @@ element! {
         optional scale_y: f64 = 1.0,
         optional colour: (u8, u8, u8, u8) = (255, 255, 255, 255),
         optional rotation: f64 = 0.0,
+        optional shadow: bool = true,
     }
 }
 
@@ -1017,6 +1019,7 @@ impl UIElement for Text {
                     self.colour.0,
                     self.colour.1,
                     self.colour.2,
+                    self.shadow,
                 )
             } else {
                 let c = self.rotation.cos();
@@ -1035,6 +1038,7 @@ impl UIElement for Text {
                     self.colour.0,
                     self.colour.1,
                     self.colour.2,
+                    self.shadow,
                 )
             };
             for e in &mut text.elements {

@@ -25,7 +25,7 @@ use crate::types::Gamemode;
 use crate::world;
 use crate::world::block;
 use cgmath::prelude::*;
-use instant::Instant;
+use instant::{Instant, Duration};
 use log::{debug, error, info, warn};
 use rand::{self, Rng};
 use std::collections::HashMap;
@@ -41,6 +41,7 @@ use leafish_protocol::protocol::Conn;
 // use rayon::prelude::*;
 use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Handsfree, ClientSettings};
 use crate::render::Renderer;
+use crate::render::hud::HudContext;
 
 pub mod plugin_messages;
 mod sun;
@@ -75,6 +76,7 @@ impl Default for WorldData {
 }
 
 pub struct Server {
+
     uuid: protocol::UUID,
     conn: Arc<RwLock<Option<protocol::Conn>>>,
     protocol_version: i32,
@@ -112,6 +114,8 @@ pub struct Server {
     pub light_updates: Mutex<Sender<bool>>, // move to world!
     pub render_list_computer: Mutex<Sender<bool>>,
     pub render_list_computer_notify: Mutex<Receiver<bool>>,
+    pub hud_context: Arc<RwLock<HudContext>>,
+
 }
 
 #[derive(Debug)]
@@ -147,6 +151,7 @@ impl Server {
         forge_mods: Vec<forge::ForgeMod>,
         fml_network_version: Option<i64>,
         renderer: Arc<RwLock<Renderer>>,
+        hud_context: Arc<RwLock<HudContext>>,
     ) -> Result<Arc<Server>, protocol::Error> {
         let mut conn = protocol::Conn::new(address, protocol_version)?;
 
@@ -194,14 +199,14 @@ impl Server {
                     debug!("Login: {} {}", val.username, val.uuid);
                     conn.state = protocol::State::Play;
                     let uuid = protocol::UUID::from_str(&val.uuid).unwrap();
-                    let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/, renderer.clone());
+                    let server = Server::connect0(conn, protocol_version, forge_mods, uuid, resources, renderer.clone(), hud_context.clone());
                     return Ok(server);
                 }
                 protocol::packet::Packet::LoginSuccess_UUID(val) => {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {:?}", val.username, val.uuid);
                     conn.state = protocol::State::Play;
-                    let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, val.uuid, resources/*, write, write_int*/, renderer.clone());
+                    let server = Server::connect0(conn, protocol_version, forge_mods, val.uuid, resources, renderer.clone(), hud_context.clone());
 
                     return Ok(server);
                 }
@@ -328,7 +333,7 @@ impl Server {
             }
         }
 
-        let server = Server::connect0(conn/*read*/, protocol_version, forge_mods, uuid, resources/*, write, write_int*/, renderer.clone());
+        let server = Server::connect0(conn, protocol_version, forge_mods, uuid, resources, renderer.clone(), hud_context.clone());
 
         Ok(server)
     }
@@ -337,7 +342,8 @@ impl Server {
                 forge_mods: Vec<forge::ForgeMod>,
                 uuid: protocol::UUID,
                 resources: Arc<RwLock<resources::Manager>>,
-                renderer: Arc<RwLock<Renderer>>) -> Arc<Server> {
+                renderer: Arc<RwLock<Renderer>>,
+                hud_context: Arc<RwLock<HudContext>>) -> Arc<Server> {
         let server_callback = Arc::new(RwLock::new(None));
         let inner_server = server_callback.clone();
         let mut inner_server = inner_server.write().unwrap();
@@ -354,6 +360,7 @@ impl Server {
             light_updater,
             render_list_computer.0.clone(),
             render_list_computer.1,
+            hud_context.clone(),
         ));
 
         let actual_server = server.clone();
@@ -566,8 +573,13 @@ impl Server {
                                                                          update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));
                             },
                             Packet::ChangeGameState(game_state) => {
-                                println!("game state change!");
                                 server.on_game_state_change(game_state);
+                            },
+                            Packet::UpdateHealth(update_health) => {
+                                server.hud_context.clone().write().unwrap().update_health_and_food(update_health.health, update_health.food.0 as u8, update_health.food_saturation as u8);
+                            },
+                            Packet::UpdateHealth_u16(update_health) => {
+                                server.hud_context.clone().write().unwrap().update_health_and_food(update_health.health, update_health.food as u8, update_health.food_saturation as u8);
                             },
                             Packet::TimeUpdate(time_update) => {
                                 server.on_time_update(time_update);
@@ -592,6 +604,9 @@ impl Server {
                             },
                             Packet::PluginMessageClientbound(plugin_message) => {
                                 server.on_plugin_message_clientbound_1(plugin_message);
+                            },
+                            Packet::SetExperience(set_exp) => {
+                                server.hud_context.clone().write().unwrap().update_exp(set_exp.experience_bar, set_exp.level.0);
                             },
                             _ => {
                                 // println!("other packet!");
@@ -626,7 +641,7 @@ impl Server {
                 if world_cloned.light_updates.clone().read().unwrap().is_empty() {
                     done = true;
                 }
-                // sleep(Duration::from_millis(1));
+                thread::sleep(Duration::from_millis(1));
             }
             while rx.try_recv().is_ok() {}
         });
@@ -663,6 +678,7 @@ impl Server {
             Self::spawn_light_updater(server_callback.clone()),
                 render_list.0,
            render_list.1,
+            Arc::new(RwLock::new(HudContext::new())),
         ));
         inner_server.replace(server.clone());
         println!("instantiated server!");
@@ -761,6 +777,7 @@ impl Server {
         light_updater: mpsc::Sender<bool>,
         render_list_computer: mpsc::Sender<bool>,
         render_list_computer_notify: mpsc::Receiver<bool>,
+        hud_context: Arc<RwLock<HudContext>>,
     ) -> Server {
         let mut entities = ecs::Manager::new();
         entity::add_systems(&mut entities);
@@ -807,6 +824,7 @@ impl Server {
             light_updates: Mutex::from(light_updater),
             render_list_computer: Mutex::from(render_list_computer),
             render_list_computer_notify: Mutex::from(render_list_computer_notify),
+            hud_context: hud_context.clone(),
         }
     }
 
