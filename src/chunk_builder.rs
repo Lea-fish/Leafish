@@ -69,8 +69,8 @@ impl ChunkBuilder {
                 world.clone().reset_building_flag(val.position);
 
                 if let Some(sec) =
-                world.clone().get_section_mut(val.position.0, val.position.1, val.position.2)
-                {
+                world.clone().get_section_mut(val.position.0, val.position.1, val.position.2) {
+                    println!("updating chunk: {:?}", val.position);
                     sec.clone().write().unwrap().cull_info = val.cull_info;
                     renderer.update_chunk_solid(
                         sec.clone().read().unwrap().render_buffer.clone(),
@@ -99,7 +99,6 @@ impl ChunkBuilder {
             .map(|v| v.0)
             .filter(|v| tmp_world.is_section_dirty(*v))
             .collect::<Vec<_>>();
-        // the following code is the performance bottleneck
         for (x, y, z) in dirty_sections.clone() {
             tmp_world.set_building_flag((x, y, z));
         }

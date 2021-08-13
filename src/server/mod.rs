@@ -23,7 +23,7 @@ use crate::shared::{Axis, Position};
 use crate::types::hash::FNVHash;
 use crate::types::Gamemode;
 use crate::world;
-use crate::world::block;
+use crate::world::{block, CPos, LightData};
 use cgmath::prelude::*;
 use instant::{Instant, Duration};
 use log::{debug, error, info, warn};
@@ -562,15 +562,27 @@ impl Server {
                             },
                             // unknown: 37, 23, 50, 60, 70, 68, 89, 76
                             Packet::UpdateLight_NoTrust(update_light) => { // 37 (1.15.2)
-                                server.world.clone().load_light_with_loc(update_light.chunk_x.0, update_light.chunk_z.0,
+                                server.world.clone().lighting_cache.clone().write().unwrap().insert(CPos(update_light.chunk_x.0, update_light.chunk_z.0),
+                                                                                                    LightData {
+                                                                                                        arrays: Cursor::new(update_light.light_arrays),
+                                                                                                        block_light_mask: update_light.block_light_mask.0,
+                                                                                                        sky_light_mask: update_light.sky_light_mask.0
+                                                                                                    });
+                                /*server.world.clone().load_light_with_loc(update_light.chunk_x.0, update_light.chunk_z.0,
                                                                          update_light.block_light_mask.0, true,
-                                                                         update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));
+                                                                         update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));*/
                             },
                             Packet::UpdateLight_WithTrust(update_light) => {
                                 // TODO: Add specific stuff!
-                                server.world.clone().load_light_with_loc(update_light.chunk_x.0, update_light.chunk_z.0,
+                                server.world.clone().lighting_cache.clone().write().unwrap().insert(CPos(update_light.chunk_x.0, update_light.chunk_z.0),
+                                                                                                    LightData {
+                                                                                                        arrays: Cursor::new(update_light.light_arrays),
+                                                                                                        block_light_mask: update_light.block_light_mask.0,
+                                                                                                        sky_light_mask: update_light.sky_light_mask.0
+                                                                                                    });
+                                /*server.world.clone().load_light_with_loc(update_light.chunk_x.0, update_light.chunk_z.0,
                                                                          update_light.block_light_mask.0, true,
-                                                                         update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));
+                                                                         update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));*/
                             },
                             Packet::ChangeGameState(game_state) => {
                                 server.on_game_state_change(game_state);
@@ -895,7 +907,7 @@ impl Server {
         /*let diff = Instant::now().duration_since(now);
         println!("Diffiii7 took {}", diff.as_millis());*/
         let world = self.world.clone();
-        world.tick(&mut self.entities.clone().write().unwrap());
+        world.tick(&mut self.entities.clone().write().unwrap()); // TODO: this causes a deadlock - FIX IT!!!
         // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
             self.light_updates.lock().unwrap().send(true).unwrap();
         // }
@@ -904,6 +916,9 @@ impl Server {
 
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
+            let position = self.entities.clone().read().unwrap().get_component(*self.player.clone().read().unwrap().as_ref().unwrap(), self.position).unwrap();
+            let tmp_chunk_pos = (position.position.x as i32 >> 4, position.position.y as i32 >> 4, position.position.z as i32 >> 4);
+            println!("has chunk {}", world.render_list.read().unwrap().contains(&tmp_chunk_pos));
             if let Some((pos, bl, _, _)) = target::trace_ray(
                 &world,
                 4.0,

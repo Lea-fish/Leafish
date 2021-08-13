@@ -242,14 +242,10 @@ fn init_config_dir() {
 // TODO: Implement rendering of slabs slabs (texture bug?).
 // TODO: Fix Non-solid blocks being solid.
 // TODO: Implement other block entities.
-// TODO: Fix networking!!!
-// TODO: Implement transaction id response!
-// TODO: Implement client settings!
+// TODO: Implement client settings! (implement settings for them)
 // TODO: Implement Items (Inventory, Hotbar etc.)
 // TODO: Implement block placing/breaking
-// TODO: Fix escape key in settings.
 // TODO: Extend the gui (assigned to vivi).
-// TODO: Fix missing keep alive responses when window is in the background.
 // TODO: Hide own character and show only the right hand. (with an item)
 // TODO: Rewrite rendering!
 // TODO: Simplify error messages in server list.
@@ -265,7 +261,6 @@ fn init_config_dir() {
 // TODO: Fix water slowdown!
 // TODO: Implement achievements tab!
 // TODO: Implement custom resource packs/data packs from the client and from the server!
-// TODO: Implement crosshair.
 // TODO: Fix cursor grabbing/visibility/transparency of window.
 // TODO: Improve clouds.
 // TODO: Implement swim animation. (low prio)
@@ -274,10 +269,11 @@ fn init_config_dir() {
 // TODO: Implement tablist.
 // TODO: Improve walking animation. (low prio)
 // TODO: Implement sprinting and sneaking!
-// TODO: Minecraftify movement (esspecially walking backwards and jumping while doing so)
+// TODO: Minecraftify movement (especially walking backwards and jumping while doing so)
 // TODO: Fix pistons.
 // TODO: Implement capes and distribute them via client settings (especially the skin layer or other stuff if it gets sent to other clients)
-// TODO: Improve startup performance (try fixing the bottleneck!)
+// TODO: Fix some chunks not loading.
+// TODO: Remove shadow from nametag text and add black, transparent box around text.
 fn main() {
     init_config_dir();
     let opt = Opt::from_args();
@@ -490,8 +486,8 @@ fn tick_all(
         }
     };
     *last_resource_version = version;
-    let diff = Instant::now().duration_since(now);
-    println!("Diff1 took {}", diff.as_millis());
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff1 took {}", diff.as_millis());*/
 
     let vsync_changed = *game.vars.get(settings::R_VSYNC);
     if *vsync != vsync_changed {
@@ -503,14 +499,14 @@ fn tick_all(
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
     game.tick(/*delta*/);
-    let diff = Instant::now().duration_since(now);
-    println!("Diff2 took {}", diff.as_millis());
-    // TODO: Fix this: Sometimes the game deadlocks after this and diff3 is not reached when joining a server.
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff2 took {}", diff.as_millis());*/
+    // TODO: Fix this: Sometimes the game deadlocks after this and diff3 is not reached when joining a server. (and while walking on it)
     if game.server.is_some() {
         game.server.as_ref().unwrap().tick(game.renderer.clone(), delta, game.focused); // TODO: Improve perf in load screen!
     }
-    let diff = Instant::now().duration_since(now);
-    println!("Diff3 took {}", diff.as_millis());
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff3 took {}", diff.as_millis());*/
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
@@ -522,18 +518,18 @@ fn tick_all(
         // world.compute_render_list(/*&mut */game.renderer.clone()); // TODO: Improve perf on server!
         // game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true); // old
         game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height);
-        let diff = Instant::now().duration_since(now);
-        println!("Diff5 took {}", diff.as_millis()); // readd
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diff5 took {}", diff.as_millis());*/ // readd
         game.chunk_builder
             .tick(game.server.as_ref().unwrap().world.clone(), /*&mut */game.renderer.clone(), version);
-        let diff = Instant::now().duration_since(now);
-        println!("Diff6 took {}", diff.as_millis());
+        /*let diff = Instant::now().duration_since(now);
+        println!("Diff6 took {}", diff.as_millis());*/
     }
 
     game.screen_sys
         .tick(delta, /*&mut */game.renderer.clone(), &mut ui_container);
-    let diff = Instant::now().duration_since(now);
-    println!("Diff7 took {}", diff.as_millis());
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff7 took {}", diff.as_millis());*/
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {
         if Instant::now().duration_since(received_chat_at).as_secs() < 5 {
@@ -546,11 +542,11 @@ fn tick_all(
         .lock()
         .unwrap()
         .tick(&mut ui_container, /*&*/game.renderer.clone(), delta, width);
-    let diff = Instant::now().duration_since(now);
-    println!("Diff8 took {}", diff.as_millis());
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff8 took {}", diff.as_millis());*/
     ui_container.tick(/*&mut */game.renderer.clone(), delta, width, height);
-    let diff = Instant::now().duration_since(now);
-    println!("Diff9 took {}", diff.as_millis()); // readd
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff9 took {}", diff.as_millis());*/ // readd
     // TODO: Improve perf of diff 9 in the menu!
     let world = if let Some(server) = game.server.as_ref() {
         Some(server.world.clone())
@@ -583,8 +579,8 @@ fn tick_all(
     if game.server.is_some() {
         game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true).unwrap();
     }
-    let diff = Instant::now().duration_since(now);
-    println!("Diff10 took {}", diff.as_millis()); // readd
+    /*let diff = Instant::now().duration_since(now);
+    println!("Diff10 took {}", diff.as_millis());*/ // readd
 
     if fps_cap > 0 && !*vsync {
         let frame_time = now.elapsed();
@@ -634,22 +630,24 @@ fn handle_window_event<T>(
             if game.focused {
                 window.set_cursor_grab(true).unwrap();
                 window.set_cursor_visible(false);
-                if let Some(player) = *game.server.as_ref().unwrap().player.clone().write().unwrap() {
-                    let rotation = game
-                        .server.as_ref().unwrap()
-                        .entities
-                        .clone()
-                        .write()
-                        .unwrap()
-                        .get_component_mut(player, game.server.as_ref().unwrap().rotation)
-                        .unwrap();
-                    rotation.yaw -= rx;
-                    rotation.pitch -= ry;
-                    if rotation.pitch < (PI / 2.0) + 0.01 {
-                        rotation.pitch = (PI / 2.0) + 0.01;
-                    }
-                    if rotation.pitch > (PI / 2.0) * 3.0 - 0.01 {
-                        rotation.pitch = (PI / 2.0) * 3.0 - 0.01;
+                if game.server.is_some() {
+                    if let Some(player) = *game.server.as_ref().unwrap().player.clone().write().unwrap() {
+                        let rotation = game
+                            .server.as_ref().unwrap()
+                            .entities
+                            .clone()
+                            .write()
+                            .unwrap()
+                            .get_component_mut(player, game.server.as_ref().unwrap().rotation)
+                            .unwrap();
+                        rotation.yaw -= rx;
+                        rotation.pitch -= ry;
+                        if rotation.pitch < (PI / 2.0) + 0.01 {
+                            rotation.pitch = (PI / 2.0) + 0.01;
+                        }
+                        if rotation.pitch > (PI / 2.0) * 3.0 - 0.01 {
+                            rotation.pitch = (PI / 2.0) * 3.0 - 0.01;
+                        }
                     }
                 }
             } else {

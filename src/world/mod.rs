@@ -45,8 +45,9 @@ use collision::Frustum;
 #[derive(Default)]
 pub struct World {
     pub chunks: Arc<RwLock<HashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>>,
+    pub lighting_cache: Arc<RwLock<HashMap<CPos, LightData>>>,
 
-    render_list: Arc<RwLock<Vec<(i32, i32, i32)>>>,
+    pub render_list: Arc<RwLock<Vec<(i32, i32, i32)>>>,
 
     pub(crate) light_updates: Arc<RwLock<VecDeque<LightUpdate>>>,
 
@@ -55,6 +56,14 @@ pub struct World {
     protocol_version: i32,
     pub modded_block_ids: Arc<RwLock<HashMap<usize, String>>>,
     pub id_map: Arc<block::VanillaIDMap>,
+}
+
+pub struct LightData {
+
+    pub arrays: Cursor<Vec<u8>>,
+    pub block_light_mask: i32,
+    pub sky_light_mask: i32,
+
 }
 
 #[derive(Clone, Debug)]
@@ -907,6 +916,11 @@ Process finished with exit code 101
                       mask_add: u16,
                       data: &mut Cursor<Vec<u8>>,
                       version: u8) -> Result<(), protocol::Error> {
+        // println!("loading {}, {}", x, z);
+        // 92, 2, -32
+        let additional_light_data = self.lighting_cache.clone().write().unwrap().remove(&CPos(x, z));
+        let has_add_light = additional_light_data.is_some();
+        let mut additional_light_data = additional_light_data.unwrap();
         let cpos = CPos(x, z);
         {
             if new {
@@ -933,7 +947,6 @@ Process finished with exit code 101
                     continue;
                 }
                 let section = chunk.sections[i as usize].as_ref().unwrap();
-                section.clone().write().unwrap().dirty = true;
 
                 if version == 17 {
                     data.read_exact(&mut block_types[i])?;
@@ -942,11 +955,14 @@ Process finished with exit code 101
                 } else if version == 19 {
                     self.prep_section_19(chunk, section.clone(), data, i);
                 }
+                section.clone().write().unwrap().dirty = true;
             }
             if version == 17 {
                 self.finish_17(chunk, mask, mask_add, skylight, data, block_types);
-            }else if version != 19 {
+            } else if version != 19 {
                 self.read_light(chunk, mask, skylight, data);
+            } else if has_add_light {
+                self.load_light(chunk, additional_light_data.block_light_mask, true, additional_light_data.sky_light_mask, &mut additional_light_data.arrays);
             }
 
             if new && read_biomes { // read biomes is always true (as param) except for load_chunk_19
@@ -1339,7 +1355,10 @@ Process finished with exit code 101
             if block_light_mask & (1 << i) == 0 {
                 continue;
             }
-            let section = chunk.sections[i as usize].as_mut().unwrap();
+            if chunk.sections[i as usize].as_ref().is_none() {
+                chunk.sections[i as usize].replace(Arc::new(RwLock::new(Section::new(i, false))));
+            }
+            let mut section = chunk.sections[i as usize].as_mut().unwrap();
 
             data.read_exact(&mut section.clone().write().unwrap().block_light.data).unwrap();
         }
@@ -1349,7 +1368,10 @@ Process finished with exit code 101
                 if sky_light_mask & (1 << i) == 0 {
                     continue;
                 }
-                let section = chunk.sections[i as usize].as_mut().unwrap();
+                if chunk.sections[i as usize].as_ref().is_none() {
+                    chunk.sections[i as usize].replace(Arc::new(RwLock::new(Section::new(i, false))));
+                }
+                let mut section = chunk.sections[i as usize].as_mut().unwrap();
 
                 data.read_exact(&mut section.clone().write().unwrap().sky_light.data).unwrap();
             }
@@ -1473,7 +1495,7 @@ impl Snapshot {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
-pub struct CPos(i32, i32);
+pub struct CPos(pub i32, pub i32);
 
 pub struct Chunk {
     position: CPos,

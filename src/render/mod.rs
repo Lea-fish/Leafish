@@ -307,6 +307,7 @@ impl Renderer {
         println!("Camera diff 3 took {}", diff.as_millis());*/ // readd
     }
 
+    // if the esc key was pressed, the window is transparent
     pub fn tick(
         &mut self,
         world: Option<Arc<World>>,
@@ -321,30 +322,29 @@ impl Renderer {
         /*let diff = Instant::now().duration_since(now);
         println!("Render diff 1 | {}", diff.as_millis());*/
 
-        if self.trans.is_some() {
-            let trans = self.trans.as_ref().unwrap();
-            trans.main.bind();
-            /*let diff = Instant::now().duration_since(now);
-            println!("Render diff 2 | {}", diff.as_millis());*/
-        }
-
-        gl::active_texture(0);
-        self.gl_texture.bind(gl::TEXTURE_2D_ARRAY);
-
-        gl::enable(gl::MULTISAMPLE);
-
-        let time_offset = self.sky_offset * 0.9;
-        gl::clear_color(
-            (122.0 / 255.0) * time_offset,
-            (165.0 / 255.0) * time_offset,
-            (247.0 / 255.0) * time_offset,
-            1.0,
-        );
-        gl::clear(gl::ClearFlags::Color | gl::ClearFlags::Depth);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Render diff 3 | {}", diff.as_millis());*/
-
         if world.is_some() {
+            if self.trans.is_some() {
+                let trans = self.trans.as_ref().unwrap();
+                trans.main.bind();
+                /*let diff = Instant::now().duration_since(now);
+                println!("Render diff 2 | {}", diff.as_millis());*/
+            }
+
+            gl::active_texture(0);
+            self.gl_texture.bind(gl::TEXTURE_2D_ARRAY);
+
+            gl::enable(gl::MULTISAMPLE);
+
+            let time_offset = self.sky_offset * 0.9;
+            gl::clear_color(
+                (122.0 / 255.0) * time_offset,
+                (165.0 / 255.0) * time_offset,
+                (247.0 / 255.0) * time_offset,
+                1.0,
+            );
+            gl::clear(gl::ClearFlags::Color | gl::ClearFlags::Depth);
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 3 | {}", diff.as_millis());*/
             // Chunk rendering
             self.chunk_shader.program.use_program();
 
@@ -373,26 +373,28 @@ impl Renderer {
                             self.element_buffer_type,
                             0,
                         );
+                        // println!("rendering solid {:?}", pos);
+                    }else {
+                        println!("1: not rendering solid {:?}", pos);
                     }
+                }else {
+                    // println!("2: not rendering solid {:?}", pos);
                 }
             }
             /*let diff = Instant::now().duration_since(now);
             println!("Render diff 4 | {}", diff.as_millis());*/
-        }
 
-        // Line rendering
-        // Model rendering
-        self.model.draw(
-            self.frustum.clone()/*&self.frustum*/,
-            &self.perspective_matrix,
-            &self.camera_matrix,
-            self.light_level,
-            self.sky_offset,
-        );
-        /*let diff = Instant::now().duration_since(now);
+            // Line rendering
+            // Model rendering
+            self.model.draw(
+                self.frustum.clone()/*&self.frustum*/,
+                &self.perspective_matrix,
+                &self.camera_matrix,
+                self.light_level,
+                self.sky_offset,
+            );
+            /*let diff = Instant::now().duration_since(now);
         println!("Render diff 5 | {}", diff.as_millis());*/
-
-        if world.is_some() {
             let tmp_world = world.as_ref().unwrap().clone();
 
             if let Some(clouds) = &mut self.clouds {
@@ -410,29 +412,29 @@ impl Renderer {
             }
             /*let diff = Instant::now().duration_since(now);
             println!("Render diff 6 | {}", diff.as_millis());*/
-        }
 
-        if self.trans.is_some() {
-            // Trans chunk rendering
-            self.chunk_shader_alpha.program.use_program();
-            self.chunk_shader_alpha
-                .perspective_matrix
-                .set_matrix4(&self.perspective_matrix);
-            self.chunk_shader_alpha
-                .camera_matrix
-                .set_matrix4(&self.camera_matrix);
-            self.chunk_shader_alpha.texture.set_int(0);
-            self.chunk_shader_alpha
-                .light_level
-                .set_float(self.light_level);
-            self.chunk_shader_alpha
-                .sky_offset
-                .set_float(self.sky_offset);
+            if self.trans.is_some() {
+                // Trans chunk rendering
+                self.chunk_shader_alpha.program.use_program();
+                self.chunk_shader_alpha
+                    .perspective_matrix
+                    .set_matrix4(&self.perspective_matrix);
+                self.chunk_shader_alpha
+                    .camera_matrix
+                    .set_matrix4(&self.camera_matrix);
+                self.chunk_shader_alpha.texture.set_int(0);
+                self.chunk_shader_alpha
+                    .light_level
+                    .set_float(self.light_level);
+                self.chunk_shader_alpha
+                    .sky_offset
+                    .set_float(self.sky_offset);
 
-            // Copy the depth buffer
-            let trans = self.trans.as_ref().unwrap();
-            trans.main.bind_read();
-            trans.trans.bind_draw();
+                // Copy the depth buffer
+                let trans = self.trans.as_ref().unwrap();
+                trans.main.bind_read();
+                trans.trans.bind_draw();
+            }
         }
         gl::blit_framebuffer(
             0,
@@ -481,7 +483,11 @@ impl Renderer {
                             self.element_buffer_type,
                             0,
                         );
+                    }else {
+                        println!("1: not rendering trans {:?}", pos);
                     }
+                }else {
+                   // println!("2: not rendering trans {:?}", pos);
                 }
             }
             /*let diff = Instant::now().duration_since(now);
@@ -492,7 +498,6 @@ impl Renderer {
         gl::unbind_framebuffer();
         gl::disable(gl::DEPTH_TEST);
         gl::clear(gl::ClearFlags::Color);
-        gl::disable(gl::BLEND);
         if self.trans.is_some() {
             let trans = self.trans.as_mut().unwrap();
             trans.draw(&self.trans_shader);
@@ -500,7 +505,6 @@ impl Renderer {
 
         gl::enable(gl::DEPTH_TEST);
         gl::depth_mask(true);
-        gl::blend_func(gl::SRC_ALPHA, gl::ONE_MINUS_SRC_ALPHA);
 
         gl::disable(gl::MULTISAMPLE);
 
