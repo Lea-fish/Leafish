@@ -89,7 +89,7 @@ impl HudContext {
             exp: 0.0, // 0.0 - 1.0
             exp_level: 0,
             dirty_exp: false,
-            breath: -1, // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble
+            breath: 0/*-1*/, // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble -- -1 is causing crashes when attempting to join servers!
             dirty_breath: false
         }
     }
