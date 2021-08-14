@@ -42,6 +42,7 @@ use leafish_protocol::protocol::Conn;
 use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Handsfree, ClientSettings};
 use crate::render::Renderer;
 use crate::render::hud::HudContext;
+use crate::ui::Container;
 
 pub mod plugin_messages;
 mod sun;
@@ -918,7 +919,7 @@ impl Server {
             let world = self.world.clone();
             let position = self.entities.clone().read().unwrap().get_component(*self.player.clone().read().unwrap().as_ref().unwrap(), self.position).unwrap();
             let tmp_chunk_pos = (position.position.x as i32 >> 4, position.position.y as i32 >> 4, position.position.z as i32 >> 4);
-            println!("has chunk {}", world.render_list.read().unwrap().contains(&tmp_chunk_pos));
+            println!("has chunk {:?} | {}", tmp_chunk_pos, world.render_list.read().unwrap().contains(&tmp_chunk_pos));
             if let Some((pos, bl, _, _)) = target::trace_ray(
                 &world,
                 4.0,
@@ -1173,15 +1174,28 @@ impl Server {
     }
 
     pub fn key_press(&self, down: bool, key: Actionkey) {
+        let mut state_changed = false;
         if let Some(player) = *self.player.clone().write().unwrap() {
             if let Some(movement) = self
                 .entities
                 .clone().write().unwrap()
-                .get_component_mut(player, self.player_movement)
-            {
-                movement.pressed_keys.insert(key, down);
+                .get_component_mut(player, self.player_movement) {
+                state_changed = movement.pressed_keys.get(&key).map_or(false, |v| *v) != down;
+                movement.pressed_keys.insert(key.clone(), down);
             }
         }
+        match key {
+            Actionkey::OpenInv => {
+
+            },
+            Actionkey::ToggleHud => {
+                if down && state_changed {
+                    let curr = self.hud_context.read().unwrap().enabled;
+                    self.hud_context.write().unwrap().enabled = !curr;
+                }
+            },
+            _ => {}
+        };
     }
 
     pub fn on_right_click(&self, renderer: Arc<RwLock<render::Renderer>>) {

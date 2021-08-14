@@ -555,7 +555,7 @@ impl PlayerMovement {
         use std::f64::consts::PI;
         let mut forward = 0.0f64;
         let mut yaw = player_yaw - (PI / 2.0);
-        if self.is_key_pressed(Actionkey::Forward) || self.is_key_pressed(Actionkey::Backward) {
+        if self.is_key_pressed(Actionkey::Forward) || self.is_key_pressed(Actionkey::Backward) { // TODO: Make walking backwards slower!
             forward = 1.0;
             if self.is_key_pressed(Actionkey::Backward) {
                 yaw += PI;

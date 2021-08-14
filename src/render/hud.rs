@@ -38,6 +38,7 @@ use std::cell::RefCell;
 
 pub struct HudContext {
 
+    pub enabled: bool,
     hardcore: bool,
     wither: bool,
     poison: bool,
@@ -68,6 +69,7 @@ impl HudContext {
 
     pub fn new() -> Self {
         HudContext {
+            enabled: true,
             hardcore: false,
             wither: false,
             poison: false,
@@ -105,6 +107,7 @@ impl HudContext {
         self.last_food_update = time;
         self.last_food = self.food;
         self.food = food;
+        self.saturation = saturation;
         self.dirty_food = true;
         self.dirty_health = true;
         self.dirty_armor = true; // We have to redraw the armor too, because it depends on the number of hearts and absorbtion.
@@ -142,6 +145,7 @@ impl HudContext {
 
 pub struct Hud {
 
+    last_enabled: bool,
     elements: Vec<ImageRef>,
     health_elements: Vec<ImageRef>,
     armor_elements: Vec<ImageRef>,
@@ -158,6 +162,7 @@ impl Hud {
     
     pub fn new(hud_context: Arc<RwLock<HudContext>>) -> Self {
         Hud {
+            last_enabled: true,
             elements: vec![],
             health_elements: vec![],
             armor_elements: vec![],
@@ -208,6 +213,16 @@ impl Screen for Hud {
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
     ) -> Option<Box<dyn Screen>> {
+        if !self.hud_context.clone().read().unwrap().enabled && self.last_enabled {
+            self.on_deactive(renderer, ui_container);
+            self.last_enabled = false;
+            return None;
+        }
+        if self.hud_context.clone().read().unwrap().enabled && !self.last_enabled {
+            self.on_active(renderer, ui_container);
+            self.last_enabled = true;
+            return None;
+        }
         if self.hud_context.clone().read().unwrap().dirty_health {
             self.health_elements.clear();
             self.render_health(renderer, ui_container);
@@ -471,10 +486,9 @@ impl Hud {
 
     fn render_exp(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer) as f64;
-        let x_offset = icon_scale / 9.0 * 182.0 / 2.0 * -1.0;
         let y_offset = icon_scale / 9.0 * 25.0;
         let hud_context = self.hud_context.clone();
-        let hud_context = self.hud_context.read().unwrap();
+        let hud_context = hud_context.read().unwrap();
         let max_exp = if hud_context.exp_level >= 30 {
             112 + (hud_context.exp_level - 30) * 9
         }else if hud_context.exp_level >= 15 {
@@ -507,8 +521,7 @@ impl Hud {
         }
         if hud_context.exp_level > 0 {
             let level_str = format!("{}", hud_context.exp_level);
-            let text_size = renderer.ui.size_of_string(&level_str);
-            let scale = icon_scale / 9.0 / text_size * 11.0;
+            let scale = icon_scale / 9.0 / 2.0;
             let y = icon_scale / 9.0 * 27.0;
             self.exp_text_elements.push(ui::TextBuilder::new()
                 .alignment(VAttach::Bottom, HAttach::Center)
@@ -598,7 +611,7 @@ impl Hud {
 
     fn render_breath(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let hud_context = self.hud_context.clone();
-        let hud_context = self.hud_context.read().unwrap();
+        let hud_context = hud_context.read().unwrap();
 
         if hud_context.breath != -1 { // Whether the player is under water or not.
             let breath = hud_context.breath as f64;

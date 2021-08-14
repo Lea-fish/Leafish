@@ -282,7 +282,7 @@ impl Console {
     pub fn tick(
         &mut self,
         ui_container: &mut ui::Container,
-        renderer: /*&*/Arc<RwLock<render::Renderer>>,
+        renderer: Arc<RwLock<render::Renderer>>,
         delta: f64,
         width: f64,
     ) {

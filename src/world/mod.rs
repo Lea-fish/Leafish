@@ -582,7 +582,7 @@ impl World {
             }
         });
         if !out.clone().read().unwrap().is_empty() {
-            println!("do next!");
+            // println!("do next!");
             self.do_render_queue(out.clone(), frustum.clone(), frame_id, valid_dirs, render_queue);
         }else {
             println!("finished!");
@@ -593,14 +593,18 @@ impl World {
         self.render_list.clone().read().unwrap()
             .iter()
             // .par_iter()
-            .map(|v| {
+            .filter_map(|v| {
                 let chunks = self.chunks.clone();
                 let chunks = chunks.read().unwrap();
-                let chunk = chunks.get(&CPos(v.0, v.2)).unwrap(); // TODO: Handle None!!!
-                let sec = chunk.sections[v.1 as usize].as_ref().unwrap();
-                let sec = sec.clone();
-                let sec = sec.read().unwrap();
-                (*v, sec.render_buffer.clone())
+                let chunk = chunks.get(&CPos(v.0, v.2));
+                if let Some(chunk) = chunk {
+                    if let Some(sec) = chunk.sections[v.1 as usize].as_ref() {
+                        let sec = sec.clone();
+                        let sec = sec.read().unwrap();
+                        return Some((*v, sec.render_buffer.clone()));
+                    }
+                }
+                return None;
             })
             .collect()
     }
@@ -916,7 +920,7 @@ Process finished with exit code 101
                       mask_add: u16,
                       data: &mut Cursor<Vec<u8>>,
                       version: u8) -> Result<(), protocol::Error> {
-        // println!("loading {}, {}", x, z);
+        println!("loading {}, {}", x, z);
         // 92, 2, -32
         let additional_light_data = self.lighting_cache.clone().write().unwrap().remove(&CPos(x, z));
         let has_add_light = additional_light_data.is_some();

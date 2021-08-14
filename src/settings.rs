@@ -134,6 +134,8 @@ pub const CL_KEYBIND_SPRINT: console::CVar<i64> =
     create_keybind!(LControl, "cl_keybind_sprint", "Keybinding for sprinting");
 pub const CL_KEYBIND_JUMP: console::CVar<i64> =
     create_keybind!(Space, "cl_keybind_jump", "Keybinding for jumping");
+pub const CL_KEYBIND_TOGGLE_HUD: console::CVar<i64> =
+    create_keybind!(F1, "cl_keybind_toggle_hud", "Keybinding for toggling the hud");
 
 pub const DOUBLE_JUMP_MS: u32 = 100;
 
@@ -150,6 +152,7 @@ pub fn register_vars(vars: &mut console::Vars) {
     vars.register(CL_KEYBIND_SNEAK);
     vars.register(CL_KEYBIND_SPRINT);
     vars.register(CL_KEYBIND_JUMP);
+    vars.register(CL_KEYBIND_TOGGLE_HUD);
     vars.register(S_CAPE);
     vars.register(S_JACKET);
     vars.register(S_LEFT_SLEEVE);
@@ -159,7 +162,7 @@ pub fn register_vars(vars: &mut console::Vars) {
     vars.register(S_HAT);
 }
 
-#[derive(Hash, PartialEq, Eq, Debug)]
+#[derive(Hash, PartialEq, Eq, Debug, Copy, Clone)]
 pub enum Actionkey {
     Forward,
     Backward,
@@ -169,6 +172,7 @@ pub enum Actionkey {
     Sneak,
     Sprint,
     Jump,
+    ToggleHud,
 }
 
 impl Actionkey {
@@ -182,6 +186,7 @@ impl Actionkey {
             Actionkey::Sneak,
             Actionkey::Sprint,
             Actionkey::Jump,
+            Actionkey::ToggleHud,
         ]
     }
 
@@ -204,6 +209,7 @@ impl Actionkey {
             Actionkey::Sneak => CL_KEYBIND_SNEAK,
             Actionkey::Sprint => CL_KEYBIND_SPRINT,
             Actionkey::Jump => CL_KEYBIND_JUMP,
+            Actionkey::ToggleHud => CL_KEYBIND_TOGGLE_HUD,
         }
     }
 }
