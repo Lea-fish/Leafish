@@ -551,7 +551,7 @@ impl PlayerMovement {
         Default::default()
     }
 
-    fn calculate_movement(&self, player_yaw: f64) -> (f64, f64) {
+    fn calculate_movement(&self, player_yaw: f64) -> (f64, f64, bool) {
         use std::f64::consts::PI;
         let mut forward = 0.0f64;
         let mut yaw = player_yaw - (PI / 2.0);
@@ -577,7 +577,7 @@ impl PlayerMovement {
             yaw += change;
         }
 
-        (forward, yaw)
+        (forward, yaw, self.is_key_pressed(Actionkey::Forward) && !self.is_key_pressed(Actionkey::Backward))
     }
 
     fn is_key_pressed(&self, key: Actionkey) -> bool {
@@ -683,20 +683,25 @@ impl ecs::System for MovementHandler {
                 (position.position.x as i32) >> 4,
                 (position.position.z as i32) >> 4,
             ) {
-                let (forward, yaw) = movement.calculate_movement(rotation.yaw);
-                let mut speed = if movement.is_key_pressed(Actionkey::Sprint) {
-                    0.2806
+                let (forward, yaw, is_forward) = movement.calculate_movement(rotation.yaw);
+                let mut speed = 0.21585;
+                let mut additional_speed = if movement.is_key_pressed(Actionkey::Sprint) && is_forward {
+                    0.2806 - 0.21585
                 } else {
-                    0.21585
+                    0.0
                 };
+                /*let looking_vec = calculate_looking_vector(rotation.yaw, rotation.pitch);
+                println!("x {}", looking_vec.0);
+                println!("z {}", looking_vec.1);*/
                 if movement.flying {
                     speed *= 2.5;
+                    additional_speed *= 2.5;
 
                     if movement.is_key_pressed(Actionkey::Jump) {
-                        position.position.y += speed;
+                        position.position.y += speed + additional_speed;
                     }
                     if movement.is_key_pressed(Actionkey::Sneak) {
-                        position.position.y -= speed;
+                        position.position.y -= speed + additional_speed;
                     }
                 } else if gravity.as_ref().map_or(false, |v| v.on_ground) {
                     if movement.is_key_pressed(Actionkey::Jump) && velocity.velocity.y.abs() < 0.001
@@ -710,8 +715,10 @@ impl ecs::System for MovementHandler {
                     }
                 }
                 velocity.velocity.y *= 0.98;
-                position.position.x += forward * yaw.cos() * speed;
-                position.position.z -= forward * yaw.sin() * speed;
+                // position.position.x += look_vec.0 * speed;
+                // position.position.z -= look_vec.1 * speed;
+                position.position.x += forward * yaw.cos() * (speed + looking_vec.0 * additional_speed); // TODO: Multiply with speed only for walking forwards
+                position.position.z -= forward * yaw.sin() * (speed + looking_vec.1 * additional_speed);
                 position.position.y += velocity.velocity.y;
 
                 if !gamemode.noclip() {
@@ -785,6 +792,13 @@ impl ecs::System for MovementHandler {
             }
         }
     }
+}
+
+fn calculate_looking_vector(yaw: f64, pitch: f64) -> (f64, f64) {
+    let xz = pitch.to_radians().cos();
+    let x = -xz * yaw.to_radians().sin();
+    let z = xz * yaw.to_radians().cos();
+    (x, z)
 }
 
 fn check_collisions(
