@@ -242,58 +242,58 @@ impl World {
     }
 
     #[allow(clippy::verbose_bit_mask)] // "llvm generates better code" for updates_performed & 0xFFF "on x86"
-    pub fn tick(&self, m: &mut ecs::Manager) { // TODO: Only call this from a separate thread!
-        // use instant::Instant;
-        /*let start = Instant::now();
-        let mut updates_performed = 0;
-        println!("light updates {}", self.light_updates.len());
-        while !self.light_updates.is_empty() {
-            updates_performed += 1;
-            self.do_light_update();
-            /*if (updates_performed & 0xFFF == 0) && start.elapsed().subsec_nanos() >= 5000000 {
-                // 5 ms for light updates
-                break;
-            }*/
-        }*/
-        /*let diff = Instant::now().duration_since(start);
-        println!("Light updates took {}", diff.as_millis());*/
-        // TODO: Improve this time!
-
+    pub fn tick(&self, m: &mut ecs::Manager) {
         let sign_info: ecs::Key<block_entity::sign::SignInfo> = m.get_key();
-
-        while let Some(action) = self.block_entity_actions.clone().write().unwrap().pop_front() {
+        let block_entity_actions = self.block_entity_actions.clone();
+        let mut block_entity_actions = block_entity_actions.write().unwrap();
+        'start: while let Some(action) = block_entity_actions.pop_front() {
             match action {
                 BlockEntityAction::Remove(pos) => {
-                    if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
-                        if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            m.remove_entity(entity);
+                    if let Ok(mut chunk) = self.chunks.clone().try_write() {
+                        if let Some(chunk) = chunk.get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
+                            if let Some(entity) = chunk.block_entities.remove(&pos) {
+                                m.remove_entity(entity);
+                            }
                         }
+                    } else {
+                        block_entity_actions.push_front(action);
+                        break 'start;
                     }
                 }
                 BlockEntityAction::Create(pos) => {
-                    if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
-                        // Remove existing entity
-                        if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            m.remove_entity(entity);
-                        }
-                        let block = chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF);
-                        if let Some(entity_type) =
+                    if let Ok(mut chunk) = self.chunks.clone().try_write() {
+                        if let Some(chunk) = chunk.get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
+                            // Remove existing entity
+                            if let Some(entity) = chunk.block_entities.remove(&pos) {
+                                m.remove_entity(entity);
+                            }
+                            let block = chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF);
+                            if let Some(entity_type) =
                             block_entity::BlockEntityType::get_block_entity(block)
-                        {
-                            let entity = entity_type.create_entity(m, pos);
-                            chunk.block_entities.insert(pos, entity);
+                            {
+                                let entity = entity_type.create_entity(m, pos);
+                                chunk.block_entities.insert(pos, entity);
+                            }
                         }
+                    } else {
+                        block_entity_actions.push_front(action);
+                        break 'start;
                     }
                 }
                 BlockEntityAction::UpdateSignText(bx) => {
-                    let (pos, line1, line2, line3, line4) = *bx;
-                    if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(pos.x >> 4, pos.z >> 4)) {
-                        if let Some(entity) = chunk.block_entities.get(&pos) {
-                            if let Some(sign) = m.get_component_mut(*entity, sign_info) {
-                                sign.lines = [line1, line2, line3, line4];
-                                sign.dirty = true;
+                    if let Ok(chunk) = self.chunks.clone().try_read() {
+                        let (pos, line1, line2, line3, line4) = *bx;
+                        if let Some(chunk) = chunk.get(&CPos(pos.x >> 4, pos.z >> 4)) {
+                            if let Some(entity) = chunk.block_entities.get(&pos) {
+                                if let Some(sign) = m.get_component_mut(*entity, sign_info) {
+                                    sign.lines = [line1, line2, line3, line4];
+                                    sign.dirty = true;
+                                }
                             }
                         }
+                    } else {
+                        block_entity_actions.push_front(BlockEntityAction::UpdateSignText(bx));
+                        break 'start;
                     }
                 }
             }

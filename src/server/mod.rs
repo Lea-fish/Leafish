@@ -917,8 +917,6 @@ impl Server {
 
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
-            let position = self.entities.clone().read().unwrap().get_component(*self.player.clone().read().unwrap().as_ref().unwrap(), self.position).unwrap();
-            let tmp_chunk_pos = (position.position.x as i32 >> 4, position.position.y as i32 >> 4, position.position.z as i32 >> 4);
             if let Some((pos, bl, _, _)) = target::trace_ray(
                 &world,
                 4.0,
@@ -947,99 +945,6 @@ impl Server {
             .get_component_mut(world_entity, self.game_info)
             .unwrap()
             .delta = delta;
-
-        // Packets modify entities so need to handled here
-        // TODO: Find a better solution cuz this kills performance entirely!
-        /*if let Some(rx) = self.read_queue.take() {
-            while let Ok(pck) = rx.try_recv() {
-                match pck {
-                    Ok(pck) => handle_packet! {
-                        self pck {
-                            // KeepAliveClientbound_i64 => on_keep_alive_i64,
-                            // KeepAliveClientbound_VarInt => on_keep_alive_varint,
-                            // KeepAliveClientbound_i32 => on_keep_alive_i32,
-                            // PluginMessageClientbound_i16 => on_plugin_message_clientbound_i16,
-                            // PluginMessageClientbound => on_plugin_message_clientbound_1,
-                            // JoinGame_WorldNames_IsHard => on_game_join_worldnames_ishard,
-                            // JoinGame_WorldNames => on_game_join_worldnames,
-                            // JoinGame_HashedSeed_Respawn => on_game_join_hashedseed_respawn,
-                            // JoinGame_i32_ViewDistance => on_game_join_i32_viewdistance,
-                            // JoinGame_i32 => on_game_join_i32,
-                            // JoinGame_i8 => on_game_join_i8,
-                            // JoinGame_i8_NoDebug => on_game_join_i8_nodebug,
-                            // Respawn_Gamemode => on_respawn_gamemode,
-                            // Respawn_HashedSeed => on_respawn_hashedseed,
-                            // Respawn_WorldName => on_respawn_worldname,
-                            // Respawn_NBT => on_respawn_nbt,
-                            // ChunkData_Biomes3D_VarInt => on_chunk_data_biomes3d_varint,
-                            // ChunkData_Biomes3D_bool => on_chunk_data_biomes3d_bool,
-                            // ChunkData => on_chunk_data,
-                            // ChunkData_Biomes3D => on_chunk_data_biomes3d, // This causes things not to get rendered on unicat!
-                            // ChunkData_HeightMap => on_chunk_data_heightmap,
-                            // ChunkData_NoEntities => on_chunk_data_no_entities,
-                            // ChunkData_NoEntities_u16 => on_chunk_data_no_entities_u16,
-                            // ChunkData_17 => on_chunk_data_17,
-                            // ChunkDataBulk => on_chunk_data_bulk,
-                            // ChunkDataBulk_17 => on_chunk_data_bulk_17,
-                            // ChunkUnload => on_chunk_unload,
-                            // BlockChange_VarInt => on_block_change_varint,
-                            // BlockChange_u8 => on_block_change_u8,
-                            // MultiBlockChange_Packed => on_multi_block_change_packed,
-                            // MultiBlockChange_VarInt => on_multi_block_change_varint,
-                            // MultiBlockChange_u16 => on_multi_block_change_u16,
-                            // TeleportPlayer_WithConfirm => on_teleport_player_withconfirm,
-                            // TeleportPlayer_NoConfirm => on_teleport_player_noconfirm,
-                            // TeleportPlayer_OnGround => on_teleport_player_onground,
-                            // TimeUpdate => on_time_update,
-                            // ChangeGameState => on_game_state_change,
-                            // UpdateBlockEntity => on_block_entity_update,
-                            // UpdateBlockEntity_Data => on_block_entity_update_data,
-                            // UpdateSign => on_sign_update,
-                            // UpdateSign_u16 => on_sign_update_u16,
-                            // PlayerInfo => on_player_info,
-                            // PlayerInfo_String => on_player_info_string,
-                            // ServerMessage_NoPosition => on_servermessage_noposition,
-                            // ServerMessage_Position => on_servermessage_position,
-                            // ServerMessage_Sender => on_servermessage_sender,
-                            // Disconnect => on_disconnect,
-                            // Entities
-                            // EntityDestroy => on_entity_destroy,
-                            // EntityDestroy_u8 => on_entity_destroy_u8,
-                            // SpawnPlayer_f64_NoMeta => on_player_spawn_f64_nometa,
-                            // SpawnPlayer_f64 => on_player_spawn_f64,
-                            // SpawnPlayer_i32 => on_player_spawn_i32,
-                            // SpawnPlayer_i32_HeldItem => on_player_spawn_i32_helditem,
-                            // SpawnPlayer_i32_HeldItem_String => on_player_spawn_i32_helditem_string,
-                            // EntityTeleport_f64 => on_entity_teleport_f64,
-                            // EntityTeleport_i32 => on_entity_teleport_i32,
-                            // EntityTeleport_i32_i32_NoGround => on_entity_teleport_i32_i32_noground,
-                            // EntityMove_i16 => on_entity_move_i16,
-                            // EntityMove_i8 => on_entity_move_i8,
-                            // EntityMove_i8_i32_NoGround => on_entity_move_i8_i32_noground,
-                            // EntityLook_VarInt => on_entity_look_varint,
-                            // EntityLook_i32_NoGround => on_entity_look_i32_noground,
-                            // EntityLookAndMove_i16 => on_entity_look_and_move_i16,
-                            // EntityLookAndMove_i8 => on_entity_look_and_move_i8,
-                            // EntityLookAndMove_i8_i32_NoGround => on_entity_look_and_move_i8_i32_noground,
-                        }
-                    },
-                    Err(err) => panic!("Err: {:?}", err), // TODO: Fix this: thread 'main' panicked at 'Err: IOError(Error { kind: UnexpectedEof, message: "failed to fill whole buffer" })', src/server/mod.rs:679:33
-                }
-                // Disconnected
-                if self.conn.is_none() {
-                    break;
-                }
-            }
-
-            if self.conn.is_some() {
-                self.read_queue.lock().unwrap().replace(rx);
-                if self.write_queue.lock().unwrap().is_some() {
-                    let mut tmp = self.conn.take().unwrap();
-                    tmp.send = self.write_queue.take();
-                    self.conn = Some(tmp);
-                }
-            }
-        }*/
 
         if self.is_connected() || self.disconnect_data.clone().read().unwrap().just_disconnected {
             // Allow an extra tick when disconnected to clean up
