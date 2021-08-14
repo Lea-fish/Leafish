@@ -919,7 +919,6 @@ impl Server {
             let world = self.world.clone();
             let position = self.entities.clone().read().unwrap().get_component(*self.player.clone().read().unwrap().as_ref().unwrap(), self.position).unwrap();
             let tmp_chunk_pos = (position.position.x as i32 >> 4, position.position.y as i32 >> 4, position.position.z as i32 >> 4);
-            println!("has chunk {:?} | {}", tmp_chunk_pos, world.render_list.read().unwrap().contains(&tmp_chunk_pos));
             if let Some((pos, bl, _, _)) = target::trace_ray(
                 &world,
                 4.0,

@@ -55,7 +55,7 @@ impl ChunkBuilder {
     pub fn tick(
         &mut self,
         world: Arc<World>,
-        renderer: /*&mut */Arc<RwLock<render::Renderer>>,
+        renderer: Arc<RwLock<render::Renderer>>,
         version: usize,
     ) {
         if version != self.resource_version {
@@ -70,7 +70,6 @@ impl ChunkBuilder {
 
                 if let Some(sec) =
                 world.clone().get_section_mut(val.position.0, val.position.1, val.position.2) {
-                    println!("updating chunk: {:?}", val.position);
                     sec.clone().write().unwrap().cull_info = val.cull_info;
                     renderer.update_chunk_solid(
                         sec.clone().read().unwrap().render_buffer.clone(),
@@ -99,10 +98,8 @@ impl ChunkBuilder {
             .map(|v| v.0)
             .filter(|v| tmp_world.is_section_dirty(*v))
             .collect::<Vec<_>>();
-        for (x, y, z) in dirty_sections.clone() {
-            tmp_world.set_building_flag((x, y, z));
-        }
         for (x, y, z) in dirty_sections {
+            tmp_world.set_building_flag((x, y, z));
             let t_id = self.free_builders.pop().unwrap();
 
                 self.threads[t_id.0]

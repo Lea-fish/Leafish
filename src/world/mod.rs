@@ -920,15 +920,13 @@ Process finished with exit code 101
                       mask_add: u16,
                       data: &mut Cursor<Vec<u8>>,
                       version: u8) -> Result<(), protocol::Error> {
-        println!("loading {}, {}", x, z);
-        // 92, 2, -32
         let additional_light_data = self.lighting_cache.clone().write().unwrap().remove(&CPos(x, z));
         let has_add_light = additional_light_data.is_some();
         let mut additional_light_data = additional_light_data.unwrap();
         let cpos = CPos(x, z);
         {
             if new {
-                // let curr = self.chunks.clone().read().unwrap().get(&cpos); // TODO: Fix lighting with something similar to bixilon's light accessor!
+                // TODO: Improve lighting with something similar to bixilon's light accessor!
                 self.chunks.clone().write().unwrap().insert(cpos, Chunk::new(cpos));
             } else if !self.chunks.clone().read().unwrap().contains_key(&cpos) {
                 return Ok(());
