@@ -44,6 +44,7 @@ pub mod server;
 pub mod settings;
 pub mod ui;
 pub mod world;
+mod inventory;
 
 use crate::protocol::mojang;
 use std::cell::RefCell;
@@ -53,6 +54,9 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::thread;
 use leafish_protocol::protocol::Error;
 use crate::render::hud::{HudContext, Hud};
+use crate::inventory::Material;
+
+// TODO: Improve calculate light performance and fix capturesnapshot
 
 const CL_BRAND: console::CVar<String> = console::CVar {
     ty: PhantomData,

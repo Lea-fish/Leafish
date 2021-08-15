@@ -256,7 +256,7 @@ impl Screen for Hud {
 
 impl Hud {
 
-    fn icon_scale(renderer: &Renderer) -> f32 {
+    pub fn icon_scale(renderer: &Renderer) -> f32 {
         let icon_scale = if renderer.height > 500 {
             renderer.height as f32 / 38.88
         }else {

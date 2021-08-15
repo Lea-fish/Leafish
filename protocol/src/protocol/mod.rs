@@ -1034,7 +1034,7 @@ impl ::std::fmt::Display for Error {
 type Aes128Cfb = Cfb8<Aes128>;
 
 pub struct Conn {
-    stream: /*Arc<RwLock<*/TcpStream/*>>*/,
+    stream: TcpStream,
     pub host: String,
     pub port: u16,
     direction: Direction,
@@ -1094,7 +1094,7 @@ impl Conn {
         let stream = TcpStream::connect(&*address)?;
         let parts = address.split(':').collect::<Vec<&str>>();
         Ok(Conn {
-            stream: /*Arc::new(RwLock::new(*/stream/*))*/,
+            stream: stream,
             host: parts[0].to_owned(),
             port: parts[1].parse().unwrap(),
             direction: Direction::Serverbound,
@@ -1135,169 +1135,16 @@ impl Conn {
             }
             buf = new;
         }
-        // let mut send_buf = Vec::new();
         let lock = self.send.clone();
         let _lock = lock.lock();
-        VarInt(buf.len() as i32 + extra).write_to(/*&mut */self)?;
+        VarInt(buf.len() as i32 + extra).write_to(self)?;
         if self.compression_threshold >= 0 && extra == 1 {
-            VarInt(0).write_to(/*&mut */self)?;
+            VarInt(0).write_to(self)?;
         }
         self.write_all(&buf)?;
-        // self.write_all(&send_buf/*&buf*/)?;
-        // self.write_buffer(buffer/*buf*/);
 
         Ok(())
     }
-
-    /*
-    pub fn write_buffer(&mut self, buffer: Vec<u8>) {
-        // self.queue.clone().write().unwrap().push_back(buffer);
-        if self.send.is_some() && false {
-            self.send.as_ref().unwrap().send(buffer).unwrap();
-        }else {
-            self.write_all(&buffer).unwrap();
-        }
-    }*/
-    /*
-    keep alive!
-thread '<unnamed>' panicked at 'attempt to shift left with overflow', protocol/src/protocol/mod.rs:793:20
-stack backtrace:
-   0: rust_begin_unwind
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
-   1: core::panicking::panic_fmt
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:92:14
-   2: core::panicking::panic
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:50:5
-   3: <steven_protocol::protocol::VarInt as steven_protocol::protocol::Serializable>::read_from
-             at /home/threadexception/IdeaProjects/stevenarella/protocol/src/protocol/mod.rs:793:20
-   4: steven_protocol::protocol::Conn::read_raw_packet_from
-             at /home/threadexception/IdeaProjects/stevenarella/protocol/src/protocol/mod.rs:1243:37
-   5: steven_protocol::protocol::Conn::read_packet
-             at /home/threadexception/IdeaProjects/stevenarella/protocol/src/protocol/mod.rs:1269:29
-   6: stevenarella::server::Server::spawn_reader::{{closure}}
-             at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:355:23
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-Diff5 took 9376
-     */
-
-    /*
-    thread 'main' panicked at 'Err: IOError(Error { kind: UnexpectedEof, message: "failed to fill whole buffer" })', src/server/mod.rs:806:33
-stack backtrace:
-   0: rust_begin_unwind
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
-   1: std::panicking::begin_panic_fmt
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:435:5
-   2: stevenarella::server::Server::entity_tick
-             at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:806:33
-   3: stevenarella::server::Server::tick
-             at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:670:9
-   4: stevenarella::tick_all
-             at /home/threadexception/IdeaProjects/stevenarella/src/main.rs:452:5
-   5: stevenarella::main::{{closure}}
-             at /home/threadexception/IdeaProjects/stevenarella/src/main.rs:384:9
-   6: winit::platform_impl::platform::sticky_exit_callback
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:746:5
-   7: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run_return
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:354:13
-   8: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:191:9
-   9: winit::platform_impl::platform::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:662:56
-  10: winit::event_loop::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/event_loop.rs:154:9
-  11: stevenarella::main
-             at /home/threadexception/IdeaProjects/stevenarella/src/main.rs:364:5
-  12: core::ops::function::FnOnce::call_once
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:227:5
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-thread '<unnamed>' panicked at 'called `unwrap()` on an `Err` value: RecvError', src/server/mod.rs:468:43
-stack backtrace:
-   0: rust_begin_unwind
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
-   1: core::panicking::panic_fmt
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:92:14
-   2: core::unwrap_failed
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/result.rs:1355:5
-   3: core::Result<T,E>::unwrap
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1037:23
-   4: stevenarella::server::Server::spawn_writer::{{closure}}
-             at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:468:33
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-     */
-
-    /*
-    entity_tick!
-keep alive!
-memory allocation of 18446744072381014920 bytes failed
-     */
-
-    /*
-    ChunkDiff2 took 0
-Diff6 took 1
-Ticking took 1
-thread 'main' panicked at 'Err: IOError(Error { kind: UnexpectedEof, message: "failed to fill whole buffer" })', src/server/mod.rs:814:33
-stack backtrace:
-   0: rust_begin_unwind
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
-   1: std::panicking::begin_panic_fmt
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:435:5
-   2: stevenarella::server::Server::entity_tick
-             at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:814:33
-   3: stevenarella::server::Server::tick
-             at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:678:9
-   4: stevenarella::tick_all
-             at /home/threadexception/IdeaProjects/stevenarella/src/main.rs:494:5
-   5: stevenarella::main::{{closure}}
-             at /home/threadexception/IdeaProjects/stevenarella/src/main.rs:426:9
-   6: winit::platform_impl::platform::sticky_exit_callback
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:746:5
-   7: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run_return
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:354:13
-   8: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:191:9
-   9: winit::platform_impl::platform::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:662:56
-  10: winit::event_loop::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/event_loop.rs:154:9
-  11: stevenarella::main
-             at /home/threadexception/IdeaProjects/stevenarella/src/main.rs:406:5
-  12: core::ops::function::FnOnce::call_once
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:227:5
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-thread '<unnamed>' panicked at 'called `unwrap()` on an `Err` value: RecvError', src/server/mod.rs:469:56
-stack backtrace:
-   0: rust_begin_unwind
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
-   1: core::panicking::panic_fmt
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:92:14
-   2: core::unwrap_failed
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/result.rs:1355:5
-   3: core::Result<T,E>::unwrap
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/result.rs:1037:23
-   4: stevenarella::server::Server::spawn_writer::{{closure}}
-             at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:469:46
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-
-Process finished with exit code 101
-     */
-    /*
-    Ticking took 1
-keep alive!
-thread '<unnamed>' panicked at 'Tried to read more than 1GB of data!', protocol/src/protocol/mod.rs:1371:13
-stack backtrace:
-   0: std::panicking::begin_panic
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/std/src/panicking.rs:519:12
-   1: steven_protocol::protocol::Conn::read_raw_packet_from
-             at /home/threadexception/IdeaProjects/stevenarella/protocol/src/protocol/mod.rs:1371:13
-   2: steven_protocol::protocol::Conn::read_packet
-             at /home/threadexception/IdeaProjects/stevenarella/protocol/src/protocol/mod.rs:1405:29
-   3: stevenarella::server::Server::spawn_reader::{{closure}}
-             at /home/threadexception/IdeaProjects/stevenarella/src/server/mod.rs:359:23
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-[server/mod.rs:2079][INFO] Received chat message: Don't forget to vote for us! You currently have 0 votes.
-
-Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
-     */
 
     pub fn write_plugin_message(&mut self, channel: &str, data: &[u8]) -> Result<(), Error> {
         if is_network_debug() {
@@ -1453,7 +1300,7 @@ Process finished with exit code 137 (interrupted by signal 9: SIGKILL)
         }
     }
 
-    pub fn enable_encyption(&mut self, key: &[u8]/*, _decrypt: bool*/) {
+    pub fn enable_encyption(&mut self, key: &[u8]) {
         let read_cipher = Aes128Cfb::new_var(key, key).unwrap();
         let write_cipher = Aes128Cfb::new_var(key, key).unwrap();
         self.read_cipher.clone().write().unwrap().replace(read_cipher);

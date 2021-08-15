@@ -97,7 +97,7 @@ impl Factory {
         key: Key,
         block: Block,
         rng: &mut R,
-        snapshot: &world::Snapshot,
+        snapshot: &world::SectionSnapshot,
         x: i32,
         y: i32,
         z: i32,
@@ -173,7 +173,7 @@ impl Factory {
         models: &Arc<RwLock<Factory>>,
         block: Block,
         rng: &mut R,
-        snapshot: &world::Snapshot,
+        snapshot: &world::SectionSnapshot,
         x: i32,
         y: i32,
         z: i32,
@@ -957,7 +957,7 @@ impl Model {
     fn render<W: Write>(
         &self,
         factory: &Factory,
-        snapshot: &world::Snapshot,
+        snapshot: &world::SectionSnapshot,
         x: i32,
         y: i32,
         z: i32,
@@ -1038,7 +1038,7 @@ impl Model {
 }
 
 fn calculate_biome(
-    snapshot: &world::Snapshot,
+    snapshot: &world::SectionSnapshot,
     x: i32,
     z: i32,
     img: &image::DynamicImage,
@@ -1069,8 +1069,8 @@ fn calculate_biome(
     ((r / count) as u8, (g / count) as u8, (b / count) as u8)
 }
 
-fn calculate_light(
-    snapshot: &world::Snapshot,
+fn calculate_light( // TODO: Fix oob access!
+    snapshot: &world::SectionSnapshot,
     orig_x: i32,
     orig_y: i32,
     orig_z: i32,
@@ -1085,8 +1085,8 @@ fn calculate_light(
     use std::cmp::max;
     let (ox, oy, oz) = face.get_offset();
 
-    let s_block_light = snapshot.get_block_light(orig_x + ox, orig_y + oy, orig_z + oz);
-    let s_sky_light = snapshot.get_sky_light(orig_x + ox, orig_y + oy, orig_z + oz);
+    let s_block_light = snapshot.get_block_light(orig_x + ox, orig_y + (oy & 1), orig_z + oz); // TODO: Remove AND when i find a better fix for the OOB (negative) access
+    let s_sky_light = snapshot.get_sky_light(orig_x + ox, orig_y + (oy & 1), orig_z + oz); // TODO: Remove AND when i find a better fix for the OOB (negative) access
     if !smooth {
         return ((s_block_light as u16) * 4000, (s_sky_light as u16) * 4000);
     }
@@ -1102,9 +1102,13 @@ fn calculate_light(
     let dy = (oy as f64) * 0.6;
     let dz = (oz as f64) * 0.6;
 
-    for ox in [-0.6, 0.0].iter() {
+    // TODO: Somehow fix negative offsets!
+    let ox = 0.0;
+    let oy = 0.0;
+    let oz = 0.0;
+    /*for ox in [-0.6, 0.0].iter() { // TODO: Readd after fixing!
         for oy in [-0.6, 0.0].iter() {
-            for oz in [-0.6, 0.0].iter() {
+            for oz in [-0.6, 0.0].iter() {*/
                 let lx = (x + ox + dx).round() as i32;
                 let ly = (y + oy + dy).round() as i32;
                 let lz = (z + oz + dz).round() as i32;
@@ -1119,9 +1123,9 @@ fn calculate_light(
                 block_light += bl as u32;
                 sky_light += sl as u32;
                 count += 1;
-            }
+            /*}
         }
-    }
+    }*/
 
     (
         (((block_light * 4000) / count) as u16),

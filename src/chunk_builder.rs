@@ -4,7 +4,7 @@ use crate::resources;
 use crate::shared::Direction;
 use crate::types::bit::Set;
 use crate::world;
-use crate::world::{block, World};
+use crate::world::{block, World, SectionSnapshot};
 use rand::{self, Rng, SeedableRng};
 use std::sync::mpsc;
 use std::sync::{Arc, RwLock};
@@ -160,8 +160,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
         mut trans_buffer,
     } = work;
     let (cx, cy, cz) = (position.0 << 4, position.1 << 4, position.2 << 4);
-    let mut snapshot = world.clone().capture_snapshot(cx - 2, cy - 2, cz - 2, 20, 20, 20); // this is the bottleneck!
-    snapshot.make_relative(-2, -2, -2);
+    let mut snapshot = world.clone().capture_snapshot(cx, cy, cz);
 
     let mut rng = rand_pcg::Pcg32::from_seed([
         ((position.0 as u32) & 0xff) as u8,
@@ -185,77 +184,84 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
     let mut solid_count = 0;
     let mut trans_count = 0;
 
-    for y in 0..16 {
-        for x in 0..16 {
-            for z in 0..16 {
-                let block = snapshot.get_block(x, y, z);
-                let mat = block.get_material();
-                if !mat.renderable {
-                    // Use one step of the rng so that
-                    // if a block is placed in an empty
-                    // location is variant doesn't change
-                    let _: u32 = rng.gen();
-                    continue;
-                }
+    match &snapshot {
+        None => {
+            // TODO: Handle this!
+        },
+        Some(snapshot) => {
+            for y in 0..16 {
+                for x in 0..16 {
+                    for z in 0..16 {
+                        let block = snapshot.get_block(x, y, z);
+                        let mat = block.get_material();
+                        if !mat.renderable {
+                            // Use one step of the rng so that
+                            // if a block is placed in an empty
+                            // location is variant doesn't change
+                            let _: u32 = rng.gen();
+                            continue;
+                        }
 
-                match block {
-                    block::Block::Water { .. } | block::Block::FlowingWater { .. } => {
-                        let tex = models.read().unwrap().textures.clone();
-                        trans_count += model::liquid::render_liquid(
-                            tex,
-                            false,
-                            &snapshot,
-                            x,
-                            y,
-                            z,
-                            &mut trans_buffer,
-                        );
-                        continue;
-                    }
-                    block::Block::Lava { .. } | block::Block::FlowingLava { .. } => {
-                        let tex = models.read().unwrap().textures.clone();
-                        solid_count += model::liquid::render_liquid(
-                            tex,
-                            true,
-                            &snapshot,
-                            x,
-                            y,
-                            z,
-                            &mut solid_buffer,
-                        );
-                        continue;
-                    }
-                    _ => {}
-                }
+                        match block {
+                            block::Block::Water { .. } | block::Block::FlowingWater { .. } => {
+                                let tex = models.read().unwrap().textures.clone();
+                                trans_count += model::liquid::render_liquid(
+                                    tex,
+                                    false,
+                                    &snapshot,
+                                    x,
+                                    y,
+                                    z,
+                                    &mut trans_buffer,
+                                );
+                                continue;
+                            }
+                            block::Block::Lava { .. } | block::Block::FlowingLava { .. } => {
+                                let tex = models.read().unwrap().textures.clone();
+                                solid_count += model::liquid::render_liquid(
+                                    tex,
+                                    true,
+                                    &snapshot,
+                                    x,
+                                    y,
+                                    z,
+                                    &mut solid_buffer,
+                                );
+                                continue;
+                            }
+                            _ => {}
+                        }
 
-                if mat.transparent {
-                    trans_count += model::Factory::get_state_model(
-                        &models,
-                        block,
-                        &mut rng,
-                        &snapshot,
-                        x,
-                        y,
-                        z,
-                        &mut trans_buffer,
-                    );
-                } else {
-                    solid_count += model::Factory::get_state_model(
-                        &models,
-                        block,
-                        &mut rng,
-                        &snapshot,
-                        x,
-                        y,
-                        z,
-                        &mut solid_buffer,
-                    );
+                        if mat.transparent {
+                            trans_count += model::Factory::get_state_model(
+                                &models,
+                                block,
+                                &mut rng,
+                                &snapshot,
+                                x,
+                                y,
+                                z,
+                                &mut trans_buffer,
+                            );
+                        } else {
+                            solid_count += model::Factory::get_state_model(
+                                &models,
+                                block,
+                                &mut rng,
+                                &snapshot,
+                                x,
+                                y,
+                                z,
+                                &mut solid_buffer,
+                            );
+                        }
+                    }
                 }
             }
         }
     }
 
-    let cull_info = build_cull_info(&snapshot);
+    let cull_info = build_cull_info(&snapshot.as_ref());
 
     BuildReply {
         position,
@@ -267,7 +273,11 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
     }
 }
 
-fn build_cull_info(snapshot: &world::Snapshot) -> CullInfo {
+fn build_cull_info(snapshot: &Option<&world::SectionSnapshot>) -> CullInfo {
+    if snapshot.is_none() {
+        return CullInfo::all_vis();
+    }
+    let snapshot = snapshot.unwrap();
     let mut visited = Set::new(16 * 16 * 16);
     let mut info = CullInfo::new();
 
@@ -299,7 +309,7 @@ fn build_cull_info(snapshot: &world::Snapshot) -> CullInfo {
     info
 }
 
-fn flood_fill(snapshot: &world::Snapshot, visited: &mut Set, x: i32, y: i32, z: i32) -> u8 {
+fn flood_fill(snapshot: &world::SectionSnapshot, visited: &mut Set, x: i32, y: i32, z: i32) -> u8 {
     use std::collections::VecDeque;
 
     let mut next_position = VecDeque::with_capacity(16 * 16);

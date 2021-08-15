@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[derive(Clone)]
 pub struct Map {
     bits: Vec<u64>,
     pub bit_size: usize,

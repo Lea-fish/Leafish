@@ -8,7 +8,7 @@ use std::sync::{Arc, RwLock};
 pub fn render_liquid<W: Write>(
     textures: Arc<RwLock<render::TextureManager>>,
     lava: bool,
-    snapshot: &world::Snapshot,
+    snapshot: &world::SectionSnapshot,
     x: i32,
     y: i32,
     z: i32,
@@ -53,7 +53,7 @@ pub fn render_liquid<W: Write>(
     let uy1 = 0i16;
     let uy2 = 16i16 * tex.get_height() as i16;
 
-    for dir in Direction::all() {
+    for dir in Direction::all() { // TODO: Fix -1
         let (ox, oy, oz) = dir.get_offset();
         let special = dir == Direction::Up && (tl < 8 || tr < 8 || bl < 8 || br < 8);
         let block = snapshot.get_block(x + ox, y + oy, z + oz);
@@ -125,8 +125,8 @@ pub fn render_liquid<W: Write>(
 }
 
 fn average_liquid_level(
-    get: fn(&world::Snapshot, i32, i32, i32) -> Option<i32>,
-    snapshot: &world::Snapshot,
+    get: fn(&world::SectionSnapshot, i32, i32, i32) -> Option<i32>,
+    snapshot: &world::SectionSnapshot,
     x: i32,
     y: i32,
     z: i32,
@@ -148,14 +148,14 @@ fn average_liquid_level(
     level
 }
 
-fn get_water_level(snapshot: &world::Snapshot, x: i32, y: i32, z: i32) -> Option<i32> {
+fn get_water_level(snapshot: &world::SectionSnapshot, x: i32, y: i32, z: i32) -> Option<i32> {
     match snapshot.get_block(x, y, z) {
         block::Block::Water { level } | block::Block::FlowingWater { level } => Some(level as i32),
         _ => None,
     }
 }
 
-fn get_lava_level(snapshot: &world::Snapshot, x: i32, y: i32, z: i32) -> Option<i32> {
+fn get_lava_level(snapshot: &world::SectionSnapshot, x: i32, y: i32, z: i32) -> Option<i32> {
     match snapshot.get_block(x, y, z) {
         block::Block::Lava { level } | block::Block::FlowingLava { level } => Some(level as i32),
         _ => None,

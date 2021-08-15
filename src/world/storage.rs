@@ -5,6 +5,7 @@ use crate::world::block;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 
+#[derive(Clone)]
 pub struct BlockStorage {
     blocks: bit::Map,
     block_map: Vec<(block::Block, u32)>,

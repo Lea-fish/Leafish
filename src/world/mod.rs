@@ -38,9 +38,9 @@ use instant::Instant;
 pub mod biome;
 mod storage;
 
-use rayon::prelude::*;
 use crate::render::Renderer;
 use collision::Frustum;
+use crate::chunk_builder::CullInfo;
 
 #[derive(Default)]
 pub struct World {
@@ -529,7 +529,7 @@ impl World {
         // let frustum = renderer.clone().read().unwrap().frustum.clone().read().unwrap().as_ref().unwrap();
         let tmp_frustum = frustum.clone();
         println!("rendering {} elems", process_queue.clone().read().unwrap().len());
-        process_queue.clone().read().unwrap().par_iter().for_each(|(from, pos)| {
+        process_queue.clone().read().unwrap().iter().for_each(|(from, pos)| {
             let (exists, cull) = if let Some((sec, rendered_on)) =
             self.get_render_section_mut(pos.0, pos.1, pos.2)
             {
@@ -554,14 +554,13 @@ impl World {
                 }
                 (
                     sec.is_some(),
-                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.clone().read().unwrap().cull_info),
+                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v),
                 )
             } else {
                 return;
             };
 
             if exists {
-                // self.render_list.clone().write().unwrap().push(*pos);
                 render_queue.clone().write().unwrap().push(*pos);
             }
 
@@ -576,15 +575,14 @@ impl World {
                     if *from == Direction::Invalid
                         || (valid_dirs[dir.index()] && cull.is_visible(*from, dir))
                     {
-                        out.clone().write().unwrap()/*process_queue*/.push_back((dir.opposite(), opos));
+                        out.clone().write().unwrap().push_back((dir.opposite(), opos));
                     }
                 }
             }
         });
         if !out.clone().read().unwrap().is_empty() {
-            // println!("do next!");
             self.do_render_queue(out.clone(), frustum.clone(), frame_id, valid_dirs, render_queue);
-        }else {
+        } else {
             println!("finished!");
         }
     }
@@ -740,14 +738,14 @@ Process finished with exit code 101
         x: i32,
         y: i32,
         z: i32,
-    ) -> Option<(Option<Arc<RwLock<Section>>>, u32)> {
+    ) -> Option<(Option<CullInfo>, u32)> {
         if !(0..=15).contains(&y) {
             return None;
         }
         if let Some(chunk) = self.chunks.clone().read().unwrap().get(&CPos(x, z)) {
             let rendered = &chunk.sections_rendered_on[y as usize];
             if let Some(sec) = chunk.sections[y as usize].as_ref() {
-                return Some((Some(sec.clone()), rendered.clone()));
+                return Some((Some(sec.clone().read().unwrap().cull_info), rendered.clone()));
             }
             return Some((None, rendered.clone()));
         }
@@ -812,94 +810,23 @@ Process finished with exit code 101
         }
     }
 
-    pub fn capture_snapshot(&self, x: i32, y: i32, z: i32, w: i32, h: i32, d: i32) -> Snapshot {
-        use std::cmp::{max, min};
-        let mut snapshot = Snapshot {
-            blocks: storage::BlockStorage::new_default((w * h * d) as usize, block::Missing {}),
-            block_light: nibble::Array::new((w * h * d) as usize),
-            sky_light: nibble::Array::new((w * h * d) as usize),
-            biomes: vec![0; (w * d) as usize],
-            x,
-            y,
-            z,
-            w,
-            _h: h,
-            d,
+    pub fn capture_snapshot(&self, x: i32, y: i32, z: i32,) -> Option<SectionSnapshot> { // TODO: Improve performance!
+        let cx = x >> 4;
+        let cy = y >> 4;
+        let cz = z >> 4;
+        let chunks = self.chunks.clone();
+        let chunks = chunks.read().unwrap();
+        let chunk = match chunks.get(&CPos(cx, cz)) {
+            Some(val) => val,
+            None => {
+                return None;
+            },
         };
-        for i in 0..(w * h * d) as usize {
-            snapshot.sky_light.set(i, 0xF);
+        let sec = &chunk.sections[cy as usize];
+        if sec.is_none() {
+            return None;
         }
-
-        let cx1 = x >> 4;
-        let cy1 = y >> 4;
-        let cz1 = z >> 4;
-        let cx2 = (x + w + 15) >> 4;
-        let cy2 = (y + h + 15) >> 4;
-        let cz2 = (z + d + 15) >> 4;
-
-        for cx in cx1..cx2 {
-            for cz in cz1..cz2 {
-                let chunks = self.chunks.clone();
-                let chunks = chunks.read().unwrap();
-                let chunk = match chunks.get(&CPos(cx, cz)) {
-                    Some(val) => val,
-                    None => continue,
-                };
-
-                let x1 = min(16, max(0, x - (cx << 4)));
-                let x2 = min(16, max(0, x + w - (cx << 4)));
-                let z1 = min(16, max(0, z - (cz << 4)));
-                let z2 = min(16, max(0, z + d - (cz << 4)));
-
-                for cy in cy1..cy2 {
-                    if !(0..=15).contains(&cy) {
-                        continue;
-                    }
-                    let section = &chunk.sections[cy as usize];
-                    let y1 = min(16, max(0, y - (cy << 4)));
-                    let y2 = min(16, max(0, y + h - (cy << 4)));
-
-                    for yy in y1..y2 {
-                        for zz in z1..z2 {
-                            for xx in x1..x2 {
-                                let ox = xx + (cx << 4);
-                                let oy = yy + (cy << 4);
-                                let oz = zz + (cz << 4);
-                                match section.as_ref() {
-                                    Some(sec) => {
-                                        snapshot.set_block(ox, oy, oz, sec.clone().read().unwrap().get_block(xx, yy, zz));
-                                        snapshot.set_block_light(
-                                            ox,
-                                            oy,
-                                            oz,
-                                            sec.clone().read().unwrap().get_block_light(xx, yy, zz),
-                                        );
-                                        snapshot.set_sky_light(
-                                            ox,
-                                            oy,
-                                            oz,
-                                            sec.clone().read().unwrap().get_sky_light(xx, yy, zz),
-                                        );
-                                    }
-                                    None => {
-                                        snapshot.set_block(ox, oy, oz, block::Air {});
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                for zz in z1..z2 {
-                    for xx in x1..x2 {
-                        let ox = xx + (cx << 4);
-                        let oz = zz + (cz << 4);
-                        snapshot.set_biome(ox, oz, chunk.get_biome(xx, zz));
-                    }
-                }
-            }
-        }
-
-        snapshot
+        return Some(sec.as_ref().unwrap().clone().read().unwrap().capture_snapshot(chunk.biomes.clone()));
     }
 
     pub fn unload_chunk(&self, x: i32, z: i32, m: &mut ecs::Manager) {
@@ -1434,68 +1361,6 @@ impl block::WorldAccess for World {
     }
 }
 
-pub struct Snapshot {
-    blocks: storage::BlockStorage,
-    block_light: nibble::Array,
-    sky_light: nibble::Array,
-    biomes: Vec<u8>,
-
-    x: i32,
-    y: i32,
-    z: i32,
-    w: i32,
-    _h: i32,
-    d: i32,
-}
-
-impl Snapshot {
-    pub fn make_relative(&mut self, x: i32, y: i32, z: i32) {
-        self.x = x;
-        self.y = y;
-        self.z = z;
-    }
-
-    pub fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
-        self.blocks.get(self.index(x, y, z))
-    }
-
-    pub fn set_block(&mut self, x: i32, y: i32, z: i32, b: block::Block) {
-        let idx = self.index(x, y, z);
-        self.blocks.set(idx, b);
-    }
-
-    pub fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        self.block_light.get(self.index(x, y, z))
-    }
-
-    pub fn set_block_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
-        let idx = self.index(x, y, z);
-        self.block_light.set(idx, l);
-    }
-
-    pub fn get_sky_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        self.sky_light.get(self.index(x, y, z))
-    }
-
-    pub fn set_sky_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
-        let idx = self.index(x, y, z);
-        self.sky_light.set(idx, l);
-    }
-
-    pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
-        biome::Biome::by_id(self.biomes[((x - self.x) + ((z - self.z) * self.w)) as usize] as usize)
-    }
-
-    pub fn set_biome(&mut self, x: i32, z: i32, b: biome::Biome) {
-        self.biomes[((x - self.x) + ((z - self.z) * self.w)) as usize] = b.id as u8;
-    }
-
-    #[inline]
-    fn index(&self, x: i32, y: i32, z: i32) -> usize {
-        ((x - self.x) + ((z - self.z) * self.w) + ((y - self.y) * self.w * self.d)) as usize
-    }
-}
-
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct CPos(pub i32, pub i32);
 
@@ -1673,6 +1538,45 @@ impl Chunk {
     fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
         biome::Biome::by_id(self.biomes[((z << 4) | x) as usize] as usize)
     }
+
+    pub fn capture_snapshot(&self) -> ChunkSnapshot {
+        let mut snapshot_sections = [None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,];
+        for section in self.sections.iter().enumerate() {
+            if section.1.is_some() {
+                snapshot_sections[section.0] = Some(section.1.as_ref().unwrap().clone().read().unwrap().capture_snapshot(self.biomes.clone()));
+            }
+        }
+        ChunkSnapshot {
+            position: self.position.clone(),
+            sections: snapshot_sections,
+            biomes: self.biomes.clone(),
+            heightmap: self.heightmap.clone(),
+        }
+    }
+}
+
+pub struct ChunkSnapshot {
+
+    pub position: CPos,
+    pub sections: [Option<SectionSnapshot>; 16],
+    pub biomes: [u8; 16 * 16],
+    pub heightmap: [u8; 16 * 16],
+
 }
 
 pub struct Section {
@@ -1691,7 +1595,7 @@ pub struct Section {
 }
 
 impl Section {
-    fn new(y: u8, fill_sky: bool) -> Section {
+    fn new(y: u8, fill_sky: bool) -> Self {
         let mut section = Section {
             cull_info: chunk_builder::CullInfo::all_vis(),
             render_buffer: Arc::new(RwLock::new(render::ChunkBuffer::new())),
@@ -1713,6 +1617,16 @@ impl Section {
         section
     }
 
+    pub fn capture_snapshot(&self, biomes: [u8; 16 * 16]) -> SectionSnapshot {
+        SectionSnapshot {
+            y: self.y,
+            blocks: self.blocks.clone(),
+            block_light: self.block_light.clone(),
+            sky_light: self.sky_light.clone(),
+            biomes,
+        }
+    }
+
     fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
         self.blocks.get(((y << 8) | (z << 4) | x) as usize)
     }
@@ -1720,7 +1634,7 @@ impl Section {
     fn set_block(&mut self, x: i32, y: i32, z: i32, b: block::Block) -> bool {
         if self.blocks.set(((y << 8) | (z << 4) | x) as usize, b) {
             self.dirty = true;
-            self.set_sky_light(x, y, z, 0);
+            self.set_sky_light(x, y, z, 0); // TODO: Do we have to set this every time?
             self.set_block_light(x, y, z, 0);
             true
         } else {
@@ -1743,4 +1657,65 @@ impl Section {
     fn set_sky_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
         self.sky_light.set(((y << 8) | (z << 4) | x) as usize, l);
     }
+}
+
+pub struct SectionSnapshot {
+    pub y: u8,
+    pub blocks: storage::BlockStorage,
+    pub block_light: nibble::Array,
+    pub sky_light: nibble::Array,
+    pub biomes: [u8; 16 * 16], // TODO: Remove this by using the chunk's biome!
+}
+
+impl SectionSnapshot {
+
+    pub fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
+        /*if x < 0 || y < 0 || z < 0 || x > 15 || y > 15 || z > 15 {
+            println!("getting block at {}, {}, {}", x, y, z);
+        }*/
+        let x = x & 15;// TODO: Remove this as soon as OOB calls are fixed!
+        let y = y & 15;
+        let z = z & 15;
+        self.blocks.get(((y << 8) | (z << 4) | x) as usize)
+    }
+
+    pub fn set_block(&mut self, x: i32, y: i32, z: i32, b: block::Block) -> bool {
+        // println!("get block at {}, {}, {}", x, y, z);
+        if self.blocks.set(((y << 8) | (z << 4) | x) as usize, b) {
+            self.set_sky_light(x, y, z, 0); // TODO: Do we have to set this every time?
+            self.set_block_light(x, y, z, 0);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
+        let x = x & 15;
+        let y = y & 15;
+        let z = z & 15;
+        self.block_light.get(((y << 8) | (z << 4) | x) as usize)
+    }
+
+    pub fn set_block_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
+        self.block_light.set(((y << 8) | (z << 4) | x) as usize, l);
+    }
+
+    pub fn get_sky_light(&self, x: i32, y: i32, z: i32) -> u8 {
+        let x = x & 15;
+        let y = y & 15;
+        let z = z & 15;
+        self.sky_light.get(((y << 8) | (z << 4) | x) as usize)
+    }
+
+    pub fn set_sky_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
+        self.sky_light.set(((y << 8) | (z << 4) | x) as usize, l);
+    }
+
+    pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
+        let x = x & 15;
+        let z = z & 15;
+        biome::Biome::by_id(self.biomes[((z << 4) | x) as usize] as usize)
+    }
+
 }

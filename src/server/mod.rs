@@ -24,6 +24,7 @@ use crate::types::hash::FNVHash;
 use crate::types::Gamemode;
 use crate::world;
 use crate::world::{block, CPos, LightData};
+use crate::inventory;
 use cgmath::prelude::*;
 use instant::{Instant, Duration};
 use log::{debug, error, info, warn};
@@ -38,11 +39,11 @@ use leafish_protocol::protocol::packet::Packet;
 use std::sync::mpsc::{Sender, Receiver};
 use std::io::Cursor;
 use leafish_protocol::protocol::Conn;
-// use rayon::prelude::*;
 use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Handsfree, ClientSettings};
 use crate::render::Renderer;
 use crate::render::hud::HudContext;
 use crate::ui::Container;
+use crate::inventory::InventoryContext;
 
 pub mod plugin_messages;
 mod sun;
@@ -99,6 +100,7 @@ pub struct Server {
     target_position: ecs::Key<entity::TargetPosition>,
     velocity: ecs::Key<entity::Velocity>,
     gamemode: ecs::Key<Gamemode>,
+    pub inventory: ecs::Key<InventoryContext>,
     pub rotation: ecs::Key<entity::Rotation>,
     target_rotation: ecs::Key<entity::TargetRotation>,
     //
@@ -116,6 +118,7 @@ pub struct Server {
     pub render_list_computer: Mutex<Sender<bool>>,
     pub render_list_computer_notify: Mutex<Receiver<bool>>,
     pub hud_context: Arc<RwLock<HudContext>>,
+    pub inventory_context: Arc<RwLock<InventoryContext>>,
 
 }
 
@@ -638,7 +641,7 @@ impl Server {
             rx.recv().unwrap();
             while server.clone().try_read().is_err() {}
             let server = server.clone().read().unwrap().as_ref().unwrap().clone();
-            let mut done = false;
+            /*let mut done = false; // TODO: Improve performance!
             while !done {
                 let start = Instant::now();
                 let mut updates_performed = 0;
@@ -655,7 +658,8 @@ impl Server {
                     done = true;
                 }
                 thread::sleep(Duration::from_millis(1));
-            }
+            }*/
+            thread::sleep(Duration::from_millis(1000));
             while rx.try_recv().is_ok() {}
         });
         tx
@@ -820,6 +824,7 @@ impl Server {
             target_position: entities.get_key(),
             velocity: entities.get_key(),
             gamemode: entities.get_key(),
+            inventory: entities.get_key(),
             rotation: entities.get_key(),
             target_rotation: entities.get_key(),
             //
@@ -838,6 +843,7 @@ impl Server {
             render_list_computer: Mutex::from(render_list_computer),
             render_list_computer_notify: Mutex::from(render_list_computer_notify),
             hud_context: hud_context.clone(),
+            inventory_context: Arc::new(RwLock::new(InventoryContext::new()))
         }
     }
 
@@ -908,7 +914,7 @@ impl Server {
         /*let diff = Instant::now().duration_since(now);
         println!("Diffiii7 took {}", diff.as_millis());*/
         let world = self.world.clone();
-        world.tick(&mut self.entities.clone().write().unwrap()); // TODO: this causes a deadlock - FIX IT!!!
+        world.tick(&mut self.entities.clone().write().unwrap());
         // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
             self.light_updates.lock().unwrap().send(true).unwrap();
         // }

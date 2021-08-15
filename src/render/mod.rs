@@ -20,6 +20,7 @@ pub mod clouds;
 pub mod model;
 pub mod ui;
 pub mod hud;
+pub mod inventory;
 
 use crate::gl;
 use crate::resources;
