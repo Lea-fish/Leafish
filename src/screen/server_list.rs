@@ -27,6 +27,8 @@ use crate::ui;
 use instant::Duration;
 use rand::Rng;
 use crate::render::hud::{Hud, HudContext};
+use crate::render::Renderer;
+use crate::ui::Container;
 
 pub struct ServerList {
     elements: Option<UIElements>,
@@ -319,10 +321,8 @@ impl ServerList {
             });
         }
     }
-}
 
-impl super::Screen for ServerList {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn init_list(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         // Refresh the server list
@@ -438,8 +438,16 @@ impl super::Screen for ServerList {
 
             _disconnected: disconnected,
         });
-        self.reload_server_list(renderer, ui_container);
     }
+
+}
+
+impl super::Screen for ServerList {
+    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+        self.init_list(renderer, ui_container);
+        *self.needs_reload.borrow_mut() = true;
+    }
+
     fn on_deactive(&mut self, renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
         // Clean up
         {
@@ -577,5 +585,12 @@ impl super::Screen for ServerList {
             s.offset += diff;
             s.update_position();
         }
+    }
+
+    fn on_resize(&mut self, _width: u32, _height: u32, _renderer: &mut Renderer, _ui_container: &mut Container) {
+        // TODO: Fix this!
+        self.on_deactive(_renderer, _ui_container);
+        // self.init_list(_renderer, _ui_container);
+        self.on_active(_renderer, _ui_container);
     }
 }

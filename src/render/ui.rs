@@ -99,7 +99,7 @@ impl UIState {
 
         let mut pages = Vec::with_capacity(0x100);
         for _ in 0..0x100 {
-            pages.push(Option::None);
+            pages.push(None);
         }
 
         let mut char_map = HashMap::new();

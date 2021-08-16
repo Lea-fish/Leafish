@@ -43,11 +43,36 @@ use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Ha
 use crate::render::Renderer;
 use crate::render::hud::HudContext;
 use crate::ui::Container;
-use crate::inventory::InventoryContext;
+use crate::inventory::{InventoryContext, Inventory};
+use std::borrow::BorrowMut;
+use crate::screen::ScreenSystem;
 
 pub mod plugin_messages;
 mod sun;
 pub mod target;
+
+pub enum Version {
+
+    Old,
+    V1_7,
+    V1_8,
+    V1_9,
+    V1_10,
+    V1_11,
+    V1_12,
+    V1_13,
+    V1_14,
+    V1_15,
+    V1_16,
+    New,
+
+}
+
+impl Version {
+
+
+
+}
 
 #[derive(Default)]
 pub struct DisconnectData {
@@ -365,6 +390,7 @@ impl Server {
             render_list_computer.0.clone(),
             render_list_computer.1,
             hud_context.clone(),
+            &renderer.clone().read().unwrap()
         ));
 
         let actual_server = server.clone();
@@ -696,6 +722,7 @@ impl Server {
                 render_list.0,
            render_list.1,
             Arc::new(RwLock::new(HudContext::new())),
+            &renderer.clone().read().unwrap()
         ));
         inner_server.replace(server.clone());
         println!("instantiated server!");
@@ -795,6 +822,7 @@ impl Server {
         render_list_computer: mpsc::Sender<bool>,
         render_list_computer_notify: mpsc::Receiver<bool>,
         hud_context: Arc<RwLock<HudContext>>,
+        renderer: &Renderer,
     ) -> Server {
         let mut entities = ecs::Manager::new();
         entity::add_systems(&mut entities);
@@ -843,7 +871,7 @@ impl Server {
             render_list_computer: Mutex::from(render_list_computer),
             render_list_computer_notify: Mutex::from(render_list_computer_notify),
             hud_context: hud_context.clone(),
-            inventory_context: Arc::new(RwLock::new(InventoryContext::new()))
+            inventory_context: Arc::new(RwLock::new(InventoryContext::new(Version::V1_8, renderer))), // TODO: Get version from protocol version!
         }
     }
 
@@ -1083,29 +1111,40 @@ impl Server {
         }
     }
 
-    pub fn key_press(&self, down: bool, key: Actionkey) {
-        let mut state_changed = false;
-        if let Some(player) = *self.player.clone().write().unwrap() {
-            if let Some(movement) = self
-                .entities
-                .clone().write().unwrap()
-                .get_component_mut(player, self.player_movement) {
-                state_changed = movement.pressed_keys.get(&key).map_or(false, |v| *v) != down;
-                movement.pressed_keys.insert(key.clone(), down);
-            }
-        }
-        match key {
-            Actionkey::OpenInv => {
-
-            },
-            Actionkey::ToggleHud => {
-                if down && state_changed {
-                    let curr = self.hud_context.read().unwrap().enabled;
-                    self.hud_context.write().unwrap().enabled = !curr;
+    pub fn key_press(&self, down: bool, key: Actionkey, screen_sys: &mut ScreenSystem, focused: &mut bool) {
+        if *focused || key == Actionkey::OpenInv {
+            let mut state_changed = false;
+            if let Some(player) = *self.player.clone().write().unwrap() {
+                if let Some(movement) = self
+                    .entities
+                    .clone().write().unwrap()
+                    .get_component_mut(player, self.player_movement) {
+                    state_changed = movement.pressed_keys.get(&key).map_or(false, |v| *v) != down;
+                    movement.pressed_keys.insert(key.clone(), down);
                 }
-            },
-            _ => {}
-        };
+            }
+            match key {
+                Actionkey::OpenInv => {
+                    if down && state_changed {
+                        if self.inventory_context.clone().read().unwrap().inventory.is_some() {
+                            screen_sys.pop_screen();
+                            *focused = true;
+                        } else if *focused {
+                            let player_inv = self.inventory_context.clone().read().unwrap().player_inventory.clone();
+                            screen_sys.add_screen(Box::new(render::inventory::InventoryWindow::new(player_inv.clone(), self.inventory_context.clone())));
+                            *focused = false;
+                        }
+                    }
+                },
+                Actionkey::ToggleHud => {
+                    if down && state_changed {
+                        let curr = self.hud_context.read().unwrap().enabled;
+                        self.hud_context.write().unwrap().enabled = !curr;
+                    }
+                },
+                _ => {}
+            };
+        }
     }
 
     pub fn on_right_click(&self, renderer: Arc<RwLock<render::Renderer>>) {

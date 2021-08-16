@@ -528,6 +528,11 @@ fn tick_all(
             .tick(game.server.as_ref().unwrap().world.clone(), /*&mut */game.renderer.clone(), version);
         /*let diff = Instant::now().duration_since(now);
         println!("Diff6 took {}", diff.as_millis());*/
+    } else {
+        if game.renderer.clone().read().unwrap().safe_width != width || game.renderer.clone().read().unwrap().safe_height != height {
+            game.renderer.clone().write().unwrap().safe_width = width;
+            game.renderer.clone().write().unwrap().safe_height = height;
+        }
     }
 
     game.screen_sys
@@ -545,10 +550,10 @@ fn tick_all(
     game.console
         .lock()
         .unwrap()
-        .tick(&mut ui_container, /*&*/game.renderer.clone(), delta, width);
+        .tick(&mut ui_container, /*&*/game.renderer.clone(), delta, width as f64);
     /*let diff = Instant::now().duration_since(now);
     println!("Diff8 took {}", diff.as_millis());*/
-    ui_container.tick(/*&mut */game.renderer.clone(), delta, width, height);
+    ui_container.tick(/*&mut */game.renderer.clone(), delta, width as f64, height as f64);
     /*let diff = Instant::now().duration_since(now);
     println!("Diff9 took {}", diff.as_millis());*/ // readd
     // TODO: Improve perf of diff 9 in the menu!
@@ -773,29 +778,27 @@ fn handle_window_event<T>(
                             game.is_fullscreen = !game.is_fullscreen;
                         }
                         (ElementState::Pressed, Some(key)) => {
-                            if game.focused {
-                                if let Some(action_key) =
-                                    settings::Actionkey::get_by_keycode(key, &game.vars)
-                                {
-                                    if game.server.is_some() {
-                                        game.server.as_ref().unwrap().key_press(true, action_key);
-                                    }
+                            if let Some(action_key) =
+                            settings::Actionkey::get_by_keycode(key, &game.vars)
+                            {
+                                if game.server.is_some() {
+                                    game.server.as_ref().unwrap().key_press(true, action_key, &mut game.screen_sys, &mut game.focused);
                                 }
-                            } else {
+                            }
+                            if !game.focused {
                                 let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
                                 ui_container.key_press(game, key, true, ctrl_pressed);
                             }
                         }
                         (ElementState::Released, Some(key)) => {
-                            if game.focused {
-                                if let Some(action_key) =
-                                    settings::Actionkey::get_by_keycode(key, &game.vars)
-                                {
-                                    if game.server.is_some() {
-                                        game.server.as_ref().unwrap().key_press(false, action_key);
-                                    }
+                            if let Some(action_key) =
+                            settings::Actionkey::get_by_keycode(key, &game.vars)
+                            {
+                                if game.server.is_some() {
+                                    game.server.as_ref().unwrap().key_press(false, action_key, &mut game.screen_sys, &mut game.focused);
                                 }
-                            } else {
+                            }
+                            if !game.focused {
                                 let ctrl_pressed = game.is_ctrl_pressed;
                                 ui_container.key_press(game, key, false, ctrl_pressed);
                             }

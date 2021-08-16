@@ -197,7 +197,7 @@ impl Screen for Hud {
         self.render_breath(renderer, ui_container);
     }
 
-    fn on_deactive(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
         self.elements.clear();
         self.health_elements.clear();
         self.exp_elements.clear();
@@ -247,6 +247,10 @@ impl Screen for Hud {
         None
     }
 
+    fn on_resize(&mut self, _width: u32, _height: u32, _renderer: &mut Renderer, _ui_container: &mut Container) {
+        self.on_deactive(_renderer, _ui_container);
+        self.on_active(_renderer, _ui_container);
+    }
 
     fn is_closable(&self) -> bool {
         false
@@ -257,10 +261,14 @@ impl Screen for Hud {
 impl Hud {
 
     pub fn icon_scale(renderer: &Renderer) -> f32 {
-        let icon_scale = if renderer.height > 500 {
-            renderer.height as f32 / 38.88
+        Hud::icon_scale_by_height(renderer.safe_height)
+    }
+
+    pub fn icon_scale_by_height(height: u32) -> f32 {
+        let icon_scale = if height > 500 {
+            height as f32 / 36.50
         }else {
-            renderer.height as f32 / 27.5/*25.0*/
+            height as f32 / 26.50/*27.5*/
         };
         icon_scale
     }
@@ -270,7 +278,7 @@ impl Hud {
         let hud_context = hud_context.read().unwrap();
         let icon_scale = Hud::icon_scale(renderer);
         let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 * -1.0 + icon_scale as f64 / 2.0;
-        let y_offset = icon_scale as f64 / 9.0 * 31.0;
+        let y_offset = icon_scale as f64 / 9.0 * 30.0;
         let hp = hud_context.health.ceil();
         let max_health = hud_context.max_health;
         let absorbtion = hud_context.absorbtion;
@@ -402,7 +410,7 @@ impl Hud {
         let armor = self.hud_context.clone().read().unwrap().armor;
         let icon_scale = Hud::icon_scale(renderer);
         let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 * -1.0 + icon_scale as f64 / 2.0;
-        let y_offset = icon_scale as f64 / 9.0 * 31.0;
+        let y_offset = icon_scale as f64 / 9.0 * 30.0;
         let max_health = self.hud_context.clone().read().unwrap().max_health;
         let absorbtion = self.hud_context.clone().read().unwrap().absorbtion;
         let icon_bars = (((max_health + absorbtion) / 2.0 / 10.0) as f64).ceil();
@@ -438,7 +446,7 @@ impl Hud {
         let food = hud_context.food;
         let last_food = hud_context.last_food;
         let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 + icon_scale as f64 / 2.0;
-        let y_offset = icon_scale as f64 / 9.0 * 31.0;
+        let y_offset = icon_scale as f64 / 9.0 * 30.0;
 
         let mut l7 = 16.0;
         let mut j8 = 0.0;
@@ -486,7 +494,7 @@ impl Hud {
 
     fn render_exp(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer) as f64;
-        let y_offset = icon_scale / 9.0 * 25.0;
+        let y_offset = icon_scale / 9.0 * 24.0;
         let hud_context = self.hud_context.clone();
         let hud_context = hud_context.read().unwrap();
         let max_exp = if hud_context.exp_level >= 30 {
@@ -522,7 +530,7 @@ impl Hud {
         if hud_context.exp_level > 0 {
             let level_str = format!("{}", hud_context.exp_level);
             let scale = icon_scale / 9.0 / 2.0;
-            let y = icon_scale / 9.0 * 27.0;
+            let y = icon_scale / 9.0 * 26.0;
             self.exp_text_elements.push(ui::TextBuilder::new()
                 .alignment(VAttach::Bottom, HAttach::Center)
                 .scale_x(scale)
@@ -620,7 +628,7 @@ impl Hud {
             let broken_bubbles = (breath * 10.0 / 300.0).ceil() - bubbles;
 
             let icon_scale = Hud::icon_scale(renderer) as f64;
-            let y_offset = icon_scale / 9.0 * 41.0;
+            let y_offset = icon_scale / 9.0 * 40.0;
             let x_offset = icon_scale / 9.0 * 182.0 / 2.0 + icon_scale / 2.0;
 
             for i in 0..bubbles as i32 + broken_bubbles as i32 {

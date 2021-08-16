@@ -528,7 +528,7 @@ impl World {
         // let frame_id = renderer.clone().read().unwrap().frame_id.clone();
         // let frustum = renderer.clone().read().unwrap().frustum.clone().read().unwrap().as_ref().unwrap();
         let tmp_frustum = frustum.clone();
-        println!("rendering {} elems", process_queue.clone().read().unwrap().len());
+        // println!("rendering {} elems", process_queue.clone().read().unwrap().len());
         process_queue.clone().read().unwrap().iter().for_each(|(from, pos)| {
             let (exists, cull) = if let Some((sec, rendered_on)) =
             self.get_render_section_mut(pos.0, pos.1, pos.2)
@@ -733,6 +733,7 @@ Process finished with exit code 101
         None
     }
 
+    // TODO: Improve the perf of this method as it is the MAIN bottleneck slowing down the program!
     fn get_render_section_mut(
         &self,
         x: i32,
@@ -1367,7 +1368,7 @@ pub struct CPos(pub i32, pub i32);
 pub struct Chunk {
     position: CPos,
 
-    sections: [Option<Arc<RwLock<Section>>>; 16],
+    pub(crate) sections: [Option<Arc<RwLock<Section>>>; 16],
     sections_rendered_on: [u32; 16],
     biomes: [u8; 16 * 16],
 

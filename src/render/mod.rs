@@ -79,6 +79,8 @@ pub struct Renderer {
 
     pub width: u32,
     pub height: u32,
+    pub safe_width: u32,
+    pub safe_height: u32,
 
     // Light renderering
     pub light_level: f32,
@@ -218,6 +220,8 @@ impl Renderer {
             width: 0,
             height: 0,
 
+            safe_width: 0,
+            safe_height: 0,
             camera: Camera {
                 pos: cgmath::Point3::new(0.0, 0.0, 0.0),
                 yaw: 0.0,
@@ -264,6 +268,8 @@ impl Renderer {
         if self.height != height || self.width != width {
             self.width = width;
             self.height = height;
+            self.safe_width = width;
+            self.safe_height = height;
             gl::viewport(0, 0, width as i32, height as i32);
 
             let fovy = cgmath::Rad::from(cgmath::Deg(90.0_f32));

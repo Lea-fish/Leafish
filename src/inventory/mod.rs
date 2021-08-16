@@ -6,6 +6,7 @@ use crate::ui::Container;
 use std::sync::{Arc, RwLock};
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::render::inventory::InventoryWindow;
+use crate::server::Version;
 
 pub trait Inventory {
 
@@ -25,20 +26,42 @@ pub trait Inventory {
 
     fn tick(&mut self, renderer: &mut Renderer, ui_container: &mut Container, inventory_window: &mut InventoryWindow);
 
-    fn close(&mut self);
+    fn close(&mut self, inventory_window: &mut InventoryWindow);
 
     fn click_at(&self, cursor: (u32, u32)); // TODO: Pass mouse data (buttons, wheel etc and shift button state)
+
+    fn resize(&mut self, width: u32, height: u32, renderer: &mut Renderer, ui_container: &mut Container, inventory_window: &mut InventoryWindow);
 
     fn ty(&self) -> InventoryType;
 
 }
 
-pub enum ClickResult {
+pub struct Slot {
 
-    SwapItem,
-    PickupItem,
-    DropItem,
-    Nothing,
+    pub x: f64,
+    pub y: f64,
+    pub size: f64,
+    pub item: Option<Item>,
+    // TODO: Is valid fn for Anvil, crafting, armor etc.
+
+}
+
+impl Slot {
+
+    pub fn new(x: f64, y: f64, size: f64) -> Self {
+        Slot {
+            x,
+            y,
+            size,
+            item: None,
+        }
+    }
+
+    pub fn update_position(&mut self, x: f64, y: f64, size: f64) {
+        self.x = x;
+        self.y = y;
+        self.size = size;
+    }
 
 }
 
@@ -52,11 +75,11 @@ pub struct InventoryContext {
 
 impl InventoryContext {
 
-    pub fn new() -> Self {
+    pub fn new(version: Version, renderer: &Renderer) -> Self {
         InventoryContext {
             cursor: None,
             inventory: None,
-            player_inventory: Arc::new(RwLock::new(PlayerInventory::new()))
+            player_inventory: Arc::new(RwLock::new(PlayerInventory::new(version, renderer))),
         }
     }
 
