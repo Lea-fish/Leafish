@@ -505,6 +505,7 @@ impl Renderer {
         gl::unbind_framebuffer();
         gl::disable(gl::DEPTH_TEST);
         gl::clear(gl::ClearFlags::Color);
+        gl::disable(gl::BLEND);
         if self.trans.is_some() {
             let trans = self.trans.as_mut().unwrap();
             trans.draw(&self.trans_shader);

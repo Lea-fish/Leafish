@@ -91,6 +91,7 @@ impl PlayerInventory {
         let x_offset = -(size * 4.5);
         let y_offset = (size * 4.18);
         let hot_bar_offset = scale / 9.0 * 4.0;
+        let slot_offset = size + size * 1.0 / 8.0;
         let slot_craft_0 = self.slots.get_mut(0).unwrap();
         // slot_craft_0.update_position((size + size * 1.0 / 8.0) * (4.0 + 2.0), scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0)), size);
         slot_craft_0.update_position(0.0/*(size + size * 1.0 / 8.0) * 2.5*/, 0.0/*scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0) * 2.0)*/, size); // TODO: The 0th slot isn't rendered, no matter what! FIX THIS!
@@ -99,20 +100,20 @@ impl PlayerInventory {
         let slot_craft_2 = self.slots.get_mut(2).unwrap();
         slot_craft_2.update_position((size + size * 1.0 / 8.0) * 2.0, scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0)), size);
         let slot_craft_3 = self.slots.get_mut(3).unwrap();
-        slot_craft_3.update_position((size + size * 1.0 / 8.0), scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0)), size);
+        slot_craft_3.update_position((size + size * 1.0 / 8.0), scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0) - slot_offset), size);
         let slot_craft_4 = self.slots.get_mut(4).unwrap();
-        slot_craft_4.update_position((size + size * 1.0 / 8.0) * 2.0, scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0)), size);
+        slot_craft_4.update_position((size + size * 1.0 / 8.0) * 2.0, scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0) - slot_offset), size);
         let slot_head = self.slots.get_mut(5).unwrap(); // 6th slot!
-        slot_head.update_position( x_offset, y_offset + -((6 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size);
+        slot_head.update_position( x_offset, y_offset + -((6 as f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0), size);
         let slot_chestplate = self.slots.get_mut(6).unwrap(); // 7th slot!
-        slot_chestplate.update_position( x_offset, y_offset + -((5 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size);
+        slot_chestplate.update_position( x_offset, y_offset + -((5 as f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0), size);
         let slot_leggings = self.slots.get_mut(7).unwrap(); // 8th slot!
-        slot_leggings.update_position( x_offset, y_offset + -((4 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size);
+        slot_leggings.update_position( x_offset, y_offset + -((4 as f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0), size);
         let slot_boots = self.slots.get_mut(8).unwrap(); // 9th slot!
-        slot_boots.update_position( x_offset, y_offset + -((3 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size);
+        slot_boots.update_position( x_offset, y_offset + -((3 as f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0), size);
         for y in (0..3).rev() {
             for x in 0..9 {
-                self.slots.get_mut(9 + x + 9 * (2 - y)).unwrap().update_position(x_offset + x as f64 * (size + size * 1.0 / 8.0), y_offset + -(y as f64 * (size + size * 1.0 / 8.0) + size + size * 1.0 / 8.0 + hot_bar_offset), size);
+                self.slots.get_mut(9 + x + 9 * (2 - y)).unwrap().update_position(x_offset + x as f64 * slot_offset, y_offset + -(y as f64 * slot_offset * 2.0 + hot_bar_offset), size);
             }
         }
         for i in 0..9 {

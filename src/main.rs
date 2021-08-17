@@ -368,7 +368,6 @@ fn main() {
         opt.default_protocol_version
             .unwrap_or_else(|| "".to_string()),
     );
-    // under here, we have the bottleneck!
     let mut game = Game {
         server: None,// Arc::from(server::Server::dummy_server(resource_manager.clone())),
         focused: false,
@@ -474,9 +473,6 @@ fn tick_all(
     let physical_size = window.inner_size();
     let (physical_width, physical_height) = physical_size.into();
     let (width, height) = physical_size.to_logical::<f64>(game.dpi_factor).into();
-    /*if game.server.is_some() {
-        *game.server.as_ref().unwrap().clone().delta.clone().write().unwrap() = delta;
-    }*/
 
     let version = {
         let try_res = game.resource_manager.try_write();
