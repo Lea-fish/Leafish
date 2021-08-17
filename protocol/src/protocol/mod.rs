@@ -16,7 +16,7 @@
 #![allow(non_camel_case_types)]
 
 use aes::Aes128;
-use cfb8::stream_cipher::{NewStreamCipher, StreamCipher};
+use cfb8::cipher::{AsyncStreamCipher, NewCipher};
 use cfb8::Cfb8;
 use std::fs;
 
@@ -1301,8 +1301,8 @@ impl Conn {
     }
 
     pub fn enable_encyption(&mut self, key: &[u8]) {
-        let read_cipher = Aes128Cfb::new_var(key, key).unwrap();
-        let write_cipher = Aes128Cfb::new_var(key, key).unwrap();
+        let read_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
+        let write_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
         self.read_cipher.clone().write().unwrap().replace(read_cipher);
         self.write_cipher.clone().write().unwrap().replace(write_cipher);
     }
