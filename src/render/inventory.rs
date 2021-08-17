@@ -62,12 +62,12 @@ impl InventoryWindow {
 
     pub fn draw_item(&mut self, item: &Item, x: f64, y: f64, elements_idx: usize,
                      ui_container: &mut Container, renderer: &Renderer) {
-        let icon_scale = Hud::icon_scale(renderer);
+        let icon_scale = Hud::icon_scale(renderer) as f64;
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 16.0, 0.0 / 16.0, 16.0 / 16.0, 16.0 / 16.0))
             .position(x, y)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-            .size(icon_scale as f64 / 9.0 * 16.0, icon_scale as f64 / 9.0 * 16.0)
+            .size(icon_scale / 9.0 * 16.0, icon_scale / 9.0 * 16.0)
             .texture(format!("minecraft:{}", item.material.texture_location()))
             .create(ui_container);
         self.elements.get_mut(elements_idx).unwrap().push(image);

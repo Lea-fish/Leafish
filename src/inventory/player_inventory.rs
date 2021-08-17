@@ -11,12 +11,11 @@ pub struct PlayerInventory {
 
     slots: Vec<Slot>,
     dirty: bool,
+    version: Version,
 
 }
 
 impl PlayerInventory {
-
-    const SIZE: u32 = 36; // TODO: is this actually correct?
 
     pub fn new(version: Version, renderer: &Renderer) -> Self {
         let scale = Hud::icon_scale(renderer) as f64;
@@ -25,17 +24,64 @@ impl PlayerInventory {
         let y_offset = (size * 4.25);
         let hot_bar_offset = scale / 9.0 * 4.0;
         let mut slots = vec![];
-        for i in 0..9 {
-            slots.push(Slot::new(x_offset + i as f64 * size, y_offset, size));
-        }
+        let mut slot_craft_0 = Slot::new((size + size * 1.0 / 8.0) * 2.5, scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0) * 2.0), size);
+        slot_craft_0.item = Some(Item { // TODO: The 0th slot isn't rendered, no matter what! FIX THIS!
+            stack: Default::default(),
+            material: Material::Apple
+        });
+        slots.push(slot_craft_0);
+        let mut slot_craft_1 = Slot::new((size + size * 1.0 / 8.0), scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0)), size);
+        slot_craft_1.item = Some(Item {
+            stack: Default::default(),
+            material: Material::Apple
+        });
+        slots.push(slot_craft_1);
+        let mut slot_craft_2 = Slot::new((size + size * 1.0 / 8.0) * 2.0, scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0)), size);
+        slot_craft_2.item = Some(Item {
+            stack: Default::default(),
+            material: Material::Apple
+        });
+        slots.push(slot_craft_2);
+        let mut slot_craft_3 = Slot::new((size + size * 1.0 / 8.0), scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0)), size);
+        slot_craft_3.item = Some(Item {
+            stack: Default::default(),
+            material: Material::Apple
+        });
+        slots.push(slot_craft_3);
+        let mut slot_craft_4 = Slot::new((size + size * 1.0 / 8.0) * 2.0, scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0)), size);
+        slot_craft_4.item = Some(Item {
+            stack: Default::default(),
+            material: Material::Apple
+        });
+        slots.push(slot_craft_4);
+        let slot_head = Slot::new(x_offset, y_offset + -((6 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size); // 6th slot!
+        let slot_chestplate = Slot::new(x_offset, y_offset + -((5 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size); // 7th slot!
+        let slot_leggings = Slot::new(x_offset, y_offset + -((4 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size); // 8th slot!
+        let slot_boots = Slot::new(x_offset, y_offset + -((3 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size); // 9th slot!
+        slots.push(slot_head);
+        slots.push(slot_chestplate);
+        slots.push(slot_leggings);
+        slots.push(slot_boots);
         for y in (0..3).rev() {
             for x in 0..9 {
-                slots.push(Slot::new(x_offset + x as f64 * size, y_offset + y as f64 * size + size + hot_bar_offset, size)); // TODO: Add the little bit in between two slots
+                slots.push(Slot::new(x_offset + (x as f64) * (size + size * 1.0 / 8.0), y_offset + -((y as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + size * 1.0 / 8.0 + hot_bar_offset), size));
             }
+        }
+        for i in 0..9 {
+            slots.push(Slot::new(x_offset + (i as f64) * (size + size * 1.0 / 8.0), y_offset, size));
+        }
+        if version > Version::V1_8 || true {
+            let mut slot = Slot::new(-(scale / 9.0 * 3.0), scale / 9.0 * 5.0 - scale / 9.0 * 18.0, size);
+            slot.item = Some(Item {
+                stack: Default::default(),
+                material: Material::Apple
+            });
+            slots.push(slot);
         }
         PlayerInventory {
             slots,
-            dirty: false
+            dirty: false,
+            version
         }
     }
 
@@ -45,13 +91,36 @@ impl PlayerInventory {
         let x_offset = -(size * 4.5);
         let y_offset = (size * 4.18);
         let hot_bar_offset = scale / 9.0 * 4.0;
-        for i in 0..9 {
-            self.slots.get_mut(i).unwrap().update_position(x_offset + i as f64 * size, y_offset, size);
-        }
+        let slot_craft_0 = self.slots.get_mut(0).unwrap();
+        // slot_craft_0.update_position((size + size * 1.0 / 8.0) * (4.0 + 2.0), scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0)), size);
+        slot_craft_0.update_position(0.0/*(size + size * 1.0 / 8.0) * 2.5*/, 0.0/*scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0) * 2.0)*/, size); // TODO: The 0th slot isn't rendered, no matter what! FIX THIS!
+        let slot_craft_1 = self.slots.get_mut(1).unwrap();
+        slot_craft_1.update_position((size + size * 1.0 / 8.0), scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0)), size);
+        let slot_craft_2 = self.slots.get_mut(2).unwrap();
+        slot_craft_2.update_position((size + size * 1.0 / 8.0) * 2.0, scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0)), size);
+        let slot_craft_3 = self.slots.get_mut(3).unwrap();
+        slot_craft_3.update_position((size + size * 1.0 / 8.0), scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0)), size);
+        let slot_craft_4 = self.slots.get_mut(4).unwrap();
+        slot_craft_4.update_position((size + size * 1.0 / 8.0) * 2.0, scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0) - (size + size * 1.0 / 9.0)), size);
+        let slot_head = self.slots.get_mut(5).unwrap(); // 6th slot!
+        slot_head.update_position( x_offset, y_offset + -((6 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size);
+        let slot_chestplate = self.slots.get_mut(6).unwrap(); // 7th slot!
+        slot_chestplate.update_position( x_offset, y_offset + -((5 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size);
+        let slot_leggings = self.slots.get_mut(7).unwrap(); // 8th slot!
+        slot_leggings.update_position( x_offset, y_offset + -((4 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size);
+        let slot_boots = self.slots.get_mut(8).unwrap(); // 9th slot!
+        slot_boots.update_position( x_offset, y_offset + -((3 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0), size);
         for y in (0..3).rev() {
             for x in 0..9 {
-                self.slots.get_mut(9 + x + 9 * (2 - y)).unwrap().update_position(x_offset + x as f64 * size, y_offset + y as f64 * size + size + hot_bar_offset, size); // TODO: Add the little bit in between two slots
+                self.slots.get_mut(9 + x + 9 * (2 - y)).unwrap().update_position(x_offset + x as f64 * (size + size * 1.0 / 8.0), y_offset + -(y as f64 * (size + size * 1.0 / 8.0) + size + size * 1.0 / 8.0 + hot_bar_offset), size);
             }
+        }
+        for i in 0..9 {
+            self.slots.get_mut(36 + i).unwrap().update_position(x_offset + i as f64 * (size + size * 1.0 / 8.0), y_offset, size);
+        }
+        if self.version > Version::V1_8 || true {
+            let mut slot = self.slots.get_mut(45).unwrap();
+            slot.update_position(-(scale / 9.0 * 3.0), scale / 9.0 * 5.0 - scale / 9.0 * 18.0, size);
         }
         self.dirty = true;
     }
@@ -60,11 +129,11 @@ impl PlayerInventory {
 
 impl Inventory for PlayerInventory {
 
-    fn size(&self) -> u32 {
-        PlayerInventory::SIZE
+    fn size(&self) -> i16 {
+        self.slots.len() as i16
     }
 
-    fn id(&self) -> i32 {
+    fn id(&self) -> i8 {
         -1
     }
 
@@ -72,16 +141,16 @@ impl Inventory for PlayerInventory {
         None
     }
 
-    fn get_item(&self, slot: u32) -> &Option<Item> {
+    fn get_item(&self, slot: i16) -> &Option<Item> {
         &self.slots[slot as usize].item
     }
 
-    fn get_item_mut(&mut self, slot: u32) -> &mut Option<Item> {
+    fn get_item_mut(&mut self, slot: i16) -> &mut Option<Item> {
         self.dirty = true;
         &mut self.slots[slot as usize].item
     }
 
-    fn set_item(&mut self, slot: u32, item: Option<Item>) {
+    fn set_item(&mut self, slot: i16, item: Option<Item>) {
         self.slots[slot as usize].item = item;
         self.dirty = true;
     }
@@ -98,6 +167,17 @@ impl Inventory for PlayerInventory {
             .texture("minecraft:gui/container/inventory")
             .create(ui_container);
         basic_elements.push(image);
+        if self.version < Version::V1_9 && false {
+            // Removes the 2nd hand slot from the inv by rendering the background color over it.
+            let image = ui::ImageBuilder::new()
+                .texture_coords(((176.0 / 2.0 - 9.0) / 256.0, 10.0 / 256.0, 18.0 / 256.0, 18.0 / 256.0))
+                .position(-(icon_scale / 9.0 * 3.0), icon_scale / 9.0 * 5.0 - icon_scale / 9.0 * 18.0)
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .size(icon_scale / 9.0 * 18.0, icon_scale / 9.0 * 18.0)
+                .texture("minecraft:gui/container/inventory")
+                .create(ui_container);
+            basic_elements.push(image);
+        }
         let scale = icon_scale / 9.0 / 2.0;
         inventory_window.text_elements.push(vec![]);
         let mut basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
@@ -112,10 +192,6 @@ impl Inventory for PlayerInventory {
             .create(ui_container);
         basic_text_elements.push(crafting_text);
         inventory_window.elements.push(vec![]);
-        self.slots.get_mut(0).unwrap().item.replace(Item {
-            stack: Default::default(),
-            material: Material::Apple
-        });
         self.update_icons(renderer);
     }
 

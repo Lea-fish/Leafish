@@ -962,8 +962,8 @@ state_packets!(
             }
             /// WindowSetSlot changes an itemstack in one of the slots in a window.
             packet WindowSetSlot {
-                field id: u8 =,
-                field property: i16 =,
+                field id: i8 =,
+                field slot: i16 =,
                 field item: Option<item::Stack> =,
             }
             /// SetCooldown disables a set item (by id) for the set number of ticks

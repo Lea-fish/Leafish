@@ -43,14 +43,17 @@ use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Ha
 use crate::render::Renderer;
 use crate::render::hud::HudContext;
 use crate::ui::Container;
-use crate::inventory::{InventoryContext, Inventory};
+use crate::inventory::{InventoryContext, Inventory, Item, Material};
 use std::borrow::BorrowMut;
 use crate::screen::ScreenSystem;
+use leafish_protocol::item::Stack;
+use std::cmp::Ordering;
 
 pub mod plugin_messages;
 mod sun;
 pub mod target;
 
+#[derive(PartialOrd, PartialEq)]
 pub enum Version {
 
     Old,
@@ -70,7 +73,16 @@ pub enum Version {
 
 impl Version {
 
+    const NEWEST: Version = Version::V1_16;
 
+    pub fn from_id(protocol_version: u32) -> Version {
+        match protocol_version {
+            5 => Version::V1_7,
+            47 => Version::V1_8,
+            107..=110 => Version::V1_9,
+            _ => Version::NEWEST,
+        }
+    }
 
 }
 
@@ -650,6 +662,32 @@ impl Server {
                             Packet::SetExperience(set_exp) => {
                                 server.hud_context.clone().write().unwrap().update_exp(set_exp.experience_bar, set_exp.level.0);
                             },
+                            Packet::WindowItems(window_items) => {
+                                println!("items!");
+                            },
+                            Packet::WindowSetSlot(set_slot) => {
+                                let inventory = server.inventory_context.clone();
+                                let inventory = inventory.write().unwrap();
+                                let inventory = if let Some(inventory) = inventory.inventory.as_ref() {
+                                    inventory.clone()
+                                } else {
+                                    inventory.player_inventory.clone()
+                                };
+                                let curr_slots = inventory.clone().read().unwrap().size();
+                                if set_slot.slot < 0 || set_slot.slot >= curr_slots {
+                                    println!("Tried to set an item to slot {} but the current inventory only has {} slots.", set_slot.id + 1, curr_slots);
+                                } else {
+                                    println!("set item to {}, {}, {}", set_slot.id, set_slot.slot, set_slot.item.as_ref().map_or(0, |s| s.id));
+                                    let item = match set_slot.item {
+                                        None => None,
+                                        Some(stack) => Some(Item {
+                                            stack,
+                                            material: Material::Apple// TODO: map stack.id to material!
+                                        }),
+                                    };
+                                    inventory.clone().write().unwrap().set_item(set_slot.slot, item);
+                                }
+                            },
                             _ => {
                                 // println!("other packet!");
                             }
@@ -727,10 +765,8 @@ impl Server {
         inner_server.replace(server.clone());
         println!("instantiated server!");
         let mut rng = rand::thread_rng();
-        // TODO: Fix the following startup bottleneck!
-        // (-7 * 16..7 * 16).into_par_iter().sum();
 
-        for x in (-7 * 16)..(7 * 16) { // TODO: Use par iters
+        for x in (-7 * 16)..(7 * 16) {
             for z in -7 * 16..7 * 16 {
                 let h = 5 + (6.0 * (x as f64 / 16.0).cos() * (z as f64 / 16.0).sin()) as i32;
                 for y in 0..h {

@@ -10,17 +10,17 @@ use crate::server::Version;
 
 pub trait Inventory {
 
-    fn size(&self) -> u32;
+    fn size(&self) -> i16;
 
-    fn id(&self) -> i32;
+    fn id(&self) -> i8;
 
     fn name(&self) -> Option<&String>;
 
-    fn get_item(&self, slot: u32) -> &Option<Item>;
+    fn get_item(&self, slot: i16) -> &Option<Item>;
 
-    fn get_item_mut(&mut self, slot: u32) -> &mut Option<Item>;
+    fn get_item_mut(&mut self, slot: i16) -> &mut Option<Item>;
 
-    fn set_item(&mut self, slot: u32, item: Option<Item>);
+    fn set_item(&mut self, slot: i16, item: Option<Item>);
 
     fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container, inventory_window: &mut InventoryWindow);
 
