@@ -243,7 +243,7 @@ fn init_config_dir() {
     }
 }
 
-// TODO: Implement rendering of slabs slabs (texture bug?).
+// TODO: Implement rendering of slabs (texture bug?).
 // TODO: Fix Non-solid blocks being solid.
 // TODO: Implement other block entities.
 // TODO: Implement client settings! (implement settings for them)
@@ -276,7 +276,6 @@ fn init_config_dir() {
 // TODO: Minecraftify movement (especially walking backwards and jumping while doing so)
 // TODO: Fix pistons.
 // TODO: Implement capes and distribute them via client settings (especially the skin layer or other stuff if it gets sent to other clients)
-// TODO: Fix some chunks not loading.
 // TODO: Remove shadow from nametag text and add black, transparent box around text.
 fn main() {
     init_config_dir();

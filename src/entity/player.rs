@@ -419,6 +419,12 @@ impl ecs::System for PlayerRenderer {
             ],
         );
 
+        let alex = true;
+        let width = if alex { // arms of alex (slim) skins have 3/4 of the width of normal skins!
+            6.0
+        } else {
+            8.0
+        };
         let mut part_verts = vec![vec![]; 4];
 
         for (i, offsets) in [
@@ -430,6 +436,7 @@ impl ecs::System for PlayerRenderer {
         .iter()
         .enumerate()
         {
+            // TODO: Fix alex (slim) skins
             let (ox, oy) = (offsets[0], offsets[1]);
             model::append_box(
                 &mut part_verts[i],
@@ -481,6 +488,7 @@ impl ecs::System for PlayerRenderer {
             let mut name = format::Component::Text(format::TextComponent::new(&player_model.name));
             format::convert_legacy(&mut name);
             state.build(&name, format::Color::Black);
+            // TODO: Remove black shadow and add dark, transparent box around name
             let width = state.width;
             // Center align text
             for vert in &mut state.text {
