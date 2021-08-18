@@ -9,6 +9,7 @@ use rand::{self, Rng, SeedableRng};
 use std::sync::mpsc;
 use std::sync::{Arc, RwLock};
 use std::thread;
+use std::time::Instant;
 // use rayon::prelude::*;
 
 const NUM_WORKERS: usize = 8;
@@ -23,10 +24,11 @@ pub struct ChunkBuilder {
 }
 
 impl ChunkBuilder {
+
     pub fn new(
         resources: Arc<RwLock<resources::Manager>>,
         textures: Arc<RwLock<render::TextureManager>>,
-    ) -> ChunkBuilder {
+    ) -> Self {
         let models = Arc::new(RwLock::new(model::Factory::new(resources, textures)));
 
         let mut threads = vec![];
@@ -58,6 +60,7 @@ impl ChunkBuilder {
         renderer: Arc<RwLock<render::Renderer>>,
         version: usize,
     ) {
+        let now = Instant::now();
         if version != self.resource_version {
             self.resource_version = version;
             self.models.write().unwrap().version_change();
@@ -88,16 +91,20 @@ impl ChunkBuilder {
                 self.free_builders
                     .push((id, val.solid_buffer, val.trans_buffer));
             }
+        let diff = Instant::now().duration_since(now);
+        println!("Diffchunk 1 took {}", diff.as_millis()); // readd
             if self.free_builders.is_empty() {
                 return;
             }
         let tmp_world = world.clone();
-        let dirty_sections = tmp_world
+        let dirty_sections = tmp_world // TODO: Improve perf!
             .get_render_list()
             .iter()//.par_iter()// .iter()//.par_iter_mut() // .par_iter()// .iter()
             .map(|v| v.0)
             .filter(|v| tmp_world.is_section_dirty(*v))
             .collect::<Vec<_>>();
+        let diff = Instant::now().duration_since(now);
+        println!("Diffchunk 2 took {}", diff.as_millis()); // readd
         for (x, y, z) in dirty_sections {
             tmp_world.set_building_flag((x, y, z));
             let t_id = self.free_builders.pop().unwrap();
@@ -115,7 +122,25 @@ impl ChunkBuilder {
                     return;
                 }
         }
+        let diff = Instant::now().duration_since(now);
+        println!("Diffchunk 3 took {}", diff.as_millis()); // readd
     }
+
+    pub fn reset(&mut self) {
+        // TODO: Find a safer solution!
+        // Drain built chunk data
+        loop {
+            let curr_data = self.built_recv.try_recv();
+            if !curr_data.is_ok() {
+                return;
+            }
+            let (id, mut val) = curr_data.unwrap();
+            val.solid_buffer.clear();
+            val.trans_buffer.clear();
+            self.free_builders.push((id, val.solid_buffer, val.trans_buffer));
+        }
+    }
+
 }
 
 struct BuildReq {

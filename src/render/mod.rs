@@ -458,7 +458,7 @@ impl Renderer {
 
         gl::enable(gl::BLEND);
         gl::depth_mask(false);
-        if self.trans.is_some() {
+        if world.is_some() && self.trans.is_some() {
             let trans = self.trans.as_ref().unwrap();
             trans.trans.bind();
         }
@@ -476,7 +476,7 @@ impl Renderer {
         println!("Render diff 7 | {}", diff.as_millis());*/
 
         if world.is_some() {
-            let tmp_world = world.unwrap().clone();
+            let tmp_world = world.as_ref().unwrap().clone();
             for (pos, info) in tmp_world.get_render_list().iter().rev() {
                 if let Some(trans) = info.clone().read().unwrap().trans.as_ref() {
                     if trans.count > 0 {
@@ -506,7 +506,7 @@ impl Renderer {
         gl::disable(gl::DEPTH_TEST);
         gl::clear(gl::ClearFlags::Color);
         gl::disable(gl::BLEND);
-        if self.trans.is_some() {
+        if world.is_some() && self.trans.is_some() {
             let trans = self.trans.as_mut().unwrap();
             trans.draw(&self.trans_shader);
         }

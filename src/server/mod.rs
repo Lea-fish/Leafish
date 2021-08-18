@@ -929,7 +929,7 @@ impl Server {
     }
 
     pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, focused: bool) {
-        // let now = Instant::now();
+        let now = Instant::now();
         let version = self.resources.read().unwrap().version();
         if version != self.version.read().unwrap().clone() {
             *self.version.write().unwrap() = version;
@@ -937,14 +937,14 @@ impl Server {
         }
         let renderer = renderer.clone();
         let renderer = &mut renderer.write().unwrap();
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii1 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii1 took {}", diff.as_millis());
         // TODO: Check if the world type actually needs a sun
         if self.sun_model.read().unwrap().is_none() {
             self.sun_model.write().unwrap().replace(sun::SunModel::new(renderer));
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii2 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii2 took {}", diff.as_millis());
 
         // Copy to camera
         if let Some(player) = *self.player.clone().read().unwrap() {
@@ -955,35 +955,35 @@ impl Server {
             renderer.camera.yaw = rotation.yaw;
             renderer.camera.pitch = rotation.pitch;
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii3 took {}", diff.as_millis());*/
-        self.entity_tick(renderer, delta, focused);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii4 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii3 took {}", diff.as_millis());
+        self.entity_tick(renderer, delta, focused);// TODO: Improve perf!
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii4 took {}", diff.as_millis());
 
         *self.tick_timer.write().unwrap() += delta;
         while self.tick_timer.read().unwrap().clone() >= 3.0 && self.is_connected() {
             self.minecraft_tick();
             *self.tick_timer.write().unwrap() -= 3.0;
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii5 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii5 took {}", diff.as_millis());
 
         self.update_time(renderer, delta);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii6 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii6 took {}", diff.as_millis());
         if let Some(sun_model) = self.sun_model.write().unwrap().as_mut() {
             sun_model.tick(renderer, self.world_data.clone().read().unwrap().world_time, self.world_data.clone().read().unwrap().world_age);
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii7 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii7 took {}", diff.as_millis());
         let world = self.world.clone();
         world.tick(&mut self.entities.clone().write().unwrap());
         // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
             self.light_updates.lock().unwrap().send(true).unwrap();
         // }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii8 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii8 took {}", diff.as_millis());
 
         if self.player.clone().read().unwrap().is_some() {
             let world = self.world.clone();
@@ -1001,8 +1001,8 @@ impl Server {
         } else {
             self.target_info.clone().write().unwrap().clear(renderer);
         }
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diffiii9 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diffiii9 took {}", diff.as_millis());
     }
     // diff 4 is to be investigated!
 
@@ -1293,8 +1293,19 @@ impl Server {
         }
     }
 
-    pub fn write_packet<T: protocol::PacketType>(&self, p: T) {
-        let _ = self.conn.clone().write().unwrap().as_mut().unwrap().write_packet(p); // TODO handle errors
+    pub fn write_packet<T: protocol::PacketType>(&self, p: T) /*-> Result<(), Error>*/ {
+        /*let conn = self.conn.clone();
+        let mut conn = conn.write().unwrap();
+        if conn.is_none() {
+            Err(leafish_protocol::protocol::Error::Disconnect(Component::Text(TextComponent {
+                text: "Already disconnected!".to_string(),
+                modifier: Default::default()
+            })))
+        } else {
+            let write_result = conn.as_mut().unwrap().write_packet(p);
+            write_result
+        }*/
+        let _ = self.conn.clone().write().unwrap().as_mut().unwrap().write_packet(p);
     }
 
     fn on_keep_alive_i64(

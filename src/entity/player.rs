@@ -419,16 +419,10 @@ impl ecs::System for PlayerRenderer {
             ],
         );
 
-        let alex = true;
-        let width = if alex { // arms of alex (slim) skins have 3/4 of the width of normal skins!
-            6.0
-        } else {
-            8.0
-        };
         let mut part_verts = vec![vec![]; 4];
 
         for (i, offsets) in [
-            [16.0, 48.0, 0.0, 48.0],  // Left left
+            [16.0, 48.0, 0.0, 48.0],  // Left leg
             [0.0, 16.0, 0.0, 32.0],   // Right Leg
             [32.0, 48.0, 48.0, 48.0], // Left arm
             [40.0, 16.0, 40.0, 32.0], // Right arm
@@ -437,6 +431,12 @@ impl ecs::System for PlayerRenderer {
         .enumerate()
         {
             // TODO: Fix alex (slim) skins
+            let alex = true && i > 1;
+            let width = if alex { // arms of alex (slim) skins have 3/4 of the width of normal skins!
+                3.0
+            } else {
+                4.0
+            };
             let (ox, oy) = (offsets[0], offsets[1]);
             model::append_box(
                 &mut part_verts[i],
@@ -449,10 +449,10 @@ impl ecs::System for PlayerRenderer {
                 [
                     srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),   // Down
                     srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),   // Up
-                    srel!(ox + 4.0, oy + 4.0, 4.0, 12.0),  // North
-                    srel!(ox + 12.0, oy + 4.0, 4.0, 12.0), // South
-                    srel!(ox + 8.0, oy + 4.0, 4.0, 12.0),  // West
-                    srel!(ox + 0.0, oy + 4.0, 4.0, 12.0),  // East
+                    srel!(ox + 4.0, oy + 4.0, width, 12.0),  // North
+                    srel!(ox + 12.0, oy + 4.0, width, 12.0), // South
+                    srel!(ox + 8.0, oy + 4.0, width, 12.0),  // West
+                    srel!(ox + 0.0, oy + 4.0, width, 12.0),  // East
                 ],
             );
             let (ox, oy) = (offsets[2], offsets[3]);

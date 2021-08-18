@@ -464,6 +464,14 @@ fn tick_all(
     last_resource_version: &mut usize,
     vsync: &mut bool,
 ) {
+
+    if game.server.is_some() {
+        if !game.server.as_ref().unwrap().is_connected() {
+            game.server = None;
+        }
+    } else {
+        game.chunk_builder.reset();
+    }
     let now = Instant::now();
     let diff = now.duration_since(*last_frame);
     *last_frame = now;
@@ -485,8 +493,8 @@ fn tick_all(
         }
     };
     *last_resource_version = version;
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff1 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff1 took {}", diff.as_millis());
 
     let vsync_changed = *game.vars.get(settings::R_VSYNC);
     if *vsync != vsync_changed {
@@ -498,14 +506,14 @@ fn tick_all(
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
     game.tick(/*delta*/);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff2 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff2 took {}", diff.as_millis());
     // TODO: Fix this: Sometimes the game deadlocks after this and diff3 is not reached when joining a server. (and while walking on it)
     if game.server.is_some() {
         game.server.as_ref().unwrap().tick(game.renderer.clone(), delta, game.focused); // TODO: Improve perf in load screen!
     }
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff3 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff3 took {}", diff.as_millis());
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
@@ -517,12 +525,12 @@ fn tick_all(
         // world.compute_render_list(/*&mut */game.renderer.clone()); // TODO: Improve perf on server!
         // game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true); // old
         game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff5 took {}", diff.as_millis());*/ // readd
+        let diff = Instant::now().duration_since(now);
+        println!("Diff5 took {}", diff.as_millis()); // readd
         game.chunk_builder
             .tick(game.server.as_ref().unwrap().world.clone(), /*&mut */game.renderer.clone(), version);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff6 took {}", diff.as_millis());*/
+        let diff = Instant::now().duration_since(now);
+        println!("Diff6 took {}", diff.as_millis());
     } else {
         if game.renderer.clone().read().unwrap().safe_width != width || game.renderer.clone().read().unwrap().safe_height != height {
             game.renderer.clone().write().unwrap().safe_width = width;
@@ -531,9 +539,9 @@ fn tick_all(
     }
 
     game.screen_sys
-        .tick(delta, /*&mut */game.renderer.clone(), &mut ui_container);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff7 took {}", diff.as_millis());*/
+        .tick(delta, game.renderer.clone(), &mut ui_container);
+    let diff = Instant::now().duration_since(now);
+    println!("Diff7 took {}", diff.as_millis());
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {
         if Instant::now().duration_since(received_chat_at).as_secs() < 5 {
@@ -546,11 +554,11 @@ fn tick_all(
         .lock()
         .unwrap()
         .tick(&mut ui_container, /*&*/game.renderer.clone(), delta, width as f64);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff8 took {}", diff.as_millis());*/
+    let diff = Instant::now().duration_since(now);
+    println!("Diff8 took {}", diff.as_millis());
     ui_container.tick(/*&mut */game.renderer.clone(), delta, width as f64, height as f64);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff9 took {}", diff.as_millis());*/ // readd
+    let diff = Instant::now().duration_since(now);
+    println!("Diff9 took {}", diff.as_millis()); // readd
     // TODO: Improve perf of diff 9 in the menu!
     let world = if let Some(server) = game.server.as_ref() {
         Some(server.world.clone())
@@ -583,8 +591,8 @@ fn tick_all(
     if game.server.is_some() {
         game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true).unwrap();
     }
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff10 took {}", diff.as_millis());*/ // readd
+    let diff = Instant::now().duration_since(now);
+    println!("Diff10 took {}", diff.as_millis()); // readd
 
     if fps_cap > 0 && !*vsync {
         let frame_time = now.elapsed();
@@ -594,6 +602,7 @@ fn tick_all(
         }
     }
 }
+// TODO: Improve perf of 3, 6 and 10
 // TODO: Reenable: [server/mod.rs:1924][WARN] Block entity at (1371,53,-484) missing id tag: NamedTag("", Compound({"y": Int(53), "Sign": String(""), "x": Int(1371), "z": Int(-484)}))
 
 fn handle_window_event<T>(
