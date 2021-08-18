@@ -43,6 +43,7 @@ use collision::Frustum;
 use crate::chunk_builder::CullInfo;
 use dashmap::DashMap;
 use crossbeam_channel::{Sender, Receiver};
+use crossbeam_channel::unbounded;
 
 pub struct World {
     pub chunks: Arc<DashMap<CPos, Chunk>>,
@@ -52,7 +53,7 @@ pub struct World {
 
     pub(crate) light_updates: Sender<LightUpdate>,
 
-    block_entity_actions: Arc<RwLock<VecDeque<BlockEntityAction>>>,
+    block_entity_actions: (Sender<BlockEntityAction>, Receiver<BlockEntityAction>),
 
     protocol_version: i32,
     pub modded_block_ids: Arc<RwLock<HashMap<usize, String>>>,
@@ -120,7 +121,7 @@ impl World {
             light_updates: sender,
             // ..Default::default()
             render_list: Arc::new(Default::default()),
-            block_entity_actions: Arc::new(Default::default())
+            block_entity_actions: unbounded(),
         }
     }
 
@@ -131,7 +132,7 @@ impl World {
         self.modded_block_ids.clone().write().unwrap().clear();
         // self.light_updates.clone().write().unwrap().clear(); // TODO: Implement a similar system!
         self.render_list.clone().write().unwrap().clear();
-        self.block_entity_actions.clone().write().unwrap().clear();
+        // self.block_entity_actions.clone().write().unwrap().clear(); // TODO: Implement a similar system!
         self.chunks.clone().clear();
     }
 
@@ -151,12 +152,10 @@ impl World {
         let mut chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         if chunk.set_block(pos.x & 0xF, pos.y, pos.z & 0xF, b) {
             if chunk.block_entities.contains_key(&pos) {
-                self.block_entity_actions.clone().write().unwrap()
-                    .push_back(BlockEntityAction::Remove(pos));
+                self.block_entity_actions.0.send(BlockEntityAction::Remove(pos));
             }
             if block_entity::BlockEntityType::get_block_entity(b).is_some() {
-                self.block_entity_actions.clone().write().unwrap()
-                    .push_back(BlockEntityAction::Create(pos));
+                self.block_entity_actions.0.send(BlockEntityAction::Create(pos));
             }
             true
         } else {
@@ -242,16 +241,14 @@ impl World {
     }
 
     pub fn add_block_entity_action(&self, action: BlockEntityAction) {
-        self.block_entity_actions.clone().write().unwrap().push_back(action);
+        self.block_entity_actions.0.send(action);
     }
 
     #[allow(clippy::verbose_bit_mask)] // "llvm generates better code" for updates_performed & 0xFFF "on x86"
     pub fn tick(&self, m: &mut ecs::Manager) {
         let sign_info: ecs::Key<block_entity::sign::SignInfo> = m.get_key();
-        let block_entity_actions = self.block_entity_actions.clone();
-        let mut block_entity_actions = block_entity_actions.write().unwrap();
-        'start: while let Some(action) = block_entity_actions.pop_front() {
-            /*match action {
+        while let Ok(action) = self.block_entity_actions.1.try_recv() {
+            match action {
                 BlockEntityAction::Remove(pos) => {
                         if let Some(mut chunk) = self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
                             if let Some(entity) = chunk.block_entities.remove(&pos) {
@@ -285,7 +282,7 @@ impl World {
                             }
                         }
                 }
-            }*/
+            }
         }
     }
 
@@ -936,11 +933,9 @@ Process finished with exit code 101
                     chunk.position.1 << 4,
                 );
                 if chunk.block_entities.contains_key(&pos) {
-                    self.block_entity_actions.clone().write().unwrap()
-                        .push_back(BlockEntityAction::Remove(pos))
+                    self.block_entity_actions.0.send(BlockEntityAction::Remove(pos));
                 }
-                self.block_entity_actions.clone().write().unwrap()
-                    .push_back(BlockEntityAction::Create(pos))
+                self.block_entity_actions.0.send(BlockEntityAction::Create(pos));
             }
         }
         if self.protocol_version >= 451 {
@@ -974,11 +969,9 @@ Process finished with exit code 101
                     chunk.position.1 << 4,
                 );
                 if chunk.block_entities.contains_key(&pos) {
-                    self.block_entity_actions.clone().write().unwrap()
-                        .push_back(BlockEntityAction::Remove(pos))
+                    self.block_entity_actions.0.send(BlockEntityAction::Remove(pos));
                 }
-                self.block_entity_actions.clone().write().unwrap()
-                    .push_back(BlockEntityAction::Create(pos))
+                self.block_entity_actions.0.send(BlockEntityAction::Create(pos));
             }
         }
     }
@@ -1098,11 +1091,9 @@ Process finished with exit code 101
                         chunk.position.1 << 4,
                     );
                     if chunk.block_entities.contains_key(&pos) {
-                        self.block_entity_actions.clone().write().unwrap()
-                            .push_back(BlockEntityAction::Remove(pos))
+                        self.block_entity_actions.0.send(BlockEntityAction::Remove(pos));
                     }
-                    self.block_entity_actions.clone().write().unwrap()
-                        .push_back(BlockEntityAction::Create(pos))
+                    self.block_entity_actions.0.send(BlockEntityAction::Create(pos));
                 }
             }
         }
