@@ -4,7 +4,7 @@ use crate::resources;
 use crate::shared::Direction;
 use crate::types::bit::Set;
 use crate::world;
-use crate::world::{block, World, SectionSnapshot};
+use crate::world::{block, World, SectionSnapshot, CPos};
 use rand::{self, Rng, SeedableRng};
 use std::sync::mpsc;
 use std::sync::{Arc, RwLock};
@@ -71,19 +71,30 @@ impl ChunkBuilder {
             while let Ok((id, mut val)) = self.built_recv.try_recv() {
                 world.clone().reset_building_flag(val.position);
 
-                if let Some(sec) =
-                world.clone().get_section_mut(val.position.0, val.position.1, val.position.2) {
-                    sec.clone().write().unwrap().cull_info = val.cull_info;
-                    renderer.update_chunk_solid(
-                        sec.clone().read().unwrap().render_buffer.clone(),
-                        &val.solid_buffer,
-                        val.solid_count,
-                    );
-                    renderer.update_chunk_trans(
-                        sec.clone().read().unwrap().render_buffer.clone(),
-                        &val.trans_buffer,
-                        val.trans_count,
-                    );
+                let world = world.clone();
+                let chunks = world.chunks.clone();
+                let chunk = chunks.get_mut(&CPos(val.position.0, val.position.2));
+                if chunk.as_ref().is_some() {
+                    let mut chunk = chunk.unwrap();
+                    let section = if let Some(sec) = chunk.sections[val.position.1 as usize].as_mut() {
+                        Some(sec)
+                    } else {
+                        None
+                    };
+
+                    if let Some(sec) = section {
+                        sec.cull_info = val.cull_info;
+                        renderer.update_chunk_solid(
+                            sec.render_buffer.clone(),
+                            &val.solid_buffer,
+                            val.solid_count,
+                        );
+                        renderer.update_chunk_trans(
+                            sec.render_buffer.clone(),
+                            &val.trans_buffer,
+                            val.trans_count,
+                        );
+                    }
                 }
 
                 val.solid_buffer.clear();

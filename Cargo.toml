@@ -41,7 +41,10 @@ structopt = "0.3.22"
 clipboard = "0.5.0"
 instant = "0.1.10"
 dirs = "3.0.2"
-# clippy = "*"
+
+# Concurrency features
+dashmap = "4.0.2"
+parking_lot = "0.11.1"
 # tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
 # rayon = "1.5.1" # this has a massive, negative performance impact!
 
