@@ -42,15 +42,15 @@ use crate::render::Renderer;
 use collision::Frustum;
 use crate::chunk_builder::CullInfo;
 use dashmap::DashMap;
+use crossbeam_channel::{Sender, Receiver};
 
-#[derive(Default)]
 pub struct World {
     pub chunks: Arc<DashMap<CPos, Chunk>>,
     pub lighting_cache: Arc<RwLock<HashMap<CPos, LightData>>>,
 
     pub render_list: Arc<RwLock<Vec<(i32, i32, i32)>>>,
 
-    pub(crate) light_updates: Arc<RwLock<VecDeque<LightUpdate>>>,
+    pub(crate) light_updates: Sender<LightUpdate>,
 
     block_entity_actions: Arc<RwLock<VecDeque<BlockEntityAction>>>,
 
@@ -109,12 +109,18 @@ pub struct LightUpdate {
 }
 
 impl World {
-    pub fn new(protocol_version: i32) -> World {
+    pub fn new(protocol_version: i32, sender: Sender<LightUpdate>) -> World {
         let id_map = Arc::new(block::VanillaIDMap::new(protocol_version));
         World {
+            chunks: Arc::new(Default::default()),
+            lighting_cache: Arc::new(Default::default()),
             protocol_version,
+            modded_block_ids: Arc::new(Default::default()),
             id_map,
-            ..Default::default()
+            light_updates: sender,
+            // ..Default::default()
+            render_list: Arc::new(Default::default()),
+            block_entity_actions: Arc::new(Default::default())
         }
     }
 
@@ -123,7 +129,7 @@ impl World {
             println!("Can't switch protocol version, when resetting the world :(");
         }
         self.modded_block_ids.clone().write().unwrap().clear();
-        self.light_updates.clone().write().unwrap().clear();
+        // self.light_updates.clone().write().unwrap().clear(); // TODO: Implement a similar system!
         self.render_list.clone().write().unwrap().clear();
         self.block_entity_actions.clone().write().unwrap().clear();
         self.chunks.clone().clear();
@@ -232,7 +238,7 @@ impl World {
     }
 
     fn update_light(&self, pos: Position, ty: LightType) {
-        self.light_updates.clone().write().unwrap().push_back(LightUpdate { ty, pos });
+        self.light_updates.send(LightUpdate { ty, pos });
     }
 
     pub fn add_block_entity_action(&self, action: BlockEntityAction) {
@@ -283,65 +289,59 @@ impl World {
         }
     }
 
-    pub(crate) fn do_light_update(&self) {
+    pub(crate) fn do_light_update(&self, update: LightUpdate) {
         use std::cmp;
-        let update = self.light_updates.clone();
-        let mut _update = update.write().unwrap();
-        let update = _update.pop_front();
-        drop(_update);
-        if let Some(update) = update {
-            if update.pos.y < 0
-                || update.pos.y > 255
-                || !self.is_chunk_loaded(update.pos.x >> 4, update.pos.z >> 4)
-            {
-                return;
-            }
-
-            let block = self.get_block(update.pos).get_material();
-            // Find the brightest source of light nearby
-            let mut best = update.ty.get_light(self, update.pos);
-            let old = best;
-            for dir in Direction::all() {
-                let light = update.ty.get_light(self, update.pos.shift(dir));
-                if light > best {
-                    best = light;
+                if update.pos.y < 0
+                    || update.pos.y > 255
+                    || !self.is_chunk_loaded(update.pos.x >> 4, update.pos.z >> 4)
+                {
+                    return;
                 }
-            }
-            best = best.saturating_sub(cmp::max(1, block.absorbed_light));
-            // If the light from the block itself is brighter than the light passing through
-            // it use that.
-            if update.ty == LightType::Block && block.emitted_light != 0 {
-                best = cmp::max(best, block.emitted_light);
-            }
-            // Sky light doesn't decrease when going down at full brightness
-            if update.ty == LightType::Sky
-                && block.absorbed_light == 0
-                && update.ty.get_light(self, update.pos.shift(Direction::Up)) == 15
-            {
-                best = 15;
-            }
 
-            // Nothing to do, we are already at the right value
-            if best == old {
-                return;
-            }
-            // Use our new light value
-            update.ty.set_light(self, update.pos, best);
-            // Flag surrounding chunks as dirty
-            for yy in -1..2 {
-                for zz in -1..2 {
-                    for xx in -1..2 {
-                        let bp = update.pos + (xx, yy, zz);
-                        self.set_dirty(bp.x >> 4, bp.y >> 4, bp.z >> 4);
+                let block = self.get_block(update.pos).get_material();
+                // Find the brightest source of light nearby
+                let mut best = update.ty.get_light(self, update.pos);
+                let old = best;
+                for dir in Direction::all() {
+                    let light = update.ty.get_light(self, update.pos.shift(dir));
+                    if light > best {
+                        best = light;
                     }
                 }
-            }
+                best = best.saturating_sub(cmp::max(1, block.absorbed_light));
+                // If the light from the block itself is brighter than the light passing through
+                // it use that.
+                if update.ty == LightType::Block && block.emitted_light != 0 {
+                    best = cmp::max(best, block.emitted_light);
+                }
+                // Sky light doesn't decrease when going down at full brightness
+                if update.ty == LightType::Sky
+                    && block.absorbed_light == 0
+                    && update.ty.get_light(self, update.pos.shift(Direction::Up)) == 15
+                {
+                    best = 15;
+                }
 
-            // Update surrounding blocks
-            for dir in Direction::all() {
-                self.update_light(update.pos.shift(dir), update.ty);
-            }
-        }
+                // Nothing to do, we are already at the right value
+                if best == old {
+                    return;
+                }
+                // Use our new light value
+                update.ty.set_light(self, update.pos, best);
+                // Flag surrounding chunks as dirty
+                for yy in -1..2 {
+                    for zz in -1..2 {
+                        for xx in -1..2 {
+                            let bp = update.pos + (xx, yy, zz);
+                            self.set_dirty(bp.x >> 4, bp.y >> 4, bp.z >> 4);
+                        }
+                    }
+                }
+
+                // Update surrounding blocks
+                for dir in Direction::all() {
+                    self.update_light(update.pos.shift(dir), update.ty);
+                }
     }
 
     pub fn copy_cloud_heightmap(&self, data: &mut [u8]) -> bool {

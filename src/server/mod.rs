@@ -23,7 +23,7 @@ use crate::shared::{Axis, Position};
 use crate::types::hash::FNVHash;
 use crate::types::Gamemode;
 use crate::world;
-use crate::world::{block, CPos, LightData};
+use crate::world::{block, CPos, LightData, LightUpdate};
 use crate::inventory;
 use cgmath::prelude::*;
 use instant::{Instant, Duration};
@@ -36,7 +36,6 @@ use std::sync::{mpsc, Mutex, PoisonError, RwLockReadGuard};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use leafish_protocol::protocol::packet::Packet;
-use std::sync::mpsc::{Sender, Receiver};
 use std::io::Cursor;
 use leafish_protocol::protocol::Conn;
 use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Handsfree, ClientSettings};
@@ -48,6 +47,7 @@ use std::borrow::BorrowMut;
 use crate::screen::ScreenSystem;
 use leafish_protocol::item::Stack;
 use std::cmp::Ordering;
+use crossbeam_channel::Sender;
 
 pub mod plugin_messages;
 mod sun;
@@ -137,7 +137,6 @@ pub struct Server {
     target_position: ecs::Key<entity::TargetPosition>,
     velocity: ecs::Key<entity::Velocity>,
     gamemode: ecs::Key<Gamemode>,
-    pub inventory: ecs::Key<InventoryContext>,
     pub rotation: ecs::Key<entity::Rotation>,
     target_rotation: ecs::Key<entity::TargetRotation>,
     //
@@ -151,9 +150,8 @@ pub struct Server {
 
     sun_model: RwLock<Option<sun::SunModel>>,
     target_info: Arc<RwLock<target::Info>>,
-    pub light_updates: Mutex<Sender<bool>>, // move to world!
-    pub render_list_computer: Mutex<Sender<bool>>,
-    pub render_list_computer_notify: Mutex<Receiver<bool>>,
+    pub render_list_computer: Mutex<mpsc::Sender<bool>>,
+    pub render_list_computer_notify: Mutex<mpsc::Receiver<bool>>,
     pub hud_context: Arc<RwLock<HudContext>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
 
@@ -699,41 +697,40 @@ impl Server {
         });
     }
 
-    fn spawn_light_updater(server: Arc<RwLock<Option<Arc<Server>>>>) -> Sender<bool> { // TODO: Use fair rwlock!
-        let (tx, rx) = mpsc::channel();
+    fn spawn_light_updater(server: Arc<RwLock<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
+        let (tx, rx) = crossbeam_channel::unbounded();
         thread::spawn(move || loop {
-            rx.recv().unwrap();
             while server.clone().try_read().is_err() {}
             let server = server.clone().read().unwrap().as_ref().unwrap().clone();
-            /*let mut done = false; // TODO: Improve performance!
+            let mut done = false; // TODO: Improve performance!
             while !done {
                 let start = Instant::now();
                 let mut updates_performed = 0;
                 let world_cloned = server.world.clone();
-                while !world_cloned.light_updates.clone().read().unwrap().is_empty() {
+                let mut interrupt = false;
+                while let Ok(update) = rx.try_recv() {
                     updates_performed += 1;
-                    world_cloned.do_light_update();
+                    world_cloned.do_light_update(update);
                     if (updates_performed & 0xFFF == 0) && start.elapsed().subsec_nanos() >= 5000000 {
                         // 5 ms for light updates
+                        interrupt = true;
                         break;
                     }
                 }
-                if world_cloned.light_updates.clone().read().unwrap().is_empty() {
+                if !interrupt {
                     done = true;
                 }
                 thread::sleep(Duration::from_millis(1));
-            }*/
-            thread::sleep(Duration::from_millis(1000));
-            while rx.try_recv().is_ok() {}
+            }
         });
         tx
     }
 
-    fn spawn_render_list_computer(server: Arc<RwLock<Option<Arc<Server>>>>, renderer: Arc<RwLock<Renderer>>) -> (Sender<bool>, mpsc::Receiver<bool>) { // TODO: Use fair rwlock!
+    fn spawn_render_list_computer(server: Arc<RwLock<Option<Arc<Server>>>>, renderer: Arc<RwLock<Renderer>>) -> (mpsc::Sender<bool>, mpsc::Receiver<bool>) { // TODO: Use fair rwlock!
         let (tx, rx) = mpsc::channel();
         let (etx, erx) = mpsc::channel();
         thread::spawn(move || loop {
-            rx.recv().unwrap();
+            let _: bool = rx.recv().unwrap();
             while server.clone().try_read().is_err() {}
             let server = server.clone().read().unwrap().as_ref().unwrap().clone();
             let world = server.world.clone();
@@ -854,7 +851,7 @@ impl Server {
         uuid: protocol::UUID,
         resources: Arc<RwLock<resources::Manager>>,
         conn: Arc<RwLock<Option<protocol::Conn>>>,
-        light_updater: mpsc::Sender<bool>,
+        light_updater: Sender<LightUpdate>,
         render_list_computer: mpsc::Sender<bool>,
         render_list_computer_notify: mpsc::Receiver<bool>,
         hud_context: Arc<RwLock<HudContext>>,
@@ -875,7 +872,7 @@ impl Server {
             forge_mods,
             disconnect_data: Arc::new(RwLock::new(DisconnectData::default())),
 
-            world: Arc::new(world::World::new(protocol_version)),
+            world: Arc::new(world::World::new(protocol_version, light_updater)),
             world_data: Arc::new(RwLock::new(WorldData::default())),
             version: RwLock::new(version),
             resources,
@@ -888,7 +885,6 @@ impl Server {
             target_position: entities.get_key(),
             velocity: entities.get_key(),
             gamemode: entities.get_key(),
-            inventory: entities.get_key(),
             rotation: entities.get_key(),
             target_rotation: entities.get_key(),
             //
@@ -903,7 +899,6 @@ impl Server {
             sun_model: RwLock::new(None),
 
             target_info: Arc::new(RwLock::new(target::Info::new())),
-            light_updates: Mutex::from(light_updater),
             render_list_computer: Mutex::from(render_list_computer),
             render_list_computer_notify: Mutex::from(render_list_computer_notify),
             hud_context: hud_context.clone(),
@@ -979,9 +974,6 @@ impl Server {
         println!("Diffiii7 took {}", diff.as_millis());
         let world = self.world.clone();
         world.tick(&mut self.entities.clone().write().unwrap());
-        // if !world.light_updates.clone().read().unwrap().is_empty() { // TODO: Check if removing this is okay!
-            self.light_updates.lock().unwrap().send(true).unwrap();
-        // }
         let diff = Instant::now().duration_since(now);
         println!("Diffiii8 took {}", diff.as_millis());
 
