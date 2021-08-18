@@ -30,7 +30,7 @@ use image::{GenericImage, GenericImageView};
 use log::{error, trace};
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 
 use crate::types::hash::FNVHash;
 use std::hash::BuildHasherDefault;
@@ -40,6 +40,7 @@ use crate::world::World;
 use std::time::Instant;
 use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
+use parking_lot::RwLock;
 
 const ATLAS_SIZE: usize = 1024;
 
@@ -155,7 +156,7 @@ init_shader! {
 
 impl Renderer {
     pub fn new(res: Arc<RwLock<resources::Manager>>, shader_version: &str) -> Renderer {
-        let version = { res.read().unwrap().version() };
+        let version = { res.read().version() };
         let tex = gl::Texture::new();
         tex.bind(gl::TEXTURE_2D_ARRAY);
         tex.image_3d(
@@ -250,13 +251,12 @@ impl Renderer {
         // Not a sane place to put this but it works
         let now = Instant::now();
         {
-            let rm = self.resources.read().unwrap();
+            let rm = self.resources.read();
             if rm.version() != self.resource_version {
                 self.resource_version = rm.version();
                 trace!("Updating textures to {}", self.resource_version);
                 self.textures
                     .write()
-                    .unwrap()
                     .update_textures(self.resource_version);
 
                 self.model
@@ -369,7 +369,7 @@ impl Renderer {
             let tmp_world = world.as_ref().unwrap().clone();
 
             for (pos, info) in tmp_world.get_render_list() {
-                if let Some(solid) = info.clone().read().unwrap().solid.as_ref() {
+                if let Some(solid) = info.clone().read().solid.as_ref() {
                     if solid.count > 0 {
                         self.chunk_shader
                             .offset
@@ -479,7 +479,7 @@ impl Renderer {
         if world.is_some() {
             let tmp_world = world.as_ref().unwrap().clone();
             for (pos, info) in tmp_world.get_render_list().iter().rev() {
-                if let Some(trans) = info.clone().read().unwrap().trans.as_ref() {
+                if let Some(trans) = info.clone().read().trans.as_ref() {
                     if trans.count > 0 {
                         self.chunk_shader_alpha
                             .offset
@@ -540,14 +540,14 @@ impl Renderer {
     pub fn update_chunk_solid(&mut self, buffer: Arc<RwLock<ChunkBuffer>>, data: &[u8], count: usize) {
         self.ensure_element_buffer(count);
         if count == 0 {
-            if buffer.clone().read().unwrap().solid.is_some() {
-                buffer.clone().write().unwrap().solid = None;
+            if buffer.clone().read().solid.is_some() {
+                buffer.clone().write().solid = None;
             }
             return;
         }
-        let new = buffer.clone().read().unwrap().solid.is_none();
-        if buffer.clone().read().unwrap().solid.is_none() {
-            buffer.clone().write().unwrap().solid = Some(ChunkRenderInfo {
+        let new = buffer.clone().read().solid.is_none();
+        if buffer.clone().read().solid.is_none() {
+            buffer.clone().write().solid = Some(ChunkRenderInfo {
                 array: gl::VertexArray::new(),
                 buffer: gl::Buffer::new(),
                 buffer_size: 0,
@@ -555,7 +555,7 @@ impl Renderer {
             });
         }
         let info = buffer.clone();
-        let mut info = info.write().unwrap();
+        let mut info = info.write();
         let info = info.solid.as_mut().unwrap();
 
         info.array.bind();
@@ -598,14 +598,14 @@ impl Renderer {
     pub fn update_chunk_trans(&mut self, buffer: Arc<RwLock<ChunkBuffer>>, data: &[u8], count: usize) {
         self.ensure_element_buffer(count);
         if count == 0 {
-            if buffer.clone().read().unwrap().trans.is_some() {
-                buffer.clone().write().unwrap().trans = None;
+            if buffer.clone().read().trans.is_some() {
+                buffer.clone().write().trans = None;
             }
             return;
         }
-        let new = buffer.clone().read().unwrap().trans.is_none();
-        if buffer.clone().read().unwrap().trans.is_none() {
-            buffer.clone().write().unwrap().trans = Some(ChunkRenderInfo {
+        let new = buffer.clone().read().trans.is_none();
+        if buffer.clone().read().trans.is_none() {
+            buffer.clone().write().trans = Some(ChunkRenderInfo {
                 array: gl::VertexArray::new(),
                 buffer: gl::Buffer::new(),
                 buffer_size: 0,
@@ -613,7 +613,7 @@ impl Renderer {
             });
         }
         let info = buffer.clone();
-        let mut info = info.write().unwrap();
+        let mut info = info.write();
         let info = info.trans.as_mut().unwrap();
 
         info.array.bind();
@@ -655,7 +655,7 @@ impl Renderer {
 
     fn do_pending_textures(&mut self) {
         let len = {
-            let tex = self.textures.read().unwrap();
+            let tex = self.textures.read();
             // Rebuild the texture if it needs resizing
             if self.texture_layers != tex.atlases.len() {
                 let len = ATLAS_SIZE * ATLAS_SIZE * 4 * tex.atlases.len();
@@ -686,7 +686,7 @@ impl Renderer {
         };
         if len > 0 {
             // Upload pending changes
-            let mut tex = self.textures.write().unwrap();
+            let mut tex = self.textures.write();
             for upload in &tex.pending_uploads {
                 let atlas = upload.0;
                 let rect = upload.1;
@@ -711,7 +711,7 @@ impl Renderer {
 
     fn update_textures(&mut self, delta: f64) {
         {
-            let mut tex = self.textures.write().unwrap();
+            let mut tex = self.textures.write();
             while let Ok((hash, img)) = self.skin_reply.try_recv() {
                 if let Some(img) = img {
                     tex.update_skin(hash, img);
@@ -731,7 +731,7 @@ impl Renderer {
         self.gl_texture.bind(gl::TEXTURE_2D_ARRAY);
         self.do_pending_textures();
 
-        for ani in &mut self.textures.write().unwrap().animated_textures {
+        for ani in &mut self.textures.write().animated_textures {
             if ani.remaining_time <= 0.0 {
                 ani.current_frame = (ani.current_frame + 1) % ani.frames.len();
                 ani.remaining_time += ani.frames[ani.current_frame].time as f64;
@@ -790,11 +790,11 @@ impl Renderer {
     }
 
     pub fn get_texture(textures: &RwLock<TextureManager>, name: &str) -> Texture {
-        let tex = { textures.read().unwrap().get_texture(name) };
+        let tex = { textures.read().get_texture(name) };
         match tex {
             Some(val) => val,
             None => {
-                let mut t = textures.write().unwrap();
+                let mut t = textures.write();
                 // Make sure it hasn't already been loaded since we switched
                 // locks.
                 if let Some(val) = t.get_texture(name) {
@@ -808,11 +808,11 @@ impl Renderer {
     }
 
     pub fn get_skin(&self, textures: &RwLock<TextureManager>, url: &str) -> Texture {
-        let tex = { textures.read().unwrap().get_skin(url) };
+        let tex = { textures.read().get_skin(url) };
         match tex {
             Some(val) => val,
             None => {
-                let mut t = textures.write().unwrap();
+                let mut t = textures.write();
                 // Make sure it hasn't already been loaded since we switched
                 // locks.
                 if let Some(val) = t.get_skin(url) {
@@ -1045,7 +1045,7 @@ impl TextureManager {
             textures: HashMap::with_hasher(BuildHasherDefault::default()),
             version: {
                 // TODO: fix borrow and remove clippy::let_and_return above
-                let ver = res.read().unwrap().version();
+                let ver = res.read().version();
                 ver
             },
             resources: res,
@@ -1249,7 +1249,6 @@ impl TextureManager {
         // have a way to select alex as a default.
         let img = if let Some(mut val) = res
             .read()
-            .unwrap()
             .open("minecraft", "textures/entity/steve.png")
         {
             let mut data = Vec::new();
@@ -1300,7 +1299,7 @@ impl TextureManager {
         };
         let path = format!("textures/{}.png", name);
         let res = self.resources.clone();
-        if let Some(mut val) = res.read().unwrap().open(plugin, &path) {
+        if let Some(mut val) = res.read().open(plugin, &path) {
             let mut data = Vec::new();
             val.read_to_end(&mut data).unwrap();
             if let Ok(img) = image::load_from_memory(&data) {
@@ -1331,7 +1330,7 @@ impl TextureManager {
     ) -> Option<AnimatedTexture> {
         let path = format!("textures/{}.png.mcmeta", name);
         let res = self.resources.clone();
-        if let Some(val) = res.read().unwrap().open(plugin, &path) {
+        if let Some(val) = res.read().open(plugin, &path) {
             let meta: serde_json::Value = serde_json::from_reader(val).unwrap();
             let animation = meta.get("animation").unwrap();
             let frame_time = animation

@@ -8,6 +8,7 @@ edition = "2018"
 lazy_static = "1.4.0"
 cgmath = "0.17.0"
 collision = "0.20.1"
+parking_lot = "0.11.1"
 
 
 [dependencies.leafish_shared]

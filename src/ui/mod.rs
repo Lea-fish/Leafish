@@ -20,7 +20,8 @@ use clipboard::{ClipboardContext, ClipboardProvider};
 use std::cell::{RefCell, RefMut};
 use std::rc::{Rc, Weak};
 use winit::event::VirtualKeyCode;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use parking_lot::RwLock;
 
 const SCALED_WIDTH: f64 = 854.0;
 const SCALED_HEIGHT: f64 = 480.0;
@@ -311,7 +312,7 @@ impl Container {
             Mode::Unscaled(scale) => (scale, scale),
         };
         let renderer = renderer.clone();
-        let renderer = &mut renderer.write().unwrap();
+        let renderer = &mut renderer.write();
 
         if self.last_sw != sw
             || self.last_sh != sh

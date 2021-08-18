@@ -20,7 +20,7 @@ use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use image::GenericImageView;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 use crate::render::ui::{UIState, UIText};
 use crate::ui;
 use crate::ui::{Container, ImageRef, FormattedRef, VAttach, HAttach, Text};
@@ -33,6 +33,7 @@ use rand::Rng;
 use leafish_protocol::format::{TextComponent, Component};
 use std::rc::Rc;
 use std::cell::RefCell;
+use parking_lot::RwLock;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
@@ -213,34 +214,34 @@ impl Screen for Hud {
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
     ) -> Option<Box<dyn Screen>> {
-        if !self.hud_context.clone().read().unwrap().enabled && self.last_enabled {
+        if !self.hud_context.clone().read().enabled && self.last_enabled {
             self.on_deactive(renderer, ui_container);
             self.last_enabled = false;
             return None;
         }
-        if self.hud_context.clone().read().unwrap().enabled && !self.last_enabled {
+        if self.hud_context.clone().read().enabled && !self.last_enabled {
             self.on_active(renderer, ui_container);
             self.last_enabled = true;
             return None;
         }
-        if self.hud_context.clone().read().unwrap().dirty_health {
+        if self.hud_context.clone().read().dirty_health {
             self.health_elements.clear();
             self.render_health(renderer, ui_container);
         }
-        if self.hud_context.clone().read().unwrap().dirty_armor {
+        if self.hud_context.clone().read().dirty_armor {
             self.armor_elements.clear();
             self.render_armor(renderer, ui_container);
         }
-        if self.hud_context.clone().read().unwrap().dirty_food {
+        if self.hud_context.clone().read().dirty_food {
             self.food_elements.clear();
             self.render_food(renderer, ui_container);
         }
-        if self.hud_context.clone().read().unwrap().dirty_exp {
+        if self.hud_context.clone().read().dirty_exp {
             self.exp_elements.clear();
             self.exp_text_elements.clear();
             self.render_exp(renderer, ui_container);
         }
-        if self.hud_context.clone().read().unwrap().dirty_breath {
+        if self.hud_context.clone().read().dirty_breath {
             self.breath_elements.clear();
             self.render_breath(renderer, ui_container);
         }
@@ -275,7 +276,7 @@ impl Hud {
 
     fn render_health(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let hud_context = self.hud_context.clone();
-        let hud_context = hud_context.read().unwrap();
+        let hud_context = hud_context.read();
         let icon_scale = Hud::icon_scale(renderer);
         let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 * -1.0 + icon_scale as f64 / 2.0;
         let y_offset = icon_scale as f64 / 9.0 * 30.0;
@@ -402,17 +403,17 @@ impl Hud {
             }
         }
         if !redirty_health {
-            self.hud_context.write().unwrap().dirty_health = false;
+            self.hud_context.write().dirty_health = false;
         }
     }
 
     fn render_armor(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let armor = self.hud_context.clone().read().unwrap().armor;
+        let armor = self.hud_context.clone().read().armor;
         let icon_scale = Hud::icon_scale(renderer);
         let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 * -1.0 + icon_scale as f64 / 2.0;
         let y_offset = icon_scale as f64 / 9.0 * 30.0;
-        let max_health = self.hud_context.clone().read().unwrap().max_health;
-        let absorbtion = self.hud_context.clone().read().unwrap().absorbtion;
+        let max_health = self.hud_context.clone().read().max_health;
+        let absorbtion = self.hud_context.clone().read().absorbtion;
         let icon_bars = (((max_health + absorbtion) / 2.0 / 10.0) as f64).ceil();
 
         if armor > 0 {
@@ -436,13 +437,13 @@ impl Hud {
                 self.armor_elements.push(image);
             }
         }
-        self.hud_context.write().unwrap().dirty_armor = false;
+        self.hud_context.write().dirty_armor = false;
     }
 
     fn render_food(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer) as f64;
         let hud_context = self.hud_context.clone();
-        let hud_context = hud_context.read().unwrap();
+        let hud_context = hud_context.read();
         let food = hud_context.food;
         let last_food = hud_context.last_food;
         let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 + icon_scale as f64 / 2.0;
@@ -489,14 +490,14 @@ impl Hud {
                 self.food_elements.push(image);
             }
         }
-        self.hud_context.write().unwrap().dirty_food = false;
+        self.hud_context.write().dirty_food = false;
     }
 
     fn render_exp(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer) as f64;
         let y_offset = icon_scale / 9.0 * 24.0;
         let hud_context = self.hud_context.clone();
-        let hud_context = hud_context.read().unwrap();
+        let hud_context = hud_context.read();
         let max_exp = if hud_context.exp_level >= 30 {
             112 + (hud_context.exp_level - 30) * 9
         }else if hud_context.exp_level >= 15 {
@@ -578,7 +579,7 @@ impl Hud {
                 .create(ui_container));
         }
         drop(hud_context);
-        self.hud_context.write().unwrap().dirty_exp = false;
+        self.hud_context.write().dirty_exp = false;
     }
 
     fn render_slots(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
@@ -619,7 +620,7 @@ impl Hud {
 
     fn render_breath(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let hud_context = self.hud_context.clone();
-        let hud_context = hud_context.read().unwrap();
+        let hud_context = hud_context.read();
 
         if hud_context.breath != -1 { // Whether the player is under water or not.
             let breath = hud_context.breath as f64;
@@ -656,7 +657,7 @@ impl Hud {
                 }
             }
         }
-        self.hud_context.write().unwrap().dirty_breath = false;
+        self.hud_context.write().dirty_breath = false;
     }
 
 }

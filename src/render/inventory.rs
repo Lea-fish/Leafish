@@ -1,12 +1,13 @@
 use crate::ui::{ImageRef, Text, Container, TextRef};
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 use crate::inventory::{InventoryContext, Inventory, Item, Material};
 use crate::screen::Screen;
 use crate::render::Renderer;
 use crate::{gl, ui};
 use crate::render::hud::Hud;
+use parking_lot::RwLock;
 
 pub struct InventoryWindow {
 
@@ -20,23 +21,23 @@ pub struct InventoryWindow {
 impl Screen for InventoryWindow {
 
     fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        self.inventory_context.clone().write().unwrap().inventory.replace(self.inventory.clone());
-        self.inventory.clone().write().unwrap().init(renderer, ui_container, self);
+        self.inventory_context.clone().write().inventory.replace(self.inventory.clone());
+        self.inventory.clone().write().init(renderer, ui_container, self);
     }
 
     fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
-        self.inventory_context.clone().write().unwrap().inventory = None;
-        self.inventory.clone().write().unwrap().close(self);
+        self.inventory_context.clone().write().inventory = None;
+        self.inventory.clone().write().close(self);
         self.clear_elements();
     }
 
     fn tick(&mut self, _delta: f64, renderer: &mut Renderer, ui_container: &mut Container) -> Option<Box<dyn Screen>> {
-        self.inventory.clone().write().unwrap().tick(renderer, ui_container, self);
+        self.inventory.clone().write().tick(renderer, ui_container, self);
         None
     }
 
     fn on_resize(&mut self, width: u32, height: u32, renderer: &mut Renderer, ui_container: &mut Container) {
-        self.inventory.clone().write().unwrap().resize(width, height, renderer, ui_container, self);
+        self.inventory.clone().write().resize(width, height, renderer, ui_container, self);
     }
 
     fn is_closable(&self) -> bool {

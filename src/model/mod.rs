@@ -9,7 +9,7 @@ use byteorder::{NativeEndian, WriteBytesExt};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 
 use crate::types::hash::FNVHash;
 use log::error;
@@ -18,6 +18,7 @@ use std::hash::BuildHasherDefault;
 use image::GenericImageView;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use parking_lot::RwLock;
 
 pub struct Factory {
     resources: Arc<RwLock<resources::Manager>>,
@@ -75,7 +76,6 @@ impl Factory {
     fn load_biome_colors(res: Arc<RwLock<resources::Manager>>, name: &str) -> image::DynamicImage {
         let mut val = match res
             .read()
-            .unwrap()
             .open("minecraft", &format!("textures/colormap/{}.png", name))
         {
             Some(val) => val,
@@ -183,7 +183,7 @@ impl Factory {
         let key = Key(plugin.to_owned(), name.to_owned());
         let mut missing_variant;
         {
-            let m = models.read().unwrap();
+            let m = models.read();
             match m.get_model(key.clone(), block, rng, snapshot, x, y, z, buf) {
                 Ok(val) => return val,
                 Err(val) => missing_variant = val,
@@ -191,7 +191,7 @@ impl Factory {
         }
         if !missing_variant {
             // Whole model not loaded, try and load
-            let mut m = models.write().unwrap();
+            let mut m = models.write();
             if !m.models.contains_key(&key) && !m.load_model(&plugin, &name) {
                 error!("Error loading model {}:{}", plugin, name);
             }
@@ -203,7 +203,7 @@ impl Factory {
         let ret = Factory::get_state_model(models, Block::Missing {}, rng, snapshot, x, y, z, buf);
         if !missing_variant {
             // Still no model, replace with placeholder
-            let mut m = models.write().unwrap();
+            let mut m = models.write();
             let model = m
                 .models
                 .get(&Key("leafish".to_owned(), "missing_block".to_owned()))
@@ -218,7 +218,6 @@ impl Factory {
         let file = match self
             .resources
             .read()
-            .unwrap()
             .open(plugin, &format!("blockstates/{}.json", name))
         {
             Some(val) => val,
@@ -307,7 +306,6 @@ impl Factory {
         let file = match self
             .resources
             .read()
-            .unwrap()
             .open(plugin, &format!("models/block/{}.json", model_name))
         {
             Some(val) => val,
@@ -345,7 +343,6 @@ impl Factory {
             let file = match self
                 .resources
                 .read()
-                .unwrap()
                 .open(plugin, &format!("models/{}.json", parent))
             {
                 Some(val) => val,

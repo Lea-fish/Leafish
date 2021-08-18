@@ -3,7 +3,8 @@ use crate::render;
 use crate::shared::Direction;
 use crate::world::{self, block};
 use std::io::Write;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use parking_lot::RwLock;
 
 pub fn render_liquid<W: Write>(
     textures: Arc<RwLock<render::TextureManager>>,

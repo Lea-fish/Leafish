@@ -17,12 +17,14 @@ use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::marker::PhantomData;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc};
 use std::fs;
 
 use crate::format::{Color, Component, TextComponent};
 use crate::render;
 use crate::ui;
+use parking_lot::Mutex;
+use parking_lot::RwLock;
 
 fn println_level(_level: log::Level, s: String) {
     println!("{}", s);
@@ -331,7 +333,7 @@ impl Console {
 
             let mut offset = 0.0;
             let renderer = renderer.clone();
-            let renderer = &*renderer.read().unwrap();
+            let renderer = &*renderer.read();
             for line in self.history.iter().rev() {
                 if offset >= 210.0 {
                     break;
@@ -432,7 +434,7 @@ impl log::Log for ConsoleProxy {
 
     fn log(&self, record: &log::Record) {
         if self.enabled(record.metadata()) {
-            self.console.lock().unwrap().log(record);
+            self.console.lock().log(record);
         }
     }
 

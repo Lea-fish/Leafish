@@ -1,10 +1,11 @@
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 
 use super::glsl;
 use crate::gl;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::{Matrix4, Point3};
 use log::error;
+use parking_lot::RwLock;
 
 pub struct Clouds {
     program: gl::Program,

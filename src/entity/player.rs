@@ -537,7 +537,6 @@ impl ecs::System for PlayerRenderer {
                 renderer
                     .get_textures_ref()
                     .read()
-                    .unwrap()
                     .release_skin(url);
             }
         }

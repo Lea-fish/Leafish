@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::hash::BuildHasherDefault;
 use std::io::{Cursor, Read};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 
 use cgmath::prelude::*;
 use flate2::read::ZlibDecoder;
@@ -44,6 +44,7 @@ use crate::chunk_builder::CullInfo;
 use dashmap::DashMap;
 use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
+use parking_lot::RwLock;
 
 pub struct World {
     pub chunks: Arc<DashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>,
@@ -129,10 +130,10 @@ impl World {
         if self.protocol_version != protocol_version {
             println!("Can't switch protocol version, when resetting the world :(");
         }
-        self.modded_block_ids.clone().write().unwrap().clear();
-        // self.light_updates.clone().write().unwrap().clear(); // TODO: Implement a similar system!
-        self.render_list.clone().write().unwrap().clear();
-        // self.block_entity_actions.clone().write().unwrap().clear(); // TODO: Implement a similar system!
+        self.modded_block_ids.clone().write().clear();
+        // self.light_updates.clone().write().clear(); // TODO: Implement a similar system!
+        self.render_list.clone().write().clear();
+        // self.block_entity_actions.clone().write().clear(); // TODO: Implement a similar system!
         self.chunks.clone().clear();
     }
 
@@ -359,22 +360,22 @@ impl World {
         dirty
     }
 
-    pub fn compute_render_list(&self, renderer: /*&mut */Arc<RwLock<render::Renderer>>) {
+    pub fn compute_render_list(&self, renderer: Arc<RwLock<render::Renderer>>) {
         let start_rec = Instant::now();
-        // self.render_list.clone().write().unwrap().clear(); // TODO: Sync with the main thread somehow!
-        // renderer.clone().read().unwrap()
+        // self.render_list.clone().write().clear(); // TODO: Sync with the main thread somehow!
+        // renderer.clone().read()
 
         let mut valid_dirs = [false; 6];
         for dir in Direction::all() {
             let (ox, oy, oz) = dir.get_offset();
             let dir_vec = cgmath::Vector3::new(ox as f32, oy as f32, oz as f32);
-            valid_dirs[dir.index()] = renderer.clone().read().unwrap().view_vector.dot(dir_vec) > -0.9;
+            valid_dirs[dir.index()] = renderer.clone().read().view_vector.dot(dir_vec) > -0.9;
         }
 
         let start = (
-            ((renderer.clone().read().unwrap().camera.pos.x as i32) >> 4),
-            ((renderer.clone().read().unwrap().camera.pos.y as i32) >> 4),
-            ((renderer.clone().read().unwrap().camera.pos.z as i32) >> 4),
+            ((renderer.clone().read().camera.pos.x as i32) >> 4),
+            ((renderer.clone().read().camera.pos.y as i32) >> 4),
+            ((renderer.clone().read().camera.pos.z as i32) >> 4),
         );
 
         let mut render_queue = Arc::new(RwLock::new(Vec::new()));
@@ -383,15 +384,14 @@ impl World {
         process_queue.push_front((Direction::Invalid, start));
         let diff = Instant::now().duration_since(start_rec);
         println!("Delay took {}", diff.as_millis());
-        let frustum = renderer.clone().read().unwrap().frustum.clone();
-        let frame_id = renderer.clone().read().unwrap().frame_id.clone();
+        let frustum = renderer.clone().read().frustum.clone();
+        let frame_id = renderer.clone().read().frame_id.clone();
         self.do_render_queue(Arc::new(RwLock::new(process_queue)),
                              frustum, frame_id, valid_dirs, render_queue.clone());
         let render_list_write = self.render_list.clone();
-        let mut render_list_write = render_list_write.write().unwrap();
+        let mut render_list_write = render_list_write.write();
         render_list_write.clear();
-        render_list_write.extend(render_queue.clone().read().unwrap().iter());
-
+        render_list_write.extend(render_queue.clone().read().iter());
         // TODO: Improve the performance of the following by moving this to another thread!
         /*
         process_queue.par_iter().for_each(|(from, pos)| {
@@ -401,7 +401,7 @@ impl World {
                 if rendered_on == renderer.frame_id {
                     return;
                 }
-                if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.0, pos.2)) {
+                if let Some(chunk) = self.chunks.clone().write().get_mut(&CPos(pos.0, pos.2)) {
                     chunk.sections_rendered_on[pos.1 as usize] = renderer.frame_id;
                 }
 
@@ -419,14 +419,14 @@ impl World {
                 }
                 (
                     sec.is_some(),
-                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.clone().read().unwrap().cull_info),
+                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.clone().read().cull_info),
                 )
             } else {
                 return;
             };
 
             if exists {
-                self.render_list.clone().write().unwrap().push(*pos);
+                self.render_list.clone().write().push(*pos);
             }
 
             for dir in Direction::all() {
@@ -453,7 +453,7 @@ impl World {
                 if rendered_on == renderer.frame_id {
                     continue;
                 }
-                if let Some(chunk) = self.chunks.clone().write().unwrap().get_mut(&CPos(pos.0, pos.2)) {
+                if let Some(chunk) = self.chunks.clone().write().get_mut(&CPos(pos.0, pos.2)) {
                     chunk.sections_rendered_on[pos.1 as usize] = renderer.frame_id;
                 }
 
@@ -471,14 +471,14 @@ impl World {
                 }
                 (
                     sec.is_some(),
-                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.clone().read().unwrap().cull_info),
+                    sec.map_or(chunk_builder::CullInfo::all_vis(), |v| v.clone().read().cull_info),
                 )
             } else {
                 continue;
             };
 
             if exists {
-                self.render_list.clone().write().unwrap().push(pos);
+                self.render_list.clone().write().push(pos);
             }
 
             for dir in Direction::all() {
@@ -503,13 +503,13 @@ impl World {
                        frustum: Frustum<f32>, frame_id: u32, valid_dirs: [bool; 6], render_queue: Arc<RwLock<Vec<(i32, i32, i32)>>>) {
         let out = Arc::new(RwLock::new(VecDeque::new())); // TODO: Add Arc!
         /*let tmp_renderer = renderer.clone();
-        let tmp_renderer = tmp_renderer.read().unwrap();
+        let tmp_renderer = tmp_renderer.read();
         let frame_id = tmp_renderer.frame_id.clone();*/
-        // let frame_id = renderer.clone().read().unwrap().frame_id.clone();
-        // let frustum = renderer.clone().read().unwrap().frustum.clone().read().unwrap().as_ref().unwrap();
+        // let frame_id = renderer.clone().read().frame_id.clone();
+        // let frustum = renderer.clone().read().frustum.clone().read().as_ref().unwrap();
         let tmp_frustum = frustum.clone();
-        // println!("rendering {} elems", process_queue.clone().read().unwrap().len());
-        process_queue.clone().read().unwrap().iter().for_each(|(from, pos)| {
+        // println!("rendering {} elems", process_queue.clone().read().len());
+        process_queue.clone().read().iter().for_each(|(from, pos)| {
             let (exists, cull) = if let Some((sec, rendered_on)) =
             self.get_render_section_mut(pos.0, pos.1, pos.2)
             {
@@ -541,7 +541,7 @@ impl World {
             };
 
             if exists {
-                render_queue.clone().write().unwrap().push(*pos);
+                render_queue.clone().write().push(*pos);
             }
 
             for dir in Direction::all() {
@@ -555,12 +555,12 @@ impl World {
                     if *from == Direction::Invalid
                         || (valid_dirs[dir.index()] && cull.is_visible(*from, dir))
                     {
-                        out.clone().write().unwrap().push_back((dir.opposite(), opos));
+                        out.clone().write().push_back((dir.opposite(), opos));
                     }
                 }
             }
         });
-        if !out.clone().read().unwrap().is_empty() {
+        if !out.clone().read().is_empty() {
             self.do_render_queue(out.clone(), frustum.clone(), frame_id, valid_dirs, render_queue);
         } else {
             println!("finished!");
@@ -568,7 +568,7 @@ impl World {
     }
 
     pub fn get_render_list(&self) -> Vec<((i32, i32, i32), Arc<RwLock<render::ChunkBuffer>>)> {
-        self.render_list.clone().read().unwrap()
+        self.render_list.clone().read()
             .iter()
             // .par_iter()
             .filter_map(|v| {
@@ -825,7 +825,7 @@ Process finished with exit code 101
                       mask_add: u16,
                       data: &mut Cursor<Vec<u8>>,
                       version: u8) -> Result<(), protocol::Error> {
-        let additional_light_data = self.lighting_cache.clone().write().unwrap().remove(&CPos(x, z));
+        let additional_light_data = self.lighting_cache.clone().write().remove(&CPos(x, z));
         let has_add_light = additional_light_data.is_some();
         let mut additional_light_data = additional_light_data.unwrap();
         let cpos = CPos(x, z);
@@ -1247,7 +1247,7 @@ Process finished with exit code 101
         // TODO: Insert chunks with light data only or cache them until the real data arrives!
         /*let cpos = CPos(x, z);
         let chunks = self.chunks.clone();
-        let mut chunks = chunks.write().unwrap();
+        let mut chunks = chunks.write();
         let chunk = chunks.get_mut(&cpos).unwrap(); // TODO: Fix this panic!
         self.load_light(chunk, block_light_mask, sky_light, sky_light_mask, data);*/
     }

@@ -20,7 +20,8 @@ use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use image::GenericImageView;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use parking_lot::RwLock;
 
 const UI_WIDTH: f64 = 854.0;
 const UI_HEIGHT: f64 = 480.0;
@@ -143,7 +144,7 @@ impl UIState {
     // This gets called all the time (no matter what)
     pub fn tick(&mut self, width: u32, height: u32) {
         {
-            let version = self.resources.read().unwrap().version();
+            let version = self.resources.read().version();
             if self.version != version {
                 self.version = version;
                 self.load_font();
@@ -262,7 +263,7 @@ impl UIState {
         for page in &mut self.font_pages {
             *page = None;
         }
-        let res = self.resources.read().unwrap();
+        let res = self.resources.read();
         if let Some(mut info) = res.open("minecraft", "font/glyph_sizes.bin") {
             let mut data = Vec::with_capacity(0x10000);
             info.read_to_end(&mut data).unwrap();

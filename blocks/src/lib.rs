@@ -13,7 +13,8 @@ pub mod material;
 pub use self::material::Material;
 
 pub use self::Block::*;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use parking_lot::RwLock;
 
 pub trait WorldAccess {
     fn get_block(&self, pos: Position) -> Block;
@@ -74,7 +75,7 @@ impl VanillaIDMap {
             } else {
                 let data = id & 0xf;
 
-                if let Some(name) = modded_block_ids.clone().read().unwrap().get(&(id >> 4)) {
+                if let Some(name) = modded_block_ids.clone().read().get(&(id >> 4)) {
                     if let Some(blocks_by_data) = self.modded.get(name) {
                         blocks_by_data[data].unwrap_or(Block::Missing {})
                     } else {

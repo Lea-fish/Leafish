@@ -6,12 +6,13 @@ use crate::types::bit::Set;
 use crate::world;
 use crate::world::{block, World, SectionSnapshot, CPos};
 use rand::{self, Rng, SeedableRng};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 use std::thread;
 use std::time::Instant;
 // use rayon::prelude::*;
 use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
+use parking_lot::RwLock;
 
 const NUM_WORKERS: usize = 8;
 
@@ -63,11 +64,11 @@ impl ChunkBuilder {
     ) {
         if version != self.resource_version {
             self.resource_version = version;
-            self.models.write().unwrap().version_change();
+            self.models.write().version_change();
         }
 
         let renderer = renderer.clone();
-        let mut renderer = renderer.write().unwrap();
+        let mut renderer = renderer.write();
             while let Ok((id, mut val)) = self.built_recv.try_recv() {
                 world.clone().reset_building_flag(val.position);
 
@@ -234,7 +235,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
 
                         match block {
                             block::Block::Water { .. } | block::Block::FlowingWater { .. } => {
-                                let tex = models.read().unwrap().textures.clone();
+                                let tex = models.read().textures.clone();
                                 trans_count += model::liquid::render_liquid(
                                     tex,
                                     false,
@@ -247,7 +248,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
                                 continue;
                             }
                             block::Block::Lava { .. } | block::Block::FlowingLava { .. } => {
-                                let tex = models.read().unwrap().textures.clone();
+                                let tex = models.read().textures.clone();
                                 solid_count += model::liquid::render_liquid(
                                     tex,
                                     true,

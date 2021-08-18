@@ -4,7 +4,8 @@ use crate::ui;
 use instant::Instant;
 use rand::{self, seq::SliceRandom};
 use std::f64::consts;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use parking_lot::RwLock;
 
 pub struct Logo {
     _shadow: ui::BatchRef,
@@ -24,7 +25,7 @@ impl Logo {
         ui_container: &mut ui::Container,
     ) -> Logo {
         let logo_str = {
-            let res = resources.read().unwrap();
+            let res = resources.read();
             let mut logo = res.open("leafish", "logo/logo.txt").unwrap();
             let mut logo_str = String::new();
             logo.read_to_string(&mut logo_str).unwrap();
@@ -93,7 +94,7 @@ impl Logo {
 
         let mut text_strings = vec![];
         {
-            let res = resources.read().unwrap();
+            let res = resources.read();
             let mut splashes = res.open_all("minecraft", "texts/splashes.txt");
             for file in &mut splashes {
                 let mut texts = String::new();

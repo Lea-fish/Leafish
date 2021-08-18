@@ -3,10 +3,11 @@ mod player_inventory;
 use leafish_protocol::item::Stack;
 use crate::render::Renderer;
 use crate::ui::Container;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::render::inventory::InventoryWindow;
 use crate::server::Version;
+use parking_lot::RwLock;
 
 pub trait Inventory {
 

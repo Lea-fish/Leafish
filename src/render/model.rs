@@ -10,7 +10,8 @@ use cgmath::{Matrix4, Point3, SquareMatrix};
 use collision::{self, Frustum, Sphere};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc};
+use parking_lot::RwLock;
 
 pub struct Manager {
     collections: Vec<Collection>,

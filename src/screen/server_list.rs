@@ -14,7 +14,7 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{RwLock, Arc};
+use std::sync::{Arc};
 use std::thread;
 use std::fs;
 
@@ -32,6 +32,7 @@ use crate::render::Renderer;
 use crate::ui::Container;
 use crossbeam_channel::{Sender, Receiver, TryRecvError};
 use crossbeam_channel::unbounded;
+use parking_lot::RwLock;
 
 pub struct ServerList {
     elements: Option<UIElements>,
@@ -109,7 +110,7 @@ impl ServerList {
         *self.needs_reload.borrow_mut() = false;
         {
             // Clean up previous list icons.
-            let mut tex = renderer.get_textures_ref().write().unwrap();
+            let mut tex = renderer.get_textures_ref().write();
             for server in &mut elements.servers {
                 if let Some(ref icon) = server.icon_texture {
                     tex.remove_dynamic(icon);
@@ -455,7 +456,7 @@ impl super::Screen for ServerList {
         // Clean up
         {
             let elements = self.elements.as_mut().unwrap();
-            let mut tex = renderer.get_textures_ref().write().unwrap();
+            let mut tex = renderer.get_textures_ref().write();
             for server in &mut elements.servers {
                 if let Some(ref icon) = server.icon_texture {
                     tex.remove_dynamic(icon);
@@ -550,7 +551,7 @@ impl super::Screen for ServerList {
                                 .collect();
                             let tex = renderer.get_textures_ref();
                             s.icon_texture = Some(name.clone());
-                            let icon_tex = tex.write().unwrap().put_dynamic(&name, favicon);
+                            let icon_tex = tex.write().put_dynamic(&name, favicon);
                             s.icon.borrow_mut().texture = icon_tex.name;
                         }
                     }

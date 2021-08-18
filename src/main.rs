@@ -50,11 +50,13 @@ use crate::protocol::mojang;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc};
 use std::thread;
 use leafish_protocol::protocol::Error;
 use crate::render::hud::{HudContext, Hud};
 use crate::inventory::Material;
+use parking_lot::RwLock;
+use parking_lot::Mutex;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -155,7 +157,7 @@ impl Game {
 
     pub fn tick(&mut self/*, delta: f64*/) {
         if self.server.is_some() {
-            if let Some(disconnect_reason) = self.server.as_ref().unwrap().disconnect_data.clone().write().unwrap().disconnect_reason.take() {
+            if let Some(disconnect_reason) = self.server.as_ref().unwrap().disconnect_data.clone().write().disconnect_reason.take() {
                 self.server = None;
                 self.screen_sys
                     .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason))));
@@ -296,7 +298,7 @@ fn main() {
         settings::register_vars(&mut vars);
         vars.load_config();
         vars.save_config();
-        con.lock().unwrap().configure(&vars);
+        con.lock().configure(&vars);
         let vsync = *vars.get(settings::R_VSYNC);
         (Rc::new(vars), vsync)
     };
@@ -388,7 +390,7 @@ fn main() {
         is_fullscreen: false,
         default_protocol_version,
     };
-    game.renderer.clone().write().unwrap().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
+    game.renderer.clone().write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {
         protocol::enable_network_debug();
     }
@@ -483,7 +485,7 @@ fn tick_all(
 
     let version = {
         let try_res = game.resource_manager.try_write();
-        if let Ok(mut res) = try_res {
+        if let Some(mut res) = try_res {
             res.tick(&mut resui, &mut ui_container, delta);
             res.version()
         } else {
@@ -524,7 +526,7 @@ fn tick_all(
         // let world = game.server.as_ref().unwrap().world.clone();
         // world.compute_render_list(/*&mut */game.renderer.clone()); // TODO: Improve perf on server!
         // game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true); // old
-        game.renderer.clone().write().unwrap().update_camera(physical_width, physical_height);
+        game.renderer.clone().write().update_camera(physical_width, physical_height);
         /*let diff = Instant::now().duration_since(now);
         println!("Diff5 took {}", diff.as_millis());*/ // readd
         game.chunk_builder
@@ -532,9 +534,9 @@ fn tick_all(
         /*let diff = Instant::now().duration_since(now);
         println!("Diff6 took {}", diff.as_millis());*/
     } else {
-        if game.renderer.clone().read().unwrap().safe_width != width || game.renderer.clone().read().unwrap().safe_height != height {
-            game.renderer.clone().write().unwrap().safe_width = width;
-            game.renderer.clone().write().unwrap().safe_height = height;
+        if game.renderer.clone().read().safe_width != width || game.renderer.clone().read().safe_height != height {
+            game.renderer.clone().write().safe_width = width;
+            game.renderer.clone().write().safe_height = height;
         }
     }
 
@@ -552,7 +554,6 @@ fn tick_all(
     */
     game.console
         .lock()
-        .unwrap()
         .tick(&mut ui_container, /*&*/game.renderer.clone(), delta, width as f64);
     /*let diff = Instant::now().duration_since(now);
     println!("Diff8 took {}", diff.as_millis());*/
@@ -580,7 +581,7 @@ fn tick_all(
     if game.server.is_some() {
         // game.server.as_ref().unwrap().clone().render_list_computer_notify.lock().unwrap().recv().unwrap();
     }*/
-    game.renderer.clone().write().unwrap().tick(
+    game.renderer.clone().write().tick(
         world,
         delta,
         width as u32,
@@ -644,13 +645,12 @@ fn handle_window_event<T>(
                 window.set_cursor_grab(true).unwrap();
                 window.set_cursor_visible(false);
                 if game.server.is_some() {
-                    if let Some(player) = *game.server.as_ref().unwrap().player.clone().write().unwrap() {
+                    if let Some(player) = *game.server.as_ref().unwrap().player.clone().write() {
                         let rotation = game
                             .server.as_ref().unwrap()
                             .entities
                             .clone()
                             .write()
-                            .unwrap()
                             .get_component_mut(player, game.server.as_ref().unwrap().rotation)
                             .unwrap();
                         rotation.yaw -= rx;
@@ -766,7 +766,7 @@ fn handle_window_event<T>(
                             }
                         }
                         (ElementState::Pressed, Some(VirtualKeyCode::Grave)) => {
-                            game.console.lock().unwrap().toggle();
+                            game.console.lock().toggle();
                         }
                         (ElementState::Pressed, Some(VirtualKeyCode::F11)) => {
                             if !game.is_fullscreen {
