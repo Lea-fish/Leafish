@@ -46,8 +46,8 @@ use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
 
 pub struct World {
-    pub chunks: Arc<DashMap<CPos, Chunk>>,
-    pub lighting_cache: Arc<RwLock<HashMap<CPos, LightData>>>,
+    pub chunks: Arc<DashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>,
+    pub lighting_cache: Arc<RwLock<HashMap<CPos, LightData, BuildHasherDefault<FNVHash>>>>,
 
     pub render_list: Arc<RwLock<Vec<(i32, i32, i32)>>>,
 
