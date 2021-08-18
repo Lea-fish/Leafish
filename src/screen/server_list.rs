@@ -14,9 +14,10 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::sync::{mpsc, RwLock, Arc};
+use std::sync::{RwLock, Arc};
 use std::thread;
 use std::fs;
+
 
 use crate::format;
 use crate::format::{Component, TextComponent};
@@ -29,6 +30,8 @@ use rand::Rng;
 use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
 use crate::ui::Container;
+use crossbeam_channel::{Sender, Receiver, TryRecvError};
+use crossbeam_channel::unbounded;
 
 pub struct ServerList {
     elements: Option<UIElements>,
@@ -63,7 +66,7 @@ struct Server {
     icon_texture: Option<String>,
 
     done_ping: bool,
-    recv: mpsc::Receiver<PingInfo>,
+    recv: Receiver<PingInfo>,
 }
 
 struct PingInfo {
@@ -136,7 +139,7 @@ impl ServerList {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container);
 
-            let (send, recv) = mpsc::channel::<PingInfo>();
+            let (send, recv) = unbounded();
             // Make whole entry interactable
             {
                 let mut backr = back.borrow_mut();
@@ -551,7 +554,7 @@ impl super::Screen for ServerList {
                             s.icon.borrow_mut().texture = icon_tex.name;
                         }
                     }
-                    Err(mpsc::TryRecvError::Disconnected) => {
+                    Err(TryRecvError::Disconnected) => {
                         s.done_ping = true;
                         let mut txt = TextComponent::new("Channel dropped");
                         txt.modifier.color = Some(format::Color::Red);

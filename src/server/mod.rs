@@ -32,7 +32,7 @@ use rand::{self, Rng};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::str::FromStr;
-use std::sync::{mpsc, Mutex, PoisonError, RwLockReadGuard};
+use std::sync::{PoisonError, RwLockReadGuard};
 use std::sync::{Arc, RwLock};
 use std::thread;
 use leafish_protocol::protocol::packet::Packet;
@@ -43,11 +43,12 @@ use crate::render::Renderer;
 use crate::render::hud::HudContext;
 use crate::ui::Container;
 use crate::inventory::{InventoryContext, Inventory, Item, Material};
-use std::borrow::BorrowMut;
 use crate::screen::ScreenSystem;
 use leafish_protocol::item::Stack;
 use std::cmp::Ordering;
-use crossbeam_channel::Sender;
+use crossbeam_channel::{Sender, Receiver};
+use crossbeam_channel::unbounded;
+use parking_lot::Mutex;
 
 pub mod plugin_messages;
 mod sun;
@@ -89,8 +90,8 @@ impl Version {
 #[derive(Default)]
 pub struct DisconnectData {
 
-    pub disconnect_reason: Option<format::Component>, // remove somehow! (interior mut?)
-    just_disconnected: bool, // remove somehow! (interior mut?)
+    pub disconnect_reason: Option<format::Component>,
+    just_disconnected: bool,
 
 }
 
@@ -150,8 +151,8 @@ pub struct Server {
 
     sun_model: RwLock<Option<sun::SunModel>>,
     target_info: Arc<RwLock<target::Info>>,
-    pub render_list_computer: Mutex<mpsc::Sender<bool>>,
-    pub render_list_computer_notify: Mutex<mpsc::Receiver<bool>>,
+    pub render_list_computer: Sender<bool>,
+    pub render_list_computer_notify: Receiver<bool>,
     pub hud_context: Arc<RwLock<HudContext>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
 
@@ -383,9 +384,9 @@ impl Server {
                 resources: Arc<RwLock<resources::Manager>>,
                 renderer: Arc<RwLock<Renderer>>,
                 hud_context: Arc<RwLock<HudContext>>) -> Arc<Server> {
-        let server_callback = Arc::new(RwLock::new(None));
+        let server_callback = Arc::new(Mutex::new(None));
         let inner_server = server_callback.clone();
-        let mut inner_server = inner_server.write().unwrap();
+        let mut inner_server = inner_server.lock();
         Self::spawn_reader(conn.clone(), server_callback.clone());
         let light_updater = Self::spawn_light_updater(server_callback.clone());
         let render_list_computer = Self::spawn_render_list_computer(server_callback.clone(), renderer.clone());
@@ -411,12 +412,10 @@ impl Server {
 
     fn spawn_reader(
         mut read: protocol::Conn,
-        server: Arc<RwLock<Option<Arc<Server>>>>,
+        server: Arc<Mutex<Option<Arc<Server>>>>,
     ) {
         thread::spawn(move || loop {
-            while server.clone().try_read().is_err() {
-            }
-            let server = server.clone().read().unwrap().as_ref().unwrap().clone();
+            let server = server.clone().lock().as_ref().unwrap().clone();
             let pck = read.read_packet();
                 match pck {
                     Ok(pck) =>
@@ -697,11 +696,11 @@ impl Server {
         });
     }
 
-    fn spawn_light_updater(server: Arc<RwLock<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
-        let (tx, rx) = crossbeam_channel::unbounded();
+    fn spawn_light_updater(server: Arc<Mutex<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
+        let (tx, rx) = unbounded();
         thread::spawn(move || loop {
-            while server.clone().try_read().is_err() {}
-            let server = server.clone().read().unwrap().as_ref().unwrap().clone();
+            /*
+            let server = server.clone().lock().as_ref().unwrap().clone();
             let mut done = false; // TODO: Improve performance!
             while !done {
                 let start = Instant::now();
@@ -721,18 +720,20 @@ impl Server {
                     done = true;
                 }
                 thread::sleep(Duration::from_millis(1));
+            }*/
+            while let Ok(update) = rx.try_recv() {
             }
+            thread::sleep(Duration::from_millis(1000));
         });
         tx
     }
 
-    fn spawn_render_list_computer(server: Arc<RwLock<Option<Arc<Server>>>>, renderer: Arc<RwLock<Renderer>>) -> (mpsc::Sender<bool>, mpsc::Receiver<bool>) { // TODO: Use fair rwlock!
-        let (tx, rx) = mpsc::channel();
-        let (etx, erx) = mpsc::channel();
+    fn spawn_render_list_computer(server: Arc<Mutex<Option<Arc<Server>>>>, renderer: Arc<RwLock<Renderer>>) -> (Sender<bool>, Receiver<bool>) { // TODO: Use fair rwlock!
+        let (tx, rx) = unbounded();
+        let (etx, erx) = unbounded();
         thread::spawn(move || loop {
             let _: bool = rx.recv().unwrap();
-            while server.clone().try_read().is_err() {}
-            let server = server.clone().read().unwrap().as_ref().unwrap().clone();
+            let server = server.clone().lock().as_ref().unwrap().clone();
             let world = server.world.clone();
             world.compute_render_list(renderer.clone());
             while rx.try_recv().is_ok() {}
@@ -742,9 +743,9 @@ impl Server {
     }
 
     pub fn dummy_server(resources: Arc<RwLock<resources::Manager>>, renderer: Arc<RwLock<Renderer>>) -> Arc<Server> {
-        let server_callback = Arc::new(RwLock::new(None));
+        let server_callback = Arc::new(Mutex::new(None));
         let inner_server = server_callback.clone();
-        let mut inner_server = inner_server.write().unwrap();
+        let mut inner_server = inner_server.lock();
         let window_size = Arc::new(RwLock::new((0, 0)));
         let render_list = Self::spawn_render_list_computer(server_callback.clone(), renderer.clone());
         let server = Arc::new(Server::new(
@@ -852,8 +853,8 @@ impl Server {
         resources: Arc<RwLock<resources::Manager>>,
         conn: Arc<RwLock<Option<protocol::Conn>>>,
         light_updater: Sender<LightUpdate>,
-        render_list_computer: mpsc::Sender<bool>,
-        render_list_computer_notify: mpsc::Receiver<bool>,
+        render_list_computer: Sender<bool>,
+        render_list_computer_notify: Receiver<bool>,
         hud_context: Arc<RwLock<HudContext>>,
         renderer: &Renderer,
     ) -> Server {
@@ -899,8 +900,8 @@ impl Server {
             sun_model: RwLock::new(None),
 
             target_info: Arc::new(RwLock::new(target::Info::new())),
-            render_list_computer: Mutex::from(render_list_computer),
-            render_list_computer_notify: Mutex::from(render_list_computer_notify),
+            render_list_computer,
+            render_list_computer_notify,
             hud_context: hud_context.clone(),
             inventory_context: Arc::new(RwLock::new(InventoryContext::new(Version::V1_8, renderer))), // TODO: Get version from protocol version!
         }

@@ -6,18 +6,19 @@ use crate::types::bit::Set;
 use crate::world;
 use crate::world::{block, World, SectionSnapshot, CPos};
 use rand::{self, Rng, SeedableRng};
-use std::sync::mpsc;
 use std::sync::{Arc, RwLock};
 use std::thread;
 use std::time::Instant;
 // use rayon::prelude::*;
+use crossbeam_channel::{Sender, Receiver};
+use crossbeam_channel::unbounded;
 
 const NUM_WORKERS: usize = 8;
 
 pub struct ChunkBuilder {
-    threads: Vec<(mpsc::Sender<BuildReq>, thread::JoinHandle<()>)>,
+    threads: Vec<(Sender<BuildReq>, thread::JoinHandle<()>)>,
     free_builders: Vec<(usize, Vec<u8>, Vec<u8>)>,
-    built_recv: mpsc::Receiver<(usize, BuildReply)>,
+    built_recv: Receiver<(usize, BuildReply)>,
 
     models: Arc<RwLock<model::Factory>>,
     resource_version: usize,
@@ -33,10 +34,10 @@ impl ChunkBuilder {
 
         let mut threads = vec![];
         let mut free = vec![];
-        let (built_send, built_recv) = mpsc::channel();
+        let (built_send, built_recv) = unbounded();
         for i in 0..NUM_WORKERS {
             let built_send = built_send.clone();
-            let (work_send, work_recv) = mpsc::channel();
+            let (work_send, work_recv) = unbounded();
             let models = models.clone();
             let id = i;
             threads.push((
@@ -60,7 +61,6 @@ impl ChunkBuilder {
         renderer: Arc<RwLock<render::Renderer>>,
         version: usize,
     ) {
-        let now = Instant::now();
         if version != self.resource_version {
             self.resource_version = version;
             self.models.write().unwrap().version_change();
@@ -102,20 +102,16 @@ impl ChunkBuilder {
                 self.free_builders
                     .push((id, val.solid_buffer, val.trans_buffer));
             }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffchunk 1 took {}", diff.as_millis()); // readd
             if self.free_builders.is_empty() {
                 return;
             }
         let tmp_world = world.clone();
-        let dirty_sections = tmp_world // TODO: Improve perf!
+        let dirty_sections = tmp_world
             .get_render_list()
-            .iter()//.par_iter()// .iter()//.par_iter_mut() // .par_iter()// .iter()
+            .iter()
             .map(|v| v.0)
             .filter(|v| tmp_world.is_section_dirty(*v))
             .collect::<Vec<_>>();
-        let diff = Instant::now().duration_since(now);
-        println!("Diffchunk 2 took {}", diff.as_millis()); // readd
         for (x, y, z) in dirty_sections {
             tmp_world.set_building_flag((x, y, z));
             let t_id = self.free_builders.pop().unwrap();
@@ -133,8 +129,6 @@ impl ChunkBuilder {
                     return;
                 }
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffchunk 3 took {}", diff.as_millis()); // readd
     }
 
     pub fn reset(&mut self) {
@@ -173,8 +167,8 @@ struct BuildReply {
 fn build_func_threaded(
     id: usize,
     models: Arc<RwLock<model::Factory>>,
-    work_recv: mpsc::Receiver<BuildReq>,
-    built_send: mpsc::Sender<(usize, BuildReply)>,
+    work_recv: Receiver<BuildReq>,
+    built_send: Sender<(usize, BuildReply)>,
 ) {
     loop {
         let work: BuildReq = match work_recv.recv() {

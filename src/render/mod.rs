@@ -30,15 +30,16 @@ use image::{GenericImage, GenericImageView};
 use log::{error, trace};
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::{Arc, RwLock, Mutex};
+use std::sync::{Arc, RwLock};
 
 use crate::types::hash::FNVHash;
 use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicIsize, Ordering};
-use std::sync::mpsc;
 use std::thread;
 use crate::world::World;
 use std::time::Instant;
+use crossbeam_channel::{Sender, Receiver};
+use crossbeam_channel::unbounded;
 
 const ATLAS_SIZE: usize = 1024;
 
@@ -85,8 +86,8 @@ pub struct Renderer {
     // Light renderering
     pub light_level: f32,
     pub sky_offset: f32,
-    skin_request: Mutex<mpsc::Sender<String>>,
-    skin_reply: Mutex<mpsc::Receiver<(String, Option<image::DynamicImage>)>>,
+    skin_request: Sender<String>,
+    skin_reply: Receiver<(String, Option<image::DynamicImage>)>,
 }
 
 #[derive(Default)]
@@ -238,8 +239,8 @@ impl Renderer {
 
             light_level: 0.8,
             sky_offset: 1.0,
-            skin_request: Mutex::new(skin_req),
-            skin_reply: Mutex::new(skin_reply),
+            skin_request: skin_req,
+            skin_reply: skin_reply,
         }
     }
 
@@ -711,7 +712,7 @@ impl Renderer {
     fn update_textures(&mut self, delta: f64) {
         {
             let mut tex = self.textures.write().unwrap();
-            while let Ok((hash, img)) = self.skin_reply.lock().unwrap().try_recv() {
+            while let Ok((hash, img)) = self.skin_reply.try_recv() {
                 if let Some(img) = img {
                     tex.update_skin(hash, img);
                 }
@@ -1032,11 +1033,11 @@ impl TextureManager {
         res: Arc<RwLock<resources::Manager>>,
     ) -> (
         TextureManager,
-        mpsc::Sender<String>,
-        mpsc::Receiver<(String, Option<image::DynamicImage>)>,
+        Sender<String>,
+        Receiver<(String, Option<image::DynamicImage>)>,
     ) {
-        let (tx, rx) = mpsc::channel();
-        let (stx, srx) = mpsc::channel();
+        let (tx, rx) = unbounded();
+        let (stx, srx) = unbounded();
 
         let skin_thread = Some(thread::spawn(|| Self::process_skins(srx, tx)));
 
@@ -1076,8 +1077,8 @@ impl TextureManager {
     }
 
     fn process_skins(
-        recv: mpsc::Receiver<String>,
-        reply: mpsc::Sender<(String, Option<image::DynamicImage>)>,
+        recv: Receiver<String>,
+        reply: Sender<(String, Option<image::DynamicImage>)>,
     ) {
         let client = reqwest::blocking::Client::new();
         loop {
@@ -1259,7 +1260,7 @@ impl TextureManager {
         };
         self.put_dynamic(&format!("skin-{}", hash), img);
         self.skins.insert(hash.to_owned(), AtomicIsize::new(0));
-        renderer.skin_request.lock().unwrap().send(hash.to_owned()).unwrap();
+        renderer.skin_request.send(hash.to_owned()).unwrap();
     }
 
     fn update_skin(&mut self, hash: String, img: image::DynamicImage) {
