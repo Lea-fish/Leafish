@@ -1,4 +1,4 @@
-mod player_inventory;
+pub mod player_inventory;
 
 use leafish_protocol::item::Stack;
 use crate::render::Renderer;
@@ -8,6 +8,7 @@ use crate::inventory::player_inventory::PlayerInventory;
 use crate::render::inventory::InventoryWindow;
 use crate::server::Version;
 use parking_lot::RwLock;
+use crate::render::hud::HudContext;
 
 pub trait Inventory {
 
@@ -76,11 +77,11 @@ pub struct InventoryContext {
 
 impl InventoryContext {
 
-    pub fn new(version: Version, renderer: &Renderer) -> Self {
+    pub fn new(version: Version, renderer: &Renderer, hud_context: Arc<RwLock<HudContext>>) -> Self {
         InventoryContext {
             cursor: None,
             inventory: None,
-            player_inventory: Arc::new(RwLock::new(PlayerInventory::new(version, renderer))),
+            player_inventory: Arc::new(RwLock::new(PlayerInventory::new(version, renderer, hud_context))),
         }
     }
 

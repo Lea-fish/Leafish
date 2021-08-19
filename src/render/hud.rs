@@ -34,6 +34,8 @@ use leafish_protocol::format::{TextComponent, Component};
 use std::rc::Rc;
 use std::cell::RefCell;
 use parking_lot::RwLock;
+use crate::inventory::player_inventory::PlayerInventory;
+use crate::inventory::{Item, Inventory};
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
@@ -62,7 +64,9 @@ pub struct HudContext {
     exp_level: i32,
     dirty_exp: bool,
     breath: i16,
-    dirty_breath: bool
+    dirty_breath: bool,
+    pub player_inventory: Option<Arc<RwLock<PlayerInventory>>>,
+    pub dirty_slots: bool,
 
 }
 
@@ -93,7 +97,9 @@ impl HudContext {
             exp_level: 0,
             dirty_exp: false,
             breath: 0/*-1*/, // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble -- -1 is causing crashes when attempting to join servers!
-            dirty_breath: false
+            dirty_breath: false,
+            player_inventory: None,
+            dirty_slots: false,
         }
     }
     // TODO: Implement effects!
@@ -154,6 +160,7 @@ pub struct Hud {
     breath_elements: Vec<ImageRef>,
     exp_elements: Vec<ImageRef>,
     exp_text_elements: Vec<Rc<RefCell<Text>>>,
+    slot_elements: Vec<ImageRef>,
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
 
@@ -171,6 +178,7 @@ impl Hud {
             breath_elements: vec![],
             exp_elements: vec![],
             exp_text_elements: vec![],
+            slot_elements: vec![],
             hud_context: hud_context.clone(),
             random: rand::thread_rng(),
         }
@@ -196,6 +204,7 @@ impl Screen for Hud {
         self.render_crosshair(renderer, ui_container);
         self.render_food(renderer, ui_container);
         self.render_breath(renderer, ui_container);
+        self.render_slots_items(renderer, ui_container);
     }
 
     fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
@@ -206,6 +215,7 @@ impl Screen for Hud {
         self.food_elements.clear();
         self.armor_elements.clear();
         self.breath_elements.clear();
+        self.slot_elements.clear();
     }
 
     fn tick(
@@ -244,6 +254,10 @@ impl Screen for Hud {
         if self.hud_context.clone().read().dirty_breath {
             self.breath_elements.clear();
             self.render_breath(renderer, ui_container);
+        }
+        if self.hud_context.clone().read().dirty_slots {
+            self.slot_elements.clear();
+            self.render_slots_items(renderer, ui_container);
         }
         None
     }
@@ -602,6 +616,24 @@ impl Hud {
 
     }
 
+    fn render_slots_items(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let slot_size = icon_scale / 9.0 * 182.0 / (9.0 + (1.0 + 1.0 / 8.0) * 2.0);
+        let space_between = slot_size / 8.0 * 2.0;
+        for i in 0..9 {
+            let player_inventory = self.hud_context.clone().read().player_inventory.as_ref().unwrap().clone();
+            let player_inventory = player_inventory.read();
+            let item = player_inventory.get_item(36 + i as i16);
+            if let Some(item) = item { // TODO: Improve the x offsets! (they are currently not quite right)
+                let slot = self.draw_item(item,
+                                          -(icon_scale / 9.0 * 182.0 / 2.0) + (i as f64 * (slot_size + space_between)) + slot_size / 2.0 + space_between / 2.0,
+                                          icon_scale / 9.0 * 3.0, ui_container, renderer);
+                self.slot_elements.push(slot);
+            }
+        }
+        self.hud_context.clone().write().dirty_slots = false;
+    }
+
     fn render_item(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
 
     }
@@ -658,6 +690,19 @@ impl Hud {
             }
         }
         self.hud_context.write().dirty_breath = false;
+    }
+
+    pub fn draw_item(&self, item: &Item, x: f64, y: f64,
+                     ui_container: &mut Container, renderer: &Renderer) -> ImageRef {
+        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let image = ui::ImageBuilder::new()
+            .texture_coords((0.0 / 16.0, 0.0 / 16.0, 16.0 / 16.0, 16.0 / 16.0))
+            .position(x, y)
+            .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
+            .size(icon_scale / 9.0 * 16.0, icon_scale / 9.0 * 16.0)
+            .texture(format!("minecraft:{}", item.material.texture_location()))
+            .create(ui_container);
+        image
     }
 
 }

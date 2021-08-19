@@ -2,22 +2,25 @@ use crate::inventory::{Inventory, Item, InventoryType, Slot, Material};
 use crate::render::Renderer;
 use crate::ui::{Container, ImageRef, VAttach, HAttach};
 use crate::ui;
-use crate::render::hud::Hud;
-use std::sync::{Arc, RwLock};
+use crate::render::hud::{Hud, HudContext};
+use std::sync::{Arc};
 use crate::render::inventory::InventoryWindow;
 use crate::server::Version;
+
+use parking_lot::RwLock;
 
 pub struct PlayerInventory {
 
     slots: Vec<Slot>,
     dirty: bool,
     version: Version,
+    hud_context: Arc<RwLock<HudContext>>,
 
 }
 
 impl PlayerInventory {
 
-    pub fn new(version: Version, renderer: &Renderer) -> Self {
+    pub fn new(version: Version, renderer: &Renderer, hud_context: Arc<RwLock<HudContext>>) -> Self {
         let scale = Hud::icon_scale(renderer) as f64;
         let size = scale / 9.0 * 16.0;
         let x_offset = -(size * 4.5);
@@ -81,7 +84,8 @@ impl PlayerInventory {
         PlayerInventory {
             slots,
             dirty: false,
-            version
+            version,
+            hud_context
         }
     }
 
@@ -148,12 +152,14 @@ impl Inventory for PlayerInventory {
 
     fn get_item_mut(&mut self, slot: i16) -> &mut Option<Item> {
         self.dirty = true;
+        self.hud_context.clone().write().dirty_slots = true;
         &mut self.slots[slot as usize].item
     }
 
     fn set_item(&mut self, slot: i16, item: Option<Item>) {
         self.slots[slot as usize].item = item;
         self.dirty = true;
+        self.hud_context.clone().write().dirty_slots = true;
     }
 
     fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container, inventory_window: &mut InventoryWindow) {
@@ -194,6 +200,7 @@ impl Inventory for PlayerInventory {
         basic_text_elements.push(crafting_text);
         inventory_window.elements.push(vec![]);
         self.update_icons(renderer);
+        self.hud_context.clone().write().dirty_slots = true;
     }
 
     fn tick(&mut self, renderer: &mut Renderer, ui_container: &mut Container, inventory_window: &mut InventoryWindow) {

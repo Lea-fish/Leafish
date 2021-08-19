@@ -866,6 +866,9 @@ impl Server {
         let game_info = entities.get_key();
         entities.add_component(world_entity, game_info, entity::GameInfo::new());
 
+        let inventory_context = Arc::new(RwLock::new(InventoryContext::new(Version::V1_8, renderer, hud_context.clone())));
+        hud_context.clone().write().player_inventory = Some(inventory_context.clone().read().player_inventory.clone());
+
         let version = resources.read().version();
         Server {
             uuid,
@@ -903,8 +906,8 @@ impl Server {
             target_info: Arc::new(RwLock::new(target::Info::new())),
             render_list_computer,
             render_list_computer_notify,
-            hud_context: hud_context.clone(),
-            inventory_context: Arc::new(RwLock::new(InventoryContext::new(Version::V1_8, renderer))), // TODO: Get version from protocol version!
+            hud_context,
+            inventory_context, // TODO: Get version from protocol version!
         }
     }
 
