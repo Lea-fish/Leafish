@@ -618,15 +618,13 @@ impl Hud {
 
     fn render_slots_items(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer) as f64;
-        let slot_size = icon_scale / 9.0 * 182.0 / (9.0 + (1.0 + 1.0 / 8.0) * 2.0);
-        let space_between = slot_size / 8.0 * 2.0;
         for i in 0..9 {
             let player_inventory = self.hud_context.clone().read().player_inventory.as_ref().unwrap().clone();
             let player_inventory = player_inventory.read();
             let item = player_inventory.get_item(36 + i as i16);
-            if let Some(item) = item { // TODO: Improve the x offsets! (they are currently not quite right)
+            if let Some(item) = item {
                 let slot = self.draw_item(item,
-                                          -(icon_scale / 9.0 * 182.0 / 2.0) + (i as f64 * (slot_size + space_between)) + slot_size / 2.0 + space_between / 2.0,
+                                          -(icon_scale / 9.0 * 90.0) + (i as f64 * (icon_scale / 9.0 * 20.0)) + icon_scale / 9.0 * 11.0,
                                           icon_scale / 9.0 * 3.0, ui_container, renderer);
                 self.slot_elements.push(slot);
             }
