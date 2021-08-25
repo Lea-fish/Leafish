@@ -18,9 +18,16 @@ pub struct Array {
 }
 
 impl Array {
-    pub fn new(size: usize) -> Array {
+    pub fn new(size: usize) -> Self {
         Array {
             data: vec![0; (size + 1) >> 1],
+        }
+    }
+
+    pub fn new_def(size: usize, def: u8) -> Self {
+        let def = (def & 0xF) | ((def & 0xF) << 4);
+        Array {
+            data: vec![def; (size + 1) >> 1],
         }
     }
 

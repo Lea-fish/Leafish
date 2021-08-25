@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::slice::Iter;
+
 #[derive(Clone)]
 pub struct Map {
     bits: Vec<u64>,
@@ -116,4 +118,9 @@ impl Map {
             (((self.bits[pos] >> ii) | (self.bits[pos2] << used)) & mask) as usize
         }
     }
+
+    pub fn iter(&self) -> Iter<'_, u64> {
+        self.bits.iter()
+    }
+
 }

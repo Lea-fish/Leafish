@@ -45,6 +45,8 @@ use dashmap::DashMap;
 use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
 use parking_lot::RwLock;
+use crate::world::storage::BlockStorage;
+use std::ops::Index;
 
 pub struct World {
     pub chunks: Arc<DashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>,
@@ -1569,6 +1571,11 @@ pub struct Section {
 
 impl Section {
     fn new(y: u8, fill_sky: bool) -> Self {
+        let sky_light = if fill_sky {
+            nibble::Array::new_def(16 * 16 * 16, 0xF)
+        } else {
+            nibble::Array::new(16 * 16 * 16)
+        };
         let mut section = Section {
             cull_info: chunk_builder::CullInfo::all_vis(),
             render_buffer: Arc::new(RwLock::new(render::ChunkBuffer::new())),
@@ -1577,16 +1584,11 @@ impl Section {
             blocks: storage::BlockStorage::new(4096),
 
             block_light: nibble::Array::new(16 * 16 * 16),
-            sky_light: nibble::Array::new(16 * 16 * 16),
+            sky_light,
 
             dirty: false,
             building: false,
         };
-        if fill_sky {
-            for i in 0..16 * 16 * 16 {
-                section.sky_light.set(i, 0xF);
-            }
-        }
         section
     }
 
@@ -1633,11 +1635,13 @@ impl Section {
 }
 
 pub struct SectionSnapshot {
+
     pub y: u8,
     pub blocks: storage::BlockStorage,
     pub block_light: nibble::Array,
     pub sky_light: nibble::Array,
     pub biomes: [u8; 16 * 16], // TODO: Remove this by using the chunk's biome!
+
 }
 
 impl SectionSnapshot {
@@ -1689,6 +1693,260 @@ impl SectionSnapshot {
         let x = x & 15;
         let z = z & 15;
         biome::Biome::by_id(self.biomes[((z << 4) | x) as usize] as usize)
+    }
+
+}
+
+pub struct ComposedSection {
+
+    // section: SectionSnapshot,
+    blocks: storage::BlockStorage,
+    block_light: nibble::Array,
+    sky_light: nibble::Array,
+    biomes: Vec<u8>,
+    x: i32,
+    y: i32,
+    z: i32,
+
+}
+
+impl ComposedSection {
+
+    // NOTE: This only supports up to 15 blocks in expansion
+    pub fn new(world: Arc<World>, x: i32, z: i32, y: i32, expand_by: u8) -> Self { // TODO: Don't pass the section snapshot and instead pass an y value
+        let chunk_lookup = world.chunks.clone();
+        let len = (16 + expand_by * 2) as usize;
+        let block_count = len.pow(3);
+        let mut blocks = BlockStorage::new_default(block_count, block::Missing {});
+        let mut block_light = nibble::Array::new(block_count);
+        let mut sky_light = nibble::Array::new(block_count);
+        let mut biomes = vec![0; len * len];
+        // let mut chunks = [None; 3 * 3 * 3]; // TODO: Try find a way to do it this way!
+        let mut chunks = [
+            None, None, None,
+            None, None, None,
+            None, None, None,
+
+            None, None, None,
+            None, None, None,
+            None, None, None,
+
+            None, None, None,
+            None, None, None,
+            None, None, None,
+        ];
+        for xo in 0..3 {
+            for zo in 0..3 {
+                let chunk = chunk_lookup.get(&CPos(x + xo, z + zo));
+                for cy in 0..3 {
+                    let section = chunk.as_ref().unwrap().sections[(y + (cy - 1)) as usize].as_ref();
+                    if section.is_some() {
+                        chunks[(x + 3 * z + 3 * 3 * (cy - 1)) as usize] = Some(section.unwrap().capture_snapshot(chunk.as_ref().unwrap().biomes.clone()));
+                    }
+                }
+            }
+        }
+        ComposedSection::biome_iter(&chunks, &mut biomes, expand_by, 0, expand_by);
+        ComposedSection::biome_iter(&chunks, &mut biomes, expand_by, 3, 16);
+        ComposedSection::biome_iter(&chunks, &mut biomes, expand_by, 3 + 3, expand_by);
+        for y in 0..(16 + expand_by) {
+
+        }/*
+        for i in 0..expand_by {
+            let offset = 16 * i;
+            if chunks[0 + chunk_offset].is_some() {
+                biomes.extend(chunks[0 + 3 * 3].as_ref().unwrap()[(15 - expand_by + offset)..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[1 + chunk_offset].is_some() {
+                biomes.extend(chunks[1 + 3 * 3].as_ref().unwrap()[offset..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[2 + chunk_offset].is_some() {
+                biomes.extend(chunks[2 + 3 * 3].as_ref().unwrap()[(expand_by + offset)..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+        }
+        for i in 0..16 {
+            let offset = 16 * i;
+            if chunks[0 + 3].is_some() {
+                biomes.extend(chunks[0 + 3 + 3 * 3].as_ref().unwrap()[(15 - expand_by + offset)..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[1 + chunk_offset].is_some() {
+                biomes.extend(chunks[1 + 3 + 3 * 3].as_ref().unwrap()[offset..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[2 + chunk_offset].is_some() {
+                biomes.extend(chunks[2 + 3 + 3 * 3].as_ref().unwrap()[(expand_by + offset)..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+        }
+        for i in 0..expand_by {
+            let offset = 16 * i;
+            if chunks[0 + 3 + 3 + 3 * 3].is_some() {
+                biomes.extend(chunks[0 + 3 + 3 + 3 * 3].as_ref().unwrap()[(15 - expand_by + offset)..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[1 + 3 + 3 + 3 * 3].is_some() {
+                biomes.extend(chunks[1 + 3 + 3 + 3 * 3].as_ref().unwrap()[offset..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[2 + 3 + 3 + 3 * 3].is_some() {
+                biomes.extend(chunks[2 + 3 + 3 + 3 * 3].as_ref().unwrap()[(expand_by + offset)..(15 + offset)]);
+            } else {
+                // TODO: Extend with 0s
+            }
+        }*/
+
+        ComposedSection {
+            blocks,
+            block_light,
+            sky_light,
+            biomes,
+            x: -((expand_by/* / 2*/) as i32),
+            y: -((expand_by/* / 2*/) as i32),
+            z: -((expand_by/* / 2*/) as i32)
+        }
+    }
+
+    fn biome_iter(chunks: &[Option<SectionSnapshot>; 27], biomes: &mut Vec<u8>, expand_by: u8, chunk_offset: u8, iters: u8) {
+        let expand_by = expand_by as usize;
+        let chunk_offset = chunk_offset as usize;
+        for i in 0..iters {
+            let offset = 16 * i as usize;
+            if chunks[0 + chunk_offset].is_some() {
+                biomes.extend(chunks[0 + chunk_offset].as_ref().unwrap().biomes[(15 - expand_by + offset)..(15 + offset)].iter());
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[1 + chunk_offset].is_some() {
+                biomes.extend(chunks[1 + chunk_offset].as_ref().unwrap().biomes[offset..(15 + offset)].iter());
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[2 + chunk_offset].is_some() {
+                biomes.extend(chunks[2 + chunk_offset].as_ref().unwrap().biomes[(expand_by + offset)..(15 + offset)].iter());
+            } else {
+                // TODO: Extend with 0s
+            }
+        }
+    }
+/*
+    let mut blocks = BlockStorage::new(block_count);
+    let mut block_light = nibble::Array::new(block_count);
+    let mut sky_light = nibble::Array::new(block_count);
+    */
+
+    fn other_iter(chunks: &[Option<SectionSnapshot>; 27], blocks: &mut BlockStorage, block_light: &mut nibble::Array,
+                  sky_light: &mut nibble::Array, expand_by: u8, chunk_offset: u8, iters: u8) {
+        let expand_by = expand_by as usize;
+        let chunk_offset = chunk_offset as usize;
+        for i in 0..iters {
+            let offset = 16 * i as usize;
+            if chunks[0 + chunk_offset].is_some() {
+                let chunk = chunks[0 + chunk_offset].as_ref().unwrap();
+                let range = (15 - expand_by + offset)..(15 + offset); // for blocks only!
+                let nibble_range = (range.start / expand_by)..(range.end / 2); // for nibbles only!
+                block_light.data.extend(chunk.block_light.data[nibble_range.clone()].iter());
+                sky_light.data.extend(chunk.sky_light.data[nibble_range].iter());
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[1 + chunk_offset].is_some() {
+                let chunk = chunks[1 + chunk_offset].as_ref().unwrap();
+                let range = offset..(15 + offset); // for blocks only!
+                let nibble_range = (range.start / expand_by)..(range.end / 2); // for nibbles only!
+                block_light.data.extend(chunk.block_light.data[nibble_range.clone()].iter());
+                sky_light.data.extend(chunk.sky_light.data[nibble_range].iter());
+            } else {
+                // TODO: Extend with 0s
+            }
+            if chunks[2 + chunk_offset].is_some() {
+                let chunk = chunks[2 + chunk_offset].as_ref().unwrap();
+                let range = (expand_by + offset)..(15 + offset); // for blocks only!
+                let nibble_range = (range.start / expand_by)..(range.end / 2); // for nibbles only!
+                block_light.data.extend(chunk.block_light.data[nibble_range.clone()].iter());
+                sky_light.data.extend(chunk.sky_light.data[nibble_range].iter());
+            } else {
+                // TODO: Extend with 0s
+            }
+        }
+    }
+
+    pub fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
+        /*if x < 0 || y < 0 || z < 0 || x > 15 || y > 15 || z > 15 {
+            println!("getting block at {}, {}, {}", x, y, z);
+        }*/
+        /*let x = x & 15;// TODO: Remove this as soon as OOB calls are fixed!
+        let y = y & 15;
+        let z = z & 15;*/
+        self.blocks.get(self.index(x, y, z))
+    }
+
+    pub fn set_block(&mut self, x: i32, y: i32, z: i32, b: block::Block) -> bool {
+        // println!("get block at {}, {}, {}", x, y, z);
+        if self.blocks.set(self.index(x, y, z), b) {
+            self.set_sky_light(x, y, z, 0); // TODO: Do we have to set this every time?
+            self.set_block_light(x, y, z, 0);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
+        /*let x = x & 15;
+        let y = y & 15;
+        let z = z & 15;*/
+        self.block_light.get(self.index(x, y, z))
+    }
+
+    pub fn set_block_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
+        self.block_light.set(self.index(x, y, z), l);
+    }
+
+    pub fn get_sky_light(&self, x: i32, y: i32, z: i32) -> u8 {
+        /*let x = x & 15;
+        let y = y & 15;
+        let z = z & 15;*/
+        self.sky_light.get(self.index(x, y, z))
+    }
+
+    pub fn set_sky_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
+        self.sky_light.set(self.index(x, y, z), l);
+    }
+
+    pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
+        biome::Biome::by_id(self.biomes[self.index_flat(x, z)] as usize)
+    }
+
+    #[inline]
+    fn index(&self, x: i32, y: i32, z: i32) -> usize {
+        ((x - self.x) | ((y - self.y) << 5) | ((z - self.z) << 10)) as usize // TODO: Use old indexing method
+    }
+
+    #[inline]
+    fn index_flat(&self, x: i32, z: i32) -> usize {
+        ((x - self.x) | ((z - self.z) << 5)) as usize
+    }
+
+    #[inline]
+    fn rev_old_index(&self, index: usize) -> (usize, usize, usize) {
+        (index & 0xF, (index >> 4) & 0xF, (index >> 8) & 0xF)
+    }
+
+    #[inline]
+    fn rev_old_index_flat(&self, index: usize) -> (usize, usize) {
+        (index & 0xF, (index >> 4) & 0xF)
     }
 
 }
