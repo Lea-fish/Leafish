@@ -97,7 +97,7 @@ impl Factory {
         key: Key,
         block: Block,
         rng: &mut R,
-        snapshot: &world::SectionSnapshot,
+        snapshot: &world::ComposedSection,
         x: i32,
         y: i32,
         z: i32,
@@ -173,7 +173,7 @@ impl Factory {
         models: &Arc<RwLock<Factory>>,
         block: Block,
         rng: &mut R,
-        snapshot: &world::SectionSnapshot,
+        snapshot: &world::ComposedSection,
         x: i32,
         y: i32,
         z: i32,
@@ -954,7 +954,7 @@ impl Model {
     fn render<W: Write>(
         &self,
         factory: &Factory,
-        snapshot: &world::SectionSnapshot,
+        snapshot: &world::ComposedSection,
         x: i32,
         y: i32,
         z: i32,
@@ -1035,7 +1035,7 @@ impl Model {
 }
 
 fn calculate_biome(
-    snapshot: &world::SectionSnapshot,
+    snapshot: &world::ComposedSection,
     x: i32,
     z: i32,
     img: &image::DynamicImage,
@@ -1067,7 +1067,7 @@ fn calculate_biome(
 }
 
 fn calculate_light( // TODO: Fix oob access!
-    snapshot: &world::SectionSnapshot,
+    snapshot: &world::ComposedSection,
     orig_x: i32,
     orig_y: i32,
     orig_z: i32,
