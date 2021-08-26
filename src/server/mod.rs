@@ -655,6 +655,13 @@ impl Server {
                             Packet::SetExperience(set_exp) => {
                                 server.hud_context.clone().write().update_exp(set_exp.experience_bar, set_exp.level.0);
                             },
+                            Packet::SetCurrentHotbarSlot(set_slot) => {
+                                if set_slot.slot <= 8 {
+                                    server.hud_context.clone().write().update_slot_index(set_slot.slot);
+                                } else {
+                                    println!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
+                                }
+                            },
                             Packet::WindowItems(window_items) => {
                                 println!("items!");
                             },
@@ -668,7 +675,7 @@ impl Server {
                                 };
                                 let curr_slots = inventory.clone().read().size();
                                 if set_slot.slot < 0 || set_slot.slot >= curr_slots {
-                                    println!("Tried to set an item to slot {} but the current inventory only has {} slots.", set_slot.id + 1, curr_slots);
+                                    println!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
                                 } else {
                                     println!("set item to {}, {}, {}", set_slot.id, set_slot.slot, set_slot.item.as_ref().map_or(0, |s| s.id));
                                     let item = match set_slot.item {

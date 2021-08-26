@@ -14,25 +14,15 @@
 
 use crate::gl;
 use crate::render;
-use crate::render::{glsl, Renderer};
-use crate::render::shaders;
-use crate::resources;
-use byteorder::{NativeEndian, WriteBytesExt};
-use image::GenericImageView;
-use std::collections::HashMap;
-use std::sync::{Arc};
-use crate::render::ui::{UIState, UIText};
+use crate::render::Renderer;
+use std::sync::Arc;
 use crate::ui;
-use crate::ui::{Container, ImageRef, FormattedRef, VAttach, HAttach, Text};
-use crate::screen::settings_menu::UIElements;
-use crate::screen::{Screen, AudioSettingsMenu};
+use crate::ui::{Container, ImageRef, VAttach, HAttach, TextRef};
+use crate::screen::Screen;
 use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
 use rand::rngs::ThreadRng;
 use rand::Rng;
-use leafish_protocol::format::{TextComponent, Component};
-use std::rc::Rc;
-use std::cell::RefCell;
 use parking_lot::RwLock;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Item, Inventory};
@@ -67,6 +57,8 @@ pub struct HudContext {
     dirty_breath: bool,
     pub player_inventory: Option<Arc<RwLock<PlayerInventory>>>,
     pub dirty_slots: bool,
+    slot_index: u8,
+    dirty_slot_index: bool,
 
 }
 
@@ -100,6 +92,8 @@ impl HudContext {
             dirty_breath: false,
             player_inventory: None,
             dirty_slots: false,
+            slot_index: 0,
+            dirty_slot_index: false,
         }
     }
     // TODO: Implement effects!
@@ -148,6 +142,11 @@ impl HudContext {
         self.dirty_exp = true;
     }
 
+    pub fn update_slot_index(&mut self, slot_index: u8) {
+        self.slot_index = slot_index;
+        self.dirty_slot_index = true;
+    }
+
 }
 
 pub struct Hud {
@@ -159,8 +158,9 @@ pub struct Hud {
     food_elements: Vec<ImageRef>,
     breath_elements: Vec<ImageRef>,
     exp_elements: Vec<ImageRef>,
-    exp_text_elements: Vec<Rc<RefCell<Text>>>,
+    exp_text_elements: Vec<TextRef>,
     slot_elements: Vec<ImageRef>,
+    slot_index_elements: Vec<ImageRef>,
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
 
@@ -179,16 +179,9 @@ impl Hud {
             exp_elements: vec![],
             exp_text_elements: vec![],
             slot_elements: vec![],
+            slot_index_elements: vec![],
             hud_context: hud_context.clone(),
             random: rand::thread_rng(),
-        }
-    }
-
-    fn max(first: f64, second: f64) -> f64 {
-        if first > second {
-            first
-        }else {
-            second
         }
     }
     
@@ -205,6 +198,7 @@ impl Screen for Hud {
         self.render_food(renderer, ui_container);
         self.render_breath(renderer, ui_container);
         self.render_slots_items(renderer, ui_container);
+        self.render_slot_index(renderer, ui_container);
     }
 
     fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
@@ -216,6 +210,7 @@ impl Screen for Hud {
         self.armor_elements.clear();
         self.breath_elements.clear();
         self.slot_elements.clear();
+        self.slot_index_elements.clear();
     }
 
     fn tick(
@@ -258,6 +253,10 @@ impl Screen for Hud {
         if self.hud_context.clone().read().dirty_slots {
             self.slot_elements.clear();
             self.render_slots_items(renderer, ui_container);
+        }
+        if self.hud_context.clone().read().dirty_slot_index {
+            self.slot_index_elements.clear();
+            self.render_slot_index(renderer, ui_container);
         }
         None
     }
@@ -630,6 +629,20 @@ impl Hud {
             }
         }
         self.hud_context.clone().write().dirty_slots = false;
+    }
+
+    fn render_slot_index(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let slot = self.hud_context.clone().read().slot_index as f64;
+        let image = ui::ImageBuilder::new()
+            .texture_coords((0.0 / 256.0, 22.0 / 256.0, 24.0 / 256.0, 22.0 / 256.0))
+            .position((icon_scale / 9.0) * -1.0 + -(icon_scale / 9.0 * 90.0) + (slot * (icon_scale / 9.0 * 20.0)) + icon_scale / 9.0 * 11.0, (icon_scale / 9.0) * 1.0)
+            .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
+            .size(icon_scale / 9.0 * 24.0, icon_scale / 9.0 * 22.0)
+            .texture("minecraft:gui/widgets")
+            .create(ui_container);
+        self.slot_index_elements.push(image);
+        self.hud_context.clone().write().dirty_slot_index = false;
     }
 
     fn render_item(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
