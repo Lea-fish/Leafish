@@ -828,7 +828,6 @@ Process finished with exit code 101
                       version: u8) -> Result<(), protocol::Error> {
         let additional_light_data = self.lighting_cache.clone().write().remove(&CPos(x, z));
         let has_add_light = additional_light_data.is_some();
-        let mut additional_light_data = additional_light_data.unwrap();
         let cpos = CPos(x, z);
         {
             if new {
@@ -869,6 +868,7 @@ Process finished with exit code 101
             } else if version != 19 {
                 self.read_light(chunk, mask, skylight, data);
             } else if has_add_light {
+                let mut additional_light_data = additional_light_data.unwrap();
                 self.load_light(chunk, additional_light_data.block_light_mask, true, additional_light_data.sky_light_mask, &mut additional_light_data.arrays);
             }
 
