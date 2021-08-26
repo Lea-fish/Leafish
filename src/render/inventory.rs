@@ -1,8 +1,6 @@
-use crate::ui::{ImageRef, Text, Container, TextRef};
-use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::{Arc};
-use crate::inventory::{InventoryContext, Inventory, Item, Material};
+use crate::ui::{ImageRef, Container, TextRef};
+use std::sync::Arc;
+use crate::inventory::{InventoryContext, Inventory, Item};
 use crate::screen::Screen;
 use crate::render::Renderer;
 use crate::{gl, ui};
@@ -75,11 +73,11 @@ impl InventoryWindow {
     }
 
     pub fn clear_elements(&mut self) {
-        for mut element in &mut self.elements {
+        for element in &mut self.elements {
             element.clear();
         }
         self.elements.clear();
-        for mut element in &mut self.text_elements {
+        for element in &mut self.text_elements {
             element.clear();
         }
         self.text_elements.clear();

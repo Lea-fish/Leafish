@@ -4,7 +4,7 @@ use crate::resources;
 use crate::shared::Direction;
 use crate::types::bit::Set;
 use crate::world;
-use crate::world::{block, World, SectionSnapshot, CPos, ComposedSection};
+use crate::world::{block, World, CPos, ComposedSection};
 use rand::{self, Rng, SeedableRng};
 use std::sync::{Arc};
 use std::thread;

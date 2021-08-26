@@ -1,6 +1,6 @@
 use crate::inventory::{Inventory, Item, InventoryType, Slot, Material};
 use crate::render::Renderer;
-use crate::ui::{Container, ImageRef, VAttach, HAttach};
+use crate::ui::{Container, VAttach, HAttach};
 use crate::ui;
 use crate::render::hud::{Hud, HudContext};
 use std::sync::{Arc};
@@ -124,7 +124,7 @@ impl PlayerInventory {
             self.slots.get_mut(36 + i).unwrap().update_position(x_offset + i as f64 * (size + size * 1.0 / 8.0), y_offset, size);
         }
         if self.version > Version::V1_8 || true {
-            let mut slot = self.slots.get_mut(45).unwrap();
+            let slot = self.slots.get_mut(45).unwrap();
             slot.update_position(-(scale / 9.0 * 3.0), scale / 9.0 * 5.0 - scale / 9.0 * 18.0, size);
         }
         self.dirty = true;
@@ -164,7 +164,7 @@ impl Inventory for PlayerInventory {
 
     fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container, inventory_window: &mut InventoryWindow) {
         inventory_window.elements.push(vec![]);
-        let mut basic_elements = inventory_window.elements.get_mut(0).unwrap();
+        let basic_elements = inventory_window.elements.get_mut(0).unwrap();
         let icon_scale = Hud::icon_scale(renderer) as f64;
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, 166.0 / 256.0))
@@ -187,7 +187,7 @@ impl Inventory for PlayerInventory {
         }
         let scale = icon_scale / 9.0 / 2.0;
         inventory_window.text_elements.push(vec![]);
-        let mut basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
+        let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
         let crafting_text = ui::TextBuilder::new()
             .alignment(VAttach::Middle, HAttach::Center)
             .scale_x(scale)

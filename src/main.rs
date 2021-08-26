@@ -53,8 +53,7 @@ use std::rc::Rc;
 use std::sync::{Arc};
 use std::thread;
 use leafish_protocol::protocol::Error;
-use crate::render::hud::{HudContext, Hud};
-use crate::inventory::Material;
+use crate::render::hud::HudContext;
 use parking_lot::RwLock;
 use parking_lot::Mutex;
 
@@ -369,7 +368,7 @@ fn main() {
         opt.default_protocol_version
             .unwrap_or_else(|| "".to_string()),
     );
-    let mut game = Game {
+    let game = Game {
         server: None,// Arc::from(server::Server::dummy_server(resource_manager.clone())),
         focused: false,
         renderer: Arc::new(RwLock::new(renderer)),

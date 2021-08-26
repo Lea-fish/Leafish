@@ -30,7 +30,7 @@ use rand::Rng;
 use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
 use crate::ui::Container;
-use crossbeam_channel::{Sender, Receiver, TryRecvError};
+use crossbeam_channel::{Receiver, TryRecvError};
 use crossbeam_channel::unbounded;
 use parking_lot::RwLock;
 

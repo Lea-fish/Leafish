@@ -38,16 +38,12 @@ use instant::Instant;
 pub mod biome;
 mod storage;
 
-use crate::render::Renderer;
 use collision::Frustum;
 use crate::chunk_builder::CullInfo;
 use dashmap::DashMap;
 use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
 use parking_lot::RwLock;
-use crate::world::storage::BlockStorage;
-use std::ops::Index;
-use std::any::Any;
 use crate::world::biome::Biome;
 use lazy_static::lazy_static;
 
@@ -158,10 +154,10 @@ impl World {
         let mut chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         if chunk.set_block(pos.x & 0xF, pos.y, pos.z & 0xF, b) {
             if chunk.block_entities.contains_key(&pos) {
-                self.block_entity_actions.0.send(BlockEntityAction::Remove(pos));
+                self.block_entity_actions.0.send(BlockEntityAction::Remove(pos)).unwrap();
             }
             if block_entity::BlockEntityType::get_block_entity(b).is_some() {
-                self.block_entity_actions.0.send(BlockEntityAction::Create(pos));
+                self.block_entity_actions.0.send(BlockEntityAction::Create(pos)).unwrap();
             }
             true
         } else {
@@ -243,11 +239,11 @@ impl World {
     }
 
     fn update_light(&self, pos: Position, ty: LightType) {
-        self.light_updates.send(LightUpdate { ty, pos });
+        self.light_updates.send(LightUpdate { ty, pos }).unwrap();
     }
 
     pub fn add_block_entity_action(&self, action: BlockEntityAction) {
-        self.block_entity_actions.0.send(action);
+        self.block_entity_actions.0.send(action).unwrap();
     }
 
     #[allow(clippy::verbose_bit_mask)] // "llvm generates better code" for updates_performed & 0xFFF "on x86"
@@ -383,7 +379,7 @@ impl World {
             ((renderer.clone().read().camera.pos.z as i32) >> 4),
         );
 
-        let mut render_queue = Arc::new(RwLock::new(Vec::new()));
+        let render_queue = Arc::new(RwLock::new(Vec::new()));
         let mut process_queue = VecDeque::with_capacity(self.chunks.clone().len() * 16);
         // println!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
@@ -842,7 +838,7 @@ Process finished with exit code 101
                 return Ok(());
             }
             let chunks = self.chunks.clone();
-            let mut chunk = &mut chunks.get_mut(&cpos).unwrap();
+            let chunk = &mut chunks.get_mut(&cpos).unwrap();
 
             // Block type array - whole byte per block  // 17
             let mut block_types: [[u8; 4096]; 16] = [[0u8; 4096]; 16]; // 17
@@ -893,7 +889,7 @@ Process finished with exit code 101
             let _block_count = data.read_u16::<byteorder::LittleEndian>().unwrap();
             // TODO: use block_count
         }
-        let mut section = chunk.sections[section_id].as_mut().unwrap();
+        let section = chunk.sections[section_id].as_mut().unwrap();
 
         let mut bit_size = data.read_u8().unwrap();
         let mut mappings: HashMap<usize, block::Block, BuildHasherDefault<FNVHash>> =
@@ -938,9 +934,9 @@ Process finished with exit code 101
                     chunk.position.1 << 4,
                 );
                 if chunk.block_entities.contains_key(&pos) {
-                    self.block_entity_actions.0.send(BlockEntityAction::Remove(pos));
+                    self.block_entity_actions.0.send(BlockEntityAction::Remove(pos)).unwrap();
                 }
-                self.block_entity_actions.0.send(BlockEntityAction::Create(pos));
+                self.block_entity_actions.0.send(BlockEntityAction::Create(pos)).unwrap();
             }
         }
         if self.protocol_version >= 451 {
@@ -952,7 +948,7 @@ Process finished with exit code 101
     }
 
     fn prep_section_18(&self, chunk: &mut Chunk, data: &mut Cursor<Vec<u8>>, section_id: usize) {
-        let mut section = chunk.sections[section_id].as_mut().unwrap();
+        let section = chunk.sections[section_id].as_mut().unwrap();
         for bi in 0..4096 {
             let id = data.read_u16::<byteorder::LittleEndian>().unwrap();
             section.blocks.set(
@@ -974,9 +970,9 @@ Process finished with exit code 101
                     chunk.position.1 << 4,
                 );
                 if chunk.block_entities.contains_key(&pos) {
-                    self.block_entity_actions.0.send(BlockEntityAction::Remove(pos));
+                    self.block_entity_actions.0.send(BlockEntityAction::Remove(pos)).unwrap();
                 }
-                self.block_entity_actions.0.send(BlockEntityAction::Create(pos));
+                self.block_entity_actions.0.send(BlockEntityAction::Create(pos)).unwrap();
             }
         }
     }
@@ -1071,7 +1067,7 @@ Process finished with exit code 101
                 continue;
             }
 
-            let mut section = chunk.sections[i as usize].as_mut().unwrap();
+            let section = chunk.sections[i as usize].as_mut().unwrap();
 
             for bi in 0..4096 {
                 let id = ((block_add[i].get(bi) as u16) << 12)
@@ -1096,9 +1092,9 @@ Process finished with exit code 101
                         chunk.position.1 << 4,
                     );
                     if chunk.block_entities.contains_key(&pos) {
-                        self.block_entity_actions.0.send(BlockEntityAction::Remove(pos));
+                        self.block_entity_actions.0.send(BlockEntityAction::Remove(pos)).unwrap();
                     }
-                    self.block_entity_actions.0.send(BlockEntityAction::Create(pos));
+                    self.block_entity_actions.0.send(BlockEntityAction::Create(pos)).unwrap();
                 }
             }
         }
@@ -1265,7 +1261,7 @@ Process finished with exit code 101
             if chunk.sections[i as usize].as_ref().is_none() {
                 chunk.sections[i as usize].replace(Section::new(i, false));
             }
-            let mut section = chunk.sections[i as usize].as_mut().unwrap();
+            let section = chunk.sections[i as usize].as_mut().unwrap();
 
             data.read_exact(&mut section.block_light.data).unwrap();
         }
@@ -1278,7 +1274,7 @@ Process finished with exit code 101
                 if chunk.sections[i as usize].as_ref().is_none() {
                     chunk.sections[i as usize].replace(Section::new(i, false));
                 }
-                let mut section = chunk.sections[i as usize].as_mut().unwrap();
+                let section = chunk.sections[i as usize].as_mut().unwrap();
 
                 data.read_exact(&mut section.sky_light.data).unwrap();
             }
@@ -1579,7 +1575,7 @@ impl Section {
         } else {
             nibble::Array::new(16 * 16 * 16)
         };
-        let mut section = Section {
+        let section = Section {
             cull_info: chunk_builder::CullInfo::all_vis(),
             render_buffer: Arc::new(RwLock::new(render::ChunkBuffer::new())),
             y,
@@ -1737,9 +1733,9 @@ impl ComposedSection {
     }
 
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
-        let chunk_x = ComposedSection::cmp((x & !15), 0);
-        let chunk_z = ComposedSection::cmp((z & !15), 0);
-        let chunk_y = ComposedSection::cmp((y & !15), 0);
+        let chunk_x = ComposedSection::cmp(x & !15, 0);
+        let chunk_z = ComposedSection::cmp(z & !15, 0);
+        let chunk_y = ComposedSection::cmp(y & !15, 0);
         let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize].as_ref();
         let x = if x < 0 {
             16 + x
@@ -1760,9 +1756,9 @@ impl ComposedSection {
     }
 
     pub fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        let chunk_x = ComposedSection::cmp((x & !15), 0);
-        let chunk_z = ComposedSection::cmp((z & !15), 0);
-        let chunk_y = ComposedSection::cmp((y & !15), 0);
+        let chunk_x = ComposedSection::cmp(x & !15, 0);
+        let chunk_z = ComposedSection::cmp(z & !15, 0);
+        let chunk_y = ComposedSection::cmp(y & !15, 0);
         let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize].as_ref();
         let x = if x < 0 {
             16 + x
@@ -1783,9 +1779,9 @@ impl ComposedSection {
     }
 
     pub fn get_sky_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        let chunk_x = ComposedSection::cmp((x & !15), 0);
-        let chunk_z = ComposedSection::cmp((z & !15), 0);
-        let chunk_y = ComposedSection::cmp((y & !15), 0);
+        let chunk_x = ComposedSection::cmp(x & !15, 0);
+        let chunk_z = ComposedSection::cmp(z & !15, 0);
+        let chunk_y = ComposedSection::cmp(y & !15, 0);
         let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize].as_ref();
         let x = if x < 0 {
             16 + x
@@ -1807,8 +1803,8 @@ impl ComposedSection {
 
 
     pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
-        let chunk_x = ComposedSection::cmp((x & !15), 0);
-        let chunk_z = ComposedSection::cmp((z & !15), 0);
+        let chunk_x = ComposedSection::cmp(x & !15, 0);
+        let chunk_z = ComposedSection::cmp(z & !15, 0);
         let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + 0 * 3 * 3) as usize].as_ref();
         let x = if x < 0 {
             16 + x
@@ -1821,26 +1817,6 @@ impl ComposedSection {
             z & 15
         };
         section.map_or(Biome::by_id(0), |s| s.get_biome(x, z))
-    }
-
-    #[inline]
-    fn index(&self, x: i32, y: i32, z: i32) -> usize {
-        ((x - self.x) | ((y - self.y) << 5) | ((z - self.z) << 10)) as usize // TODO: Use old indexing method
-    }
-
-    #[inline]
-    fn index_flat(&self, x: i32, z: i32) -> usize {
-        ((x - self.x) | ((z - self.z) << 5)) as usize
-    }
-
-    #[inline]
-    fn rev_old_index(&self, index: usize) -> (usize, usize, usize) {
-        (index & 0xF, (index >> 4) & 0xF, (index >> 8) & 0xF)
-    }
-
-    #[inline]
-    fn rev_old_index_flat(&self, index: usize) -> (usize, usize) {
-        (index & 0xF, (index >> 4) & 0xF)
     }
 
     #[inline]
