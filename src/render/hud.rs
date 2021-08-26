@@ -274,25 +274,25 @@ impl Screen for Hud {
 
 impl Hud {
 
-    pub fn icon_scale(renderer: &Renderer) -> f32 {
+    pub fn icon_scale(renderer: &Renderer) -> f64 {
         Hud::icon_scale_by_height(renderer.safe_height)
     }
 
-    pub fn icon_scale_by_height(height: u32) -> f32 {
+    pub fn icon_scale_by_height(height: u32) -> f64 {
         let icon_scale = if height > 500 {
-            height as f32 / 36.50
+            height as f64 / 36.50
         }else {
-            height as f32 / 26.50/*27.5*/
+            height as f64 / 26.50/*27.5*/
         };
-        icon_scale
+        icon_scale / 9.0
     }
 
     fn render_health(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let hud_context = self.hud_context.clone();
         let hud_context = hud_context.read();
         let icon_scale = Hud::icon_scale(renderer);
-        let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 * -1.0 + icon_scale as f64 / 2.0;
-        let y_offset = icon_scale as f64 / 9.0 * 30.0;
+        let x_offset = icon_scale * 182.0 / 2.0 * -1.0 + icon_scale * 9.0 / 2.0;
+        let y_offset = icon_scale * 30.0;
         let hp = hud_context.health.ceil();
         let max_health = hud_context.max_health;
         let absorbtion = hud_context.absorbtion;
@@ -322,26 +322,26 @@ impl Hud {
         let mut redirty_health = false;
 
         for heart in (0..((((max_health + absorbtion) / 2.0) as f64).ceil()) as isize).rev() {
-            let heart_rows = ((heart + 1) as f32 / 10.0).ceil() - 1.0;
-            let x = x_offset as f32 + (heart as f32) % 10.0 * (icon_scale / 9.0 * 8.0);
-            let mut y = y_offset as f32 + (heart_rows * (icon_scale + (icon_scale / 9.0 * 1.0)));
+            let heart_rows = (((heart + 1) as f32 / 10.0).ceil() as f64) - 1.0;
+            let x = x_offset + (heart as f64) % 10.0 * (icon_scale * 8.0);
+            let mut y = y_offset + (heart_rows * (icon_scale * 9.0 + (icon_scale * 1.0)));
 
             if heart == regen_animation {
                 // This moves the hearts down when the regeneration effect is active
-                y -= icon_scale / 9.0 * 2.0;
+                y -= icon_scale * 2.0;
             }
 
             if hp <= 4.0 {
                 // Creates the jittery effect when player has less than 2.5 hearts
-                y += icon_scale / 9.0 * (self.random.gen_range(0..2) as f32);
+                y += icon_scale * (self.random.gen_range(0..2) as f64);
                 redirty_health = true;
             }
 
             let image = ui::ImageBuilder::new()
                 .texture_coords(((16.0 + updated_offset) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                .position(x as f64, y as f64)
+                .position(x, y)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                .size(icon_scale as f64, icon_scale as f64)
+                .size(icon_scale * 9.0, icon_scale * 9.0)
                 .texture("minecraft:gui/icons")
                 .create(ui_container);
             self.health_elements.push(image);
@@ -350,18 +350,18 @@ impl Hud {
                 if heart as f32 * 2.0 + 1.0 < last_health {
                     let image = ui::ImageBuilder::new()
                         .texture_coords(((texture_offset + 54) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                        .position(x as f64, y as f64)
+                        .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                        .size(icon_scale as f64, icon_scale as f64)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.health_elements.push(image);
                 } else if heart as f32 * 2.0 + 1.0 == last_health {
                     let image = ui::ImageBuilder::new()
                         .texture_coords(((texture_offset + 63) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                        .position(x as f64, y as f64)
+                        .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                        .size(icon_scale as f64, icon_scale as f64)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.health_elements.push(image);
@@ -372,9 +372,9 @@ impl Hud {
                 if tmp_absorbtion == absorbtion && absorbtion % 2.0 == 1.0 {
                     let image = ui::ImageBuilder::new()
                         .texture_coords(((texture_offset + 153) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                        .position(x as f64, y as f64)
+                        .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                        .size(icon_scale as f64, icon_scale as f64)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.health_elements.push(image);
@@ -382,9 +382,9 @@ impl Hud {
                 } else {
                     let image = ui::ImageBuilder::new()
                         .texture_coords(((texture_offset + 144) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                        .position(x as f64, y as f64)
+                        .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                        .size(icon_scale as f64, icon_scale as f64)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.health_elements.push(image);
@@ -395,9 +395,9 @@ impl Hud {
                 if heart * 2 + 1 < hp as isize {
                     let image = ui::ImageBuilder::new()
                         .texture_coords(((texture_offset + 36) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                        .position(x as f64, y as f64)
+                        .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                        .size(icon_scale as f64, icon_scale as f64)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.health_elements.push(image);
@@ -406,9 +406,9 @@ impl Hud {
                 if heart * 2 + 1 == hp as isize {
                     let image = ui::ImageBuilder::new()
                         .texture_coords(((texture_offset + 45) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                        .position(x as f64, y as f64)
+                        .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                        .size(icon_scale as f64, icon_scale as f64)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.health_elements.push(image);
@@ -423,16 +423,16 @@ impl Hud {
     fn render_armor(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let armor = self.hud_context.clone().read().armor;
         let icon_scale = Hud::icon_scale(renderer);
-        let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 * -1.0 + icon_scale as f64 / 2.0;
-        let y_offset = icon_scale as f64 / 9.0 * 30.0;
+        let x_offset = icon_scale * 182.0 / 2.0 * -1.0 + icon_scale * 9.0 / 2.0;
+        let y_offset = icon_scale * 30.0;
         let max_health = self.hud_context.clone().read().max_health;
         let absorbtion = self.hud_context.clone().read().absorbtion;
         let icon_bars = (((max_health + absorbtion) / 2.0 / 10.0) as f64).ceil();
 
         if armor > 0 {
             for i in 0..10 {
-                let x = x_offset as f32 + i as f32 * (icon_scale / 9.0 * 8.0);
-                let y = y_offset as f32 + (icon_bars as f32 * (icon_scale + (icon_scale / 9.0 * 1.0)));
+                let x = x_offset + i as f64 * (icon_scale * 8.0);
+                let y = y_offset + (icon_bars as f64 * (icon_scale * 9.0 + (icon_scale * 1.0)));
                 let texture_offset = if i * 2 + 1 < armor {
                     34.0
                 } else if i * 2 + 1 == armor {
@@ -442,9 +442,9 @@ impl Hud {
                 };
                 let image = ui::ImageBuilder::new()
                     .texture_coords((texture_offset / 256.0, 9.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                    .position(x as f64, y as f64)
+                    .position(x, y)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                    .size(icon_scale as f64, icon_scale as f64)
+                    .size(icon_scale * 9.0, icon_scale * 9.0)
                     .texture("minecraft:gui/icons")
                     .create(ui_container);
                 self.armor_elements.push(image);
@@ -454,13 +454,13 @@ impl Hud {
     }
 
     fn render_food(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let icon_scale = Hud::icon_scale(renderer);
         let hud_context = self.hud_context.clone();
         let hud_context = hud_context.read();
         let food = hud_context.food;
         let last_food = hud_context.last_food;
-        let x_offset = icon_scale as f64 / 9.0 * 182.0 / 2.0 + icon_scale as f64 / 2.0;
-        let y_offset = icon_scale as f64 / 9.0 * 30.0;
+        let x_offset = icon_scale * 182.0 / 2.0 + icon_scale * 9.0 / 2.0;
+        let y_offset = icon_scale * 30.0;
 
         let mut l7 = 16.0;
         let mut j8 = 0.0;
@@ -473,12 +473,12 @@ impl Hud {
         drop(hud_context);
 
         for i in 0..10 {
-            let x = x_offset - i as f64 * (icon_scale / 9.0 * 8.0) - icon_scale;
+            let x = x_offset - i as f64 * (icon_scale * 8.0) - icon_scale * 9.0;
             let image = ui::ImageBuilder::new()
                 .texture_coords(((16.0 + j8 * 9.0) / 256.0, 27.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                .position(x as f64, y_offset as f64)
+                .position(x, y_offset)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                .size(icon_scale as f64, icon_scale as f64)
+                .size(icon_scale * 9.0, icon_scale * 9.0)
                 .texture("minecraft:gui/icons")
                 .create(ui_container);
             self.food_elements.push(image);
@@ -486,18 +486,18 @@ impl Hud {
             if i * 2 + 1 < food {
                 let image = ui::ImageBuilder::new()
                     .texture_coords(((l7 + 36.0) / 256.0, 27.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                    .position(x as f64, y_offset as f64)
+                    .position(x, y_offset)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                    .size(icon_scale as f64, icon_scale as f64)
+                    .size(icon_scale * 9.0, icon_scale * 9.0)
                     .texture("minecraft:gui/icons")
                     .create(ui_container);
                 self.food_elements.push(image);
             } else if i * 2 + 1 == food {
                 let image = ui::ImageBuilder::new()
                     .texture_coords(((l7 + 45.0) / 256.0, 27.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                    .position(x as f64, y_offset as f64)
+                    .position(x, y_offset)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                    .size(icon_scale as f64, icon_scale as f64)
+                    .size(icon_scale * 9.0, icon_scale * 9.0)
                     .texture("minecraft:gui/icons")
                     .create(ui_container);
                 self.food_elements.push(image);
@@ -507,8 +507,8 @@ impl Hud {
     }
 
     fn render_exp(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer) as f64;
-        let y_offset = icon_scale / 9.0 * 24.0;
+        let icon_scale = Hud::icon_scale(renderer);
+        let y_offset = icon_scale * 24.0;
         let hud_context = self.hud_context.clone();
         let hud_context = hud_context.read();
         let max_exp = if hud_context.exp_level >= 30 {
@@ -521,21 +521,21 @@ impl Hud {
         if max_exp > 0 {
             let image = ui::ImageBuilder::new()
                 .texture_coords((0.0 / 256.0, 64.0 / 256.0, 182.0 / 256.0, 5.0 / 256.0))
-                .position(0.0 as f64, y_offset as f64)
+                .position(0.0, y_offset)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                .size(icon_scale / 9.0 * 182.0, icon_scale / 9.0 * 5.0)
+                .size(icon_scale * 182.0, icon_scale * 5.0)
                 .texture("minecraft:gui/icons")
                 .create(ui_container);
             self.exp_elements.push(image);
 
             let scaled_length = hud_context.exp * 182.0;
             if scaled_length > 0.0 {
-                let shift = icon_scale / 9.0 * (((182.0) - scaled_length as f64) / 2.0);
+                let shift = icon_scale * (((182.0) - scaled_length as f64) / 2.0);
                 let image = ui::ImageBuilder::new()
                     .texture_coords((0.0 / 256.0, 69.0 / 256.0, scaled_length as f64 / 256.0, 5.0 / 256.0))
-                    .position(shift * -1.0, y_offset as f64)
+                    .position(shift * -1.0, y_offset)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                    .size(icon_scale / 9.0 * scaled_length as f64, icon_scale / 9.0 * 5.0)
+                    .size(icon_scale * scaled_length as f64, icon_scale * 5.0)
                     .texture("minecraft:gui/icons")
                     .create(ui_container);
                 self.exp_elements.push(image);
@@ -543,13 +543,13 @@ impl Hud {
         }
         if hud_context.exp_level > 0 {
             let level_str = format!("{}", hud_context.exp_level);
-            let scale = icon_scale / 9.0 / 2.0;
-            let y = icon_scale / 9.0 * 26.0;
+            let scale = icon_scale / 2.0;
+            let y = icon_scale * 26.0;
             self.exp_text_elements.push(ui::TextBuilder::new()
                 .alignment(VAttach::Bottom, HAttach::Center)
                 .scale_x(scale)
                 .scale_y(scale)
-                .position((icon_scale / 9.0 * 1.0), y)
+                .position((icon_scale * 1.0), y)
                 .text(&level_str)
                 .colour((0, 0, 0, 255))
                 .shadow(false)
@@ -558,7 +558,7 @@ impl Hud {
                 .alignment(VAttach::Bottom, HAttach::Center)
                 .scale_x(scale)
                 .scale_y(scale)
-                .position(-(icon_scale / 9.0 * 1.0), y)
+                .position(-(icon_scale * 1.0), y)
                 .text(&level_str)
                 .colour((0, 0, 0, 1))
                 .shadow(false)
@@ -567,7 +567,7 @@ impl Hud {
                 .alignment(VAttach::Bottom, HAttach::Center)
                 .scale_x(scale)
                 .scale_y(scale)
-                .position(0.0, y + (icon_scale / 9.0 * 1.0))
+                .position(0.0, y + (icon_scale * 1.0))
                 .text(&level_str)
                 .colour((0, 0, 0, 255))
                 .shadow(false)
@@ -576,7 +576,7 @@ impl Hud {
                 .alignment(VAttach::Bottom, HAttach::Center)
                 .scale_x(scale)
                 .scale_y(scale)
-                .position(0.0, y - (icon_scale / 9.0 * 1.0))
+                .position(0.0, y - (icon_scale * 1.0))
                 .text(&level_str)
                 .colour((0, 0, 0, 255))
                 .shadow(false)
@@ -596,12 +596,12 @@ impl Hud {
     }
 
     fn render_slots(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 256.0, 0.0 / 256.0, 182.0 / 256.0, 22.0 / 256.0))
             .position(0.0, 0.0)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-            .size(icon_scale / 9.0 * 182.0, icon_scale / 9.0 * 22.0)
+            .size(icon_scale * 182.0, icon_scale * 22.0)
             .texture("minecraft:gui/widgets")
             .create(ui_container);
         self.elements.push(image);
@@ -616,15 +616,15 @@ impl Hud {
     }
 
     fn render_slots_items(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let icon_scale = Hud::icon_scale(renderer);
         for i in 0..9 {
             let player_inventory = self.hud_context.clone().read().player_inventory.as_ref().unwrap().clone();
             let player_inventory = player_inventory.read();
             let item = player_inventory.get_item(36 + i as i16);
             if let Some(item) = item {
                 let slot = self.draw_item(item,
-                                          -(icon_scale / 9.0 * 90.0) + (i as f64 * (icon_scale / 9.0 * 20.0)) + icon_scale / 9.0 * 11.0,
-                                          icon_scale / 9.0 * 3.0, ui_container, renderer);
+                                          -(icon_scale * 90.0) + (i as f64 * (icon_scale * 20.0)) + icon_scale * 11.0,
+                                          icon_scale * 3.0, ui_container, renderer);
                 self.slot_elements.push(slot);
             }
         }
@@ -632,13 +632,13 @@ impl Hud {
     }
 
     fn render_slot_index(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let icon_scale = Hud::icon_scale(renderer);
         let slot = self.hud_context.clone().read().slot_index as f64;
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 256.0, 22.0 / 256.0, 24.0 / 256.0, 22.0 / 256.0))
-            .position((icon_scale / 9.0) * -1.0 + -(icon_scale / 9.0 * 90.0) + (slot * (icon_scale / 9.0 * 20.0)) + icon_scale / 9.0 * 11.0, (icon_scale / 9.0) * 1.0)
+            .position((icon_scale) * -1.0 + -(icon_scale * 90.0) + (slot * (icon_scale * 20.0)) + icon_scale * 11.0, (icon_scale) * 1.0)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-            .size(icon_scale / 9.0 * 24.0, icon_scale / 9.0 * 22.0)
+            .size(icon_scale * 24.0, icon_scale * 22.0)
             .texture("minecraft:gui/widgets")
             .create(ui_container);
         self.slot_index_elements.push(image);
@@ -650,12 +650,12 @@ impl Hud {
     }
 
     fn render_crosshair(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 256.0, 0.0 / 256.0, 16.0 / 256.0, 16.0 / 256.0))
             .position(0.0, 0.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-            .size(icon_scale / 9.0 * 16.0, icon_scale / 9.0 * 16.0)
+            .size(icon_scale * 16.0, icon_scale * 16.0)
             .texture("minecraft:gui/icons")
             .create(ui_container);
         self.elements.push(image);
@@ -671,9 +671,9 @@ impl Hud {
             let bubbles = ((breath - 2.0) * 10.0 / 300.0).ceil();
             let broken_bubbles = (breath * 10.0 / 300.0).ceil() - bubbles;
 
-            let icon_scale = Hud::icon_scale(renderer) as f64;
-            let y_offset = icon_scale / 9.0 * 40.0;
-            let x_offset = icon_scale / 9.0 * 182.0 / 2.0 + icon_scale / 2.0;
+            let icon_scale = Hud::icon_scale(renderer);
+            let y_offset = icon_scale * 40.0;
+            let x_offset = icon_scale * 182.0 / 2.0 + icon_scale * 9.0 / 2.0;
 
             for i in 0..bubbles as i32 + broken_bubbles as i32 {
                 let x = x_offset - i as f64 * (icon_scale / 9.0 * 8.0) - icon_scale;
@@ -683,7 +683,7 @@ impl Hud {
                         .texture_coords((16.0 / 256.0, 18.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
                         .position(x, y_offset)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                        .size(icon_scale / 9.0 * 9.0, icon_scale / 9.0 * 9.0)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.elements.push(image);
@@ -693,7 +693,7 @@ impl Hud {
                         .texture_coords((25.0 / 256.0, 18.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
                         .position(x, y_offset)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                        .size(icon_scale / 9.0 * 9.0, icon_scale / 9.0 * 9.0)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.elements.push(image);
@@ -705,12 +705,12 @@ impl Hud {
 
     pub fn draw_item(&self, item: &Item, x: f64, y: f64,
                      ui_container: &mut Container, renderer: &Renderer) -> ImageRef {
-        let icon_scale = Hud::icon_scale(renderer) as f64;
+        let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 16.0, 0.0 / 16.0, 16.0 / 16.0, 16.0 / 16.0))
             .position(x, y)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-            .size(icon_scale / 9.0 * 16.0, icon_scale / 9.0 * 16.0)
+            .size(icon_scale * 16.0, icon_scale * 16.0)
             .texture(format!("minecraft:{}", item.material.texture_location()))
             .create(ui_container);
         image
