@@ -7,7 +7,7 @@ Because I wanted to remove some stuff and add other stuff freely without having 
 
 Multi-protocol Minecraft-compatible client written in Rust.
 
-Don't expect it to go anywhere, just doing this for fun.
+If you want to communicate with us you can do so on this matrix channel #leafish:matrix.org
 
 ## Images
 
