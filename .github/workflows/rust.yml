@@ -11,14 +11,13 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v2
     - name: install_dependencies
-      run: apt-get install --no-install-recommends libxcb-shape0-dev libxcb-xfixes0-dev
-    - name: Build
+      run: sudo apt-get install --no-install-recommends libxcb-shape0-dev libxcb-xfixes0-dev
+    - name: build
       run: cargo build --verbose
-    - name: Run tests
+    - name: check
       run: cargo test --verbose
