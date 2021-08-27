@@ -18,7 +18,7 @@
 #![allow(clippy::float_cmp)] // float comparison used to check if changed
 
 use instant::{Duration, Instant};
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use std::fs;
 extern crate leafish_shared as shared;
 
@@ -119,7 +119,7 @@ impl Game {
                     (self.default_protocol_version, vec![], None)
                 }
             };
-        println!("connecting...?!?!");
+        debug!("connecting...?!?!");
         // let (tx, rx) = mpsc::channel();
         // self.connect_reply = Some(rx);
         let address = address.to_owned();
@@ -151,7 +151,7 @@ impl Game {
                 // self.server.disconnect_reason = Some(Component::from_string(&*err.to_string()));
             }
         }
-        println!("after connect!");
+        debug!("after connect!");
     }
 
     pub fn tick(&mut self/*, delta: f64*/) {
@@ -183,10 +183,10 @@ impl Game {
                         self.focused = true;
                         self.server.remove(&mut self.renderer);
                         self.server = val;
-                        println!("focused!");
+                        debug!("focused!");
                     }
                     Err(err) => {
-                        println!("trying to disconnect!");
+                        debug!("trying to disconnect!");
                         let msg = match err {
                             protocol::Error::Disconnect(val) => val,
                             err => {
@@ -420,7 +420,7 @@ fn main() {
         );
         if DEBUG {
             let dist = Instant::now().checked_duration_since(start);
-            println!("Ticking took {}", dist.unwrap().as_millis());
+            debug!("Ticking took {}", dist.unwrap().as_millis());
         }
         glutin_window
             .swap_buffers()
