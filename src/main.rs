@@ -401,7 +401,6 @@ fn main() {
         } = event
         {
             glutin_window.resize(physical_size);
-            // TODO: Fix window resizing (when in login screen).
         }
 
         if !handle_window_event(winit_window, &mut game, &mut ui_container, event) {
@@ -418,9 +417,10 @@ fn main() {
             &mut last_resource_version,
             &mut vsync,
         );
-        let dist = Instant::now().checked_duration_since(start);
-        println!("Ticking took {}", dist.unwrap().as_millis());
-        // TODO: Fix: skins werden durchgemischt von verschiedenen spielern
+        if DEBUG {
+            let dist = Instant::now().checked_duration_since(start);
+            println!("Ticking took {}", dist.unwrap().as_millis());
+        }
         glutin_window
             .swap_buffers()
             .expect("Failed to swap GL buffers");
@@ -430,6 +430,8 @@ fn main() {
         }
     });
 }
+
+const DEBUG: bool = false;
 
 fn tick_all(
     window: &winit::window::Window,
@@ -469,8 +471,6 @@ fn tick_all(
         }
     };
     *last_resource_version = version;
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff1 took {}", diff.as_millis());*/
 
     let vsync_changed = *game.vars.get(settings::R_VSYNC);
     if *vsync != vsync_changed {
@@ -481,15 +481,10 @@ fn tick_all(
     }
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
-    game.tick(/*delta*/);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff2 took {}", diff.as_millis());*/
-    // TODO: Fix this: Sometimes the game deadlocks after this and diff3 is not reached when joining a server. (and while walking on it)
+    game.tick();
     if game.server.is_some() {
         game.server.as_ref().unwrap().tick(game.renderer.clone(), delta, game.focused); // TODO: Improve perf in load screen!
     }
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff3 took {}", diff.as_millis());*/
 
     // Check if window is valid, it might be minimized
     if physical_width == 0 || physical_height == 0 {
@@ -497,16 +492,9 @@ fn tick_all(
     }
 
     if game.server.is_some() {
-        // let world = game.server.as_ref().unwrap().world.clone();
-        // world.compute_render_list(/*&mut */game.renderer.clone()); // TODO: Improve perf on server!
-        // game.server.as_ref().unwrap().clone().render_list_computer.lock().unwrap().send(true); // old
         game.renderer.clone().write().update_camera(physical_width, physical_height);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff5 took {}", diff.as_millis());*/ // readd
         game.chunk_builder
-            .tick(game.server.as_ref().unwrap().world.clone(), /*&mut */game.renderer.clone(), version);
-        /*let diff = Instant::now().duration_since(now);
-        println!("Diff6 took {}", diff.as_millis());*/
+            .tick(game.server.as_ref().unwrap().world.clone(), game.renderer.clone(), version);
     } else {
         if game.renderer.clone().read().safe_width != width || game.renderer.clone().read().safe_height != height {
             game.renderer.clone().write().safe_width = width;
@@ -517,8 +505,6 @@ fn tick_all(
 
     game.screen_sys
         .tick(delta, game.renderer.clone(), &mut ui_container);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff7 took {}", diff.as_millis());*/
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {
         if Instant::now().duration_since(received_chat_at).as_secs() < 5 {
@@ -529,33 +515,13 @@ fn tick_all(
     */
     game.console
         .lock()
-        .tick(&mut ui_container, /*&*/game.renderer.clone(), delta, width as f64);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff8 took {}", diff.as_millis());*/
-    ui_container.tick(/*&mut */game.renderer.clone(), delta, width as f64, height as f64);
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff9 took {}", diff.as_millis());*/ // readd
-    // TODO: Improve perf of diff 9 in the menu!
+        .tick(&mut ui_container, game.renderer.clone(), delta, width as f64);
+    ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
     let world = if let Some(server) = game.server.as_ref() {
         Some(server.world.clone())
     }else {
         None
     };
-    /*
-    if game.server.is_some() {
-        game.renderer.tick(
-            world/*&mut game.server.world*/,
-            delta,
-            width as u32,
-            height as u32,
-            physical_width,
-            physical_height,
-        );
-    }*/
-    /*// TODO: Wait for rendering list to finish! (to fix delayed chunk displaying when turning) (but also preserve the good performance)
-    if game.server.is_some() {
-        // game.server.as_ref().unwrap().clone().render_list_computer_notify.lock().unwrap().recv().unwrap();
-    }*/
     game.renderer.clone().write().tick(
         world,
         delta,
@@ -567,8 +533,6 @@ fn tick_all(
     if game.server.is_some() {
         game.server.as_ref().unwrap().clone().render_list_computer.send(true).unwrap();
     }
-    /*let diff = Instant::now().duration_since(now);
-    println!("Diff10 took {}", diff.as_millis());*/ // readd
 
     if fps_cap > 0 && !*vsync {
         let frame_time = now.elapsed();
