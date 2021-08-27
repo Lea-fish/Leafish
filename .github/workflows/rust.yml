@@ -1,0 +1,23 @@
+name: Rust
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: install_dependencies
+      run: sudo apt-get install --no-install-recommends libxcb-shape0-dev libxcb-xfixes0-dev
+    - name: build
+      run: cargo build --verbose
+    - name: check
+      run: cargo test --verbose
