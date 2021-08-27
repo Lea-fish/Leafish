@@ -190,15 +190,17 @@ impl Hud {
 impl Screen for Hud {
 
     fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        self.render_health(renderer, ui_container);
-        self.render_armor(renderer, ui_container);
-        self.render_slots(renderer, ui_container);
-        self.render_exp(renderer, ui_container);
-        self.render_crosshair(renderer, ui_container);
-        self.render_food(renderer, ui_container);
-        self.render_breath(renderer, ui_container);
-        self.render_slots_items(renderer, ui_container);
-        self.render_slot_index(renderer, ui_container);
+        if self.hud_context.clone().read().enabled {
+            self.render_health(renderer, ui_container);
+            self.render_armor(renderer, ui_container);
+            self.render_slots(renderer, ui_container);
+            self.render_exp(renderer, ui_container);
+            self.render_crosshair(renderer, ui_container);
+            self.render_food(renderer, ui_container);
+            self.render_breath(renderer, ui_container);
+            self.render_slots_items(renderer, ui_container);
+            self.render_slot_index(renderer, ui_container);
+        }
     }
 
     fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
@@ -219,9 +221,11 @@ impl Screen for Hud {
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
     ) -> Option<Box<dyn Screen>> {
-        if !self.hud_context.clone().read().enabled && self.last_enabled {
-            self.on_deactive(renderer, ui_container);
-            self.last_enabled = false;
+        if !self.hud_context.clone().read().enabled {
+            if self.last_enabled {
+                self.on_deactive(renderer, ui_container);
+                self.last_enabled = false;
+            }
             return None;
         }
         if self.hud_context.clone().read().enabled && !self.last_enabled {
@@ -262,8 +266,10 @@ impl Screen for Hud {
     }
 
     fn on_resize(&mut self, _width: u32, _height: u32, _renderer: &mut Renderer, _ui_container: &mut Container) {
-        self.on_deactive(_renderer, _ui_container);
-        self.on_active(_renderer, _ui_container);
+        if self.hud_context.clone().read().enabled {
+            self.on_deactive(_renderer, _ui_container);
+            self.on_active(_renderer, _ui_container);
+        }
     }
 
     fn is_closable(&self) -> bool {
