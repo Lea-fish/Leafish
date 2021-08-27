@@ -51,7 +51,8 @@ pub mod plugin_messages;
 mod sun;
 pub mod target;
 
-#[derive(PartialOrd, PartialEq)]
+/// A list of all supported versions
+#[derive(PartialOrd, PartialEq, Debug)]
 pub enum Version {
 
     Old,
@@ -71,13 +72,21 @@ pub enum Version {
 
 impl Version {
 
-    const NEWEST: Version = Version::V1_16;
+    const NEWEST: Version = Version::V1_16; /// This is only the newest *supported*
 
     pub fn from_id(protocol_version: u32) -> Version {
         match protocol_version {
+            0..=4 => Version::Old,
             5 => Version::V1_7,
             47 => Version::V1_8,
             107..=110 => Version::V1_9,
+            210 => Version::V1_10,
+            315..=316 => Version::V1_11,
+            335..=340 => Version::V1_12,
+            393..=404 => Version::V1_13,
+            477..=498 => Version::V1_14,
+            573..=578 => Version::V1_15,
+            735..=754 => Version::V1_16,
             _ => Version::NEWEST,
         }
     }
@@ -867,7 +876,8 @@ impl Server {
         let game_info = entities.get_key();
         entities.add_component(world_entity, game_info, entity::GameInfo::new());
 
-        let inventory_context = Arc::new(RwLock::new(InventoryContext::new(Version::V1_8, renderer, hud_context.clone())));
+        let version = Version::from_id(protocol_version as u32);
+        let inventory_context = Arc::new(RwLock::new(InventoryContext::new(version, renderer, hud_context.clone())));
         hud_context.clone().write().player_inventory = Some(inventory_context.clone().read().player_inventory.clone());
 
         let version = resources.read().version();
