@@ -244,40 +244,14 @@ fn init_config_dir() {
     }
 }
 
-// TODO: Implement rendering of slabs (texture bug?).
-// TODO: Fix Non-solid blocks being solid.
-// TODO: Implement other block entities.
-// TODO: Implement client settings! (implement settings for them)
-// TODO: Implement Items (Inventory, Hotbar etc.)
-// TODO: Implement block placing/breaking
-// TODO: Extend the gui (assigned to vivi).
 // TODO: Hide own character and show only the right hand. (with an item)
-// TODO: Rewrite rendering!
 // TODO: Simplify error messages in server list.
-// TODO: Fix misassignment of skins to players.
-// TODO: Implement velocity!
-// TODO: Implement Collision on higher versions.
-// TODO: Implement Entities!
-// TODO: Implement Particles.
-// TODO: Implement death screen!
 // TODO: Render skin of players joining after one self.
 // TODO: Implement arm swing animation!
 // TODO: Implement attacking entities!
-// TODO: Fix water slowdown!
-// TODO: Implement achievements tab!
-// TODO: Implement custom resource packs/data packs from the client and from the server!
 // TODO: Fix cursor grabbing/visibility/transparency of window.
 // TODO: Improve clouds.
-// TODO: Implement swim animation. (low prio)
-// TODO: Fix slim skin rendering.
-// TODO: Implement scoreboard.
-// TODO: Implement tablist.
-// TODO: Improve walking animation. (low prio)
-// TODO: Implement sprinting and sneaking!
-// TODO: Minecraftify movement (especially walking backwards and jumping while doing so)
 // TODO: Fix pistons.
-// TODO: Implement capes and distribute them via client settings (especially the skin layer or other stuff if it gets sent to other clients)
-// TODO: Remove shadow from nametag text and add black, transparent box around text.
 fn main() {
     init_config_dir();
     let opt = Opt::from_args();
@@ -309,7 +283,8 @@ fn main() {
 
     let window_builder = winit::window::WindowBuilder::new()
         .with_title("Leafish")
-        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)); // Why are we using this particular value here?
+        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0))
+        .with_maximized(true); // Why are we using this particular value here?
 
     let (context, shader_version, dpi_factor, glutin_window) = {
         let glutin_window = glutin::ContextBuilder::new()
@@ -536,6 +511,7 @@ fn tick_all(
         if game.renderer.clone().read().safe_width != width || game.renderer.clone().read().safe_height != height {
             game.renderer.clone().write().safe_width = width;
             game.renderer.clone().write().safe_height = height;
+            gl::viewport(0, 0, width as i32, height as i32);
         }
     }
 

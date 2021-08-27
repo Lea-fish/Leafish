@@ -433,7 +433,7 @@ impl ServerList {
 
         self.elements = Some(UIElements {
             logo,
-            servers: Vec::new(),
+            servers: vec![],
 
             _add_btn: add,
             _refresh_btn: refresh,
@@ -591,10 +591,10 @@ impl super::Screen for ServerList {
         }
     }
 
-    fn on_resize(&mut self, _width: u32, _height: u32, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn on_resize(&mut self, _width: u32, _height: u32, renderer: &mut Renderer, ui_container: &mut Container) {
         // TODO: Fix this!
-        self.on_deactive(_renderer, _ui_container);
+        self.on_deactive(renderer, ui_container);
         // self.init_list(_renderer, _ui_container);
-        self.on_active(_renderer, _ui_container);
+        self.on_active(renderer, ui_container);
     }
 }

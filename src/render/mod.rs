@@ -241,7 +241,7 @@ impl Renderer {
             light_level: 0.8,
             sky_offset: 1.0,
             skin_request: skin_req,
-            skin_reply: skin_reply,
+            skin_reply,
         }
     }
 
@@ -315,7 +315,6 @@ impl Renderer {
         println!("Camera diff 3 took {}", diff.as_millis());*/ // readd
     }
 
-    // if the esc key was pressed, the window is transparent
     pub fn tick(
         &mut self,
         world: Option<Arc<World>>,

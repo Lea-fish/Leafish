@@ -198,11 +198,11 @@ impl super::Screen for SettingsMenu {
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.safe_width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.safe_height as f64,
             };
         }
         None
@@ -358,11 +358,11 @@ impl super::Screen for VideoSettingsMenu {
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.safe_width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.safe_height as f64,
             };
         }
         None
@@ -444,11 +444,11 @@ impl super::Screen for AudioSettingsMenu {
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.safe_width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.safe_height as f64,
             };
         }
         None
@@ -621,11 +621,11 @@ impl super::Screen for SkinSettingsMenu {
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.safe_width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.safe_height as f64,
             };
         }
         None

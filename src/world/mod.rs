@@ -502,7 +502,7 @@ impl World {
 
     fn do_render_queue(&self, process_queue: Arc<RwLock<VecDeque<(Direction, (i32, i32, i32))>>>,
                        frustum: Frustum<f32>, frame_id: u32, valid_dirs: [bool; 6], render_queue: Arc<RwLock<Vec<(i32, i32, i32)>>>) {
-        let out = Arc::new(RwLock::new(VecDeque::new())); // TODO: Add Arc!
+        let out = Arc::new(RwLock::new(VecDeque::new()));
         /*let tmp_renderer = renderer.clone();
         let tmp_renderer = tmp_renderer.read();
         let frame_id = tmp_renderer.frame_id.clone();*/

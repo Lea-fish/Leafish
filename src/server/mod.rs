@@ -35,7 +35,7 @@ use std::sync::Arc;
 use std::thread;
 use leafish_protocol::protocol::packet::Packet;
 use std::io::Cursor;
-use leafish_protocol::protocol::Conn;
+use leafish_protocol::protocol::{Conn, Error};
 use leafish_protocol::protocol::packet::play::serverbound::{ClientSettings_u8_Handsfree, ClientSettings};
 use crate::render::Renderer;
 use crate::render::hud::HudContext;
@@ -45,6 +45,7 @@ use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
+use leafish_protocol::format::{Component, TextComponent};
 
 pub mod plugin_messages;
 mod sun;
@@ -1289,19 +1290,19 @@ impl Server {
         }
     }
 
-    pub fn write_packet<T: protocol::PacketType>(&self, p: T) /*-> Result<(), Error>*/ {
-        /*let conn = self.conn.clone();
+    pub fn write_packet<T: protocol::PacketType>(&self, p: T) {
+        let conn = self.conn.clone();
         let mut conn = conn.write();
-        if conn.is_none() {
-            Err(leafish_protocol::protocol::Error::Disconnect(Component::Text(TextComponent {
-                text: "Already disconnected!".to_string(),
-                modifier: Default::default()
-            })))
-        } else {
-            let write_result = conn.as_mut().unwrap().write_packet(p);
-            write_result
-        }*/
-        let _ = self.conn.clone().write().as_mut().unwrap().write_packet(p);
+        if conn.is_some() {
+            let result = conn.as_mut().unwrap().write_packet(p);
+            if let Ok(_) = result {
+                return;
+            }
+        }
+        self.disconnect(Some(Component::Text(TextComponent { // TODO: Test this!
+            text: "Already disconnected!".to_string(),
+            modifier: Default::default()
+        })));
     }
 
     fn on_keep_alive_i64(
