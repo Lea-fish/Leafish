@@ -765,7 +765,6 @@ impl Server {
             &renderer.clone().read()
         ));
         inner_server.replace(server.clone());
-        println!("instantiated server!");
         let mut rng = rand::thread_rng();
 
         for x in (-7 * 16)..(7 * 16) {
@@ -846,7 +845,6 @@ impl Server {
                 }
             }
         }
-        println!("built server!");
         server.clone()
     }
 
@@ -929,7 +927,6 @@ impl Server {
     }
 
     pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, focused: bool) {
-        let now = Instant::now();
         let version = self.resources.read().version();
         if version != self.version.read().clone() {
             *self.version.write() = version;
@@ -937,14 +934,10 @@ impl Server {
         }
         let renderer = renderer.clone();
         let renderer = &mut renderer.write();
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii1 took {}", diff.as_millis());
         // TODO: Check if the world type actually needs a sun
         if self.sun_model.read().is_none() {
             self.sun_model.write().replace(sun::SunModel::new(renderer));
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii2 took {}", diff.as_millis());
 
         // Copy to camera
         if let Some(player) = *self.player.clone().read() {
@@ -955,32 +948,20 @@ impl Server {
             renderer.camera.yaw = rotation.yaw;
             renderer.camera.pitch = rotation.pitch;
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii3 took {}", diff.as_millis());
-        self.entity_tick(renderer, delta, focused);// TODO: Improve perf!
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii4 took {}", diff.as_millis());
+        self.entity_tick(renderer, delta, focused);
 
         *self.tick_timer.write() += delta;
         while self.tick_timer.read().clone() >= 3.0 && self.is_connected() {
             self.minecraft_tick();
             *self.tick_timer.write() -= 3.0;
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii5 took {}", diff.as_millis());
 
         self.update_time(renderer, delta);
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii6 took {}", diff.as_millis());
         if let Some(sun_model) = self.sun_model.write().as_mut() {
             sun_model.tick(renderer, self.world_data.clone().read().world_time, self.world_data.clone().read().world_age);
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii7 took {}", diff.as_millis());
         let world = self.world.clone();
         world.tick(&mut self.entities.clone().write());
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii8 took {}", diff.as_millis());
 
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
@@ -998,10 +979,7 @@ impl Server {
         } else {
             self.target_info.clone().write().clear(renderer);
         }
-        let diff = Instant::now().duration_since(now);
-        println!("Diffiii9 took {}", diff.as_millis());
     }
-    // diff 4 is to be investigated!
 
 
     fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64, focused: bool) {
@@ -1016,7 +994,6 @@ impl Server {
         if self.is_connected() || self.disconnect_data.clone().read().just_disconnected {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().just_disconnected = false;
-            // TODO: Investigate this entity shit!
             *self.entity_tick_timer.write() += delta;
             while self.entity_tick_timer.read().clone() >= 3.0 {
                 let world = self.world.clone();
@@ -1447,7 +1424,6 @@ impl Server {
         }
     }
 
-    // TODO: remove wrappers and directly call on Conn
     fn write_fmlhs_plugin_message(&self, msg: &forge::FmlHs) {
         let _ = self.conn.clone().write().as_mut().unwrap().write_fmlhs_plugin_message(msg); // TODO handle errors
     }
@@ -1512,7 +1488,6 @@ impl Server {
             .clone().write()
             .get_component_mut(player, self.gamemode)
             .unwrap() = gamemode;
-        // TODO: Temp
         self.entities
             .clone().write()
             .get_component_mut(player, self.player_movement)
@@ -1527,7 +1502,6 @@ impl Server {
             brand: "leafish".into(),
         };
         // TODO: refactor with write_plugin_message
-        // TODO: Try sending ClientSettings right here! (leafishish)
         if self.protocol_version >= 47 {
             self.write_packet(brand.into_message());
         } else {
@@ -1580,7 +1554,6 @@ impl Server {
                 .clone().write()
                 .get_component_mut(player, self.gamemode)
                 .unwrap() = gamemode;
-            // TODO: Temp
             self.entities
                 .clone().write()
                 .get_component_mut(player, self.player_movement)
@@ -1614,7 +1587,6 @@ impl Server {
                     .clone().write()
                     .get_component_mut(player, self.gamemode)
                     .unwrap() = gamemode;
-                // TODO: Temp
                 self.entities
                     .clone().write()
                     .get_component_mut(player, self.player_movement)
@@ -2109,7 +2081,6 @@ impl Server {
         }
     }
 
-    // TODO: Move to world!
     fn on_block_entity_update(
         &self,
         block_update: packet::play::clientbound::UpdateBlockEntity,
