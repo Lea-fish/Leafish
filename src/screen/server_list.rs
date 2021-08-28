@@ -590,11 +590,4 @@ impl super::Screen for ServerList {
             s.update_position();
         }
     }
-
-    fn on_resize(&mut self, _width: u32, _height: u32, renderer: &mut Renderer, ui_container: &mut Container) {
-        // TODO: Fix this!
-        self.on_deactive(renderer, ui_container);
-        // self.init_list(_renderer, _ui_container);
-        self.on_active(renderer, ui_container);
-    }
 }
