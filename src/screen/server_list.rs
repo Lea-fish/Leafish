@@ -51,6 +51,7 @@ struct UIElements {
     _disclaimer: ui::TextRef,
 
     _disconnected: Option<ui::ImageRef>,
+    _background: Option<ui::ImageRef>,
 }
 
 struct Server {
@@ -375,6 +376,7 @@ impl ServerList {
         let options = ui::ButtonBuilder::new()
             .position(5.0, 25.0)
             .size(40.0, 40.0)
+            .draw_index(1)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
             .create(ui_container);
         {
@@ -397,6 +399,7 @@ impl ServerList {
             .text("Not affiliated with Mojang/Minecraft")
             .position(5.0, 5.0)
             .colour((255, 200, 200, 255))
+            .draw_index(1)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
             .create(ui_container);
 
@@ -431,6 +434,16 @@ impl ServerList {
             None
         };
 
+        let background = if let Some(tex) = Renderer::get_texture_optional(renderer.get_textures_ref(), "leafish:gui/background") {
+            Some(ui::ImageBuilder::new()
+                .texture("leafish:gui/background")
+                .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .create(ui_container))
+        } else {
+            None
+        };
+
         self.elements = Some(UIElements {
             logo,
             servers: vec![],
@@ -441,6 +454,7 @@ impl ServerList {
             _disclaimer: disclaimer,
 
             _disconnected: disconnected,
+            _background: background,
         });
     }
 
@@ -589,5 +603,10 @@ impl super::Screen for ServerList {
             s.offset += diff;
             s.update_position();
         }
+    }
+
+    fn on_resize(&mut self, _width: u32, _height: u32, _renderer: &mut Renderer, _ui_container: &mut Container) { // TODO: Don't ping the servers on resize!
+        self.on_deactive(_renderer, _ui_container);
+        self.on_active(_renderer, _ui_container);
     }
 }

@@ -39,7 +39,7 @@ impl Atlas {
     }
 
     pub fn add(&mut self, width: usize, height: usize) -> Option<Rect> {
-        let mut priority = usize::max_value();
+        let mut priority = usize::MAX;
         let mut target: Option<Rect> = None;
         let mut target_index = 0;
         // Search through and find the best fit for this texture

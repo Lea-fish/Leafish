@@ -42,7 +42,7 @@ use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
 use parking_lot::RwLock;
 
-const ATLAS_SIZE: usize = 1024;
+const ATLAS_SIZE: usize = 2048;
 
 pub struct Camera {
     pub pos: cgmath::Point3<f64>,
@@ -801,6 +801,24 @@ impl Renderer {
                 } else {
                     t.load_texture(name);
                     t.get_texture(name).unwrap()
+                }
+            }
+        }
+    }
+
+    pub fn get_texture_optional(textures: &RwLock<TextureManager>, name: &str) -> Option<Texture> {
+        let tex = { textures.read().get_texture(name) };
+        match tex {
+            Some(val) => Some(val),
+            None => {
+                let mut t = textures.write();
+                // Make sure it hasn't already been loaded since we switched
+                // locks.
+                if let Some(val) = t.get_texture(name) {
+                    Some(val)
+                } else {
+                    t.load_texture(name);
+                    t.get_texture(name)
                 }
             }
         }
@@ -1594,7 +1612,7 @@ impl Texture {
 #[allow(unused_must_use)]
 pub fn generate_element_buffer(size: usize) -> (Vec<u8>, gl::Type) {
     let mut ty = gl::UNSIGNED_SHORT;
-    let mut data = if (size / 6) * 4 * 3 >= u16::max_value() as usize {
+    let mut data = if (size / 6) * 4 * 3 >= u16::MAX as usize {
         ty = gl::UNSIGNED_INT;
         Vec::with_capacity(size * 4)
     } else {
