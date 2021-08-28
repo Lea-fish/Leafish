@@ -59,7 +59,7 @@ impl Map {
             bits: Vec::with_capacity((len * size) / 64),
             padded: false,
         };
-        for _ in 0..len {
+        for _ in 0..len { // TODO: Try finding a O(1) solution to this
             map.bits.push(0)
         }
         map

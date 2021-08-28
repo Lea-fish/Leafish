@@ -30,7 +30,7 @@ use image::{GenericImage, GenericImageView, RgbaImage};
 use log::{error, trace};
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use crate::types::hash::FNVHash;
 use std::hash::BuildHasherDefault;
@@ -157,7 +157,7 @@ init_shader! {
 
 impl Renderer {
     pub fn new(res: Arc<RwLock<resources::Manager>>, shader_version: &str) -> Renderer {
-        let version = { res.read().version() };
+        let version = res.read().version();
         let tex = gl::Texture::new();
         tex.bind(gl::TEXTURE_2D_ARRAY);
         tex.image_3d(
@@ -244,6 +244,10 @@ impl Renderer {
             skin_request: skin_req,
             skin_reply,
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.textures.clone().write().reset();
     }
 
     // TODO: Improve perf!
@@ -1081,6 +1085,10 @@ impl TextureManager {
         (tm, stx, rx)
     }
 
+    pub fn reset(&mut self) {
+        self.skins.iter_mut().for_each(|skin| skin.1.store(0, Ordering::Relaxed));
+    }
+
     fn add_defaults(&mut self) {
         self.put_texture(
             "leafish",
@@ -1278,6 +1286,11 @@ impl TextureManager {
         self.put_dynamic(&format!("skin-{}", hash), img);
         self.skins.insert(hash.to_owned(), AtomicIsize::new(0));
         renderer.skin_request.send(hash.to_owned()).unwrap();
+    }
+
+    fn unload_skin(&mut self, url: &str) {
+        self.remove_dynamic(&format!("skin-{}", url));
+        self.skins.remove(url);
     }
 
     fn update_skin(&mut self, hash: String, img: image::DynamicImage) {

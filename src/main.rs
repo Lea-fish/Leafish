@@ -160,6 +160,7 @@ impl Game {
                 self.server = None;
                 self.screen_sys
                     .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason), self.vars.get(settings::BACKGROUND_IMAGE).clone())));
+                self.renderer.clone().write().reset();
             }
         }
 
@@ -446,6 +447,7 @@ fn tick_all(
     if game.server.is_some() {
         if !game.server.as_ref().unwrap().is_connected() {
             game.server = None;
+            game.renderer.clone().write().reset();
         }
     } else {
         game.chunk_builder.reset();

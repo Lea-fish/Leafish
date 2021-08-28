@@ -86,10 +86,8 @@ impl Manager {
             vanilla_progress: Arc::new(Mutex::new(Progress { tasks: vec![] })),
         };
         m.add_pack(Box::new(InternalPack));
-        {// TODO: Cleanup!
-            m.download_vanilla();
-            m.download_assets();
-        }
+        m.download_vanilla();
+        m.download_assets();
         (
             m,
             ManagerUI {
