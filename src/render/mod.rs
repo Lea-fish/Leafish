@@ -26,7 +26,7 @@ use crate::gl;
 use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::prelude::*;
-use image::{GenericImage, GenericImageView};
+use image::{GenericImage, GenericImageView, RgbaImage};
 use log::{error, trace};
 use std::collections::HashMap;
 use std::io::Write;
@@ -41,6 +41,7 @@ use std::time::Instant;
 use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
 use parking_lot::RwLock;
+use image::imageops::FilterType;
 
 const ATLAS_SIZE: usize = 2048;
 
@@ -1302,19 +1303,48 @@ impl TextureManager {
 
     fn get_texture(&self, name: &str) -> Option<Texture> {
         if name.find(':').is_some() {
+            let name = if name.starts_with('#') {
+                &name[1..]
+            } else {
+                name
+            };
             self.textures.get(name).cloned()
-        } else {
+        } else if !name.starts_with('#') {
             self.textures.get(&format!("minecraft:{}", name)).cloned()
+        } else {
+            let name = if name.starts_with('#') {
+                &name[1..]
+            } else {
+                name
+            };
+            self.textures.get(&format!("global:{}", name)).cloned()
         }
     }
 
     fn load_texture(&mut self, name: &str) {
-        let (plugin, name) = if let Some(pos) = name.find(':') {
+        let (plugin, name) = if let Some(mut pos) = name.find(':') {
+            let name = if name.starts_with('#') {
+                pos -= 1;
+                &name[1..]
+            } else {
+                name
+            };
             (&name[..pos], &name[pos + 1..])
-        } else {
+        } else if !name.starts_with('#') {
             ("minecraft", name)
+        } else {
+            let name = if name.starts_with('#') {
+                &name[1..]
+            } else {
+                name
+            };
+            ("global", name)
         };
-        let path = format!("textures/{}.png", name);
+        let path = if plugin != "global" {
+            format!("textures/{}.png", name)
+        } else {
+            name.to_string()
+        };
         let res = self.resources.clone();
         if let Some(mut val) = res.read().open(plugin, &path) {
             let mut data = Vec::new();
@@ -1407,8 +1437,17 @@ impl TextureManager {
         height: u32,
         data: Vec<u8>,
     ) -> Texture {
+        let (image, width, height) = if width > ATLAS_SIZE as u32 || height > ATLAS_SIZE as u32 {
+            let image = RgbaImage::from_raw(width, height, data).unwrap();
+            let scale = width.max(height) as f64 / ATLAS_SIZE as f64;
+            let width = (width as f64 / scale) as u32;
+            let height = (height as f64 / scale) as u32;
+            (image::imageops::resize(&image, width, height, FilterType::Nearest).as_raw().clone(), width, height)
+        } else {
+            (data, width, height)
+        };
         let (atlas, rect) = self.find_free(width as usize, height as usize);
-        self.pending_uploads.push((atlas, rect, data));
+        self.pending_uploads.push((atlas, rect, image));
 
         let mut full_name = String::new();
         full_name.push_str(plugin);

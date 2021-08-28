@@ -15,7 +15,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use crate::render;
+use crate::{render, settings};
 use crate::ui;
 
 use serde_json::{self, Value};
@@ -132,7 +132,7 @@ impl super::Screen for EditServerEntry {
                     &server_address.borrow().input,
                 );
                 game.screen_sys
-                    .replace_screen(Box::new(super::ServerList::new(None)));
+                    .replace_screen(Box::new(super::ServerList::new(None, game.vars.get(settings::BACKGROUND_IMAGE).clone())));
                 true
             });
         }
@@ -152,7 +152,7 @@ impl super::Screen for EditServerEntry {
             cancel.add_text(txt);
             cancel.add_click_func(|_, game| {
                 game.screen_sys
-                    .replace_screen(Box::new(super::ServerList::new(None)));
+                    .replace_screen(Box::new(super::ServerList::new(None, game.vars.get(settings::BACKGROUND_IMAGE).clone())));
                 true
             });
         }

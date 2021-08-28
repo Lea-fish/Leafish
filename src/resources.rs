@@ -25,6 +25,8 @@ use std::fs;
 
 use crate::types::hash::FNVHash;
 use crate::ui;
+use std::fs::File;
+use std::path::Path;
 
 const RESOURCES_VERSION: &str = "1.12.2";
 const VANILLA_CLIENT_URL: &str =
@@ -104,13 +106,22 @@ impl Manager {
     }
 
     pub fn open(&self, plugin: &str, name: &str) -> Option<Box<dyn io::Read>> {
-        let path = format!("assets/{}/{}", plugin, name);
-        for pack in self.packs.iter().rev() {
-            if let Some(val) = pack.open(&path) {
-                return Some(val);
+        if plugin == "global" {
+            let file = File::open(Path::new(name));
+            if let Ok(file) = file {
+                Some(Box::new(file))
+            } else {
+                None
             }
+        } else {
+            let path = format!("assets/{}/{}", plugin, name);
+            for pack in self.packs.iter().rev() {
+                if let Some(val) = pack.open(&path) {
+                    return Some(val);
+                }
+            }
+            None
         }
-        None
     }
 
     pub fn open_all(&self, plugin: &str, name: &str) -> Vec<Box<dyn io::Read>> {

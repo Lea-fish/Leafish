@@ -24,6 +24,7 @@ use crate::format::{Component, TextComponent};
 use crate::protocol;
 use crate::render;
 use crate::ui;
+use crate::settings;
 
 use instant::Duration;
 use rand::Rng;
@@ -39,6 +40,7 @@ pub struct ServerList {
     disconnect_reason: Option<Component>,
 
     needs_reload: Rc<RefCell<bool>>,
+    background_image: String,
 }
 
 struct UIElements {
@@ -94,11 +96,12 @@ impl Server {
 }
 
 impl ServerList {
-    pub fn new(disconnect_reason: Option<Component>) -> ServerList {
+    pub fn new(disconnect_reason: Option<Component>, background_image: String) -> ServerList {
         ServerList {
             elements: None,
             disconnect_reason,
             needs_reload: Rc::new(RefCell::new(false)),
+            background_image
         }
     }
 
@@ -224,7 +227,7 @@ impl ServerList {
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
                     game.screen_sys.replace_screen(Box::new(
-                        super::delete_server::DeleteServerEntry::new(index, &sname, &saddr),
+                        super::delete_server::DeleteServerEntry::new(index, &sname, &saddr, game.vars.get(settings::BACKGROUND_IMAGE).clone()),
                     ));
                     true
                 })
@@ -434,9 +437,9 @@ impl ServerList {
             None
         };
 
-        let background = if let Some(tex) = Renderer::get_texture_optional(renderer.get_textures_ref(), "leafish:gui/background") {
+        let background = if let Some(_) = Renderer::get_texture_optional(renderer.get_textures_ref(), &*format!("#{}", self.background_image)) {
             Some(ui::ImageBuilder::new()
-                .texture("leafish:gui/background")
+                .texture(&*format!("#{}", self.background_image))
                 .size(renderer.safe_width as f64, renderer.safe_height as f64)
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container))

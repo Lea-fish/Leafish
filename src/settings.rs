@@ -1,6 +1,7 @@
 use crate::console;
 use std::marker::PhantomData;
 use winit::event::VirtualKeyCode;
+use crate::console::CVar;
 
 pub const R_MAX_FPS: console::CVar<i64> = console::CVar {
     ty: PhantomData,
@@ -137,6 +138,15 @@ pub const CL_KEYBIND_JUMP: console::CVar<i64> =
 pub const CL_KEYBIND_TOGGLE_HUD: console::CVar<i64> =
     create_keybind!(F1, "cl_keybind_toggle_hud", "Keybinding for toggling the hud");
 
+pub const BACKGROUND_IMAGE: console::CVar<String> = CVar {
+    ty: PhantomData,
+    name: "background",
+    description: "Select the background image",
+    mutable: true,
+    serializable: true,
+    default: &|| String::from("leafish:gui/background"),
+};
+
 pub const DOUBLE_JUMP_MS: u32 = 100;
 
 pub fn register_vars(vars: &mut console::Vars) {
@@ -160,6 +170,7 @@ pub fn register_vars(vars: &mut console::Vars) {
     vars.register(S_LEFT_PANTS);
     vars.register(S_RIGHT_PANTS);
     vars.register(S_HAT);
+    vars.register(BACKGROUND_IMAGE);
 }
 
 #[derive(Hash, PartialEq, Eq, Debug, Copy, Clone)]

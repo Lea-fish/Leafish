@@ -159,7 +159,7 @@ impl Game {
             if let Some(disconnect_reason) = self.server.as_ref().unwrap().disconnect_data.clone().write().disconnect_reason.take() {
                 self.server = None;
                 self.screen_sys
-                    .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason))));
+                    .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason), self.vars.get(settings::BACKGROUND_IMAGE).clone())));
             }
         }
 
