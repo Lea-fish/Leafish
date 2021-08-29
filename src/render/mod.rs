@@ -27,7 +27,7 @@ use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::prelude::*;
 use image::{GenericImage, GenericImageView, RgbaImage};
-use log::{error, debug, trace};
+use log::{error, trace};
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
@@ -268,6 +268,8 @@ impl Renderer {
                     .rebuild_models(self.resource_version, &self.textures);
             }
         }
+        /*let diff = Instant::now().duration_since(now);
+        println!("Camera diff 1 took {}", diff.as_millis());*/ // readd
 
         if self.height != height || self.width != width {
             self.width = width;
@@ -287,6 +289,8 @@ impl Renderer {
             });
 
             self.init_trans(width, height);
+            /*let diff = Instant::now().duration_since(now);
+            println!("Camera diff 2 took {}", diff.as_millis());*/ // readd
         }
 
         self.view_vector = cgmath::Vector3::new(
@@ -309,7 +313,11 @@ impl Renderer {
         self.camera_matrix = camera_matrix * cgmath::Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
         /*self.frustum =
             collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();*/
+        /*let diff = Instant::now().duration_since(now);
+        println!("Camera diff 2.8 took {}", diff.as_millis());*/ // readd
         self.frustum = collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();
+        /*let diff = Instant::now().duration_since(now);
+        println!("Camera diff 3 took {}", diff.as_millis());*/ // readd
     }
 
     pub fn tick(
@@ -323,11 +331,15 @@ impl Renderer {
     ) {
         // let now = Instant::now();
         self.update_textures(delta);
+        /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 1 | {}", diff.as_millis());*/
 
         if world.is_some() {
             if self.trans.is_some() {
                 let trans = self.trans.as_ref().unwrap();
                 trans.main.bind();
+                /*let diff = Instant::now().duration_since(now);
+                println!("Render diff 2 | {}", diff.as_millis());*/
             }
 
             gl::active_texture(0);
@@ -343,6 +355,8 @@ impl Renderer {
                 1.0,
             );
             gl::clear(gl::ClearFlags::Color | gl::ClearFlags::Depth);
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 3 | {}", diff.as_millis());*/
             // Chunk rendering
             self.chunk_shader.program.use_program();
 
@@ -371,13 +385,16 @@ impl Renderer {
                             self.element_buffer_type,
                             0,
                         );
+                        // println!("rendering solid {:?}", pos);
                     }else {
-                        debug!("1: not rendering solid {:?}", pos);
+                        println!("1: not rendering solid {:?}", pos);
                     }
                 }else {
-                    debug!("2: not rendering solid {:?}", pos);
+                    // println!("2: not rendering solid {:?}", pos);
                 }
             }
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 4 | {}", diff.as_millis());*/
 
             // Line rendering
             // Model rendering
@@ -388,6 +405,8 @@ impl Renderer {
                 self.light_level,
                 self.sky_offset,
             );
+            /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 5 | {}", diff.as_millis());*/
             let tmp_world = world.as_ref().unwrap().clone();
 
             if let Some(clouds) = &mut self.clouds {
@@ -403,6 +422,8 @@ impl Renderer {
                     delta,
                 );
             }
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 6 | {}", diff.as_millis());*/
 
             if self.trans.is_some() {
                 // Trans chunk rendering
@@ -456,6 +477,8 @@ impl Renderer {
             gl::ZERO_FACTOR,
             gl::ONE_MINUS_SRC_ALPHA,
         );
+        /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 7 | {}", diff.as_millis());*/
 
         if world.is_some() {
             let tmp_world = world.as_ref().unwrap().clone();
@@ -473,12 +496,14 @@ impl Renderer {
                             0,
                         );
                     }else {
-                        debug!("1: not rendering trans {:?}", pos);
+                        println!("1: not rendering trans {:?}", pos);
                     }
                 }else {
-                   debug!("2: not rendering trans {:?}", pos);
+                   // println!("2: not rendering trans {:?}", pos);
                 }
             }
+            /*let diff = Instant::now().duration_since(now);
+            println!("Render diff 8 | {}", diff.as_millis());*/
         }
 
         gl::check_framebuffer_status();
@@ -501,6 +526,8 @@ impl Renderer {
         gl::check_gl_error();
 
         self.frame_id = self.frame_id.wrapping_add(1);
+        /*let diff = Instant::now().duration_since(now);
+        println!("Render diff 9 | {}", diff.as_millis());*/
     }
 
     fn ensure_element_buffer(&mut self, size: usize) {
