@@ -5,7 +5,7 @@ But why creating a new project in the first place..?
 
 Because I wanted to remove some stuff and add other stuff freely without having to wait for prs to get accepted.
 
-Multi-protocol Minecraft-compatible client written in Rust.
+Multi-protocol Minecraft-compatible client written in Rust. It's fast.
 
 If you want to communicate with us you can do so here:
 https://matrix.to/#/#leafish:matrix.org
@@ -18,6 +18,10 @@ https://discord.gg/YkHCy3f4qt
 
 
 In action: http://gfycat.com/NeedyElaborateGypsymoth
+
+## Speed comparison
+
+(screenshots or some kind of comparison here)
 
 
 ## Protocol support
