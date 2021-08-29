@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use log::info;
 use std::any::Any;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
@@ -25,10 +26,6 @@ use crate::render;
 use crate::ui;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
-
-fn println_level(_level: log::Level, s: String) {
-    println!("{}", s);
-}
 
 const FILTERED_CRATES: &[&str] = &[
     //"reqwest", // TODO: needed?
@@ -378,7 +375,7 @@ impl Console {
         }
 
         if record.level() <= self.log_level_term {
-            println_level(record.level(), line);
+            info!("{}", line);
         }
 
         self.history.remove(0);
