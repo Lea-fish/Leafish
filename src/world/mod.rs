@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::{debug, warn};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -130,7 +129,7 @@ impl World {
 
     pub fn reset(&self, protocol_version: i32) {
         if self.protocol_version != protocol_version {
-            warn!("Can't switch protocol version, when resetting the world :(");
+            println!("Can't switch protocol version, when resetting the world :(");
         }
         self.modded_block_ids.clone().write().clear();
         // self.light_updates.clone().write().clear(); // TODO: Implement a similar system!
@@ -382,9 +381,10 @@ impl World {
 
         let render_queue = Arc::new(RwLock::new(Vec::new()));
         let mut process_queue = VecDeque::with_capacity(self.chunks.clone().len() * 16);
-        // debug!("processqueue size {}", self.chunks.len() * 16);
+        // println!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
         let diff = Instant::now().duration_since(start_rec);
+        println!("Delay took {}", diff.as_millis());
         let frustum = renderer.clone().read().frustum.clone();
         let frame_id = renderer.clone().read().frame_id.clone();
         self.do_render_queue(Arc::new(RwLock::new(process_queue)),
@@ -509,7 +509,7 @@ impl World {
         // let frame_id = renderer.clone().read().frame_id.clone();
         // let frustum = renderer.clone().read().frustum.clone().read().as_ref().unwrap();
         let tmp_frustum = frustum.clone();
-        // debug!("rendering {} elems", process_queue.clone().read().len());
+        // println!("rendering {} elems", process_queue.clone().read().len());
         process_queue.clone().read().iter().for_each(|(from, pos)| {
             let (exists, cull) = if let Some((sec, rendered_on)) =
             self.get_render_section_mut(pos.0, pos.1, pos.2)
@@ -564,7 +564,7 @@ impl World {
         if !out.clone().read().is_empty() {
             self.do_render_queue(out.clone(), frustum.clone(), frame_id, valid_dirs, render_queue);
         } else {
-            debug!("finished!");
+            println!("finished!");
         }
     }
 
@@ -1244,7 +1244,7 @@ Process finished with exit code 101
     }
 
     pub fn load_light_with_loc(&self, x: i32, z: i32, block_light_mask: i32, sky_light: bool, sky_light_mask: i32, data: &mut Cursor<Vec<u8>>) {
-        // debug!("x {} z {}", x, z);
+        // println!("x {} z {}", x, z);
         // TODO: Insert chunks with light data only or cache them until the real data arrives!
         /*let cpos = CPos(x, z);
         let chunks = self.chunks.clone();

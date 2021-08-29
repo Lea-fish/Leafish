@@ -428,15 +428,15 @@ impl Server {
                         match pck {
                             Packet::KeepAliveClientbound_i64(keep_alive) => {
                                 server.on_keep_alive_i64(keep_alive);
-                                debug!("keep alive!");
+                                println!("keep alive!");
                             },
                             Packet::KeepAliveClientbound_VarInt(keep_alive) => {
                                 server.on_keep_alive_varint(keep_alive);
-                                debug!("keep alive!");
+                                println!("keep alive!");
                             },
                             Packet::KeepAliveClientbound_i32(keep_alive) => {
                                 server.on_keep_alive_i32(keep_alive);
-                                debug!("keep alive!");
+                                println!("keep alive!");
                             },
                             Packet::ChunkData_NoEntities(chunk_data) => {
                                 server.on_chunk_data_no_entities(chunk_data);
@@ -472,7 +472,7 @@ impl Server {
                                 server.on_block_entity_update(block_update);
                             },
                             Packet::ChunkData_Biomes3D(chunk_data) => {
-                                // debug!("data x {} z {}", chunk_data.chunk_x, chunk_data.chunk_z);
+                                // println!("data x {} z {}", chunk_data.chunk_x, chunk_data.chunk_z);
                                 server.on_chunk_data_biomes3d(chunk_data);
                             },
                             Packet::ChunkData_Biomes3D_VarInt(chunk_data) => {
@@ -669,11 +669,11 @@ impl Server {
                                 if set_slot.slot <= 8 {
                                     server.hud_context.clone().write().update_slot_index(set_slot.slot);
                                 } else {
-                                    warn!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
+                                    println!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
                                 }
                             },
                             Packet::WindowItems(window_items) => {
-                                debug!("items!");
+                                println!("items!");
                             },
                             Packet::WindowSetSlot(set_slot) => {
                                 let inventory = server.inventory_context.clone();
@@ -685,9 +685,9 @@ impl Server {
                                 };
                                 let curr_slots = inventory.clone().read().size();
                                 if set_slot.slot < 0 || set_slot.slot >= curr_slots {
-                                    warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
+                                    println!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
                                 } else {
-                                    debug!("set item to {}, {}, {}", set_slot.id, set_slot.slot, set_slot.item.as_ref().map_or(0, |s| s.id));
+                                    println!("set item to {}, {}, {}", set_slot.id, set_slot.slot, set_slot.item.as_ref().map_or(0, |s| s.id));
                                     let item = match set_slot.item {
                                         None => None,
                                         Some(stack) => Some(Item {
@@ -699,7 +699,7 @@ impl Server {
                                 }
                             },
                             _ => {
-                                // debug!("other packet!");
+                                // println!("other packet!");
                             }
                         },
                     Err(err) => {
@@ -1588,7 +1588,7 @@ impl Server {
     }
 
     fn on_game_state_change(&self, game_state: packet::play::clientbound::ChangeGameState) {
-        debug!("game state change!");
+        println!("game state change!");
         if game_state.reason == 3 {
             if let Some(player) = *self.player.write() {
                 let gamemode = Gamemode::from_int(game_state.value as i32);

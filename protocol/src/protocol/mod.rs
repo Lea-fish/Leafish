@@ -37,7 +37,7 @@ use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
 use flate2::read::{ZlibDecoder, ZlibEncoder};
 use flate2::Compression;
 use instant::{Duration, Instant};
-use log::{debug, info, warn};
+use log::{debug, warn};
 use std::convert;
 use std::default;
 use std::fmt;
@@ -1070,7 +1070,7 @@ impl Conn {
         let records = RESOLVER.srv_lookup(format!("_minecraft._tcp.{}", hostname));
         if records.is_ok() {
             for record in records.unwrap() {
-                info!("{}:{}", record.target(), record.port());
+                println!("{}:{}", record.target(), record.port());
                 addresses.push(format!("{}:{}", record.target(), record.port()));
             }
         }
@@ -1083,11 +1083,11 @@ impl Conn {
 
         let mut address = target.to_string();
         if !IPADDRESS_PATTERN.is_match(target) {
-            info!("{} has an no address! :(", address);
+            println!("{} has an no address! :(", address);
             let result = Conn::get_server_addresses(target);
             // TODO: Try all possible ips not just the first!
             let next = result.iter().next().unwrap();
-            info!("{}'s ip may be {}.", address, next);
+            println!("{}'s ip may be {}.", address, next);
             address = next.to_string();
         }
 
@@ -1264,7 +1264,7 @@ impl Conn {
             Direction::Serverbound => Direction::Clientbound,
         };
 
-        // info!("received packet with id {} dir {:?}", id, dir);
+        // println!("received packet with id {} dir {:?}", id, dir);
 
         if is_network_debug() {
             debug!(
@@ -1451,7 +1451,7 @@ impl Conn {
 
 /// Parse a clientbound packet, for debugging packet parsing issues (Conn::read_packet)
 pub fn try_parse_packet(ibuf: Vec<u8>, protocol_version: i32) {
-    info!("trying to parse packet data {:?}", ibuf);
+    println!("trying to parse packet data {:?}", ibuf);
 
     let mut buf = io::Cursor::new(ibuf);
 
@@ -1459,23 +1459,23 @@ pub fn try_parse_packet(ibuf: Vec<u8>, protocol_version: i32) {
     let dir = Direction::Clientbound;
     let state = State::Play; // TODO: allow parsing other states
 
-    info!(
+    println!(
         "about to parse id={:x}, dir={:?} state={:?}",
         id, dir, state
     );
 
     let packet = packet::packet_by_id(protocol_version, state, dir, id, &mut buf).unwrap();
 
-    info!("packet = {:?}", packet);
+    println!("packet = {:?}", packet);
 
     match packet {
         Some(_val) => {
             let pos = buf.position() as usize;
             let ibuf = buf.into_inner();
             if ibuf.len() != pos {
-                info!("pos = {:?}", pos);
-                info!("ibuf = {:?}", ibuf);
-                info!(
+                println!("pos = {:?}", pos);
+                println!("ibuf = {:?}", ibuf);
+                println!(
                     "Failed to read all of packet 0x{:X}, \
                                                        had {} bytes left",
                     id,
@@ -1483,7 +1483,7 @@ pub fn try_parse_packet(ibuf: Vec<u8>, protocol_version: i32) {
                 )
             }
         }
-        None => info!("missing packet"),
+        None => println!("missing packet"),
     }
 }
 
