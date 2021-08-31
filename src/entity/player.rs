@@ -698,8 +698,6 @@ impl ecs::System for MovementHandler {
                     0.0
                 };
                 let looking_vec = calculate_looking_vector(rotation.yaw, rotation.pitch);
-                /*println!("x {}", looking_vec.0);
-                println!("z {}", looking_vec.1);*/
                 if movement.flying {
                     speed *= 2.5;
                     additional_speed *= 2.5;
