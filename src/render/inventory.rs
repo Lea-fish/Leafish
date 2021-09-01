@@ -2,8 +2,8 @@ use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::Screen;
+use crate::ui;
 use crate::ui::{Container, ImageRef, TextRef};
-use crate::{gl, ui};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -90,7 +90,7 @@ impl InventoryWindow {
     ) {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
-            .texture_coords((0.0 / 16.0, 0.0 / 16.0, 16.0 / 16.0, 16.0 / 16.0))
+            .texture_coords((0.0 / 16.0, 0.0 / 16.0, 1.0, 1.0))
             .position(x, y)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)

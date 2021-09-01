@@ -21,6 +21,8 @@ use crate::ui;
 
 use serde_json::{self, Value};
 
+// TODO: make use of "background_img: String"
+#[allow(dead_code)]
 pub struct DeleteServerEntry {
     elements: Option<UIElements>,
     index: usize,

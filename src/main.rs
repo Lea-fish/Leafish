@@ -379,7 +379,7 @@ fn main() {
         is_fullscreen: false,
         default_protocol_version,
     };
-    game.renderer.clone().write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
+    game.renderer.write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {
         protocol::enable_network_debug();
     }
@@ -519,14 +519,12 @@ fn tick_all(
             game.renderer.clone(),
             version,
         );
-    } else {
-        if game.renderer.clone().read().safe_width != width
-            || game.renderer.clone().read().safe_height != height
-        {
-            game.renderer.clone().write().safe_width = width;
-            game.renderer.clone().write().safe_height = height;
-            gl::viewport(0, 0, width as i32, height as i32);
-        }
+    } else if game.renderer.clone().read().safe_width != width
+        || game.renderer.clone().read().safe_height != height
+    {
+        game.renderer.clone().write().safe_width = width;
+        game.renderer.clone().write().safe_height = height;
+        gl::viewport(0, 0, width as i32, height as i32);
     }
 
     game.screen_sys
@@ -546,11 +544,7 @@ fn tick_all(
         width as f64,
     );
     ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
-    let world = if let Some(server) = game.server.as_ref() {
-        Some(server.world.clone())
-    } else {
-        None
-    };
+    let world = game.server.as_ref().map(|server| server.world.clone());
     game.renderer.clone().write().tick(
         world,
         delta,

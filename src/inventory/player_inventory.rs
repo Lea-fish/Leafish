@@ -25,7 +25,7 @@ impl PlayerInventory {
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
         let x_offset = -(size * 4.5);
-        let y_offset = (size * 4.25);
+        let y_offset = size * 4.25;
         let hot_bar_offset = scale * 4.0;
         let mut slots = vec![];
         let mut slot_craft_0 = Slot::new(
@@ -42,7 +42,7 @@ impl PlayerInventory {
         });
         slots.push(slot_craft_0);
         let mut slot_craft_1 = Slot::new(
-            (size + size * 1.0 / 8.0),
+            size + size * 1.0 / 8.0,
             scale * 5.0 - (scale * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0)),
             size,
         );
@@ -62,7 +62,7 @@ impl PlayerInventory {
         });
         slots.push(slot_craft_2);
         let mut slot_craft_3 = Slot::new(
-            (size + size * 1.0 / 8.0),
+            size + size * 1.0 / 8.0,
             scale * 5.0
                 - (scale * 24.5 + size * 1.0 / 9.0 + size * (2.0 + 1.0 / 5.0)
                     - (size + size * 1.0 / 9.0)),
@@ -88,33 +88,25 @@ impl PlayerInventory {
         let slot_head = Slot::new(
             x_offset,
             y_offset
-                + -((6 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0)
-                    + size
-                    + hot_bar_offset * 2.0),
+                + -((6_f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0),
             size,
         ); // 6th slot!
         let slot_chestplate = Slot::new(
             x_offset,
             y_offset
-                + -((5 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0)
-                    + size
-                    + hot_bar_offset * 2.0),
+                + -((5_f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0),
             size,
         ); // 7th slot!
         let slot_leggings = Slot::new(
             x_offset,
             y_offset
-                + -((4 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0)
-                    + size
-                    + hot_bar_offset * 2.0),
+                + -((4_f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0),
             size,
         ); // 8th slot!
         let slot_boots = Slot::new(
             x_offset,
             y_offset
-                + -((3 as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0)
-                    + size
-                    + hot_bar_offset * 2.0),
+                + -((3_f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0) + size + hot_bar_offset * 2.0),
             size,
         ); // 9th slot!
         slots.push(slot_head);
@@ -141,7 +133,7 @@ impl PlayerInventory {
                 size,
             ));
         }
-        if version > Version::V1_8 || true {
+        if version > Version::V1_8 {
             let mut slot = Slot::new(-(scale * 3.0), scale * 5.0 - scale * 18.0, size);
             slot.item = Some(Item {
                 stack: Default::default(),
@@ -161,7 +153,7 @@ impl PlayerInventory {
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
         let x_offset = -(size * 4.5);
-        let y_offset = (size * 4.18);
+        let y_offset = size * 4.18;
         let hot_bar_offset = scale * 4.0;
         let slot_offset = size + size * 1.0 / 8.0;
         let slot_craft_0 = self.slots.get_mut(0).unwrap();
@@ -169,7 +161,7 @@ impl PlayerInventory {
         slot_craft_0.update_position(0.0/*(size + size * 1.0 / 8.0) * 2.5*/, 0.0/*scale / 9.0 * 5.0 - (scale / 9.0 * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0) * 2.0)*/, size); // TODO: The 0th slot isn't rendered, no matter what! FIX THIS!
         let slot_craft_1 = self.slots.get_mut(1).unwrap();
         slot_craft_1.update_position(
-            (size + size * 1.0 / 8.0),
+            size + size * 1.0 / 8.0,
             scale * 5.0 - (scale * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0)),
             size,
         );
@@ -181,7 +173,7 @@ impl PlayerInventory {
         );
         let slot_craft_3 = self.slots.get_mut(3).unwrap();
         slot_craft_3.update_position(
-            (size + size * 1.0 / 8.0),
+            size + size * 1.0 / 8.0,
             scale * 5.0
                 - (scale * 24.5 + size * 1.0 / 8.0 + size * (2.0 + 1.0 / 5.0) - slot_offset),
             size,
@@ -196,25 +188,25 @@ impl PlayerInventory {
         let slot_head = self.slots.get_mut(5).unwrap(); // 6th slot!
         slot_head.update_position(
             x_offset,
-            y_offset + -((6 as f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
+            y_offset + -((6_f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
             size,
         );
         let slot_chestplate = self.slots.get_mut(6).unwrap(); // 7th slot!
         slot_chestplate.update_position(
             x_offset,
-            y_offset + -((5 as f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
+            y_offset + -((5_f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
             size,
         );
         let slot_leggings = self.slots.get_mut(7).unwrap(); // 8th slot!
         slot_leggings.update_position(
             x_offset,
-            y_offset + -((4 as f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
+            y_offset + -((4_f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
             size,
         );
         let slot_boots = self.slots.get_mut(8).unwrap(); // 9th slot!
         slot_boots.update_position(
             x_offset,
-            y_offset + -((3 as f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
+            y_offset + -((3_f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
             size,
         );
         for y in (0..3).rev() {
@@ -236,7 +228,7 @@ impl PlayerInventory {
                 size,
             );
         }
-        if self.version > Version::V1_8 || true {
+        if self.version > Version::V1_8 {
             let slot = self.slots.get_mut(45).unwrap();
             slot.update_position(-(scale * 3.0), scale * 5.0 - scale * 18.0, size);
         }
@@ -290,7 +282,7 @@ impl Inventory for PlayerInventory {
             .texture("minecraft:gui/container/inventory")
             .create(ui_container);
         basic_elements.push(image);
-        if self.version < Version::V1_9 && false {
+        if self.version < Version::V1_9 {
             // Removes the 2nd hand slot from the inv by rendering the background color over it.
             let image = ui::ImageBuilder::new()
                 .texture_coords((
@@ -348,18 +340,18 @@ impl Inventory for PlayerInventory {
         }
     }
 
-    fn close(&mut self, inventory_window: &mut InventoryWindow) {
+    fn close(&mut self, _inventory_window: &mut InventoryWindow) {
         // TODO
     }
 
-    fn click_at(&self, cursor: (u32, u32)) {
+    fn click_at(&self, _cursor: (u32, u32)) {
         // TODO
     }
 
     fn resize(
         &mut self,
-        width: u32,
-        height: u32,
+        _width: u32,
+        _height: u32,
         renderer: &mut Renderer,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,

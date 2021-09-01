@@ -12,15 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use log::debug;
+use std::cmp::Ordering;
 use std::sync::Arc;
-use std::time::Instant;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use parking_lot::RwLock;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::gl;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
 use crate::render;
@@ -31,6 +31,8 @@ use crate::ui::{Container, HAttach, ImageRef, TextRef, VAttach};
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
+// TODO: read out "regen: bool"
+#[allow(dead_code)]
 pub struct HudContext {
     pub enabled: bool,
     pub debug: bool,
@@ -65,6 +67,11 @@ pub struct HudContext {
     dirty_slot_index: bool,
 }
 
+impl Default for render::hud::HudContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 impl HudContext {
     pub fn new() -> Self {
         HudContext {
@@ -102,6 +109,7 @@ impl HudContext {
             dirty_slot_index: false,
         }
     }
+
     // TODO: Implement effects!
 
     pub fn update_health_and_food(&mut self, health: f32, food: u8, saturation: u8) {
@@ -192,7 +200,7 @@ impl Hud {
             slot_elements: vec![],
             slot_index_elements: vec![],
             debug_elements: vec![],
-            hud_context: hud_context.clone(),
+            hud_context,
             random: rand::thread_rng(),
         }
     }
@@ -330,7 +338,7 @@ impl Hud {
         let absorbtion = hud_context.absorbtion;
         let last_health = hud_context.last_health;
         let mut tmp_absorbtion = absorbtion;
-        let mut regen_animation = -1; // TODO: Implement regen animation!
+        let regen_animation = -1; // TODO: Implement regen animation!
         let updated_health = false; // whether health updated recently or not
                                     // TODO: Implement updated health animation!
         let updated_offset = if updated_health { 9.0 } else { 0.0 };
@@ -491,12 +499,10 @@ impl Hud {
             for i in 0..10 {
                 let x = x_offset + i as f64 * (icon_scale * 8.0);
                 let y = y_offset + (icon_bars as f64 * (icon_scale * 9.0 + (icon_scale * 1.0)));
-                let texture_offset = if i * 2 + 1 < armor {
-                    34.0
-                } else if i * 2 + 1 == armor {
-                    25.0
-                } else {
-                    16.0
+                let texture_offset = match (i * 2 + 1).cmp(&armor) {
+                    Ordering::Greater => 16.0,
+                    Ordering::Equal => 25.0,
+                    Ordering::Less => 34.0,
                 };
                 let image = ui::ImageBuilder::new()
                     .texture_coords((
@@ -521,7 +527,7 @@ impl Hud {
         let hud_context = self.hud_context.clone();
         let hud_context = hud_context.read();
         let food = hud_context.food;
-        let last_food = hud_context.last_food;
+        let _last_food = hud_context.last_food;
         let x_offset = icon_scale * 182.0 / 2.0 + icon_scale * 9.0 / 2.0;
         let y_offset = icon_scale * 30.0;
 
@@ -551,24 +557,38 @@ impl Hud {
                 .create(ui_container);
             self.food_elements.push(image);
 
-            if i * 2 + 1 < food {
-                let image = ui::ImageBuilder::new()
-                    .texture_coords(((l7 + 36.0) / 256.0, 27.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                    .position(x, y_offset)
-                    .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                    .size(icon_scale * 9.0, icon_scale * 9.0)
-                    .texture("minecraft:gui/icons")
-                    .create(ui_container);
-                self.food_elements.push(image);
-            } else if i * 2 + 1 == food {
-                let image = ui::ImageBuilder::new()
-                    .texture_coords(((l7 + 45.0) / 256.0, 27.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
-                    .position(x, y_offset)
-                    .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
-                    .size(icon_scale * 9.0, icon_scale * 9.0)
-                    .texture("minecraft:gui/icons")
-                    .create(ui_container);
-                self.food_elements.push(image);
+            match (i * 2 + 1).cmp(&food) {
+                Ordering::Less => {
+                    let image = ui::ImageBuilder::new()
+                        .texture_coords((
+                            (l7 + 36.0) / 256.0,
+                            27.0 / 256.0,
+                            9.0 / 256.0,
+                            9.0 / 256.0,
+                        ))
+                        .position(x, y_offset)
+                        .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
+                        .texture("minecraft:gui/icons")
+                        .create(ui_container);
+                    self.food_elements.push(image);
+                }
+                Ordering::Equal => {
+                    let image = ui::ImageBuilder::new()
+                        .texture_coords((
+                            (l7 + 45.0) / 256.0,
+                            27.0 / 256.0,
+                            9.0 / 256.0,
+                            9.0 / 256.0,
+                        ))
+                        .position(x, y_offset)
+                        .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
+                        .size(icon_scale * 9.0, icon_scale * 9.0)
+                        .texture("minecraft:gui/icons")
+                        .create(ui_container);
+                    self.food_elements.push(image);
+                }
+                Ordering::Greater => debug!("Nothing happens here, but that's probably wrong"),
             }
         }
         self.hud_context.write().dirty_food = false;
@@ -623,7 +643,7 @@ impl Hud {
                     .alignment(VAttach::Bottom, HAttach::Center)
                     .scale_x(scale)
                     .scale_y(scale)
-                    .position((icon_scale * 1.0), y)
+                    .position(icon_scale * 1.0, y)
                     .text(&level_str)
                     .colour((0, 0, 0, 255))
                     .shadow(false)
@@ -690,9 +710,13 @@ impl Hud {
         self.elements.push(image);
     }
 
-    fn render_scoreboard(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {}
+    // TODO: make use of "render_scoreboard"
+    #[allow(dead_code)]
+    fn render_scoreboard(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
-    fn render_title(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {}
+    // TODO: make use of "render_title"
+    #[allow(dead_code)]
+    fn render_title(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
     fn render_slots_items(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
@@ -741,7 +765,9 @@ impl Hud {
         self.hud_context.clone().write().dirty_slot_index = false;
     }
 
-    fn render_item(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {}
+    // TODO: make use of "render_item"
+    #[allow(dead_code)]
+    fn render_item(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
     fn render_crosshair(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
@@ -803,7 +829,6 @@ impl Hud {
         let hud_context = hud_context.read();
         let icon_scale = Hud::icon_scale(renderer);
         let scale = icon_scale / 2.0;
-        let y = icon_scale * 26.0;
         self.debug_elements.push(
             ui::TextBuilder::new()
                 .alignment(VAttach::Top, HAttach::Left)
@@ -827,7 +852,7 @@ impl Hud {
     ) -> ImageRef {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
-            .texture_coords((0.0 / 16.0, 0.0 / 16.0, 16.0 / 16.0, 16.0 / 16.0))
+            .texture_coords((0.0 / 16.0, 0.0 / 16.0, 1.0, 1.0))
             .position(x, y)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)

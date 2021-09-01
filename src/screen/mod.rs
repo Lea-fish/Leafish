@@ -119,7 +119,6 @@ impl ScreenSystem {
         renderer: Arc<RwLock<render::Renderer>>,
         ui_container: &mut ui::Container,
     ) {
-        let renderer = renderer.clone();
         let renderer = &mut renderer.write();
         for screen in &mut self.remove_queue {
             if screen.active {

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::debug;
 use std::any::Any;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
@@ -329,7 +328,6 @@ impl Console {
             elements.lines.clear();
 
             let mut offset = 0.0;
-            let renderer = renderer.clone();
             let renderer = &*renderer.read();
             for line in self.history.iter().rev() {
                 if offset >= 210.0 {
