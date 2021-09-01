@@ -9,16 +9,16 @@ use byteorder::{NativeEndian, WriteBytesExt};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::io::Write;
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use crate::types::hash::FNVHash;
 use log::error;
 use std::hash::BuildHasherDefault;
 
 use image::GenericImageView;
+use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::Rng;
-use parking_lot::RwLock;
 
 pub struct Factory {
     resources: Arc<RwLock<resources::Manager>>,

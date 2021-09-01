@@ -13,27 +13,26 @@
 // limitations under the License.
 
 use std::cell::RefCell;
-use std::rc::Rc;
-use std::sync::{Arc};
-use std::thread;
 use std::fs;
-
+use std::rc::Rc;
+use std::sync::Arc;
+use std::thread;
 
 use crate::format;
 use crate::format::{Component, TextComponent};
 use crate::protocol;
 use crate::render;
-use crate::ui;
 use crate::settings;
+use crate::ui;
 
-use instant::Duration;
-use rand::Rng;
 use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
 use crate::ui::Container;
-use crossbeam_channel::{Receiver, TryRecvError};
 use crossbeam_channel::unbounded;
+use crossbeam_channel::{Receiver, TryRecvError};
+use instant::Duration;
 use parking_lot::RwLock;
+use rand::Rng;
 
 pub struct ServerList {
     elements: Option<UIElements>,
@@ -101,7 +100,7 @@ impl ServerList {
             elements: None,
             disconnect_reason,
             needs_reload: Rc::new(RefCell::new(false)),
-            background_image
+            background_image,
         }
     }
 
@@ -159,7 +158,8 @@ impl ServerList {
                     let hud_context = Arc::new(RwLock::new(HudContext::new()));
                     game.connect_to(&address, hud_context.clone());
                     game.screen_sys.pop_screen();
-                    game.screen_sys.add_screen(Box::new(Hud::new(hud_context.clone())));
+                    game.screen_sys
+                        .add_screen(Box::new(Hud::new(hud_context.clone())));
                     game.focused = true;
                     true
                 });
@@ -227,7 +227,12 @@ impl ServerList {
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
                     game.screen_sys.replace_screen(Box::new(
-                        super::delete_server::DeleteServerEntry::new(index, &sname, &saddr, game.vars.get(settings::BACKGROUND_IMAGE).clone()),
+                        super::delete_server::DeleteServerEntry::new(
+                            index,
+                            &sname,
+                            &saddr,
+                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                        ),
                     ));
                     true
                 })
@@ -437,12 +442,17 @@ impl ServerList {
             None
         };
 
-        let background = if let Some(_) = Renderer::get_texture_optional(renderer.get_textures_ref(), &*format!("#{}", self.background_image)) {
-            Some(ui::ImageBuilder::new()
-                .texture(&*format!("#{}", self.background_image))
-                .size(renderer.safe_width as f64, renderer.safe_height as f64)
-                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                .create(ui_container))
+        let background = if let Some(_) = Renderer::get_texture_optional(
+            renderer.get_textures_ref(),
+            &*format!("#{}", self.background_image),
+        ) {
+            Some(
+                ui::ImageBuilder::new()
+                    .texture(&*format!("#{}", self.background_image))
+                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .create(ui_container),
+            )
         } else {
             None
         };
@@ -460,7 +470,6 @@ impl ServerList {
             _background: background,
         });
     }
-
 }
 
 impl super::Screen for ServerList {
@@ -608,7 +617,14 @@ impl super::Screen for ServerList {
         }
     }
 
-    fn on_resize(&mut self, _width: u32, _height: u32, _renderer: &mut Renderer, _ui_container: &mut Container) { // TODO: Don't ping the servers on resize!
+    fn on_resize(
+        &mut self,
+        _width: u32,
+        _height: u32,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+        // TODO: Don't ping the servers on resize!
         self.on_deactive(_renderer, _ui_container);
         self.on_active(_renderer, _ui_container);
     }

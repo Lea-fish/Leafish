@@ -24,8 +24,8 @@ use crate::console;
 use crate::protocol;
 use crate::protocol::mojang;
 use crate::render;
-use crate::ui;
 use crate::settings;
+use crate::ui;
 
 pub struct Login {
     elements: Option<UIElements>,
@@ -206,7 +206,10 @@ impl super::Screen for Login {
                         self.vars.set(auth::CL_UUID, val.id.clone());
                         self.vars.set(auth::AUTH_TOKEN, val.access_token.clone());
                         elements.profile = val;
-                        return Some(Box::new(super::ServerList::new(None, self.vars.get(settings::BACKGROUND_IMAGE).clone())));
+                        return Some(Box::new(super::ServerList::new(
+                            None,
+                            self.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                        )));
                     }
                     Err(err) => {
                         elements.login_error.borrow_mut().text = format!("{}", err);

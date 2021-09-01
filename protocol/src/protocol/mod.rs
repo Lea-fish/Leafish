@@ -20,16 +20,14 @@ use cfb8::cipher::{AsyncStreamCipher, NewCipher};
 use cfb8::Cfb8;
 use std::fs;
 
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 
 pub mod forge;
 pub mod mojang;
 
-extern crate regex;
 extern crate lazy_static;
-use trust_dns_resolver::config::ResolverConfig;
-use trust_dns_resolver::config::ResolverOpts;
+extern crate regex;
 use crate::format;
 use crate::nbt;
 use crate::shared::Position;
@@ -45,6 +43,8 @@ use std::io;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use trust_dns_resolver::config::ResolverConfig;
+use trust_dns_resolver::config::ResolverOpts;
 
 pub const SUPPORTED_PROTOCOLS: [i32; 24] = [
     754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 452, 451, 404, 340, 316, 315, 210,
@@ -667,8 +667,8 @@ impl Lengthable for i32 {
 }
 
 use num_traits::cast::{cast, NumCast};
+use std::sync::{Arc, Mutex, RwLock};
 use trust_dns_resolver::Resolver;
-use std::sync::{RwLock, Arc, Mutex};
 
 /// `FixedPoint5` has the 5 least-significant bits for the fractional
 /// part, upper for integer part: https://wiki.vg/Data_types#Fixed-point_numbers
@@ -1049,17 +1049,22 @@ pub struct Conn {
 }
 
 lazy_static! {
-    static ref IPADDRESS_PATTERN: Regex =
-        Regex::new(format!("{}{}{}{}", "^([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
-        "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
-        "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
-        "([01]?\\d\\d?|2[0-4]\\d|25[0-5])$").as_str()).unwrap();
+    static ref IPADDRESS_PATTERN: Regex = Regex::new(
+        format!(
+            "{}{}{}{}",
+            "^([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
+            "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
+            "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
+            "([01]?\\d\\d?|2[0-4]\\d|25[0-5])$"
+        )
+        .as_str()
+    )
+    .unwrap();
     static ref RESOLVER: Resolver =
-    Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
+        Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
 }
 
 impl Conn {
-
     fn get_server_addresses(mut hostname: &str) -> Vec<String> {
         let mut addresses = vec![];
         let parts = hostname.split(':').collect::<Vec<&str>>();
@@ -1301,8 +1306,16 @@ impl Conn {
     pub fn enable_encyption(&mut self, key: &[u8]) {
         let read_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
         let write_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
-        self.read_cipher.clone().write().unwrap().replace(read_cipher);
-        self.write_cipher.clone().write().unwrap().replace(write_cipher);
+        self.read_cipher
+            .clone()
+            .write()
+            .unwrap()
+            .replace(read_cipher);
+        self.write_cipher
+            .clone()
+            .write()
+            .unwrap()
+            .replace(write_cipher);
     }
 
     pub fn set_compresssion(&mut self, threshold: i32) {

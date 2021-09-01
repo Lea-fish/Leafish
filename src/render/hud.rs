@@ -13,16 +13,16 @@
 // limitations under the License.
 
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::time::Instant;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use parking_lot::RwLock;
-use rand::Rng;
 use rand::rngs::ThreadRng;
+use rand::Rng;
 
 use crate::gl;
-use crate::inventory::{Inventory, Item};
 use crate::inventory::player_inventory::PlayerInventory;
+use crate::inventory::{Inventory, Item};
 use crate::render;
 use crate::render::Renderer;
 use crate::screen::Screen;
@@ -32,7 +32,6 @@ use crate::ui::{Container, HAttach, ImageRef, TextRef, VAttach};
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
 pub struct HudContext {
-
     pub enabled: bool,
     pub debug: bool,
     fps: u32,
@@ -64,11 +63,9 @@ pub struct HudContext {
     pub dirty_slots: bool,
     slot_index: u8,
     dirty_slot_index: bool,
-
 }
 
 impl HudContext {
-
     pub fn new() -> Self {
         HudContext {
             enabled: true,
@@ -96,7 +93,8 @@ impl HudContext {
             exp: 0.0, // 0.0 - 1.0
             exp_level: 0,
             dirty_exp: false,
-            breath: 0/*-1*/, // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble -- -1 is causing crashes when attempting to join servers!
+            breath: 0, /*-1*/
+            // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble -- -1 is causing crashes when attempting to join servers!
             dirty_breath: false,
             player_inventory: None,
             dirty_slots: false,
@@ -108,8 +106,7 @@ impl HudContext {
 
     pub fn update_health_and_food(&mut self, health: f32, food: u8, saturation: u8) {
         let start = SystemTime::now();
-        let time = start
-            .duration_since(UNIX_EPOCH).unwrap().as_millis();
+        let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis();
         self.last_health_update = time;
         self.last_health = self.health;
         self.health = health;
@@ -161,11 +158,9 @@ impl HudContext {
             self.dirty_debug = true;
         }
     }
-
 }
 
 pub struct Hud {
-
     last_enabled: bool,
     last_debug_enabled: bool,
     elements: Vec<ImageRef>,
@@ -180,11 +175,9 @@ pub struct Hud {
     debug_elements: Vec<TextRef>,
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
-
 }
 
 impl Hud {
-    
     pub fn new(hud_context: Arc<RwLock<HudContext>>) -> Self {
         Hud {
             last_enabled: true,
@@ -203,11 +196,9 @@ impl Hud {
             random: rand::thread_rng(),
         }
     }
-    
 }
 
 impl Screen for Hud {
-
     fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         if self.hud_context.clone().read().enabled {
             self.render_health(renderer, ui_container);
@@ -296,7 +287,13 @@ impl Screen for Hud {
         None
     }
 
-    fn on_resize(&mut self, _width: u32, _height: u32, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn on_resize(
+        &mut self,
+        _width: u32,
+        _height: u32,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
         if self.hud_context.clone().read().enabled {
             self.on_deactive(_renderer, _ui_container);
             self.on_active(_renderer, _ui_container);
@@ -306,11 +303,9 @@ impl Screen for Hud {
     fn is_closable(&self) -> bool {
         false
     }
-
 }
 
 impl Hud {
-
     pub fn icon_scale(renderer: &Renderer) -> f64 {
         Hud::icon_scale_by_height(renderer.safe_height)
     }
@@ -318,8 +313,8 @@ impl Hud {
     pub fn icon_scale_by_height(height: u32) -> f64 {
         let icon_scale = if height > 500 {
             height as f64 / 36.50
-        }else {
-            height as f64 / 26.50/*27.5*/
+        } else {
+            height as f64 / 26.50 /*27.5*/
         };
         icon_scale / 9.0
     }
@@ -337,17 +332,9 @@ impl Hud {
         let mut tmp_absorbtion = absorbtion;
         let mut regen_animation = -1; // TODO: Implement regen animation!
         let updated_health = false; // whether health updated recently or not
-        // TODO: Implement updated health animation!
-        let updated_offset = if updated_health {
-            9.0
-        } else {
-            0.0
-        };
-        let hardcore_offset = if hud_context.hardcore {
-            5.0
-        } else {
-            0.0
-        };
+                                    // TODO: Implement updated health animation!
+        let updated_offset = if updated_health { 9.0 } else { 0.0 };
+        let hardcore_offset = if hud_context.hardcore { 5.0 } else { 0.0 };
         let texture_offset = if hud_context.poison {
             16 + 36
         } else if hud_context.wither {
@@ -375,7 +362,12 @@ impl Hud {
             }
 
             let image = ui::ImageBuilder::new()
-                .texture_coords(((16.0 + updated_offset) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                .texture_coords((
+                    (16.0 + updated_offset) as f64 / 256.0,
+                    (9.0 * hardcore_offset) as f64 / 256.0,
+                    9.0 / 256.0,
+                    9.0 / 256.0,
+                ))
                 .position(x, y)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                 .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -386,7 +378,12 @@ impl Hud {
             if updated_health {
                 if heart as f32 * 2.0 + 1.0 < last_health {
                     let image = ui::ImageBuilder::new()
-                        .texture_coords(((texture_offset + 54) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                        .texture_coords((
+                            (texture_offset + 54) as f64 / 256.0,
+                            (9.0 * hardcore_offset) as f64 / 256.0,
+                            9.0 / 256.0,
+                            9.0 / 256.0,
+                        ))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -395,7 +392,12 @@ impl Hud {
                     self.health_elements.push(image);
                 } else if heart as f32 * 2.0 + 1.0 == last_health {
                     let image = ui::ImageBuilder::new()
-                        .texture_coords(((texture_offset + 63) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                        .texture_coords((
+                            (texture_offset + 63) as f64 / 256.0,
+                            (9.0 * hardcore_offset) as f64 / 256.0,
+                            9.0 / 256.0,
+                            9.0 / 256.0,
+                        ))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -408,17 +410,26 @@ impl Hud {
             if tmp_absorbtion > 0.0 {
                 if tmp_absorbtion == absorbtion && absorbtion % 2.0 == 1.0 {
                     let image = ui::ImageBuilder::new()
-                        .texture_coords(((texture_offset + 153) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                        .texture_coords((
+                            (texture_offset + 153) as f64 / 256.0,
+                            (9.0 * hardcore_offset) as f64 / 256.0,
+                            9.0 / 256.0,
+                            9.0 / 256.0,
+                        ))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
                         .texture("minecraft:gui/icons")
                         .create(ui_container);
                     self.health_elements.push(image);
-
                 } else {
                     let image = ui::ImageBuilder::new()
-                        .texture_coords(((texture_offset + 144) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                        .texture_coords((
+                            (texture_offset + 144) as f64 / 256.0,
+                            (9.0 * hardcore_offset) as f64 / 256.0,
+                            9.0 / 256.0,
+                            9.0 / 256.0,
+                        ))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -431,7 +442,12 @@ impl Hud {
             } else {
                 if heart * 2 + 1 < hp as isize {
                     let image = ui::ImageBuilder::new()
-                        .texture_coords(((texture_offset + 36) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                        .texture_coords((
+                            (texture_offset + 36) as f64 / 256.0,
+                            (9.0 * hardcore_offset) as f64 / 256.0,
+                            9.0 / 256.0,
+                            9.0 / 256.0,
+                        ))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -442,7 +458,12 @@ impl Hud {
 
                 if heart * 2 + 1 == hp as isize {
                     let image = ui::ImageBuilder::new()
-                        .texture_coords(((texture_offset + 45) as f64 / 256.0, (9.0 * hardcore_offset) as f64 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                        .texture_coords((
+                            (texture_offset + 45) as f64 / 256.0,
+                            (9.0 * hardcore_offset) as f64 / 256.0,
+                            9.0 / 256.0,
+                            9.0 / 256.0,
+                        ))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -478,7 +499,12 @@ impl Hud {
                     16.0
                 };
                 let image = ui::ImageBuilder::new()
-                    .texture_coords((texture_offset / 256.0, 9.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                    .texture_coords((
+                        texture_offset / 256.0,
+                        9.0 / 256.0,
+                        9.0 / 256.0,
+                        9.0 / 256.0,
+                    ))
                     .position(x, y)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                     .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -512,7 +538,12 @@ impl Hud {
         for i in 0..10 {
             let x = x_offset - i as f64 * (icon_scale * 8.0) - icon_scale * 9.0;
             let image = ui::ImageBuilder::new()
-                .texture_coords(((16.0 + j8 * 9.0) / 256.0, 27.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                .texture_coords((
+                    (16.0 + j8 * 9.0) / 256.0,
+                    27.0 / 256.0,
+                    9.0 / 256.0,
+                    9.0 / 256.0,
+                ))
                 .position(x, y_offset)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                 .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -550,9 +581,9 @@ impl Hud {
         let hud_context = hud_context.read();
         let max_exp = if hud_context.exp_level >= 30 {
             112 + (hud_context.exp_level - 30) * 9
-        }else if hud_context.exp_level >= 15 {
+        } else if hud_context.exp_level >= 15 {
             37 + (hud_context.exp_level - 15) * 5
-        }else {
+        } else {
             7 + hud_context.exp_level * 2
         };
         if max_exp > 0 {
@@ -569,7 +600,12 @@ impl Hud {
             if scaled_length > 0.0 {
                 let shift = icon_scale * (((182.0) - scaled_length as f64) / 2.0);
                 let image = ui::ImageBuilder::new()
-                    .texture_coords((0.0 / 256.0, 69.0 / 256.0, scaled_length as f64 / 256.0, 5.0 / 256.0))
+                    .texture_coords((
+                        0.0 / 256.0,
+                        69.0 / 256.0,
+                        scaled_length as f64 / 256.0,
+                        5.0 / 256.0,
+                    ))
                     .position(shift * -1.0, y_offset)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                     .size(icon_scale * scaled_length as f64, icon_scale * 5.0)
@@ -582,51 +618,61 @@ impl Hud {
             let level_str = format!("{}", hud_context.exp_level);
             let scale = icon_scale / 2.0;
             let y = icon_scale * 26.0;
-            self.exp_text_elements.push(ui::TextBuilder::new()
-                .alignment(VAttach::Bottom, HAttach::Center)
-                .scale_x(scale)
-                .scale_y(scale)
-                .position((icon_scale * 1.0), y)
-                .text(&level_str)
-                .colour((0, 0, 0, 255))
-                .shadow(false)
-                .create(ui_container));
-            self.exp_text_elements.push(ui::TextBuilder::new()
-                .alignment(VAttach::Bottom, HAttach::Center)
-                .scale_x(scale)
-                .scale_y(scale)
-                .position(-(icon_scale * 1.0), y)
-                .text(&level_str)
-                .colour((0, 0, 0, 1))
-                .shadow(false)
-                .create(ui_container));
-            self.exp_text_elements.push(ui::TextBuilder::new()
-                .alignment(VAttach::Bottom, HAttach::Center)
-                .scale_x(scale)
-                .scale_y(scale)
-                .position(0.0, y + (icon_scale * 1.0))
-                .text(&level_str)
-                .colour((0, 0, 0, 255))
-                .shadow(false)
-                .create(ui_container));
-            self.exp_text_elements.push(ui::TextBuilder::new()
-                .alignment(VAttach::Bottom, HAttach::Center)
-                .scale_x(scale)
-                .scale_y(scale)
-                .position(0.0, y - (icon_scale * 1.0))
-                .text(&level_str)
-                .colour((0, 0, 0, 255))
-                .shadow(false)
-                .create(ui_container));
-            self.exp_text_elements.push(ui::TextBuilder::new()
-                .alignment(VAttach::Bottom, HAttach::Center)
-                .scale_x(scale)
-                .scale_y(scale)
-                .position(0.0, y)
-                .text(&level_str)
-                .colour((128, 255, 32, 255))
-                .shadow(false)
-                .create(ui_container));
+            self.exp_text_elements.push(
+                ui::TextBuilder::new()
+                    .alignment(VAttach::Bottom, HAttach::Center)
+                    .scale_x(scale)
+                    .scale_y(scale)
+                    .position((icon_scale * 1.0), y)
+                    .text(&level_str)
+                    .colour((0, 0, 0, 255))
+                    .shadow(false)
+                    .create(ui_container),
+            );
+            self.exp_text_elements.push(
+                ui::TextBuilder::new()
+                    .alignment(VAttach::Bottom, HAttach::Center)
+                    .scale_x(scale)
+                    .scale_y(scale)
+                    .position(-(icon_scale * 1.0), y)
+                    .text(&level_str)
+                    .colour((0, 0, 0, 1))
+                    .shadow(false)
+                    .create(ui_container),
+            );
+            self.exp_text_elements.push(
+                ui::TextBuilder::new()
+                    .alignment(VAttach::Bottom, HAttach::Center)
+                    .scale_x(scale)
+                    .scale_y(scale)
+                    .position(0.0, y + (icon_scale * 1.0))
+                    .text(&level_str)
+                    .colour((0, 0, 0, 255))
+                    .shadow(false)
+                    .create(ui_container),
+            );
+            self.exp_text_elements.push(
+                ui::TextBuilder::new()
+                    .alignment(VAttach::Bottom, HAttach::Center)
+                    .scale_x(scale)
+                    .scale_y(scale)
+                    .position(0.0, y - (icon_scale * 1.0))
+                    .text(&level_str)
+                    .colour((0, 0, 0, 255))
+                    .shadow(false)
+                    .create(ui_container),
+            );
+            self.exp_text_elements.push(
+                ui::TextBuilder::new()
+                    .alignment(VAttach::Bottom, HAttach::Center)
+                    .scale_x(scale)
+                    .scale_y(scale)
+                    .position(0.0, y)
+                    .text(&level_str)
+                    .colour((128, 255, 32, 255))
+                    .shadow(false)
+                    .create(ui_container),
+            );
         }
         drop(hud_context);
         self.hud_context.write().dirty_exp = false;
@@ -644,24 +690,31 @@ impl Hud {
         self.elements.push(image);
     }
 
-    fn render_scoreboard(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn render_scoreboard(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {}
 
-    }
-
-    fn render_title(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-
-    }
+    fn render_title(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {}
 
     fn render_slots_items(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         for i in 0..9 {
-            let player_inventory = self.hud_context.clone().read().player_inventory.as_ref().unwrap().clone();
+            let player_inventory = self
+                .hud_context
+                .clone()
+                .read()
+                .player_inventory
+                .as_ref()
+                .unwrap()
+                .clone();
             let player_inventory = player_inventory.read();
             let item = player_inventory.get_item(36 + i as i16);
             if let Some(item) = item {
-                let slot = self.draw_item(item,
-                                          -(icon_scale * 90.0) + (i as f64 * (icon_scale * 20.0)) + icon_scale * 11.0,
-                                          icon_scale * 3.0, ui_container, renderer);
+                let slot = self.draw_item(
+                    item,
+                    -(icon_scale * 90.0) + (i as f64 * (icon_scale * 20.0)) + icon_scale * 11.0,
+                    icon_scale * 3.0,
+                    ui_container,
+                    renderer,
+                );
                 self.slot_elements.push(slot);
             }
         }
@@ -673,7 +726,13 @@ impl Hud {
         let slot = self.hud_context.clone().read().slot_index as f64;
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 256.0, 22.0 / 256.0, 24.0 / 256.0, 22.0 / 256.0))
-            .position((icon_scale) * -1.0 + -(icon_scale * 90.0) + (slot * (icon_scale * 20.0)) + icon_scale * 11.0, (icon_scale) * 1.0)
+            .position(
+                (icon_scale) * -1.0
+                    + -(icon_scale * 90.0)
+                    + (slot * (icon_scale * 20.0))
+                    + icon_scale * 11.0,
+                (icon_scale) * 1.0,
+            )
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
             .size(icon_scale * 24.0, icon_scale * 22.0)
             .texture("minecraft:gui/widgets")
@@ -682,9 +741,7 @@ impl Hud {
         self.hud_context.clone().write().dirty_slot_index = false;
     }
 
-    fn render_item(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-
-    }
+    fn render_item(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {}
 
     fn render_crosshair(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
@@ -702,7 +759,8 @@ impl Hud {
         let hud_context = self.hud_context.clone();
         let hud_context = hud_context.read();
 
-        if hud_context.breath != -1 { // Whether the player is under water or not.
+        if hud_context.breath != -1 {
+            // Whether the player is under water or not.
             let breath = hud_context.breath as f64;
             drop(hud_context);
             let bubbles = ((breath - 2.0) * 10.0 / 300.0).ceil();
@@ -746,19 +804,27 @@ impl Hud {
         let icon_scale = Hud::icon_scale(renderer);
         let scale = icon_scale / 2.0;
         let y = icon_scale * 26.0;
-        self.debug_elements.push(ui::TextBuilder::new()
-            .alignment(VAttach::Top, HAttach::Left)
-            .scale_x(scale)
-            .scale_y(scale)
-            .position(icon_scale, icon_scale)
-            .text(format!("FPS: {}", hud_context.fps))
-            .colour((0, 102, 204, 255))
-            .shadow(false)
-            .create(ui_container));
+        self.debug_elements.push(
+            ui::TextBuilder::new()
+                .alignment(VAttach::Top, HAttach::Left)
+                .scale_x(scale)
+                .scale_y(scale)
+                .position(icon_scale, icon_scale)
+                .text(format!("FPS: {}", hud_context.fps))
+                .colour((0, 102, 204, 255))
+                .shadow(false)
+                .create(ui_container),
+        );
     }
 
-    pub fn draw_item(&self, item: &Item, x: f64, y: f64,
-                     ui_container: &mut Container, renderer: &Renderer) -> ImageRef {
+    pub fn draw_item(
+        &self,
+        item: &Item,
+        x: f64,
+        y: f64,
+        ui_container: &mut Container,
+        renderer: &Renderer,
+    ) -> ImageRef {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 16.0, 0.0 / 16.0, 16.0 / 16.0, 16.0 / 16.0))
@@ -769,5 +835,4 @@ impl Hud {
             .create(ui_container);
         image
     }
-
 }

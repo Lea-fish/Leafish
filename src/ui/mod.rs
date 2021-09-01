@@ -17,11 +17,11 @@ pub mod logo;
 use crate::format;
 use crate::render;
 use clipboard::{ClipboardContext, ClipboardProvider};
+use parking_lot::RwLock;
 use std::cell::{RefCell, RefMut};
 use std::rc::{Rc, Weak};
+use std::sync::Arc;
 use winit::event::VirtualKeyCode;
-use std::sync::{Arc};
-use parking_lot::RwLock;
 
 const SCALED_WIDTH: f64 = 854.0;
 const SCALED_HEIGHT: f64 = 480.0;
@@ -306,7 +306,13 @@ impl Container {
         }
     }
 
-    pub fn tick(&mut self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, width: f64, height: f64) {
+    pub fn tick(
+        &mut self,
+        renderer: Arc<RwLock<render::Renderer>>,
+        delta: f64,
+        width: f64,
+        height: f64,
+    ) {
         let (sw, sh) = match self.mode {
             Mode::Scaled => (SCALED_WIDTH / width, SCALED_HEIGHT / height),
             Mode::Unscaled(scale) => (scale, scale),

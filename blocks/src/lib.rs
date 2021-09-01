@@ -13,8 +13,8 @@ pub mod material;
 pub use self::material::Material;
 
 pub use self::Block::*;
-use std::sync::{Arc};
 use parking_lot::RwLock;
+use std::sync::Arc;
 
 pub trait WorldAccess {
     fn get_block(&self, pos: Position) -> Block;

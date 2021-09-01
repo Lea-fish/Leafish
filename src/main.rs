@@ -36,6 +36,7 @@ pub mod auth;
 pub mod chunk_builder;
 pub mod console;
 pub mod entity;
+mod inventory;
 pub mod model;
 pub mod render;
 pub mod resources;
@@ -44,18 +45,17 @@ pub mod server;
 pub mod settings;
 pub mod ui;
 pub mod world;
-mod inventory;
 
 use crate::protocol::mojang;
+use crate::render::hud::HudContext;
+use leafish_protocol::protocol::Error;
+use parking_lot::Mutex;
+use parking_lot::RwLock;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::thread;
-use leafish_protocol::protocol::Error;
-use crate::render::hud::HudContext;
-use parking_lot::RwLock;
-use parking_lot::Mutex;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -141,7 +141,9 @@ impl Game {
                 renderer,
                 hud_context.clone(),
             )
-        }).join().unwrap();
+        })
+        .join()
+        .unwrap();
         match result {
             Ok(srv) => {
                 self.server = Some(srv);
@@ -154,12 +156,24 @@ impl Game {
         debug!("after connect!");
     }
 
-    pub fn tick(&mut self/*, delta: f64*/) {
+    pub fn tick(&mut self /*, delta: f64*/) {
         if self.server.is_some() {
-            if let Some(disconnect_reason) = self.server.as_ref().unwrap().disconnect_data.clone().write().disconnect_reason.take() {
+            if let Some(disconnect_reason) = self
+                .server
+                .as_ref()
+                .unwrap()
+                .disconnect_data
+                .clone()
+                .write()
+                .disconnect_reason
+                .take()
+            {
                 self.server = None;
                 self.screen_sys
-                    .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason), self.vars.get(settings::BACKGROUND_IMAGE).clone())));
+                    .replace_screen(Box::new(screen::ServerList::new(
+                        Some(disconnect_reason),
+                        self.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                    )));
                 self.renderer.clone().write().reset();
             }
         }
@@ -345,7 +359,7 @@ fn main() {
             .unwrap_or_else(|| "".to_string()),
     );
     let game = Game {
-        server: None,// Arc::from(server::Server::dummy_server(resource_manager.clone())),
+        server: None, // Arc::from(server::Server::dummy_server(resource_manager.clone())),
         focused: false,
         renderer: Arc::new(RwLock::new(renderer)),
         screen_sys,
@@ -443,7 +457,6 @@ fn tick_all(
     last_resource_version: &mut usize,
     vsync: &mut bool,
 ) {
-
     if game.server.is_some() {
         if !game.server.as_ref().unwrap().is_connected() {
             game.server = None;
@@ -485,7 +498,10 @@ fn tick_all(
 
     game.tick();
     if game.server.is_some() {
-        game.server.as_ref().unwrap().tick(game.renderer.clone(), delta, game.focused); // TODO: Improve perf in load screen!
+        game.server
+            .as_ref()
+            .unwrap()
+            .tick(game.renderer.clone(), delta, game.focused); // TODO: Improve perf in load screen!
     }
 
     // Check if window is valid, it might be minimized
@@ -494,11 +510,19 @@ fn tick_all(
     }
 
     if game.server.is_some() {
-        game.renderer.clone().write().update_camera(physical_width, physical_height);
-        game.chunk_builder
-            .tick(game.server.as_ref().unwrap().world.clone(), game.renderer.clone(), version);
+        game.renderer
+            .clone()
+            .write()
+            .update_camera(physical_width, physical_height);
+        game.chunk_builder.tick(
+            game.server.as_ref().unwrap().world.clone(),
+            game.renderer.clone(),
+            version,
+        );
     } else {
-        if game.renderer.clone().read().safe_width != width || game.renderer.clone().read().safe_height != height {
+        if game.renderer.clone().read().safe_width != width
+            || game.renderer.clone().read().safe_height != height
+        {
             game.renderer.clone().write().safe_width = width;
             game.renderer.clone().write().safe_height = height;
             gl::viewport(0, 0, width as i32, height as i32);
@@ -515,13 +539,16 @@ fn tick_all(
         }
     }
     */
-    game.console
-        .lock()
-        .tick(&mut ui_container, game.renderer.clone(), delta, width as f64);
+    game.console.lock().tick(
+        &mut ui_container,
+        game.renderer.clone(),
+        delta,
+        width as f64,
+    );
     ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
     let world = if let Some(server) = game.server.as_ref() {
         Some(server.world.clone())
-    }else {
+    } else {
         None
     };
     game.renderer.clone().write().tick(
@@ -533,7 +560,13 @@ fn tick_all(
         physical_height,
     );
     if game.server.is_some() {
-        game.server.as_ref().unwrap().clone().render_list_computer.send(true).unwrap();
+        game.server
+            .as_ref()
+            .unwrap()
+            .clone()
+            .render_list_computer
+            .send(true)
+            .unwrap();
     }
 
     if fps_cap > 0 && !*vsync {
@@ -588,7 +621,9 @@ fn handle_window_event<T>(
                 if game.server.is_some() {
                     if let Some(player) = *game.server.as_ref().unwrap().player.clone().write() {
                         let rotation = game
-                            .server.as_ref().unwrap()
+                            .server
+                            .as_ref()
+                            .unwrap()
                             .entities
                             .clone()
                             .write()
@@ -638,7 +673,8 @@ fn handle_window_event<T>(
                         let (width, height) =
                             physical_size.to_logical::<f64>(game.dpi_factor).into();
 
-                        if game.server.is_some() && game.server.as_ref().unwrap().is_connected()
+                        if game.server.is_some()
+                            && game.server.as_ref().unwrap().is_connected()
                             && !game.focused
                             && !game.screen_sys.is_current_closable()
                         {
@@ -660,7 +696,10 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
                         if game.focused && game.server.is_some() {
-                            game.server.as_ref().unwrap().on_right_click(game.renderer.clone());
+                            game.server
+                                .as_ref()
+                                .unwrap()
+                                .on_right_click(game.renderer.clone());
                         }
                     }
                     (_, _) => (),
@@ -696,9 +735,11 @@ fn handle_window_event<T>(
                                 window.set_cursor_grab(false).unwrap();
                                 window.set_cursor_visible(true);
                                 game.focused = false;
-                                game.screen_sys.add_screen(Box::new(
-                                    screen::SettingsMenu::new(game.vars.clone(), true),
-                                ));
+                                game.screen_sys
+                                    .add_screen(Box::new(screen::SettingsMenu::new(
+                                        game.vars.clone(),
+                                        true,
+                                    )));
                             } else if game.screen_sys.is_current_closable() {
                                 window.set_cursor_grab(true).unwrap();
                                 window.set_cursor_visible(false);
@@ -724,10 +765,15 @@ fn handle_window_event<T>(
                         }
                         (ElementState::Pressed, Some(key)) => {
                             if let Some(action_key) =
-                            settings::Actionkey::get_by_keycode(key, &game.vars)
+                                settings::Actionkey::get_by_keycode(key, &game.vars)
                             {
                                 if game.server.is_some() {
-                                    game.server.as_ref().unwrap().key_press(true, action_key, &mut game.screen_sys, &mut game.focused);
+                                    game.server.as_ref().unwrap().key_press(
+                                        true,
+                                        action_key,
+                                        &mut game.screen_sys,
+                                        &mut game.focused,
+                                    );
                                 }
                             }
                             if !game.focused {
@@ -737,10 +783,15 @@ fn handle_window_event<T>(
                         }
                         (ElementState::Released, Some(key)) => {
                             if let Some(action_key) =
-                            settings::Actionkey::get_by_keycode(key, &game.vars)
+                                settings::Actionkey::get_by_keycode(key, &game.vars)
                             {
                                 if game.server.is_some() {
-                                    game.server.as_ref().unwrap().key_press(false, action_key, &mut game.screen_sys, &mut game.focused);
+                                    game.server.as_ref().unwrap().key_press(
+                                        false,
+                                        action_key,
+                                        &mut game.screen_sys,
+                                        &mut game.focused,
+                                    );
                                 }
                             }
                             if !game.focused {

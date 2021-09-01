@@ -168,7 +168,10 @@ impl super::Screen for SettingsMenu {
                     game.server.as_ref().unwrap().disconnect(None);
                     game.screen_sys.pop_screen();
                     game.screen_sys
-                        .replace_screen(Box::new(super::ServerList::new(None, game.vars.get(settings::BACKGROUND_IMAGE).clone())));
+                        .replace_screen(Box::new(super::ServerList::new(
+                            None,
+                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                        )));
                     true
                 });
             }
@@ -518,14 +521,13 @@ impl super::Screen for SkinSettingsMenu {
             hat_setting.add_text(txt);
             hat_setting.add_click_func(move |_, game| {
                 let s_hat = !*game.vars.get(settings::S_HAT);
-                txt_hat.borrow_mut().text =
-                    format!(
-                        "Hat: {}",
-                        match s_hat {
-                            true => "On",
-                            false => "Off",
-                        }
-                    );
+                txt_hat.borrow_mut().text = format!(
+                    "Hat: {}",
+                    match s_hat {
+                        true => "On",
+                        false => "Off",
+                    }
+                );
                 game.vars.set(settings::S_HAT, s_hat);
                 false
             });
@@ -638,4 +640,3 @@ impl super::Screen for SkinSettingsMenu {
         true
     }
 }
-

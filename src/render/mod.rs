@@ -17,31 +17,31 @@ pub mod glsl;
 #[macro_use]
 pub mod shaders;
 pub mod clouds;
-pub mod model;
-pub mod ui;
 pub mod hud;
 pub mod inventory;
+pub mod model;
+pub mod ui;
 
 use crate::gl;
 use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::prelude::*;
 use image::{GenericImage, GenericImageView, RgbaImage};
-use log::{error, debug, trace};
+use log::{debug, error, trace};
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
 
 use crate::types::hash::FNVHash;
+use crate::world::World;
+use crossbeam_channel::unbounded;
+use crossbeam_channel::{Receiver, Sender};
+use image::imageops::FilterType;
+use parking_lot::RwLock;
 use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::thread;
-use crate::world::World;
 use std::time::Instant;
-use crossbeam_channel::{Sender, Receiver};
-use crossbeam_channel::unbounded;
-use parking_lot::RwLock;
-use image::imageops::FilterType;
 
 const ATLAS_SIZE: usize = 2048;
 
@@ -260,9 +260,7 @@ impl Renderer {
             if rm.version() != self.resource_version {
                 self.resource_version = rm.version();
                 trace!("Updating textures to {}", self.resource_version);
-                self.textures
-                    .write()
-                    .update_textures(self.resource_version);
+                self.textures.write().update_textures(self.resource_version);
 
                 self.model
                     .rebuild_models(self.resource_version, &self.textures);
@@ -308,8 +306,9 @@ impl Renderer {
         );
         self.camera_matrix = camera_matrix * cgmath::Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
         /*self.frustum =
-            collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();*/
-        self.frustum = collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();
+        collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();*/
+        self.frustum =
+            collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();
     }
 
     pub fn tick(
@@ -371,10 +370,10 @@ impl Renderer {
                             self.element_buffer_type,
                             0,
                         );
-                    }else {
+                    } else {
                         debug!("1: not rendering solid {:?}", pos);
                     }
-                }else {
+                } else {
                     debug!("2: not rendering solid {:?}", pos);
                 }
             }
@@ -382,7 +381,7 @@ impl Renderer {
             // Line rendering
             // Model rendering
             self.model.draw(
-                self.frustum.clone()/*&self.frustum*/,
+                self.frustum.clone(), /*&self.frustum*/
                 &self.perspective_matrix,
                 &self.camera_matrix,
                 self.light_level,
@@ -472,11 +471,11 @@ impl Renderer {
                             self.element_buffer_type,
                             0,
                         );
-                    }else {
+                    } else {
                         debug!("1: not rendering trans {:?}", pos);
                     }
-                }else {
-                   debug!("2: not rendering trans {:?}", pos);
+                } else {
+                    debug!("2: not rendering trans {:?}", pos);
                 }
             }
         }
@@ -514,7 +513,12 @@ impl Renderer {
         }
     }
 
-    pub fn update_chunk_solid(&mut self, buffer: Arc<RwLock<ChunkBuffer>>, data: &[u8], count: usize) {
+    pub fn update_chunk_solid(
+        &mut self,
+        buffer: Arc<RwLock<ChunkBuffer>>,
+        data: &[u8],
+        count: usize,
+    ) {
         self.ensure_element_buffer(count);
         if count == 0 {
             if buffer.clone().read().solid.is_some() {
@@ -572,7 +576,12 @@ impl Renderer {
         info.count = count;
     }
 
-    pub fn update_chunk_trans(&mut self, buffer: Arc<RwLock<ChunkBuffer>>, data: &[u8], count: usize) {
+    pub fn update_chunk_trans(
+        &mut self,
+        buffer: Arc<RwLock<ChunkBuffer>>,
+        data: &[u8],
+        count: usize,
+    ) {
         self.ensure_element_buffer(count);
         if count == 0 {
             if buffer.clone().read().trans.is_some() {
@@ -1059,7 +1068,9 @@ impl TextureManager {
     }
 
     pub fn reset(&mut self) {
-        self.skins.iter_mut().for_each(|skin| skin.1.store(0, Ordering::Relaxed));
+        self.skins
+            .iter_mut()
+            .for_each(|skin| skin.1.store(0, Ordering::Relaxed));
     }
 
     fn add_defaults(&mut self) {
@@ -1075,10 +1086,7 @@ impl TextureManager {
         self.put_texture("leafish", "solid", 1, 1, vec![255, 255, 255, 255]);
     }
 
-    fn process_skins(
-        recv: Receiver<String>,
-        reply: Sender<(String, Option<image::DynamicImage>)>,
-    ) {
+    fn process_skins(recv: Receiver<String>, reply: Sender<(String, Option<image::DynamicImage>)>) {
         let client = reqwest::blocking::Client::new();
         loop {
             let hash = match recv.recv() {
@@ -1101,10 +1109,10 @@ impl TextureManager {
         client: &::reqwest::blocking::Client,
         hash: &str,
     ) -> Result<image::DynamicImage, ::std::io::Error> {
+        use std::fs;
         use std::io::Read;
         use std::io::{Error, ErrorKind};
         use std::path::Path;
-        use std::fs;
         let path = format!("skin-cache/{}/{}.png", &hash[..2], hash);
         let cache_path = Path::new(&path);
         fs::create_dir_all(cache_path.parent().unwrap())?;
@@ -1246,10 +1254,7 @@ impl TextureManager {
         let res = self.resources.clone();
         // TODO: This shouldn't be hardcoded to steve but instead
         // have a way to select alex as a default.
-        let img = if let Some(mut val) = res
-            .read()
-            .open("minecraft", "textures/entity/steve.png")
-        {
+        let img = if let Some(mut val) = res.read().open("minecraft", "textures/entity/steve.png") {
             let mut data = Vec::new();
             val.read_to_end(&mut data).unwrap();
             image::load_from_memory(&data).unwrap()
@@ -1428,7 +1433,13 @@ impl TextureManager {
             let scale = width.max(height) as f64 / ATLAS_SIZE as f64;
             let width = (width as f64 / scale) as u32;
             let height = (height as f64 / scale) as u32;
-            (image::imageops::resize(&image, width, height, FilterType::Nearest).as_raw().clone(), width, height)
+            (
+                image::imageops::resize(&image, width, height, FilterType::Nearest)
+                    .as_raw()
+                    .clone(),
+                width,
+                height,
+            )
         } else {
             (data, width, height)
         };

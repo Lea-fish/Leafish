@@ -4,14 +4,14 @@ use crate::resources;
 use crate::shared::Direction;
 use crate::types::bit::Set;
 use crate::world;
-use crate::world::{block, World, CPos, ComposedSection};
+use crate::world::{block, CPos, ComposedSection, World};
 use rand::{self, Rng, SeedableRng};
-use std::sync::{Arc};
+use std::sync::Arc;
 use std::thread;
 use std::time::Instant;
 // use rayon::prelude::*;
-use crossbeam_channel::{Sender, Receiver};
 use crossbeam_channel::unbounded;
+use crossbeam_channel::{Receiver, Sender};
 use parking_lot::RwLock;
 
 const NUM_WORKERS: usize = 8;
@@ -26,7 +26,6 @@ pub struct ChunkBuilder {
 }
 
 impl ChunkBuilder {
-
     pub fn new(
         resources: Arc<RwLock<resources::Manager>>,
         textures: Arc<RwLock<render::TextureManager>>,
@@ -69,43 +68,43 @@ impl ChunkBuilder {
 
         let renderer = renderer.clone();
         let mut renderer = renderer.write();
-            while let Ok((id, mut val)) = self.built_recv.try_recv() {
-                world.clone().reset_building_flag(val.position);
+        while let Ok((id, mut val)) = self.built_recv.try_recv() {
+            world.clone().reset_building_flag(val.position);
 
-                let world = world.clone();
-                let chunks = world.chunks.clone();
-                let chunk = chunks.get_mut(&CPos(val.position.0, val.position.2));
-                if chunk.as_ref().is_some() {
-                    let mut chunk = chunk.unwrap();
-                    let section = if let Some(sec) = chunk.sections[val.position.1 as usize].as_mut() {
-                        Some(sec)
-                    } else {
-                        None
-                    };
+            let world = world.clone();
+            let chunks = world.chunks.clone();
+            let chunk = chunks.get_mut(&CPos(val.position.0, val.position.2));
+            if chunk.as_ref().is_some() {
+                let mut chunk = chunk.unwrap();
+                let section = if let Some(sec) = chunk.sections[val.position.1 as usize].as_mut() {
+                    Some(sec)
+                } else {
+                    None
+                };
 
-                    if let Some(sec) = section {
-                        sec.cull_info = val.cull_info;
-                        renderer.update_chunk_solid(
-                            sec.render_buffer.clone(),
-                            &val.solid_buffer,
-                            val.solid_count,
-                        );
-                        renderer.update_chunk_trans(
-                            sec.render_buffer.clone(),
-                            &val.trans_buffer,
-                            val.trans_count,
-                        );
-                    }
+                if let Some(sec) = section {
+                    sec.cull_info = val.cull_info;
+                    renderer.update_chunk_solid(
+                        sec.render_buffer.clone(),
+                        &val.solid_buffer,
+                        val.solid_count,
+                    );
+                    renderer.update_chunk_trans(
+                        sec.render_buffer.clone(),
+                        &val.trans_buffer,
+                        val.trans_count,
+                    );
                 }
+            }
 
-                val.solid_buffer.clear();
-                val.trans_buffer.clear();
-                self.free_builders
-                    .push((id, val.solid_buffer, val.trans_buffer));
-            }
-            if self.free_builders.is_empty() {
-                return;
-            }
+            val.solid_buffer.clear();
+            val.trans_buffer.clear();
+            self.free_builders
+                .push((id, val.solid_buffer, val.trans_buffer));
+        }
+        if self.free_builders.is_empty() {
+            return;
+        }
         let tmp_world = world.clone();
         let dirty_sections = tmp_world
             .get_render_list()
@@ -117,18 +116,18 @@ impl ChunkBuilder {
             tmp_world.set_building_flag((x, y, z));
             let t_id = self.free_builders.pop().unwrap();
 
-                self.threads[t_id.0]
-                    .0
-                    .send(BuildReq {
-                        world: world.clone(),
-                        position: (x, y, z),
-                        solid_buffer: t_id.1,
-                        trans_buffer: t_id.2,
-                    })
-                    .unwrap();
-                if self.free_builders.is_empty() {
-                    return;
-                }
+            self.threads[t_id.0]
+                .0
+                .send(BuildReq {
+                    world: world.clone(),
+                    position: (x, y, z),
+                    solid_buffer: t_id.1,
+                    trans_buffer: t_id.2,
+                })
+                .unwrap();
+            if self.free_builders.is_empty() {
+                return;
+            }
         }
     }
 
@@ -143,10 +142,10 @@ impl ChunkBuilder {
             let (id, mut val) = curr_data.unwrap();
             val.solid_buffer.clear();
             val.trans_buffer.clear();
-            self.free_builders.push((id, val.solid_buffer, val.trans_buffer));
+            self.free_builders
+                .push((id, val.solid_buffer, val.trans_buffer));
         }
     }
-
 }
 
 struct BuildReq {

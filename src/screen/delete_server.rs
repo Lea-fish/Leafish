@@ -16,8 +16,8 @@ use std::collections::BTreeMap;
 use std::fs;
 
 use crate::render;
-use crate::ui;
 use crate::settings;
+use crate::ui;
 
 use serde_json::{self, Value};
 
@@ -38,13 +38,18 @@ struct UIElements {
 }
 
 impl DeleteServerEntry {
-    pub fn new(index: usize, name: &str, address: &str, background_img: String) -> DeleteServerEntry {
+    pub fn new(
+        index: usize,
+        name: &str,
+        address: &str,
+        background_img: String,
+    ) -> DeleteServerEntry {
         DeleteServerEntry {
             elements: None,
             index,
             name: name.to_string(),
             address: address.to_string(),
-            background_img
+            background_img,
         }
     }
 
@@ -105,7 +110,10 @@ impl super::Screen for DeleteServerEntry {
             confirm.add_click_func(move |_, game| {
                 Self::delete_server(index);
                 game.screen_sys
-                    .replace_screen(Box::new(super::ServerList::new(None, game.vars.get(settings::BACKGROUND_IMAGE).clone())));
+                    .replace_screen(Box::new(super::ServerList::new(
+                        None,
+                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                    )));
                 true
             });
         }
@@ -125,7 +133,10 @@ impl super::Screen for DeleteServerEntry {
             cancel.add_text(txt);
             cancel.add_click_func(|_, game| {
                 game.screen_sys
-                    .replace_screen(Box::new(super::ServerList::new(None, game.vars.get(settings::BACKGROUND_IMAGE).clone())));
+                    .replace_screen(Box::new(super::ServerList::new(
+                        None,
+                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                    )));
                 true
             });
         }

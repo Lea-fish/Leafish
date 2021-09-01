@@ -25,11 +25,11 @@ pub mod settings_menu;
 pub use self::settings_menu::{AudioSettingsMenu, SettingsMenu, VideoSettingsMenu};
 
 use crate::render;
-use crate::ui;
-use std::sync::{Arc};
 use crate::render::Renderer;
+use crate::ui;
 use crate::ui::Container;
 use parking_lot::RwLock;
+use std::sync::Arc;
 
 pub trait Screen {
     // Called once
@@ -51,7 +51,14 @@ pub trait Screen {
     // Events
     fn on_scroll(&mut self, _x: f64, _y: f64) {}
 
-    fn on_resize(&mut self, _width: u32, _height: u32, _renderer: &mut Renderer, _ui_container: &mut Container) {} // TODO: make non-optional!
+    fn on_resize(
+        &mut self,
+        _width: u32,
+        _height: u32,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    } // TODO: make non-optional!
 
     fn is_closable(&self) -> bool {
         false
@@ -144,9 +151,16 @@ impl ScreenSystem {
                 current.active = true;
                 current.screen.on_active(renderer, ui_container);
             }
-            if current.last_width != renderer.safe_width as i32 || current.last_height != renderer.safe_height as i32 {
+            if current.last_width != renderer.safe_width as i32
+                || current.last_height != renderer.safe_height as i32
+            {
                 if current.last_width != -1 && current.last_height != -1 {
-                    current.screen.on_resize(renderer.safe_width, renderer.safe_height, renderer, ui_container);
+                    current.screen.on_resize(
+                        renderer.safe_width,
+                        renderer.safe_height,
+                        renderer,
+                        ui_container,
+                    );
                 }
                 current.last_width = renderer.safe_width as i32;
                 current.last_height = renderer.safe_height as i32;

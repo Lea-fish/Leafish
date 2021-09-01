@@ -2,9 +2,9 @@ use crate::model::BlockVertex;
 use crate::render;
 use crate::shared::Direction;
 use crate::world::{self, block};
-use std::io::Write;
-use std::sync::{Arc};
 use parking_lot::RwLock;
+use std::io::Write;
+use std::sync::Arc;
 
 pub fn render_liquid<W: Write>(
     textures: Arc<RwLock<render::TextureManager>>,
@@ -54,7 +54,8 @@ pub fn render_liquid<W: Write>(
     let uy1 = 0i16;
     let uy2 = 16i16 * tex.get_height() as i16;
 
-    for dir in Direction::all() { // TODO: Fix -1
+    for dir in Direction::all() {
+        // TODO: Fix -1
         let (ox, oy, oz) = dir.get_offset();
         let special = dir == Direction::Up && (tl < 8 || tr < 8 || bl < 8 || br < 8);
         let block = snapshot.get_block(x + ox, y + oy, z + oz);

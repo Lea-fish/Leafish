@@ -182,7 +182,12 @@ impl Manager {
     }
 
     /// Ticks all render systems
-    pub fn render_tick(&mut self, world: &world::World, renderer: &mut render::Renderer, focused: bool) {
+    pub fn render_tick(
+        &mut self,
+        world: &world::World,
+        renderer: &mut render::Renderer,
+        focused: bool,
+    ) {
         self.process_entity_changes(world, renderer);
         let mut systems = self.render_systems.take().unwrap();
         for sys in &mut systems {
@@ -192,11 +197,7 @@ impl Manager {
         self.process_entity_changes(world, renderer);
     }
 
-    fn process_entity_changes(
-        &mut self,
-        world: &world::World,
-        renderer: &mut render::Renderer,
-    ) {
+    fn process_entity_changes(&mut self, world: &world::World, renderer: &mut render::Renderer) {
         let changes = self.changed_entity_components.clone();
         self.changed_entity_components = HashSet::with_hasher(BuildHasherDefault::default());
         for entity in changes {
@@ -308,11 +309,7 @@ impl Manager {
     }
 
     /// Deallocates all entities/components excluding the world entity
-    pub fn remove_all_entities(
-        &mut self,
-        world: &world::World,
-        renderer: &mut render::Renderer,
-    ) {
+    pub fn remove_all_entities(&mut self, world: &world::World, renderer: &mut render::Renderer) {
         for (id, e) in self.entities[1..].iter_mut().enumerate() {
             if let Some(set) = e.0.as_mut() {
                 set.components = BSet::new(self.components.len());
