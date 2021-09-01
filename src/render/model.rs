@@ -8,10 +8,10 @@ use crate::types::hash::FNVHash;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::{Matrix4, Point3, SquareMatrix};
 use collision::{self, Frustum, Sphere};
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
-use std::sync::{Arc};
-use parking_lot::RwLock;
+use std::sync::Arc;
 
 pub struct Manager {
     collections: Vec<Collection>,
@@ -269,7 +269,8 @@ impl Manager {
 
             for model in collection.models.values() {
                 if model.radius > 0.0
-                    && frustum.contains(&Sphere { // TODO: Possibly move the frustum read
+                    && frustum.contains(&Sphere {
+                        // TODO: Possibly move the frustum read
                         center: Point3::new(model.x, -model.y, model.z),
                         radius: model.radius,
                     }) == collision::Relation::Out

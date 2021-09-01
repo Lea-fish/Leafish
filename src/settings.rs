@@ -1,7 +1,7 @@
 use crate::console;
+use crate::console::CVar;
 use std::marker::PhantomData;
 use winit::event::VirtualKeyCode;
-use crate::console::CVar;
 
 pub const R_MAX_FPS: console::CVar<i64> = console::CVar {
     ty: PhantomData,
@@ -40,7 +40,8 @@ pub const CL_MASTER_VOLUME: console::CVar<i64> = console::CVar {
 };
 
 // https://github.com/SpigotMC/BungeeCord/blob/bda160562792a913cba3a65ba4996de60d0d6d68/proxy/src/main/java/net/md_5/bungee/PlayerSkinConfiguration.java#L20
-pub const S_CAPE: console::CVar<bool> = console::CVar { //
+pub const S_CAPE: console::CVar<bool> = console::CVar {
+    //
     ty: PhantomData,
     name: "s_cape",
     description: "Toggle your cape",
@@ -49,7 +50,8 @@ pub const S_CAPE: console::CVar<bool> = console::CVar { //
     default: &|| false,
 };
 
-pub const S_JACKET: console::CVar<bool> = console::CVar { //
+pub const S_JACKET: console::CVar<bool> = console::CVar {
+    //
     ty: PhantomData,
     name: "s_jacket",
     description: "Toggle your jacket",
@@ -58,7 +60,8 @@ pub const S_JACKET: console::CVar<bool> = console::CVar { //
     default: &|| false,
 };
 
-pub const S_LEFT_SLEEVE: console::CVar<bool> = console::CVar { //
+pub const S_LEFT_SLEEVE: console::CVar<bool> = console::CVar {
+    //
     ty: PhantomData,
     name: "s_left_sleeve",
     description: "Toggle your left sleeve",
@@ -67,7 +70,8 @@ pub const S_LEFT_SLEEVE: console::CVar<bool> = console::CVar { //
     default: &|| false,
 };
 
-pub const S_RIGHT_SLEEVE: console::CVar<bool> = console::CVar { //
+pub const S_RIGHT_SLEEVE: console::CVar<bool> = console::CVar {
+    //
     ty: PhantomData,
     name: "s_right_sleeve",
     description: "Toggle your right sleeve",
@@ -76,7 +80,8 @@ pub const S_RIGHT_SLEEVE: console::CVar<bool> = console::CVar { //
     default: &|| false,
 };
 
-pub const S_LEFT_PANTS: console::CVar<bool> = console::CVar { //
+pub const S_LEFT_PANTS: console::CVar<bool> = console::CVar {
+    //
     ty: PhantomData,
     name: "s_left_pants",
     description: "Toggle your left pants",
@@ -85,7 +90,8 @@ pub const S_LEFT_PANTS: console::CVar<bool> = console::CVar { //
     default: &|| false,
 };
 
-pub const S_RIGHT_PANTS: console::CVar<bool> = console::CVar { //
+pub const S_RIGHT_PANTS: console::CVar<bool> = console::CVar {
+    //
     ty: PhantomData,
     name: "s_right_pants",
     description: "Toggle your right pants",
@@ -94,7 +100,8 @@ pub const S_RIGHT_PANTS: console::CVar<bool> = console::CVar { //
     default: &|| false,
 };
 
-pub const S_HAT: console::CVar<bool> = console::CVar { //
+pub const S_HAT: console::CVar<bool> = console::CVar {
+    //
     ty: PhantomData,
     name: "s_hat",
     description: "Toggle your hat",
@@ -135,10 +142,16 @@ pub const CL_KEYBIND_SPRINT: console::CVar<i64> =
     create_keybind!(LControl, "cl_keybind_sprint", "Keybinding for sprinting");
 pub const CL_KEYBIND_JUMP: console::CVar<i64> =
     create_keybind!(Space, "cl_keybind_jump", "Keybinding for jumping");
-pub const CL_KEYBIND_TOGGLE_HUD: console::CVar<i64> =
-    create_keybind!(F1, "cl_keybind_toggle_hud", "Keybinding for toggling the hud");
-pub const CL_KEYBIND_TOGGLE_DEBUG: console::CVar<i64> =
-    create_keybind!(F3, "cl_keybind_toggle_debug", "Keybinding for toggling the debug info");
+pub const CL_KEYBIND_TOGGLE_HUD: console::CVar<i64> = create_keybind!(
+    F1,
+    "cl_keybind_toggle_hud",
+    "Keybinding for toggling the hud"
+);
+pub const CL_KEYBIND_TOGGLE_DEBUG: console::CVar<i64> = create_keybind!(
+    F3,
+    "cl_keybind_toggle_debug",
+    "Keybinding for toggling the debug info"
+);
 
 pub const BACKGROUND_IMAGE: console::CVar<String> = CVar {
     ty: PhantomData,

@@ -19,9 +19,9 @@ use crate::render::shaders;
 use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use image::GenericImageView;
-use std::collections::HashMap;
-use std::sync::{Arc};
 use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 const UI_WIDTH: f64 = 854.0;
 const UI_HEIGHT: f64 = 480.0;
@@ -308,7 +308,16 @@ impl UIState {
         }
     }
 
-    pub fn new_text(&mut self, val: &str, x: f64, y: f64, r: u8, g: u8, b: u8, shadow: bool) -> UIText {
+    pub fn new_text(
+        &mut self,
+        val: &str,
+        x: f64,
+        y: f64,
+        r: u8,
+        g: u8,
+        b: u8,
+        shadow: bool,
+    ) -> UIText {
         self.new_text_scaled(val, x, y, 1.0, 1.0, r, g, b, shadow)
     }
 

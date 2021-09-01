@@ -18,7 +18,7 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::hash::BuildHasherDefault;
 use std::io::{Cursor, Read};
-use std::sync::{Arc};
+use std::sync::Arc;
 
 use cgmath::prelude::*;
 use flate2::read::ZlibDecoder;
@@ -31,22 +31,22 @@ use crate::format;
 use crate::protocol;
 use crate::render;
 use crate::shared::{Direction, Position};
-use crate::types::{bit, nibble};
 use crate::types::hash::FNVHash;
+use crate::types::{bit, nibble};
 use byteorder::ReadBytesExt;
 use instant::Instant;
 
 pub mod biome;
 mod storage;
 
-use collision::Frustum;
 use crate::chunk_builder::CullInfo;
-use dashmap::DashMap;
-use crossbeam_channel::{Sender, Receiver};
-use crossbeam_channel::unbounded;
-use parking_lot::RwLock;
 use crate::world::biome::Biome;
+use collision::Frustum;
+use crossbeam_channel::unbounded;
+use crossbeam_channel::{Receiver, Sender};
+use dashmap::DashMap;
 use lazy_static::lazy_static;
+use parking_lot::RwLock;
 
 pub struct World {
     pub chunks: Arc<DashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>,
@@ -64,11 +64,9 @@ pub struct World {
 }
 
 pub struct LightData {
-
     pub arrays: Cursor<Vec<u8>>,
     pub block_light_mask: i32,
     pub sky_light_mask: i32,
-
 }
 
 #[derive(Clone, Debug)]
@@ -155,10 +153,16 @@ impl World {
         let mut chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         if chunk.set_block(pos.x & 0xF, pos.y, pos.z & 0xF, b) {
             if chunk.block_entities.contains_key(&pos) {
-                self.block_entity_actions.0.send(BlockEntityAction::Remove(pos)).unwrap();
+                self.block_entity_actions
+                    .0
+                    .send(BlockEntityAction::Remove(pos))
+                    .unwrap();
             }
             if block_entity::BlockEntityType::get_block_entity(b).is_some() {
-                self.block_entity_actions.0.send(BlockEntityAction::Create(pos)).unwrap();
+                self.block_entity_actions
+                    .0
+                    .send(BlockEntityAction::Create(pos))
+                    .unwrap();
             }
             true
         } else {
@@ -253,37 +257,41 @@ impl World {
         while let Ok(action) = self.block_entity_actions.1.try_recv() {
             match action {
                 BlockEntityAction::Remove(pos) => {
-                        if let Some(mut chunk) = self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
-                            if let Some(entity) = chunk.block_entities.remove(&pos) {
-                                m.remove_entity(entity);
-                            }
+                    if let Some(mut chunk) =
+                        self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
+                    {
+                        if let Some(entity) = chunk.block_entities.remove(&pos) {
+                            m.remove_entity(entity);
                         }
+                    }
                 }
                 BlockEntityAction::Create(pos) => {
-                        if let Some(mut chunk) = self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4)) {
-                            // Remove existing entity
-                            if let Some(entity) = chunk.block_entities.remove(&pos) {
-                                m.remove_entity(entity);
-                            }
-                            let block = chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF);
-                            if let Some(entity_type) =
-                            block_entity::BlockEntityType::get_block_entity(block)
-                            {
-                                let entity = entity_type.create_entity(m, pos);
-                                chunk.block_entities.insert(pos, entity);
-                            }
+                    if let Some(mut chunk) =
+                        self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
+                    {
+                        // Remove existing entity
+                        if let Some(entity) = chunk.block_entities.remove(&pos) {
+                            m.remove_entity(entity);
                         }
+                        let block = chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF);
+                        if let Some(entity_type) =
+                            block_entity::BlockEntityType::get_block_entity(block)
+                        {
+                            let entity = entity_type.create_entity(m, pos);
+                            chunk.block_entities.insert(pos, entity);
+                        }
+                    }
                 }
                 BlockEntityAction::UpdateSignText(bx) => {
-                        let (pos, line1, line2, line3, line4) = *bx;
-                        if let Some(chunk) = self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
-                            if let Some(entity) = chunk.block_entities.get(&pos) {
-                                if let Some(sign) = m.get_component_mut(*entity, sign_info) {
-                                    sign.lines = [line1, line2, line3, line4];
-                                    sign.dirty = true;
-                                }
+                    let (pos, line1, line2, line3, line4) = *bx;
+                    if let Some(chunk) = self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
+                        if let Some(entity) = chunk.block_entities.get(&pos) {
+                            if let Some(sign) = m.get_component_mut(*entity, sign_info) {
+                                sign.lines = [line1, line2, line3, line4];
+                                sign.dirty = true;
                             }
                         }
+                    }
                 }
             }
         }
@@ -291,57 +299,57 @@ impl World {
 
     pub(crate) fn do_light_update(&self, update: LightUpdate) {
         use std::cmp;
-                if update.pos.y < 0
-                    || update.pos.y > 255
-                    || !self.is_chunk_loaded(update.pos.x >> 4, update.pos.z >> 4)
-                {
-                    return;
-                }
+        if update.pos.y < 0
+            || update.pos.y > 255
+            || !self.is_chunk_loaded(update.pos.x >> 4, update.pos.z >> 4)
+        {
+            return;
+        }
 
-                let block = self.get_block(update.pos).get_material();
-                // Find the brightest source of light nearby
-                let mut best = update.ty.get_light(self, update.pos);
-                let old = best;
-                for dir in Direction::all() {
-                    let light = update.ty.get_light(self, update.pos.shift(dir));
-                    if light > best {
-                        best = light;
-                    }
-                }
-                best = best.saturating_sub(cmp::max(1, block.absorbed_light));
-                // If the light from the block itself is brighter than the light passing through
-                // it use that.
-                if update.ty == LightType::Block && block.emitted_light != 0 {
-                    best = cmp::max(best, block.emitted_light);
-                }
-                // Sky light doesn't decrease when going down at full brightness
-                if update.ty == LightType::Sky
-                    && block.absorbed_light == 0
-                    && update.ty.get_light(self, update.pos.shift(Direction::Up)) == 15
-                {
-                    best = 15;
-                }
+        let block = self.get_block(update.pos).get_material();
+        // Find the brightest source of light nearby
+        let mut best = update.ty.get_light(self, update.pos);
+        let old = best;
+        for dir in Direction::all() {
+            let light = update.ty.get_light(self, update.pos.shift(dir));
+            if light > best {
+                best = light;
+            }
+        }
+        best = best.saturating_sub(cmp::max(1, block.absorbed_light));
+        // If the light from the block itself is brighter than the light passing through
+        // it use that.
+        if update.ty == LightType::Block && block.emitted_light != 0 {
+            best = cmp::max(best, block.emitted_light);
+        }
+        // Sky light doesn't decrease when going down at full brightness
+        if update.ty == LightType::Sky
+            && block.absorbed_light == 0
+            && update.ty.get_light(self, update.pos.shift(Direction::Up)) == 15
+        {
+            best = 15;
+        }
 
-                // Nothing to do, we are already at the right value
-                if best == old {
-                    return;
+        // Nothing to do, we are already at the right value
+        if best == old {
+            return;
+        }
+        // Use our new light value
+        update.ty.set_light(self, update.pos, best);
+        // Flag surrounding chunks as dirty
+        for yy in -1..2 {
+            for zz in -1..2 {
+                for xx in -1..2 {
+                    let bp = update.pos + (xx, yy, zz);
+                    self.set_dirty(bp.x >> 4, bp.y >> 4, bp.z >> 4);
                 }
-                // Use our new light value
-                update.ty.set_light(self, update.pos, best);
-                // Flag surrounding chunks as dirty
-                for yy in -1..2 {
-                    for zz in -1..2 {
-                        for xx in -1..2 {
-                            let bp = update.pos + (xx, yy, zz);
-                            self.set_dirty(bp.x >> 4, bp.y >> 4, bp.z >> 4);
-                        }
-                    }
-                }
+            }
+        }
 
-                // Update surrounding blocks
-                for dir in Direction::all() {
-                    self.update_light(update.pos.shift(dir), update.ty);
-                }
+        // Update surrounding blocks
+        for dir in Direction::all() {
+            self.update_light(update.pos.shift(dir), update.ty);
+        }
     }
 
     pub fn copy_cloud_heightmap(&self, data: &mut [u8]) -> bool {
@@ -387,8 +395,13 @@ impl World {
         let diff = Instant::now().duration_since(start_rec);
         let frustum = renderer.clone().read().frustum.clone();
         let frame_id = renderer.clone().read().frame_id.clone();
-        self.do_render_queue(Arc::new(RwLock::new(process_queue)),
-                             frustum, frame_id, valid_dirs, render_queue.clone());
+        self.do_render_queue(
+            Arc::new(RwLock::new(process_queue)),
+            frustum,
+            frame_id,
+            valid_dirs,
+            render_queue.clone(),
+        );
         let render_list_write = self.render_list.clone();
         let mut render_list_write = render_list_write.write();
         render_list_write.clear();
@@ -500,8 +513,14 @@ impl World {
         }*/
     }
 
-    fn do_render_queue(&self, process_queue: Arc<RwLock<VecDeque<(Direction, (i32, i32, i32))>>>,
-                       frustum: Frustum<f32>, frame_id: u32, valid_dirs: [bool; 6], render_queue: Arc<RwLock<Vec<(i32, i32, i32)>>>) {
+    fn do_render_queue(
+        &self,
+        process_queue: Arc<RwLock<VecDeque<(Direction, (i32, i32, i32))>>>,
+        frustum: Frustum<f32>,
+        frame_id: u32,
+        valid_dirs: [bool; 6],
+        render_queue: Arc<RwLock<Vec<(i32, i32, i32)>>>,
+    ) {
         let out = Arc::new(RwLock::new(VecDeque::new()));
         /*let tmp_renderer = renderer.clone();
         let tmp_renderer = tmp_renderer.read();
@@ -512,7 +531,7 @@ impl World {
         // debug!("rendering {} elems", process_queue.clone().read().len());
         process_queue.clone().read().iter().for_each(|(from, pos)| {
             let (exists, cull) = if let Some((sec, rendered_on)) =
-            self.get_render_section_mut(pos.0, pos.1, pos.2)
+                self.get_render_section_mut(pos.0, pos.1, pos.2)
             {
                 if rendered_on == frame_id {
                     return;
@@ -562,14 +581,22 @@ impl World {
             }
         });
         if !out.clone().read().is_empty() {
-            self.do_render_queue(out.clone(), frustum.clone(), frame_id, valid_dirs, render_queue);
+            self.do_render_queue(
+                out.clone(),
+                frustum.clone(),
+                frame_id,
+                valid_dirs,
+                render_queue,
+            );
         } else {
             debug!("finished!");
         }
     }
 
     pub fn get_render_list(&self) -> Vec<((i32, i32, i32), Arc<RwLock<render::ChunkBuffer>>)> {
-        self.render_list.clone().read()
+        self.render_list
+            .clone()
+            .read()
             .iter()
             // .par_iter()
             .filter_map(|v| {
@@ -585,122 +612,122 @@ impl World {
             .collect()
     }
     /*
-    thread 'main' panicked at 'called `Option::unwrap()` on a `None` value', src/world/mod.rs:414:62
-stack backtrace:
-   0: rust_begin_unwind
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
-   1: core::panicking::panic_fmt
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:92:14
-   2: core::panicking::panic
-             at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:50:5
-   3: core::option::Option<T>::unwrap
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:386:21
-   4: leafish::world::World::get_render_list::{{closure}}
-             at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:414:29
-   5: core::iter::adapters::map::map_fold::{{closure}}
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:82:28
-   6: core::iter::traits::iterator::Iterator::fold
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2146:21
-   7: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:122:9
-   8: core::iter::traits::iterator::Iterator::for_each
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:776:9
-   9: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:40:17
-  10: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:56:9
-  11: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:36:9
-  12: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:2404:9
-  13: core::iter::traits::iterator::Iterator::collect
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:1788:9
-  14: leafish::world::World::get_render_list
-             at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:411:9
-  15: leafish::chunk_builder::ChunkBuilder::tick
-             at /home/threadexception/IdeaProjects/Leafish/src/chunk_builder.rs:97:30
-  16: leafish::tick_all
-             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:507:5
-  17: leafish::main::{{closure}}
-             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:423:9
-  18: winit::platform_impl::platform::sticky_exit_callback
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:746:5
-  19: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run_return
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:354:13
-  20: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:191:9
-  21: winit::platform_impl::platform::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:662:56
-  22: winit::event_loop::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/event_loop.rs:154:9
-  23: leafish::main
-             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:403:5
-  24: core::ops::function::FnOnce::call_once
-             at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:227:5
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+        thread 'main' panicked at 'called `Option::unwrap()` on a `None` value', src/world/mod.rs:414:62
+    stack backtrace:
+       0: rust_begin_unwind
+                 at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/std/src/panicking.rs:493:5
+       1: core::panicking::panic_fmt
+                 at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:92:14
+       2: core::panicking::panic
+                 at /rustc/53cb7b09b00cbea8754ffb78e7e3cb521cb8af4b/library/core/src/panicking.rs:50:5
+       3: core::option::Option<T>::unwrap
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/option.rs:386:21
+       4: leafish::world::World::get_render_list::{{closure}}
+                 at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:414:29
+       5: core::iter::adapters::map::map_fold::{{closure}}
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:82:28
+       6: core::iter::traits::iterator::Iterator::fold
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:2146:21
+       7: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/adapters/map.rs:122:9
+       8: core::iter::traits::iterator::Iterator::for_each
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:776:9
+       9: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_extend.rs:40:17
+      10: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter_nested.rs:56:9
+      11: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/spec_from_iter.rs:36:9
+      12: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/alloc/src/vec/mod.rs:2404:9
+      13: core::iter::traits::iterator::Iterator::collect
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/iter/traits/iterator.rs:1788:9
+      14: leafish::world::World::get_render_list
+                 at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:411:9
+      15: leafish::chunk_builder::ChunkBuilder::tick
+                 at /home/threadexception/IdeaProjects/Leafish/src/chunk_builder.rs:97:30
+      16: leafish::tick_all
+                 at /home/threadexception/IdeaProjects/Leafish/src/main.rs:507:5
+      17: leafish::main::{{closure}}
+                 at /home/threadexception/IdeaProjects/Leafish/src/main.rs:423:9
+      18: winit::platform_impl::platform::sticky_exit_callback
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:746:5
+      19: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run_return
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:354:13
+      20: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:191:9
+      21: winit::platform_impl::platform::EventLoop<T>::run
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:662:56
+      22: winit::event_loop::EventLoop<T>::run
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/event_loop.rs:154:9
+      23: leafish::main
+                 at /home/threadexception/IdeaProjects/Leafish/src/main.rs:403:5
+      24: core::ops::function::FnOnce::call_once
+                 at /home/threadexception/.rustup/toolchains/stable-x86_64-unknown-linux-gnu/lib/rustlib/src/rust/library/core/src/ops/function.rs:227:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
 
-Process finished with exit code 101
-     */
+    Process finished with exit code 101
+         */
     /*
-    rendering 179 elems
-thread 'main' panicked at 'called `Option::unwrap()` on a `None` value', src/world/mod.rs:590:57
-stack backtrace:
-   0: rust_begin_unwind
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/std/src/panicking.rs:515:5
-   1: core::panicking::panic_fmt
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/panicking.rs:92:14
-   2: core::panicking::panic
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/panicking.rs:50:5
-   3: core::option::Option<T>::unwrap
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/option.rs:388:21
-   4: leafish::world::World::get_render_list::{{closure}}
-             at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:590:29
-   5: core::iter::adapters::map::map_fold::{{closure}}
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/adapters/map.rs:82:28
-   6: core::iter::traits::iterator::Iterator::fold
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/traits/iterator.rs:2112:21
-   7: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/adapters/map.rs:122:9
-   8: core::iter::traits::iterator::Iterator::for_each
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/traits/iterator.rs:736:9
-   9: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/alloc/src/vec/spec_extend.rs:40:17
-  10: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/alloc/src/vec/spec_from_iter_nested.rs:56:9
-  11: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/alloc/src/vec/spec_from_iter.rs:33:9
-  12: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/alloc/src/vec/mod.rs:2449:9
-  13: core::iter::traits::iterator::Iterator::collect
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/traits/iterator.rs:1748:9
-  14: leafish::world::World::get_render_list
-             at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:584:9
-  15: leafish::chunk_builder::ChunkBuilder::tick
-             at /home/threadexception/IdeaProjects/Leafish/src/chunk_builder.rs:96:30
-  16: leafish::tick_all
-             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:526:9
-  17: leafish::main::{{closure}}
-             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:437:9
-  18: winit::platform_impl::platform::sticky_exit_callback
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:746:5
-  19: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run_return
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:354:13
-  20: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:191:9
-  21: winit::platform_impl::platform::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:662:56
-  22: winit::event_loop::EventLoop<T>::run
-             at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/event_loop.rs:154:9
-  23: leafish::main
-             at /home/threadexception/IdeaProjects/Leafish/src/main.rs:416:5
-  24: core::ops::function::FnOnce::call_once
-             at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/ops/function.rs:227:5
-note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
-do next!
-rendering 198 elems
+        rendering 179 elems
+    thread 'main' panicked at 'called `Option::unwrap()` on a `None` value', src/world/mod.rs:590:57
+    stack backtrace:
+       0: rust_begin_unwind
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/std/src/panicking.rs:515:5
+       1: core::panicking::panic_fmt
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/panicking.rs:92:14
+       2: core::panicking::panic
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/panicking.rs:50:5
+       3: core::option::Option<T>::unwrap
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/option.rs:388:21
+       4: leafish::world::World::get_render_list::{{closure}}
+                 at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:590:29
+       5: core::iter::adapters::map::map_fold::{{closure}}
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/adapters/map.rs:82:28
+       6: core::iter::traits::iterator::Iterator::fold
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/traits/iterator.rs:2112:21
+       7: <core::iter::adapters::map::Map<I,F> as core::iter::traits::iterator::Iterator>::fold
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/adapters/map.rs:122:9
+       8: core::iter::traits::iterator::Iterator::for_each
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/traits/iterator.rs:736:9
+       9: <alloc::vec::Vec<T,A> as alloc::vec::spec_extend::SpecExtend<T,I>>::spec_extend
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/alloc/src/vec/spec_extend.rs:40:17
+      10: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter_nested::SpecFromIterNested<T,I>>::from_iter
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/alloc/src/vec/spec_from_iter_nested.rs:56:9
+      11: <alloc::vec::Vec<T> as alloc::vec::spec_from_iter::SpecFromIter<T,I>>::from_iter
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/alloc/src/vec/spec_from_iter.rs:33:9
+      12: <alloc::vec::Vec<T> as core::iter::traits::collect::FromIterator<T>>::from_iter
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/alloc/src/vec/mod.rs:2449:9
+      13: core::iter::traits::iterator::Iterator::collect
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/iter/traits/iterator.rs:1748:9
+      14: leafish::world::World::get_render_list
+                 at /home/threadexception/IdeaProjects/Leafish/src/world/mod.rs:584:9
+      15: leafish::chunk_builder::ChunkBuilder::tick
+                 at /home/threadexception/IdeaProjects/Leafish/src/chunk_builder.rs:96:30
+      16: leafish::tick_all
+                 at /home/threadexception/IdeaProjects/Leafish/src/main.rs:526:9
+      17: leafish::main::{{closure}}
+                 at /home/threadexception/IdeaProjects/Leafish/src/main.rs:437:9
+      18: winit::platform_impl::platform::sticky_exit_callback
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:746:5
+      19: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run_return
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:354:13
+      20: winit::platform_impl::platform::wayland::event_loop::EventLoop<T>::run
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/wayland/event_loop/mod.rs:191:9
+      21: winit::platform_impl::platform::EventLoop<T>::run
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/platform_impl/linux/mod.rs:662:56
+      22: winit::event_loop::EventLoop<T>::run
+                 at /home/threadexception/.cargo/registry/src/github.com-1ecc6299db9ec823/winit-0.25.0/src/event_loop.rs:154:9
+      23: leafish::main
+                 at /home/threadexception/IdeaProjects/Leafish/src/main.rs:416:5
+      24: core::ops::function::FnOnce::call_once
+                 at /rustc/a178d0322ce20e33eac124758e837cbd80a6f633/library/core/src/ops/function.rs:227:5
+    note: Some details are omitted, run with `RUST_BACKTRACE=full` for a verbose backtrace.
+    do next!
+    rendering 198 elems
 
-Process finished with exit code 101
-     */
+    Process finished with exit code 101
+         */
 
     /*
     pub fn get_section_mut(&self, x: i32, y: i32, z: i32) -> Option<Section> {
@@ -713,12 +740,7 @@ Process finished with exit code 101
     }*/
 
     // TODO: Improve the perf of this method as it is the MAIN bottleneck slowing down the program!
-    fn get_render_section_mut(
-        &self,
-        x: i32,
-        y: i32,
-        z: i32,
-    ) -> Option<(Option<CullInfo>, u32)> {
+    fn get_render_section_mut(&self, x: i32, y: i32, z: i32) -> Option<(Option<CullInfo>, u32)> {
         if !(0..=15).contains(&y) {
             return None;
         }
@@ -790,7 +812,8 @@ Process finished with exit code 101
         }
     }
 
-    pub fn capture_snapshot(&self, x: i32, y: i32, z: i32,) -> Option<SectionSnapshot> { // TODO: Improve performance!
+    pub fn capture_snapshot(&self, x: i32, y: i32, z: i32) -> Option<SectionSnapshot> {
+        // TODO: Improve performance!
         let cx = x >> 4;
         let cy = y >> 4;
         let cz = z >> 4;
@@ -799,7 +822,7 @@ Process finished with exit code 101
             Some(val) => val,
             None => {
                 return None;
-            },
+            }
         };
         let sec = &chunk.sections[cy as usize];
         if sec.is_none() {
@@ -816,16 +839,18 @@ Process finished with exit code 101
         }
     }
 
-    pub fn load_chunk(&self,
-                      x: i32,
-                      z: i32,
-                      new: bool,
-                      skylight: bool,
-                      read_biomes: bool,
-                      mask: u16,
-                      mask_add: u16,
-                      data: &mut Cursor<Vec<u8>>,
-                      version: u8) -> Result<(), protocol::Error> {
+    pub fn load_chunk(
+        &self,
+        x: i32,
+        z: i32,
+        new: bool,
+        skylight: bool,
+        read_biomes: bool,
+        mask: u16,
+        mask_add: u16,
+        data: &mut Cursor<Vec<u8>>,
+        version: u8,
+    ) -> Result<(), protocol::Error> {
         let additional_light_data = self.lighting_cache.clone().write().remove(&CPos(x, z));
         let has_add_light = additional_light_data.is_some();
         let cpos = CPos(x, z);
@@ -869,10 +894,17 @@ Process finished with exit code 101
                 self.read_light(chunk, mask, skylight, data);
             } else if has_add_light {
                 let mut additional_light_data = additional_light_data.unwrap();
-                self.load_light(chunk, additional_light_data.block_light_mask, true, additional_light_data.sky_light_mask, &mut additional_light_data.arrays);
+                self.load_light(
+                    chunk,
+                    additional_light_data.block_light_mask,
+                    true,
+                    additional_light_data.sky_light_mask,
+                    &mut additional_light_data.arrays,
+                );
             }
 
-            if new && read_biomes { // read biomes is always true (as param) except for load_chunk_19
+            if new && read_biomes {
+                // read biomes is always true (as param) except for load_chunk_19
                 data.read_exact(&mut chunk.biomes)?;
             }
 
@@ -934,9 +966,15 @@ Process finished with exit code 101
                     chunk.position.1 << 4,
                 );
                 if chunk.block_entities.contains_key(&pos) {
-                    self.block_entity_actions.0.send(BlockEntityAction::Remove(pos)).unwrap();
+                    self.block_entity_actions
+                        .0
+                        .send(BlockEntityAction::Remove(pos))
+                        .unwrap();
                 }
-                self.block_entity_actions.0.send(BlockEntityAction::Create(pos)).unwrap();
+                self.block_entity_actions
+                    .0
+                    .send(BlockEntityAction::Create(pos))
+                    .unwrap();
             }
         }
         if self.protocol_version >= 451 {
@@ -970,9 +1008,15 @@ Process finished with exit code 101
                     chunk.position.1 << 4,
                 );
                 if chunk.block_entities.contains_key(&pos) {
-                    self.block_entity_actions.0.send(BlockEntityAction::Remove(pos)).unwrap();
+                    self.block_entity_actions
+                        .0
+                        .send(BlockEntityAction::Remove(pos))
+                        .unwrap();
                 }
-                self.block_entity_actions.0.send(BlockEntityAction::Create(pos)).unwrap();
+                self.block_entity_actions
+                    .0
+                    .send(BlockEntityAction::Create(pos))
+                    .unwrap();
             }
         }
     }
@@ -1001,7 +1045,15 @@ Process finished with exit code 101
         }
     }
 
-    fn finish_17(&self, chunk: &mut Chunk, mask: u16, mask_add: u16, skylight: bool, data: &mut Cursor<Vec<u8>>, block_types: [[u8; 4096]; 16]) {
+    fn finish_17(
+        &self,
+        chunk: &mut Chunk,
+        mask: u16,
+        mask_add: u16,
+        skylight: bool,
+        data: &mut Cursor<Vec<u8>>,
+        block_types: [[u8; 4096]; 16],
+    ) {
         // Block metadata array - half byte per block
         let mut block_meta: [nibble::Array; 16] = [
             // TODO: cleanup this initialization
@@ -1092,9 +1144,15 @@ Process finished with exit code 101
                         chunk.position.1 << 4,
                     );
                     if chunk.block_entities.contains_key(&pos) {
-                        self.block_entity_actions.0.send(BlockEntityAction::Remove(pos)).unwrap();
+                        self.block_entity_actions
+                            .0
+                            .send(BlockEntityAction::Remove(pos))
+                            .unwrap();
                     }
-                    self.block_entity_actions.0.send(BlockEntityAction::Create(pos)).unwrap();
+                    self.block_entity_actions
+                        .0
+                        .send(BlockEntityAction::Create(pos))
+                        .unwrap();
                 }
             }
         }
@@ -1243,7 +1301,15 @@ Process finished with exit code 101
         self.load_chunk(x, z, new, skylight, new, mask, mask_add, data, 17)
     }
 
-    pub fn load_light_with_loc(&self, x: i32, z: i32, block_light_mask: i32, sky_light: bool, sky_light_mask: i32, data: &mut Cursor<Vec<u8>>) {
+    pub fn load_light_with_loc(
+        &self,
+        x: i32,
+        z: i32,
+        block_light_mask: i32,
+        sky_light: bool,
+        sky_light_mask: i32,
+        data: &mut Cursor<Vec<u8>>,
+    ) {
         // debug!("x {} z {}", x, z);
         // TODO: Insert chunks with light data only or cache them until the real data arrives!
         /*let cpos = CPos(x, z);
@@ -1253,7 +1319,14 @@ Process finished with exit code 101
         self.load_light(chunk, block_light_mask, sky_light, sky_light_mask, data);*/
     }
 
-    fn load_light(&self, chunk: &mut Chunk, block_light_mask: i32, sky_light: bool, sky_light_mask: i32, data: &mut Cursor<Vec<u8>>) {
+    fn load_light(
+        &self,
+        chunk: &mut Chunk,
+        block_light_mask: i32,
+        sky_light: bool,
+        sky_light_mask: i32,
+        data: &mut Cursor<Vec<u8>>,
+    ) {
         for i in 0..16 {
             if block_light_mask & (1 << i) == 0 {
                 continue;
@@ -1313,7 +1386,17 @@ Process finished with exit code 101
         mask: u16,
         data: Vec<u8>,
     ) -> Result<(), protocol::Error> {
-        self.load_chunk(x, z, new, true, read_biomes, mask, 0, &mut Cursor::new(data), 19)
+        self.load_chunk(
+            x,
+            z,
+            new,
+            true,
+            read_biomes,
+            mask,
+            0,
+            &mut Cursor::new(data),
+            19,
+        )
     }
 
     fn flag_section_dirty(&self, x: i32, y: i32, z: i32) {
@@ -1356,22 +1439,8 @@ impl Chunk {
         Chunk {
             position: pos,
             sections: [
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None
+                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+                None, None,
             ],
             sections_rendered_on: [0; 16],
             biomes: [0; 16 * 16],
@@ -1514,25 +1583,19 @@ impl Chunk {
     }
 
     pub fn capture_snapshot(&self) -> ChunkSnapshot {
-        let mut snapshot_sections = [None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,];
+        let mut snapshot_sections = [
+            None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+            None, None,
+        ];
         for section in self.sections.iter().enumerate() {
             if section.1.is_some() {
-                snapshot_sections[section.0] = Some(section.1.as_ref().unwrap().capture_snapshot(self.biomes.clone()));
+                snapshot_sections[section.0] = Some(
+                    section
+                        .1
+                        .as_ref()
+                        .unwrap()
+                        .capture_snapshot(self.biomes.clone()),
+                );
             }
         }
         ChunkSnapshot {
@@ -1545,12 +1608,10 @@ impl Chunk {
 }
 
 pub struct ChunkSnapshot {
-
     pub position: CPos,
     pub sections: [Option<SectionSnapshot>; 16],
     pub biomes: [u8; 16 * 16],
     pub heightmap: [u8; 16 * 16],
-
 }
 
 pub struct Section {
@@ -1635,13 +1696,11 @@ impl Section {
 
 #[derive(Clone)]
 pub struct SectionSnapshot {
-
     pub y: u8,
     pub blocks: storage::BlockStorage,
     pub block_light: nibble::Array,
     pub sky_light: nibble::Array,
     pub biomes: [u8; 16 * 16], // TODO: Remove this by using the chunk's biome!
-
 }
 
 lazy_static! {
@@ -1655,7 +1714,6 @@ lazy_static! {
 }
 
 impl SectionSnapshot {
-
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
         self.blocks.get(((y << 8) | (z << 4) | x) as usize)
     }
@@ -1671,35 +1729,22 @@ impl SectionSnapshot {
     pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
         biome::Biome::by_id(self.biomes[((z << 4) | x) as usize] as usize)
     }
-
 }
 
 pub struct ComposedSection {
-
     sections: [Option<SectionSnapshot>; 27],
     x: i32,
     y: i32,
     z: i32,
-
 }
 
 impl ComposedSection {
-
     // NOTE: This only supports up to 15 blocks in expansion
     pub fn new(world: Arc<World>, x: i32, z: i32, y: i32, expand_by: u8) -> Self {
         let chunk_lookup = world.chunks.clone();
         let mut sections = [
-            None, None, None,
-            None, None, None,
-            None, None, None,
-
-            None, None, None,
-            None, None, None,
-            None, None, None,
-
-            None, None, None,
-            None, None, None,
-            None, None, None,
+            None, None, None, None, None, None, None, None, None, None, None, None, None, None,
+            None, None, None, None, None, None, None, None, None, None, None, None, None,
         ];
         for xo in -1..2 {
             for zo in -1..2 {
@@ -1712,7 +1757,11 @@ impl ComposedSection {
                         } else {
                             let section = chunk.unwrap().sections[(y + yo) as usize].as_ref();
                             if section.is_some() {
-                                Some(section.unwrap().capture_snapshot(chunk.unwrap().biomes.clone()))
+                                Some(
+                                    section
+                                        .unwrap()
+                                        .capture_snapshot(chunk.unwrap().biomes.clone()),
+                                )
                             } else {
                                 Some(EMPTY_SECTION.clone())
                             }
@@ -1724,34 +1773,24 @@ impl ComposedSection {
                 }
             }
         }
-       ComposedSection {
-           sections,
-           x: -(expand_by as i32),
-           y: -(expand_by as i32),
-           z: -(expand_by as i32)
-       }
+        ComposedSection {
+            sections,
+            x: -(expand_by as i32),
+            y: -(expand_by as i32),
+            z: -(expand_by as i32),
+        }
     }
 
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
         let chunk_x = ComposedSection::cmp(x & !15, 0);
         let chunk_z = ComposedSection::cmp(z & !15, 0);
         let chunk_y = ComposedSection::cmp(y & !15, 0);
-        let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize].as_ref();
-        let x = if x < 0 {
-            16 + x
-        } else {
-            x & 15
-        };
-        let y = if y < 0 {
-            16 + y
-        } else {
-            y & 15
-        };
-        let z = if z < 0 {
-            16 + z
-        } else {
-            z & 15
-        };
+        let section = self.sections
+            [((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize]
+            .as_ref();
+        let x = if x < 0 { 16 + x } else { x & 15 };
+        let y = if y < 0 { 16 + y } else { y & 15 };
+        let z = if z < 0 { 16 + z } else { z & 15 };
         section.map_or(block::Missing {}, |s| s.get_block(x, y, z))
     }
 
@@ -1759,22 +1798,12 @@ impl ComposedSection {
         let chunk_x = ComposedSection::cmp(x & !15, 0);
         let chunk_z = ComposedSection::cmp(z & !15, 0);
         let chunk_y = ComposedSection::cmp(y & !15, 0);
-        let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize].as_ref();
-        let x = if x < 0 {
-            16 + x
-        } else {
-            x & 15
-        };
-        let y = if y < 0 {
-            16 + y
-        } else {
-            y & 15
-        };
-        let z = if z < 0 {
-            16 + z
-        } else {
-            z & 15
-        };
+        let section = self.sections
+            [((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize]
+            .as_ref();
+        let x = if x < 0 { 16 + x } else { x & 15 };
+        let y = if y < 0 { 16 + y } else { y & 15 };
+        let z = if z < 0 { 16 + z } else { z & 15 };
         section.map_or(16, |s| s.get_block_light(x, y, z))
     }
 
@@ -1782,49 +1811,35 @@ impl ComposedSection {
         let chunk_x = ComposedSection::cmp(x & !15, 0);
         let chunk_z = ComposedSection::cmp(z & !15, 0);
         let chunk_y = ComposedSection::cmp(y & !15, 0);
-        let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize].as_ref();
-        let x = if x < 0 {
-            16 + x
-        } else {
-            x & 15
-        };
-        let y = if y < 0 {
-            16 + y
-        } else {
-            y & 15
-        };
-        let z = if z < 0 {
-            16 + z
-        } else {
-            z & 15
-        };
+        let section = self.sections
+            [((chunk_x + 1) + (chunk_z + 1) * 3 + (chunk_y + 1) * 3 * 3) as usize]
+            .as_ref();
+        let x = if x < 0 { 16 + x } else { x & 15 };
+        let y = if y < 0 { 16 + y } else { y & 15 };
+        let z = if z < 0 { 16 + z } else { z & 15 };
         section.map_or(16, |s| s.get_sky_light(x, y, z))
     }
-
 
     pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
         let chunk_x = ComposedSection::cmp(x & !15, 0);
         let chunk_z = ComposedSection::cmp(z & !15, 0);
-        let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + 0 * 3 * 3) as usize].as_ref();
-        let x = if x < 0 {
-            16 + x
-        } else {
-            x & 15
-        };
-        let z = if z < 0 {
-            16 + z
-        } else {
-            z & 15
-        };
+        let section =
+            self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + 0 * 3 * 3) as usize].as_ref();
+        let x = if x < 0 { 16 + x } else { x & 15 };
+        let z = if z < 0 { 16 + z } else { z & 15 };
         section.map_or(Biome::by_id(0), |s| s.get_biome(x, z))
     }
 
     #[inline]
-    fn cmp(first: i32, second: i32) -> i32 { // copied from rust's ordering enum's src code
+    fn cmp(first: i32, second: i32) -> i32 {
+        // copied from rust's ordering enum's src code
         // The order here is important to generate more optimal assembly.
-        if first < second { -1 }
-        else if first == second { 0 }
-        else { 1 }
+        if first < second {
+            -1
+        } else if first == second {
+            0
+        } else {
+            1
+        }
     }
-
 }

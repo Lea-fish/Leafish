@@ -2,10 +2,10 @@ use crate::render;
 use crate::resources;
 use crate::ui;
 use instant::Instant;
+use parking_lot::RwLock;
 use rand::{self, seq::SliceRandom};
 use std::f64::consts;
-use std::sync::{Arc};
-use parking_lot::RwLock;
+use std::sync::Arc;
 
 pub struct Logo {
     _shadow: ui::BatchRef,

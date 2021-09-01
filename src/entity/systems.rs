@@ -30,7 +30,13 @@ impl ecs::System for ApplyVelocity {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, _: &world::World, _: &mut render::Renderer, _: bool) {
+    fn update(
+        &mut self,
+        m: &mut ecs::Manager,
+        _: &world::World,
+        _: &mut render::Renderer,
+        _: bool,
+    ) {
         for e in m.find(&self.filter) {
             if m.get_component(e, self.movement).is_some() {
                 // Player's handle their own physics
@@ -66,7 +72,13 @@ impl ecs::System for ApplyGravity {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, _: &world::World, _: &mut render::Renderer, _: bool) {
+    fn update(
+        &mut self,
+        m: &mut ecs::Manager,
+        _: &world::World,
+        _: &mut render::Renderer,
+        _: bool,
+    ) {
         for e in m.find(&self.filter) {
             if m.get_component(e, self.movement).is_some() {
                 // Player's handle their own physics
@@ -102,7 +114,13 @@ impl ecs::System for UpdateLastPosition {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, _: &world::World, _: &mut render::Renderer, _: bool) {
+    fn update(
+        &mut self,
+        m: &mut ecs::Manager,
+        _: &world::World,
+        _: &mut render::Renderer,
+        _: bool,
+    ) {
         for e in m.find(&self.filter) {
             let pos = m.get_component_mut(e, self.position).unwrap();
 
@@ -137,7 +155,13 @@ impl ecs::System for LerpPosition {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, _: &world::World, _: &mut render::Renderer, _: bool) {
+    fn update(
+        &mut self,
+        m: &mut ecs::Manager,
+        _: &world::World,
+        _: &mut render::Renderer,
+        _: bool,
+    ) {
         let world_entity = m.get_world();
         let delta = m
             .get_component_mut(world_entity, self.game_info)
@@ -183,7 +207,13 @@ impl ecs::System for LerpRotation {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, _: &world::World, _: &mut render::Renderer, _: bool) {
+    fn update(
+        &mut self,
+        m: &mut ecs::Manager,
+        _: &world::World,
+        _: &mut render::Renderer,
+        _: bool,
+    ) {
         use std::f64::consts::PI;
         let world_entity = m.get_world();
         let delta = m
@@ -241,7 +271,13 @@ impl ecs::System for LightEntity {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, world: &world::World, _: &mut render::Renderer, _: bool) {
+    fn update(
+        &mut self,
+        m: &mut ecs::Manager,
+        world: &world::World,
+        _: &mut render::Renderer,
+        _: bool,
+    ) {
         for e in m.find(&self.filter) {
             let pos = m.get_component(e, self.position).unwrap();
             let bounds = m.get_component(e, self.bounds).unwrap();

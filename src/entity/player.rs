@@ -432,7 +432,8 @@ impl ecs::System for PlayerRenderer {
         {
             // TODO: Fix alex (slim) skins
             let alex = true && i > 1;
-            let width = if alex { // arms of alex (slim) skins have 3/4 of the width of normal skins!
+            let width = if alex {
+                // arms of alex (slim) skins have 3/4 of the width of normal skins!
                 3.0
             } else {
                 4.0
@@ -447,8 +448,8 @@ impl ecs::System for PlayerRenderer {
                 12.0 / 16.0,
                 4.0 / 16.0,
                 [
-                    srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),   // Down
-                    srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),   // Up
+                    srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),     // Down
+                    srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),     // Up
                     srel!(ox + 4.0, oy + 4.0, width, 12.0),  // North
                     srel!(ox + 12.0, oy + 4.0, width, 12.0), // South
                     srel!(ox + 8.0, oy + 4.0, width, 12.0),  // West
@@ -534,10 +535,7 @@ impl ecs::System for PlayerRenderer {
         if let Some(model) = player_model.model.take() {
             renderer.model.remove_model(model);
             if let Some(url) = player_model.skin_url.as_ref() {
-                renderer
-                    .get_textures_ref()
-                    .read()
-                    .release_skin(url);
+                renderer.get_textures_ref().read().release_skin(url);
             }
         }
     }
@@ -562,7 +560,8 @@ impl PlayerMovement {
         use std::f64::consts::PI;
         let mut forward = 0.0f64;
         let mut yaw = player_yaw - (PI / 2.0);
-        if self.is_key_pressed(Actionkey::Forward) || self.is_key_pressed(Actionkey::Backward) { // TODO: Make walking backwards slower!
+        if self.is_key_pressed(Actionkey::Forward) || self.is_key_pressed(Actionkey::Backward) {
+            // TODO: Make walking backwards slower!
             forward = 1.0;
             if self.is_key_pressed(Actionkey::Backward) {
                 yaw += PI;
@@ -584,7 +583,11 @@ impl PlayerMovement {
             yaw += change;
         }
 
-        (forward, yaw, self.is_key_pressed(Actionkey::Forward) && !self.is_key_pressed(Actionkey::Backward))
+        (
+            forward,
+            yaw,
+            self.is_key_pressed(Actionkey::Forward) && !self.is_key_pressed(Actionkey::Backward),
+        )
     }
 
     fn is_key_pressed(&self, key: Actionkey) -> bool {
@@ -633,7 +636,13 @@ impl ecs::System for MovementHandler {
         &self.filter
     }
 
-    fn update(&mut self, m: &mut ecs::Manager, world: &world::World, _: &mut render::Renderer, focused: bool) {
+    fn update(
+        &mut self,
+        m: &mut ecs::Manager,
+        world: &world::World,
+        _: &mut render::Renderer,
+        focused: bool,
+    ) {
         for e in m.find(&self.filter) {
             let movement = m.get_component_mut(e, self.movement).unwrap();
             if movement.flying && m.get_component(e, self.gravity).is_some() {
@@ -643,7 +652,11 @@ impl ecs::System for MovementHandler {
             }
             let gamemode = m.get_component(e, self.gamemode).unwrap();
             movement.flying |= gamemode.always_fly();
-            if !focused && (movement.pressed_keys.len() > 1 || (!movement.pressed_keys.is_empty() && !movement.is_key_pressed(Actionkey::OpenInv))) {
+            if !focused
+                && (movement.pressed_keys.len() > 1
+                    || (!movement.pressed_keys.is_empty()
+                        && !movement.is_key_pressed(Actionkey::OpenInv)))
+            {
                 movement.pressed_keys.insert(Actionkey::Backward, false);
                 movement.pressed_keys.insert(Actionkey::Forward, false);
                 movement.pressed_keys.insert(Actionkey::Right, false);
@@ -692,11 +705,12 @@ impl ecs::System for MovementHandler {
             ) {
                 let (forward, yaw, is_forward) = movement.calculate_movement(rotation.yaw);
                 let mut speed = 0.21585;
-                let mut additional_speed = if movement.is_key_pressed(Actionkey::Sprint) && is_forward {
-                    0.2806 - 0.21585
-                } else {
-                    0.0
-                };
+                let mut additional_speed =
+                    if movement.is_key_pressed(Actionkey::Sprint) && is_forward {
+                        0.2806 - 0.21585
+                    } else {
+                        0.0
+                    };
                 let looking_vec = calculate_looking_vector(rotation.yaw, rotation.pitch);
                 if movement.flying {
                     speed *= 2.5;
@@ -722,8 +736,10 @@ impl ecs::System for MovementHandler {
                 velocity.velocity.y *= 0.98;
                 // position.position.x += look_vec.0 * speed;
                 // position.position.z -= look_vec.1 * speed;
-                position.position.x += forward * yaw.cos() * (speed + looking_vec.0 * additional_speed); // TODO: Multiply with speed only for walking forwards
-                position.position.z -= forward * yaw.sin() * (speed + looking_vec.1 * additional_speed);
+                position.position.x +=
+                    forward * yaw.cos() * (speed + looking_vec.0 * additional_speed); // TODO: Multiply with speed only for walking forwards
+                position.position.z -=
+                    forward * yaw.sin() * (speed + looking_vec.1 * additional_speed);
                 position.position.y += velocity.velocity.y;
 
                 if !gamemode.noclip() {
