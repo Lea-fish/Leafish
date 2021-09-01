@@ -492,12 +492,12 @@ impl super::Screen for SkinSettingsMenu {
 
         // Load defaults
         let s_hat = *self.vars.get(settings::S_HAT);
-        let s_jacket = *self.vars.get(settings::S_JACKET);
-        let s_cape = *self.vars.get(settings::S_CAPE);
-        let s_right_sleeve = *self.vars.get(settings::S_RIGHT_SLEEVE);
-        let s_left_sleeve = *self.vars.get(settings::S_LEFT_SLEEVE);
-        let s_right_pants = *self.vars.get(settings::S_RIGHT_PANTS);
-        let s_left_pants = *self.vars.get(settings::S_LEFT_PANTS);
+        let _s_jacket = *self.vars.get(settings::S_JACKET);
+        let _s_cape = *self.vars.get(settings::S_CAPE);
+        let _s_right_sleeve = *self.vars.get(settings::S_RIGHT_SLEEVE);
+        let _s_left_sleeve = *self.vars.get(settings::S_LEFT_SLEEVE);
+        let _s_right_pants = *self.vars.get(settings::S_RIGHT_PANTS);
+        let _s_left_pants = *self.vars.get(settings::S_LEFT_PANTS);
 
         // Setting buttons
         let hat_setting = ui::ButtonBuilder::new()

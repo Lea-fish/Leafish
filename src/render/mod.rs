@@ -41,7 +41,6 @@ use parking_lot::RwLock;
 use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::thread;
-use std::time::Instant;
 
 const ATLAS_SIZE: usize = 2048;
 
@@ -254,7 +253,6 @@ impl Renderer {
     pub fn update_camera(&mut self, width: u32, height: u32) {
         use std::f64::consts::PI as PI64;
         // Not a sane place to put this but it works
-        let now = Instant::now();
         {
             let rm = self.resources.read();
             if rm.version() != self.resource_version {
@@ -381,7 +379,7 @@ impl Renderer {
             // Line rendering
             // Model rendering
             self.model.draw(
-                self.frustum.clone(), /*&self.frustum*/
+                self.frustum, /*&self.frustum*/
                 &self.perspective_matrix,
                 &self.camera_matrix,
                 self.light_level,
@@ -521,21 +519,21 @@ impl Renderer {
     ) {
         self.ensure_element_buffer(count);
         if count == 0 {
-            if buffer.clone().read().solid.is_some() {
-                buffer.clone().write().solid = None;
+            if buffer.read().solid.is_some() {
+                buffer.write().solid = None;
             }
             return;
         }
-        let new = buffer.clone().read().solid.is_none();
-        if buffer.clone().read().solid.is_none() {
-            buffer.clone().write().solid = Some(ChunkRenderInfo {
+        let new = buffer.read().solid.is_none();
+        if buffer.read().solid.is_none() {
+            buffer.write().solid = Some(ChunkRenderInfo {
                 array: gl::VertexArray::new(),
                 buffer: gl::Buffer::new(),
                 buffer_size: 0,
                 count: 0,
             });
         }
-        let info = buffer.clone();
+        let info = buffer;
         let mut info = info.write();
         let info = info.solid.as_mut().unwrap();
 
@@ -584,21 +582,21 @@ impl Renderer {
     ) {
         self.ensure_element_buffer(count);
         if count == 0 {
-            if buffer.clone().read().trans.is_some() {
-                buffer.clone().write().trans = None;
+            if buffer.read().trans.is_some() {
+                buffer.write().trans = None;
             }
             return;
         }
-        let new = buffer.clone().read().trans.is_none();
-        if buffer.clone().read().trans.is_none() {
-            buffer.clone().write().trans = Some(ChunkRenderInfo {
+        let new = buffer.read().trans.is_none();
+        if buffer.read().trans.is_none() {
+            buffer.write().trans = Some(ChunkRenderInfo {
                 array: gl::VertexArray::new(),
                 buffer: gl::Buffer::new(),
                 buffer_size: 0,
                 count: 0,
             });
         }
-        let info = buffer.clone();
+        let info = buffer;
         let mut info = info.write();
         let info = info.trans.as_mut().unwrap();
 
@@ -1266,6 +1264,8 @@ impl TextureManager {
         renderer.skin_request.send(hash.to_owned()).unwrap();
     }
 
+    // TODO: make use of "unload_skin"
+    #[allow(dead_code)]
     fn unload_skin(&mut self, url: &str) {
         self.remove_dynamic(&format!("skin-{}", url));
         self.skins.remove(url);
@@ -1294,8 +1294,8 @@ impl TextureManager {
 
     fn get_texture(&self, name: &str) -> Option<Texture> {
         if name.find(':').is_some() {
-            let name = if name.starts_with('#') {
-                &name[1..]
+            let name = if let Some(name) = name.strip_prefix('#') {
+                &name
             } else {
                 name
             };
@@ -1303,8 +1303,8 @@ impl TextureManager {
         } else if !name.starts_with('#') {
             self.textures.get(&format!("minecraft:{}", name)).cloned()
         } else {
-            let name = if name.starts_with('#') {
-                &name[1..]
+            let name = if let Some(name) = name.strip_prefix('#') {
+                &name
             } else {
                 name
             };
@@ -1314,9 +1314,9 @@ impl TextureManager {
 
     fn load_texture(&mut self, name: &str) {
         let (plugin, name) = if let Some(mut pos) = name.find(':') {
-            let name = if name.starts_with('#') {
+            let name = if let Some(name) = name.strip_prefix('#') {
                 pos -= 1;
-                &name[1..]
+                &name
             } else {
                 name
             };
@@ -1324,8 +1324,8 @@ impl TextureManager {
         } else if !name.starts_with('#') {
             ("minecraft", name)
         } else {
-            let name = if name.starts_with('#') {
-                &name[1..]
+            let name = if let Some(name) = name.strip_prefix('#') {
+                &name
             } else {
                 name
             };

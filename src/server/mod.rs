@@ -171,19 +171,6 @@ pub struct PlayerInfo {
     gamemode: Gamemode,
 }
 
-macro_rules! handle_packet {
-    ($s:ident $pck:ident {
-        $($packet:ident => $func:ident,)*
-    }) => (
-        match $pck {
-        $(
-            protocol::packet::Packet::$packet(val) => $s.$func(val),
-        )*
-            _ => {},
-        }
-    )
-}
-
 impl Server {
     pub fn connect(
         resources: Arc<RwLock<resources::Manager>>,
@@ -247,8 +234,8 @@ impl Server {
                         forge_mods,
                         uuid,
                         resources,
-                        renderer.clone(),
-                        hud_context.clone(),
+                        renderer,
+                        hud_context,
                     );
                     return Ok(server);
                 }
@@ -262,8 +249,8 @@ impl Server {
                         forge_mods,
                         val.uuid,
                         resources,
-                        renderer.clone(),
-                        hud_context.clone(),
+                        renderer,
+                        hud_context,
                     );
 
                     return Ok(server);
@@ -397,8 +384,8 @@ impl Server {
             forge_mods,
             uuid,
             resources,
-            renderer.clone(),
-            hud_context.clone(),
+            renderer,
+            hud_context,
         );
 
         Ok(server)
@@ -419,7 +406,7 @@ impl Server {
         Self::spawn_reader(conn.clone(), server_callback.clone());
         let light_updater = Self::spawn_light_updater(server_callback.clone());
         let render_list_computer =
-            Self::spawn_render_list_computer(server_callback.clone(), renderer.clone());
+            Self::spawn_render_list_computer(server_callback, renderer.clone());
         let conn = Arc::new(RwLock::new(Some(conn)));
         let server = Arc::new(Server::new(
             protocol_version,
@@ -430,14 +417,14 @@ impl Server {
             light_updater,
             render_list_computer.0.clone(),
             render_list_computer.1,
-            hud_context.clone(),
-            &renderer.clone().read(),
+            hud_context,
+            &renderer.read(),
         ));
 
         let actual_server = server.clone();
         inner_server.replace(actual_server);
         render_list_computer.0.send(true).unwrap();
-        server.clone()
+        server
     }
 
     fn spawn_reader(mut read: protocol::Conn, server: Arc<Mutex<Option<Arc<Server>>>>) {
@@ -716,7 +703,7 @@ impl Server {
                             warn!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
                         }
                     }
-                    Packet::WindowItems(window_items) => {
+                    Packet::WindowItems(_window_items) => {
                         debug!("items!");
                     }
                     Packet::WindowSetSlot(set_slot) => {
@@ -737,13 +724,10 @@ impl Server {
                                 set_slot.slot,
                                 set_slot.item.as_ref().map_or(0, |s| s.id)
                             );
-                            let item = match set_slot.item {
-                                None => None,
-                                Some(stack) => Some(Item {
-                                    stack,
-                                    material: Material::Apple, // TODO: map stack.id to material!
-                                }),
-                            };
+                            let item = set_slot.item.map(|stack| Item {
+                                stack,
+                                material: Material::Apple, // TODO: map stack.id to material!
+                            });
                             inventory.clone().write().set_item(set_slot.slot, item);
                         }
                     }
@@ -758,7 +742,7 @@ impl Server {
         });
     }
 
-    fn spawn_light_updater(server: Arc<Mutex<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
+    fn spawn_light_updater(_server: Arc<Mutex<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
         let (tx, rx) = unbounded();
         thread::spawn(move || loop {
             /*
@@ -783,7 +767,7 @@ impl Server {
                 }
                 thread::sleep(Duration::from_millis(1));
             }*/
-            while let Ok(update) = rx.try_recv() {}
+            while let Ok(_update) = rx.try_recv() {}
             thread::sleep(Duration::from_millis(1000));
         });
         tx
@@ -814,7 +798,7 @@ impl Server {
         let server_callback = Arc::new(Mutex::new(None));
         let inner_server = server_callback.clone();
         let mut inner_server = inner_server.lock();
-        let window_size = Arc::new(RwLock::new((0, 0)));
+        let _window_size = Arc::new(RwLock::new((0, 0)));
         let render_list =
             Self::spawn_render_list_computer(server_callback.clone(), renderer.clone());
         let server = Arc::new(Server::new(
@@ -823,11 +807,11 @@ impl Server {
             protocol::UUID::default(),
             resources,
             Arc::new(RwLock::new(None)),
-            Self::spawn_light_updater(server_callback.clone()),
+            Self::spawn_light_updater(server_callback),
             render_list.0,
             render_list.1,
             Arc::new(RwLock::new(HudContext::new())),
-            &renderer.clone().read(),
+            &renderer.read(),
         ));
         inner_server.replace(server.clone());
         let mut rng = rand::thread_rng();
@@ -910,7 +894,7 @@ impl Server {
                 }
             }
         }
-        server.clone()
+        server
     }
 
     fn new(
@@ -938,8 +922,8 @@ impl Server {
             renderer,
             hud_context.clone(),
         )));
-        hud_context.clone().write().player_inventory =
-            Some(inventory_context.clone().read().player_inventory.clone());
+        hud_context.write().player_inventory =
+            Some(inventory_context.read().player_inventory.clone());
 
         let version = resources.read().version();
         Server {
@@ -1000,7 +984,7 @@ impl Server {
 
     pub fn is_connected(&self) -> bool {
         let tmp = self.conn.clone();
-        return tmp.clone().read().is_some();
+        return tmp.read().is_some();
     }
 
     pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, focused: bool) {
@@ -1017,11 +1001,10 @@ impl Server {
             *self.fps.write() += 1;
         }
         let version = self.resources.read().version();
-        if version != self.version.read().clone() {
+        if version != *self.version.read() {
             *self.version.write() = version;
             self.world.clone().flag_dirty_all();
         }
-        let renderer = renderer.clone();
         let renderer = &mut renderer.write();
         // TODO: Check if the world type actually needs a sun
         if self.sun_model.read().is_none() {
@@ -1050,7 +1033,7 @@ impl Server {
         self.entity_tick(renderer, delta, focused);
 
         *self.tick_timer.write() += delta;
-        while self.tick_timer.read().clone() >= 3.0 && self.is_connected() {
+        while *self.tick_timer.read() >= 3.0 && self.is_connected() {
             self.minecraft_tick();
             *self.tick_timer.write() -= 3.0;
         }
@@ -1098,7 +1081,7 @@ impl Server {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().just_disconnected = false;
             *self.entity_tick_timer.write() += delta;
-            while self.entity_tick_timer.read().clone() >= 3.0 {
+            while *self.entity_tick_timer.read() >= 3.0 {
                 let world = self.world.clone();
                 self.entities
                     .clone()
@@ -1254,7 +1237,7 @@ impl Server {
                     .get_component_mut(player, self.player_movement)
                 {
                     state_changed = movement.pressed_keys.get(&key).map_or(false, |v| *v) != down;
-                    movement.pressed_keys.insert(key.clone(), down);
+                    movement.pressed_keys.insert(key, down);
                 }
             }
             match key {
@@ -1272,7 +1255,7 @@ impl Server {
                                 .clone();
                             screen_sys.add_screen(Box::new(
                                 render::inventory::InventoryWindow::new(
-                                    player_inv.clone(),
+                                    player_inv,
                                     self.inventory_context.clone(),
                                 ),
                             ));
@@ -1301,7 +1284,6 @@ impl Server {
         use crate::shared::Direction;
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
-            let renderer = renderer.clone();
             let renderer = &mut renderer.write();
             if let Some((pos, _, face, at)) = target::trace_ray(
                 &world,
@@ -1412,7 +1394,7 @@ impl Server {
         let mut conn = conn.write();
         if conn.is_some() {
             let result = conn.as_mut().unwrap().write_packet(p);
-            if let Ok(_) = result {
+            if result.is_ok() {
                 return;
             }
         }
@@ -1720,6 +1702,8 @@ impl Server {
         }
     }
 
+    // TODO: make use of "on_disconnect"
+    #[allow(dead_code)]
     fn on_disconnect(&self, disconnect: packet::play::clientbound::Disconnect) {
         self.disconnect(Some(disconnect.reason));
     }
@@ -2691,7 +2675,7 @@ impl Server {
         let world = self.world.clone();
         let modded_block_ids = world.modded_block_ids.clone();
         let block = world.id_map.by_vanilla_id(id as usize, modded_block_ids);
-        world.clone().set_block(location, block)
+        world.set_block(location, block)
     }
 
     fn on_block_change_varint(&self, block_change: packet::play::clientbound::BlockChange_VarInt) {

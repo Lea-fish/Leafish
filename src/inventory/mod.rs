@@ -519,9 +519,8 @@ impl Material {
 
     pub fn texture_location(&self) -> String {
         // TODO: Compute this at compile time and only lookup at runtime in (O(1))
-        let mut i = 0;
         let mut result = String::new();
-        for c in self.name().chars() {
+        for (i, c) in self.name().chars().enumerate() {
             if c.is_uppercase() {
                 if i != 0 {
                     result.push('_');
@@ -530,7 +529,6 @@ impl Material {
             } else {
                 result.push(c);
             }
-            i += 1;
         }
         format!("items/{}", result)
     }

@@ -431,7 +431,7 @@ impl ecs::System for PlayerRenderer {
         .enumerate()
         {
             // TODO: Fix alex (slim) skins
-            let alex = true && i > 1;
+            let alex = i > 1;
             let width = if alex {
                 // arms of alex (slim) skins have 3/4 of the width of normal skins!
                 3.0

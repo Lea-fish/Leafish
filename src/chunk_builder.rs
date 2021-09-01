@@ -8,7 +8,6 @@ use crate::world::{block, CPos, ComposedSection, World};
 use rand::{self, Rng, SeedableRng};
 use std::sync::Arc;
 use std::thread;
-use std::time::Instant;
 // use rayon::prelude::*;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
@@ -66,7 +65,6 @@ impl ChunkBuilder {
             self.models.write().version_change();
         }
 
-        let renderer = renderer.clone();
         let mut renderer = renderer.write();
         while let Ok((id, mut val)) = self.built_recv.try_recv() {
             world.clone().reset_building_flag(val.position);
@@ -76,11 +74,7 @@ impl ChunkBuilder {
             let chunk = chunks.get_mut(&CPos(val.position.0, val.position.2));
             if chunk.as_ref().is_some() {
                 let mut chunk = chunk.unwrap();
-                let section = if let Some(sec) = chunk.sections[val.position.1 as usize].as_mut() {
-                    Some(sec)
-                } else {
-                    None
-                };
+                let section = chunk.sections[val.position.1 as usize].as_mut();
 
                 if let Some(sec) = section {
                     sec.cull_info = val.cull_info;
@@ -136,7 +130,7 @@ impl ChunkBuilder {
         // Drain built chunk data
         loop {
             let curr_data = self.built_recv.try_recv();
-            if !curr_data.is_ok() {
+            if curr_data.is_err() {
                 return;
             }
             let (id, mut val) = curr_data.unwrap();
@@ -189,7 +183,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
         mut solid_buffer,
         mut trans_buffer,
     } = work;
-    let snapshot = ComposedSection::new(world.clone(), position.0, position.2, position.1, 2);
+    let snapshot = ComposedSection::new(world, position.0, position.2, position.1, 2);
 
     let mut rng = rand_pcg::Pcg32::from_seed([
         ((position.0 as u32) & 0xff) as u8,

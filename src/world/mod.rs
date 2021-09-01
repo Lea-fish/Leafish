@@ -90,13 +90,16 @@ enum LightType {
     Sky,
 }
 
+// TODO: make use of "get_light" and "set_light"
 impl LightType {
+    #[allow(dead_code)]
     fn get_light(self, world: &World, pos: Position) -> u8 {
         match self {
             LightType::Block => world.get_block_light(pos),
             LightType::Sky => world.get_sky_light(pos),
         }
     }
+    #[allow(dead_code)]
     fn set_light(self, world: &World, pos: Position, light: u8) {
         match self {
             LightType::Block => world.set_block_light(pos, light),
@@ -105,6 +108,8 @@ impl LightType {
     }
 }
 
+// TODO: make use of "ty: LightType" and "pos: Position"
+#[allow(dead_code)]
 pub struct LightUpdate {
     ty: LightType,
     pos: Position,
@@ -297,6 +302,8 @@ impl World {
         }
     }
 
+    // TODO: make use of "do_light_update"
+    #[allow(dead_code)]
     pub(crate) fn do_light_update(&self, update: LightUpdate) {
         use std::cmp;
         if update.pos.y < 0
@@ -383,18 +390,18 @@ impl World {
         }
 
         let start = (
-            ((renderer.clone().read().camera.pos.x as i32) >> 4),
-            ((renderer.clone().read().camera.pos.y as i32) >> 4),
-            ((renderer.clone().read().camera.pos.z as i32) >> 4),
+            ((renderer.read().camera.pos.x as i32) >> 4),
+            ((renderer.read().camera.pos.y as i32) >> 4),
+            ((renderer.read().camera.pos.z as i32) >> 4),
         );
 
         let render_queue = Arc::new(RwLock::new(Vec::new()));
         let mut process_queue = VecDeque::with_capacity(self.chunks.clone().len() * 16);
         // debug!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
-        let diff = Instant::now().duration_since(start_rec);
-        let frustum = renderer.clone().read().frustum.clone();
-        let frame_id = renderer.clone().read().frame_id.clone();
+        let _diff = Instant::now().duration_since(start_rec);
+        let frustum = renderer.read().frustum;
+        let frame_id = renderer.read().frame_id;
         self.do_render_queue(
             Arc::new(RwLock::new(process_queue)),
             frustum,
@@ -405,7 +412,7 @@ impl World {
         let render_list_write = self.render_list.clone();
         let mut render_list_write = render_list_write.write();
         render_list_write.clear();
-        render_list_write.extend(render_queue.clone().read().iter());
+        render_list_write.extend(render_queue.read().iter());
         // TODO: Improve the performance of the following by moving this to another thread!
         /*
         process_queue.par_iter().for_each(|(from, pos)| {
@@ -513,6 +520,7 @@ impl World {
         }*/
     }
 
+    #[allow(clippy::type_complexity)]
     fn do_render_queue(
         &self,
         process_queue: Arc<RwLock<VecDeque<(Direction, (i32, i32, i32))>>>,
@@ -527,9 +535,9 @@ impl World {
         let frame_id = tmp_renderer.frame_id.clone();*/
         // let frame_id = renderer.clone().read().frame_id.clone();
         // let frustum = renderer.clone().read().frustum.clone().read().as_ref().unwrap();
-        let tmp_frustum = frustum.clone();
+        let tmp_frustum = frustum;
         // debug!("rendering {} elems", process_queue.clone().read().len());
-        process_queue.clone().read().iter().for_each(|(from, pos)| {
+        process_queue.read().iter().for_each(|(from, pos)| {
             let (exists, cull) = if let Some((sec, rendered_on)) =
                 self.get_render_section_mut(pos.0, pos.1, pos.2)
             {
@@ -580,19 +588,14 @@ impl World {
                 }
             }
         });
-        if !out.clone().read().is_empty() {
-            self.do_render_queue(
-                out.clone(),
-                frustum.clone(),
-                frame_id,
-                valid_dirs,
-                render_queue,
-            );
+        if !out.read().is_empty() {
+            self.do_render_queue(out, frustum, frame_id, valid_dirs, render_queue);
         } else {
             debug!("finished!");
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn get_render_list(&self) -> Vec<((i32, i32, i32), Arc<RwLock<render::ChunkBuffer>>)> {
         self.render_list
             .clone()
@@ -607,7 +610,7 @@ impl World {
                         return Some((*v, sec.render_buffer.clone()));
                     }
                 }
-                return None;
+                None
             })
             .collect()
     }
@@ -747,9 +750,9 @@ impl World {
         if let Some(chunk) = self.chunks.clone().get(&CPos(x, z)) {
             let rendered = &chunk.sections_rendered_on[y as usize];
             if let Some(sec) = chunk.sections[y as usize].as_ref() {
-                return Some((Some(sec.cull_info), rendered.clone()));
+                return Some((Some(sec.cull_info), *rendered));
             }
-            return Some((None, rendered.clone()));
+            return Some((None, *rendered));
         }
         None
     }
@@ -828,7 +831,7 @@ impl World {
         if sec.is_none() {
             return None;
         }
-        return Some(sec.as_ref().unwrap().capture_snapshot(chunk.biomes.clone()));
+        return Some(sec.as_ref().unwrap().capture_snapshot(chunk.biomes));
     }
 
     pub fn unload_chunk(&self, x: i32, z: i32, m: &mut ecs::Manager) {
@@ -866,7 +869,7 @@ impl World {
 
             // Block type array - whole byte per block  // 17
             let mut block_types: [[u8; 4096]; 16] = [[0u8; 4096]; 16]; // 17
-            for i in 0..16 {
+            for (i, block_type) in block_types.iter_mut().enumerate() {
                 if chunk.sections[i].is_none() {
                     let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
                     fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
@@ -879,7 +882,7 @@ impl World {
                 }
 
                 if version == 17 {
-                    data.read_exact(&mut block_types[i])?;
+                    data.read_exact(block_type)?;
                 } else if version == 18 {
                     self.prep_section_18(chunk, data, i);
                 } else if version == 19 {
@@ -951,7 +954,9 @@ impl World {
                     .get(&id)
                     .cloned()
                     // TODO: fix or_fun_call, but do not re-borrow self
-                    .unwrap_or(self.id_map.by_vanilla_id(id, self.modded_block_ids.clone())),
+                    .unwrap_or_else(|| {
+                        self.id_map.by_vanilla_id(id, self.modded_block_ids.clone())
+                    }),
             );
             // Spawn block entities
             let b = section.blocks.get(bi);
@@ -1075,18 +1080,18 @@ impl World {
             nibble::Array::new(16 * 16 * 16),
         ];
 
-        for i in 0..16 {
+        for (i, meta) in block_meta.iter_mut().enumerate() {
             if mask & (1 << i) == 0 {
                 continue;
             }
 
-            data.read_exact(&mut block_meta[i].data).unwrap();
+            data.read_exact(&mut meta.data).unwrap();
         }
 
         self.read_light(chunk, mask, skylight, data);
 
         // Add array - half byte per block - uses secondary bitmask
-        let mut block_add: [nibble::Array; 16] = [
+        let block_add: [nibble::Array; 16] = [
             // TODO: cleanup this initialization
             nibble::Array::new(16 * 16 * 16),
             nibble::Array::new(16 * 16 * 16),
@@ -1106,11 +1111,11 @@ impl World {
             nibble::Array::new(16 * 16 * 16),
         ];
 
-        for i in 0..16 {
+        for (i, meta) in block_meta.iter_mut().enumerate() {
             if mask_add & (1 << i) == 0 {
                 continue;
             }
-            data.read_exact(&mut block_add[i].data).unwrap();
+            data.read_exact(&mut meta.data).unwrap();
         }
 
         // Now that we have the block types, metadata, and add, combine to initialize the blocks
@@ -1303,12 +1308,12 @@ impl World {
 
     pub fn load_light_with_loc(
         &self,
-        x: i32,
-        z: i32,
-        block_light_mask: i32,
-        sky_light: bool,
-        sky_light_mask: i32,
-        data: &mut Cursor<Vec<u8>>,
+        _x: i32,
+        _z: i32,
+        _block_light_mask: i32,
+        _sky_light: bool,
+        _sky_light_mask: i32,
+        _data: &mut Cursor<Vec<u8>>,
     ) {
         // debug!("x {} z {}", x, z);
         // TODO: Insert chunks with light data only or cache them until the real data arrives!
@@ -1578,6 +1583,8 @@ impl Chunk {
         }
     }
 
+    // TODO: make use of "get_biome"
+    #[allow(dead_code)]
     fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
         biome::Biome::by_id(self.biomes[((z << 4) | x) as usize] as usize)
     }
@@ -1589,20 +1596,15 @@ impl Chunk {
         ];
         for section in self.sections.iter().enumerate() {
             if section.1.is_some() {
-                snapshot_sections[section.0] = Some(
-                    section
-                        .1
-                        .as_ref()
-                        .unwrap()
-                        .capture_snapshot(self.biomes.clone()),
-                );
+                snapshot_sections[section.0] =
+                    Some(section.1.as_ref().unwrap().capture_snapshot(self.biomes));
             }
         }
         ChunkSnapshot {
-            position: self.position.clone(),
+            position: self.position,
             sections: snapshot_sections,
-            biomes: self.biomes.clone(),
-            heightmap: self.heightmap.clone(),
+            biomes: self.biomes,
+            heightmap: self.heightmap,
         }
     }
 }
@@ -1636,7 +1638,7 @@ impl Section {
         } else {
             nibble::Array::new(16 * 16 * 16)
         };
-        let section = Section {
+        Section {
             cull_info: chunk_builder::CullInfo::all_vis(),
             render_buffer: Arc::new(RwLock::new(render::ChunkBuffer::new())),
             y,
@@ -1648,8 +1650,7 @@ impl Section {
 
             dirty: false,
             building: false,
-        };
-        section
+        }
     }
 
     pub fn capture_snapshot(&self, biomes: [u8; 16 * 16]) -> SectionSnapshot {
@@ -1731,6 +1732,8 @@ impl SectionSnapshot {
     }
 }
 
+// TODO: make use of "x: i32", "y: i32" and "z: i32"
+#[allow(dead_code)]
 pub struct ComposedSection {
     sections: [Option<SectionSnapshot>; 27],
     x: i32,
@@ -1751,17 +1754,13 @@ impl ComposedSection {
                 let chunk = chunk_lookup.get(&CPos(x + xo, z + zo));
                 let chunk = chunk.as_ref();
                 for yo in -1..2 {
-                    let section = if chunk.is_some() {
+                    let section = if let Some(chunk) = chunk {
                         if y + yo != (y + yo) & 15 {
                             None
                         } else {
-                            let section = chunk.unwrap().sections[(y + yo) as usize].as_ref();
-                            if section.is_some() {
-                                Some(
-                                    section
-                                        .unwrap()
-                                        .capture_snapshot(chunk.unwrap().biomes.clone()),
-                                )
+                            let section = &chunk.sections[(y + yo) as usize].as_ref();
+                            if let Some(section) = section {
+                                Some(section.capture_snapshot(chunk.biomes))
                             } else {
                                 Some(EMPTY_SECTION.clone())
                             }
@@ -1823,8 +1822,7 @@ impl ComposedSection {
     pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
         let chunk_x = ComposedSection::cmp(x & !15, 0);
         let chunk_z = ComposedSection::cmp(z & !15, 0);
-        let section =
-            self.sections[((chunk_x + 1) + (chunk_z + 1) * 3 + 0 * 3 * 3) as usize].as_ref();
+        let section = self.sections[((chunk_x + 1) + (chunk_z + 1) * 3) as usize].as_ref();
         let x = if x < 0 { 16 + x } else { x & 15 };
         let z = if z < 0 { 16 + z } else { z & 15 };
         section.map_or(Biome::by_id(0), |s| s.get_biome(x, z))
@@ -1834,12 +1832,10 @@ impl ComposedSection {
     fn cmp(first: i32, second: i32) -> i32 {
         // copied from rust's ordering enum's src code
         // The order here is important to generate more optimal assembly.
-        if first < second {
-            -1
-        } else if first == second {
-            0
-        } else {
-            1
+        match first.cmp(&second) {
+            Ordering::Less => -1,
+            Ordering::Equal => 0,
+            Ordering::Greater => 1,
         }
     }
 }

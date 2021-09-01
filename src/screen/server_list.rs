@@ -158,8 +158,7 @@ impl ServerList {
                     let hud_context = Arc::new(RwLock::new(HudContext::new()));
                     game.connect_to(&address, hud_context.clone());
                     game.screen_sys.pop_screen();
-                    game.screen_sys
-                        .add_screen(Box::new(Hud::new(hud_context.clone())));
+                    game.screen_sys.add_screen(Box::new(Hud::new(hud_context)));
                     game.focused = true;
                     true
                 });
@@ -442,10 +441,12 @@ impl ServerList {
             None
         };
 
-        let background = if let Some(_) = Renderer::get_texture_optional(
+        let background = if Renderer::get_texture_optional(
             renderer.get_textures_ref(),
             &*format!("#{}", self.background_image),
-        ) {
+        )
+        .is_some()
+        {
             Some(
                 ui::ImageBuilder::new()
                     .texture(&*format!("#{}", self.background_image))
