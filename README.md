@@ -96,8 +96,9 @@ Support for older protocols will _not_ be dropped as newer protocols are added.
 
 ### Downloading a pre-built version
 
-There currently is no pre-built version available.
-We welcome anyone willing to help out here to provide pre-built binaries for Linux, macOS and Windows.
+Since there currently is no release yet, pre-built binaries have to be downloaded from Github Actions.
+The latest actions can always be seen [here](https://github.com/terrarier2111/Leafish/actions).
+Click on a workflow run from the main branch and download the artifact for your platform.
 
 ### Building the game
 
