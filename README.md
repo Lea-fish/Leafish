@@ -1,129 +1,160 @@
 # Leafish
-**This project was built upon preexisting code located here: https://github.com/iceiix/stevenarella/**
 
-But why creating a new project in the first place..?
+Multi-version Minecraft-compatible client written in Rust, forked from [Stevenarella](https://github.com/iceiix/stevenarella/).
 
-Because I wanted to remove some stuff and add other stuff freely without having to wait for prs to get accepted.
+---
 
-Multi-protocol Minecraft-compatible client written in Rust.
+![Example screenshot showing a rendered Minecraft world](resources/assets/leafish/textures/gui/background.png)
 
-If you want to communicate with us you can do so here:
-https://matrix.to/#/#leafish:matrix.org
-https://discord.gg/YkHCy3f4qt
+---
 
-## Images
+### Chat
 
-![Steven on Hypixel](https://i.imgur.com/PM5fLuu.png)
-![Steven](https://i.imgur.com/RRspOQF.png)
+Chat takes place on Matrix and Discord.
+The channels are bridged to each other so you won't need an account on both services.
 
+If you want to help _make_ and _improve_ the game, join the developer room.
 
-In action: http://gfycat.com/NeedyElaborateGypsymoth
+If you're a user and need help or want to ask some questions then join the general room.
 
+Announcements are made in the announcement room and joining it is a good way to keep up-to-date with the project.
 
-## Protocol support
+| General | Development | Announcements |
+| ------- | ----------- | ------------- |
+| [![Matrix](https://img.shields.io/badge/matrix-general-yellow.svg)](https://matrix.to/#/#leafish-general:matrix.org) | [![Matrix](https://img.shields.io/badge/matrix-development-yellow.svg)](https://matrix.to/#/#leafish-development:matrix.org) | [![Matrix](https://img.shields.io/badge/matrix-announcements-yellow.svg)](https://matrix.to/#/#leafish-announcements:matrix.org) |
+| [![Discord](https://img.shields.io/badge/discord-general-blue.svg)](https://discord.gg/YkHCy3f4qt) | [![Discord](https://img.shields.io/badge/discord-development-blue.svg)](https://discord.gg/YkHCy3f4qt) | [![Discord](https://img.shields.io/badge/discord-announcements-blue.svg)](https://discord.gg/YkHCy3f4qt) |
+
+Aside from the individual rooms you can also join the [Matrix space](https://matrix.to/#/#leafish:matrix.org) to have all rooms grouped together nicely.
+
+# Contents
+
+- [Introduction](#introduction)
+- [Version support](#version-support)
+- [Getting the game](#getting-the-game)
+- [Contributing](#contributing)
+- [Credits](#credits)
+- [License](#license)
+
+## Introduction
+
+**Leafish** is an open-source re-implementation of Minecraft.
+The game is a open-world sandbox where players explore a blocky, procedurally-generated 3D world with virtually infinite terrain, and may discover and extract raw materials, craft tools and items, and build structures or earthworks.
+The game has various game modes including survival mode, in which players must acquire resources to build the world and maintain health, and a creative mode, where players have unlimited resources and access to flight.
+
+Minecraft is originally written by Mojang in Java for PC, but nowadays also has a so-called "Bedrock edition" which has ports to various alternative platforms.
+Leafish attempts to provide everything from the Java-edition and tries to be compatible with it so you can join regular servers and play alongside people using the official Java-based clients.
+Being written in Rust with support for modern graphic API's like Vulkan means performance improvements and enhancements that are not possible in the original game.
+It's also completely community driven!
+
+Note that currently not everything from the original game is supported yet so Leafish can't currently be seen as a fully fledged alternative.
+A list of missing features is available on the [issues page](https://github.com/terrarier2111/Leafish/issues).
+
+## Version support
+
+| Symbol | Meaning |
+| ------ | ------- |
+| ✓      | All features supported |
+| -      | Protocol supported (so the client can join servers using the version) but various missing features |
 
 | Game version | Protocol version | Supported? |
-| ------ | --- | --- |
-| 1.16.5 | 754 | ✓ |
-| 1.16.4 | 754 | ✓ |
-| 1.16.3 | 753 | ✓ |
-| 1.16.2 | 751 | ✓ |
-| 1.16.1 | 736 | ✓ |
-| 1.16 | 735 | ✓ |
-| 1.15.2 | 578 | ✓ |
-| 1.15.1 | 575 | ✓ |
-| 1.14.4 | 498 | ✓ |
-| 1.14.3 | 490 | ✓ |
-| 1.14.2 | 485 | ✓ |
-| 1.14.1 | 480 | ✓ |
-| 1.14 | 477 | ✓ |
-| 19w02a | 452 | ✓ |
-| 18w50a | 451 | ✓ |
-| 1.13.2 | 404 | ✓ |
-| 1.12.2 | 340 | ✓ |
-| 1.11.2 | 316 | ✓ |
-| 1.11   | 315 | ✓ |
-| 1.10.2 | 210 | ✓ |
-| 1.9.2  | 109 | ✓ |
-| 1.9    | 107 | ✓ |
-| 15w39c | 74  | ✓ |
-| 1.8.9  | 47  | ✓ |
-| 1.7.10 | 5   | ✓ |
+| ------------ | ---------------- | ---------- |
+| 1.16.5 | 754 | - |
+| 1.16.4 | 754 | - |
+| 1.16.3 | 753 | - |
+| 1.16.2 | 751 | - |
+| 1.16.1 | 736 | - |
+| 1.16 | 735 | - |
+| 1.15.2 | 578 | - |
+| 1.15.1 | 575 | - |
+| 1.14.4 | 498 | - |
+| 1.14.3 | 490 | - |
+| 1.14.2 | 485 | - |
+| 1.14.1 | 480 | - |
+| 1.14 | 477 | - |
+| 19w02a | 452 | - |
+| 18w50a | 451 | - |
+| 1.13.2 | 404 | - |
+| 1.12.2 | 340 | - |
+| 1.11.2 | 316 | - |
+| 1.11   | 315 | - |
+| 1.10.2 | 210 | - |
+| 1.9.2  | 109 | - |
+| 1.9    | 107 | - |
+| 15w39c | 74  | - |
+| 1.8.9  | 47  | - |
+| 1.7.10 | 5   | - |
 
-Leafish is designed to support multiple protocol versions, so that client
-development is not in lock-step with the server version. The level of
-support varies, but the goal is to support major versions from 1.7.10
-up to the current latest major version. Occasionally, snapshots are also supported.
+Leafish is designed to support multiple protocol versions, so that client development is not in lock-step with the server version.
+The level of support varies, but the goal is to support major versions from 1.7.10 up to the current latest major version.
+Occasionally, snapshots are also supported.
 
 Forge servers are supported on 1.7.10 - 1.12.2 (FML) and 1.13.2 - 1.16.5 (FML2).
 
 Support for older protocols will _not_ be dropped as newer protocols are added.
 
-## Dependencies
+## Getting the game
 
-Requires Rust stable version 1.54.0 or newer.
+### Downloading a pre-built version
+
+There currently is no pre-built version available.
+We welcome anyone willing to help out here to provide pre-built binaries for Linux, macOS and Windows.
+
+### Building the game
+
+#### Dependencies
+
+Rust stable version 1.53.0 or newer is required.
 
 **Debian/Ubuntu**
 
-```bash
-sudo apt-get install libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-composite0-dev
+```sh
+sudo apt-get install cargo libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-composite0-dev
 ```
 
 **Alpine Linux**
 
-```bash
-sudo apk add openssl-dev xcb-util-dev
+```sh
+sudo apk add cargo openssl-dev xcb-util-dev
 ```
 
-## Building
+#### Building
+
+Make sure you're in the root of the Git repository before running the following commands.
 
 Compile and run:
-```bash
+
+```sh
 cargo run --release
 ```
+
 Just compile:
-```bash
+
+```sh
 cargo build --release
 ```
 
-## Running
+#### Running
 
-### Standalone
+Double-clicking the game should be enough to run Leafish, which will bring up a login screen followed by a server list from which you can select a server.
+If nothing happens consider running the executable from the command-line, `./leafish` and see if any errors come up.
 
-Just running Leafish via a double click (Windows) or `./leafish` (everything else)
-will bring up a login screen followed by a server list which you can select a server
-from.
+## Contributing
 
-## Contributions
+A list of bugs and missing features can be found on the [issue tracker](https://github.com/terrarier2111/Leafish/issues/).
+Feel free to work on any bug and submit a pull request to the `main` branch with the fix.
+Mentioning that you intend to fix a bug on the issue will prevent other people from trying as well and makes sure no duplicated work is done.
 
-Leafish is an [OPEN Open Source Project](https://github.com/openopensource/openopensource.github.io):
+### New features
 
-> Individuals making significant and valuable contributions are given
-> commit-access to the project to contribute as they see fit. This project
-> is more like an open wiki than a standard guarded open source project.
+Please talk to the Leafish team first before starting to develop a new feature.
+We first and foremost try to make the game feature complete compared to the vanilla Java edition and except for very specific things these should be prioritized.
+Therefor contacting us will allow us to help you or prevent you from wasting any time.
+You can talk to us via Matrix and/or Discord, see links at the top of this page.
 
-### Rules
+## Credits
 
-There are a few basic ground-rules for contributors:
+Thanks to [@thinkofname](https://github.com/thinkofname/) for the original [Steven (Rust)](https://github.com/thinkofname/steven) and [@iceiix](https://github.com/iceiix/) for taking up development with [Stevenarella](https://github.com/iceiix/stevenarella/).
 
-1. **No `--force` pushes** or modifying the Git history on the `master` branch.
-1. **Non-master branches** ought to be used for ongoing work.
-1. **External API changes and significant modifications** ought to be subject to an **internal pull-request** to solicit feedback from other contributors.
-1. Internal pull-requests to solicit feedback are *encouraged* for any other non-trivial contribution but left to the discretion of the contributor.
-1. Contributors should attempt to adhere to the prevailing code-style. Please install and run [cargo fmt](https://github.com/rust-lang/rustfmt) before merging any changes.
-
-### Changes to this arrangement
-
-This is an experiment and feedback is welcome! This document may also be
-subject to pull-requests or changes by contributors where you believe
-you have something valuable to add or change.
-
-### Credits
-
-Thanks to [@thinkofname](https://github.com/thinkofname/) for
-the original [Steven (Rust)](https://github.com/thinkofname/steven),
-which Stevenarella is an updated and enhanced version of.
-
-### License
+## License
 
 Dual-licensed MIT and ApacheV2
