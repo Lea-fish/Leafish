@@ -46,6 +46,7 @@ use crossbeam_channel::unbounded;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use leafish_protocol::format::{Component, TextComponent};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod plugin_messages;
 mod sun;
@@ -161,6 +162,8 @@ pub struct Server {
     pub render_list_computer_notify: Receiver<bool>,
     pub hud_context: Arc<RwLock<HudContext>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
+    fps: RwLock<u32>,
+    fps_start: RwLock<u128>
 
 }
 
@@ -919,6 +922,8 @@ impl Server {
             render_list_computer_notify,
             hud_context,
             inventory_context, // TODO: Get version from protocol version!
+            fps: RwLock::new(0),
+            fps_start: RwLock::new(0)
         }
     }
 
@@ -937,6 +942,16 @@ impl Server {
     }
 
     pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, focused: bool) {
+        let start = SystemTime::now();
+        let time = start
+            .duration_since(UNIX_EPOCH).unwrap().as_millis();
+        if *self.fps_start.read() + 1000 < time {
+            self.hud_context.clone().write().update_fps(*self.fps.read());
+            *self.fps_start.write() = time;
+            *self.fps.write() = 0;
+        } else {
+            *self.fps.write() += 1;
+        }
         let version = self.resources.read().version();
         if version != self.version.read().clone() {
             *self.version.write() = version;
@@ -1160,6 +1175,12 @@ impl Server {
                     if down && state_changed {
                         let curr = self.hud_context.read().enabled;
                         self.hud_context.write().enabled = !curr;
+                    }
+                },
+                Actionkey::ToggleDebug => {
+                    if down && state_changed {
+                        let curr = self.hud_context.read().debug;
+                        self.hud_context.write().debug = !curr;
                     }
                 },
                 _ => {}

@@ -137,6 +137,8 @@ pub const CL_KEYBIND_JUMP: console::CVar<i64> =
     create_keybind!(Space, "cl_keybind_jump", "Keybinding for jumping");
 pub const CL_KEYBIND_TOGGLE_HUD: console::CVar<i64> =
     create_keybind!(F1, "cl_keybind_toggle_hud", "Keybinding for toggling the hud");
+pub const CL_KEYBIND_TOGGLE_DEBUG: console::CVar<i64> =
+    create_keybind!(F3, "cl_keybind_toggle_debug", "Keybinding for toggling the debug info");
 
 pub const BACKGROUND_IMAGE: console::CVar<String> = CVar {
     ty: PhantomData,
@@ -163,6 +165,7 @@ pub fn register_vars(vars: &mut console::Vars) {
     vars.register(CL_KEYBIND_SPRINT);
     vars.register(CL_KEYBIND_JUMP);
     vars.register(CL_KEYBIND_TOGGLE_HUD);
+    vars.register(CL_KEYBIND_TOGGLE_DEBUG);
     vars.register(S_CAPE);
     vars.register(S_JACKET);
     vars.register(S_LEFT_SLEEVE);
@@ -184,6 +187,7 @@ pub enum Actionkey {
     Sprint,
     Jump,
     ToggleHud,
+    ToggleDebug,
 }
 
 impl Actionkey {
@@ -198,6 +202,7 @@ impl Actionkey {
             Actionkey::Sprint,
             Actionkey::Jump,
             Actionkey::ToggleHud,
+            Actionkey::ToggleDebug,
         ]
     }
 
@@ -221,6 +226,7 @@ impl Actionkey {
             Actionkey::Sprint => CL_KEYBIND_SPRINT,
             Actionkey::Jump => CL_KEYBIND_JUMP,
             Actionkey::ToggleHud => CL_KEYBIND_TOGGLE_HUD,
+            Actionkey::ToggleDebug => CL_KEYBIND_TOGGLE_DEBUG,
         }
     }
 }

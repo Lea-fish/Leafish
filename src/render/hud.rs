@@ -12,26 +12,31 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::sync::Arc;
+use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::Instant;
+
+use parking_lot::RwLock;
+use rand::Rng;
+use rand::rngs::ThreadRng;
+
 use crate::gl;
+use crate::inventory::{Inventory, Item};
+use crate::inventory::player_inventory::PlayerInventory;
 use crate::render;
 use crate::render::Renderer;
-use std::sync::Arc;
-use crate::ui;
-use crate::ui::{Container, ImageRef, VAttach, HAttach, TextRef};
 use crate::screen::Screen;
-use std::time::Instant;
-use std::time::{SystemTime, UNIX_EPOCH};
-use rand::rngs::ThreadRng;
-use rand::Rng;
-use parking_lot::RwLock;
-use crate::inventory::player_inventory::PlayerInventory;
-use crate::inventory::{Item, Inventory};
+use crate::ui;
+use crate::ui::{Container, HAttach, ImageRef, TextRef, VAttach};
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
 pub struct HudContext {
 
     pub enabled: bool,
+    pub debug: bool,
+    fps: u32,
+    dirty_debug: bool,
     hardcore: bool,
     wither: bool,
     poison: bool,
@@ -67,6 +72,9 @@ impl HudContext {
     pub fn new() -> Self {
         HudContext {
             enabled: true,
+            debug: false,
+            fps: 0,
+            dirty_debug: false,
             hardcore: false,
             wither: false,
             poison: false,
@@ -147,11 +155,19 @@ impl HudContext {
         self.dirty_slot_index = true;
     }
 
+    pub fn update_fps(&mut self, fps: u32) {
+        self.fps = fps;
+        if self.debug {
+            self.dirty_debug = true;
+        }
+    }
+
 }
 
 pub struct Hud {
 
     last_enabled: bool,
+    last_debug_enabled: bool,
     elements: Vec<ImageRef>,
     health_elements: Vec<ImageRef>,
     armor_elements: Vec<ImageRef>,
@@ -161,6 +177,7 @@ pub struct Hud {
     exp_text_elements: Vec<TextRef>,
     slot_elements: Vec<ImageRef>,
     slot_index_elements: Vec<ImageRef>,
+    debug_elements: Vec<TextRef>,
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
 
@@ -171,6 +188,7 @@ impl Hud {
     pub fn new(hud_context: Arc<RwLock<HudContext>>) -> Self {
         Hud {
             last_enabled: true,
+            last_debug_enabled: false,
             elements: vec![],
             health_elements: vec![],
             armor_elements: vec![],
@@ -180,6 +198,7 @@ impl Hud {
             exp_text_elements: vec![],
             slot_elements: vec![],
             slot_index_elements: vec![],
+            debug_elements: vec![],
             hud_context: hud_context.clone(),
             random: rand::thread_rng(),
         }
@@ -213,6 +232,7 @@ impl Screen for Hud {
         self.breath_elements.clear();
         self.slot_elements.clear();
         self.slot_index_elements.clear();
+        self.debug_elements.clear();
     }
 
     fn tick(
@@ -232,6 +252,13 @@ impl Screen for Hud {
             self.on_active(renderer, ui_container);
             self.last_enabled = true;
             return None;
+        }
+        if self.hud_context.clone().read().debug {
+            self.render_debug(renderer, ui_container);
+            self.last_debug_enabled = true;
+        } else if self.last_debug_enabled {
+            self.debug_elements.clear();
+            self.last_debug_enabled = false;
         }
         if self.hud_context.clone().read().dirty_health {
             self.health_elements.clear();
@@ -261,6 +288,10 @@ impl Screen for Hud {
         if self.hud_context.clone().read().dirty_slot_index {
             self.slot_index_elements.clear();
             self.render_slot_index(renderer, ui_container);
+        }
+        if self.hud_context.clone().read().dirty_debug {
+            self.debug_elements.clear();
+            self.render_debug(renderer, ui_container);
         }
         None
     }
@@ -707,6 +738,23 @@ impl Hud {
             }
         }
         self.hud_context.write().dirty_breath = false;
+    }
+
+    pub fn render_debug(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        let hud_context = self.hud_context.clone();
+        let hud_context = hud_context.read();
+        let icon_scale = Hud::icon_scale(renderer);
+        let scale = icon_scale / 2.0;
+        let y = icon_scale * 26.0;
+        self.debug_elements.push(ui::TextBuilder::new()
+            .alignment(VAttach::Top, HAttach::Left)
+            .scale_x(scale)
+            .scale_y(scale)
+            .position(icon_scale, icon_scale)
+            .text(format!("FPS: {}", hud_context.fps))
+            .colour((0, 102, 204, 255))
+            .shadow(false)
+            .create(ui_container));
     }
 
     pub fn draw_item(&self, item: &Item, x: f64, y: f64,
