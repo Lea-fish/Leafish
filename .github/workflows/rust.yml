@@ -33,6 +33,15 @@ jobs:
       run: |
         cargo test --verbose
 
+    - name: Run clippy
+      uses: actions-rs/clippy-check@v1.0.7
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+        args: --all-targets -- -D warnings
+    - name: Check formatting
+      run: |
+        cargo fmt --all -- --check
+
     - name: Upload binary
       uses: actions/upload-artifact@v2
       with:
@@ -63,6 +72,15 @@ jobs:
       - name: Run tests
         run: |
           cargo test --verbose
+
+      - name: Run clippy
+        uses: actions-rs/clippy-check@v1.0.7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-targets -- -D warnings
+      - name: Check formatting
+        run: |
+          cargo fmt --all -- --check
 
       - name: Upload binary
         uses: actions/upload-artifact@v2
@@ -97,6 +115,15 @@ jobs:
       - name: Run tests
         run: |
           cargo test --verbose
+
+      - name: Run clippy
+        uses: actions-rs/clippy-check@v1.0.7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --all-targets -- -D warnings
+      - name: Check formatting
+        run: |
+          cargo fmt --all -- --check
 
       - name: Package binary
         run: |
