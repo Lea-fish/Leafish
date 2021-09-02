@@ -519,12 +519,12 @@ fn tick_all(
             game.renderer.clone(),
             version,
         );
-    } else if game.renderer.clone().read().safe_width != width
-        || game.renderer.clone().read().safe_height != height
+    } else if game.renderer.clone().read().safe_width != physical_width
+        || game.renderer.clone().read().safe_height != physical_height
     {
-        game.renderer.clone().write().safe_width = width;
-        game.renderer.clone().write().safe_height = height;
-        gl::viewport(0, 0, width as i32, height as i32);
+        game.renderer.clone().write().safe_width = physical_width;
+        game.renderer.clone().write().safe_height = physical_height;
+        gl::viewport(0, 0, physical_width as i32, physical_height as i32);
     }
 
     game.screen_sys
