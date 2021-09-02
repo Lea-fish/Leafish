@@ -4,7 +4,7 @@ Multi-version Minecraft-compatible client written in Rust, forked from [Stevenar
 
 ---
 
-![Example screenshot showing a rendered Minecraft world](resources/assets/leafish/textures/gui/background.png)
+![Screenshot showing the main menu](.github/readme-resources/screenshot-mainmenu.jpg)
 
 ---
 
