@@ -160,18 +160,18 @@ jobs:
 
       - name: Package binary
         run: |
-          cargo install cargo-bundle
           cargo bundle --release
           chmod a+x target/release/bundle/osx/Leafish.app/Contents/MacOS/leafish
           cd target/release/bundle/osx
+          zip -r Leafish.app.zip Leafish.app
       - name: Upload binary
         uses: actions/upload-artifact@v2
         with:
           name: Leafish.app
-          path: target/release/bundle/osx/Leafish.app
+          path: target/release/bundle/osx/Leafish.app.zip
       - name: Release binary
         if: startsWith(github.ref, 'refs/tag/')
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            target/release/bundle/osx/Leafish.app
+            target/release/bundle/osx/Leafish.app.zip
