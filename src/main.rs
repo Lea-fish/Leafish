@@ -472,7 +472,7 @@ fn tick_all(
     let delta = (diff.subsec_nanos() as f64) / frame_time;
     let physical_size = window.inner_size();
     let (physical_width, physical_height) = physical_size.into();
-    let (width, height) = physical_size.to_logical::<f64>(game.dpi_factor).into();
+    let (width, height): (u32, u32) = physical_size.to_logical::<f64>(game.dpi_factor).into();
 
     let version = {
         let try_res = game.resource_manager.try_write();
