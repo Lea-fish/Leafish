@@ -36,6 +36,7 @@ impl ecs::System for ApplyVelocity {
         _: &world::World,
         _: &mut render::Renderer,
         _: bool,
+        _: bool,
     ) {
         for e in m.find(&self.filter) {
             if m.get_component(e, self.movement).is_some() {
@@ -77,6 +78,7 @@ impl ecs::System for ApplyGravity {
         m: &mut ecs::Manager,
         _: &world::World,
         _: &mut render::Renderer,
+        _: bool,
         _: bool,
     ) {
         for e in m.find(&self.filter) {
@@ -120,6 +122,7 @@ impl ecs::System for UpdateLastPosition {
         _: &world::World,
         _: &mut render::Renderer,
         _: bool,
+        _: bool,
     ) {
         for e in m.find(&self.filter) {
             let pos = m.get_component_mut(e, self.position).unwrap();
@@ -160,6 +163,7 @@ impl ecs::System for LerpPosition {
         m: &mut ecs::Manager,
         _: &world::World,
         _: &mut render::Renderer,
+        _: bool,
         _: bool,
     ) {
         let world_entity = m.get_world();
@@ -212,6 +216,7 @@ impl ecs::System for LerpRotation {
         m: &mut ecs::Manager,
         _: &world::World,
         _: &mut render::Renderer,
+        _: bool,
         _: bool,
     ) {
         use std::f64::consts::PI;
@@ -276,6 +281,7 @@ impl ecs::System for LightEntity {
         m: &mut ecs::Manager,
         world: &world::World,
         _: &mut render::Renderer,
+        _: bool,
         _: bool,
     ) {
         for e in m.find(&self.filter) {

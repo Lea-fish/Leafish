@@ -125,7 +125,6 @@ impl World {
             modded_block_ids: Arc::new(Default::default()),
             id_map,
             light_updates: sender,
-            // ..Default::default()
             render_list: Arc::new(Default::default()),
             block_entity_actions: unbounded(),
         }
@@ -135,11 +134,7 @@ impl World {
         if self.protocol_version != protocol_version {
             warn!("Can't switch protocol version, when resetting the world :(");
         }
-        self.modded_block_ids.clone().write().clear();
-        // self.light_updates.clone().write().clear(); // TODO: Implement a similar system!
-        self.render_list.clone().write().clear();
-        // self.block_entity_actions.clone().write().clear(); // TODO: Implement a similar system!
-        self.chunks.clone().clear();
+        // TODO: Check if we actually have to do anything here.
     }
 
     pub fn is_chunk_loaded(&self, x: i32, z: i32) -> bool {

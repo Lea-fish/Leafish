@@ -501,7 +501,8 @@ fn tick_all(
         game.server
             .as_ref()
             .unwrap()
-            .tick(game.renderer.clone(), delta, game.focused); // TODO: Improve perf in load screen!
+            .clone()
+            .tick(game.renderer.clone(), delta, game); // TODO: Improve perf in load screen!
     }
 
     // Check if window is valid, it might be minimized
@@ -612,7 +613,7 @@ fn handle_window_event<T>(
             if game.focused {
                 window.set_cursor_grab(true).unwrap();
                 window.set_cursor_visible(false);
-                if game.server.is_some() {
+                if game.server.is_some() && !*game.server.as_ref().unwrap().clone().dead.read() {
                     if let Some(player) = *game.server.as_ref().unwrap().player.clone().write() {
                         let rotation = game
                             .server
@@ -725,20 +726,20 @@ fn handle_window_event<T>(
                 WindowEvent::KeyboardInput { input, .. } => {
                     match (input.state, input.virtual_keycode) {
                         (ElementState::Released, Some(VirtualKeyCode::Escape)) => {
-                            if game.focused {
-                                window.set_cursor_grab(false).unwrap();
-                                window.set_cursor_visible(true);
-                                game.focused = false;
-                                game.screen_sys
-                                    .add_screen(Box::new(screen::SettingsMenu::new(
-                                        game.vars.clone(),
-                                        true,
-                                    )));
-                            } else if game.screen_sys.is_current_closable() {
-                                window.set_cursor_grab(true).unwrap();
-                                window.set_cursor_visible(false);
-                                game.focused = true;
-                                game.screen_sys.pop_screen();
+                            if !*game.server.as_ref().unwrap().clone().dead.read() {
+                                if game.focused {
+                                    window.set_cursor_grab(false).unwrap();
+                                    window.set_cursor_visible(true);
+                                    game.focused = false;
+                                    game.screen_sys.add_screen(Box::new(
+                                        screen::SettingsMenu::new(game.vars.clone(), true),
+                                    ));
+                                } else if game.screen_sys.is_current_closable() {
+                                    window.set_cursor_grab(true).unwrap();
+                                    window.set_cursor_visible(false);
+                                    game.focused = true;
+                                    game.screen_sys.pop_screen();
+                                }
                             }
                         }
                         (ElementState::Pressed, Some(VirtualKeyCode::Grave)) => {

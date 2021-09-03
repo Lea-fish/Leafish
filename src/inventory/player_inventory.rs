@@ -328,7 +328,7 @@ impl Inventory for PlayerInventory {
             for slot in self.slots.iter() {
                 if slot.item.is_some() {
                     inventory_window.draw_item(
-                        &slot.item.as_ref().unwrap(),
+                        slot.item.as_ref().unwrap(),
                         slot.x,
                         slot.y,
                         1,
