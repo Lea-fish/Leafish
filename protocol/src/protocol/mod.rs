@@ -15,36 +15,40 @@
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
 
-use aes::Aes128;
-use cfb8::cipher::{AsyncStreamCipher, NewCipher};
-use cfb8::Cfb8;
-use std::fs;
-
-use lazy_static::lazy_static;
-use regex::Regex;
-
-pub mod forge;
-pub mod mojang;
-
 extern crate lazy_static;
 extern crate regex;
-use crate::format;
-use crate::nbt;
-use crate::shared::Position;
-use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use flate2::read::{ZlibDecoder, ZlibEncoder};
-use flate2::Compression;
-use instant::{Duration, Instant};
-use log::{debug, warn};
+
 use std::convert;
 use std::default;
 use std::fmt;
+use std::fs;
 use std::io;
 use std::io::{Read, Write};
 use std::net::TcpStream;
+use std::sync::{Arc, Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+
+use aes::Aes128;
+use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use cfb8::Cfb8;
+use cfb8::cipher::{AsyncStreamCipher, NewCipher};
+use flate2::Compression;
+use flate2::read::{ZlibDecoder, ZlibEncoder};
+use instant::{Duration, Instant};
+use lazy_static::lazy_static;
+use log::{debug, warn};
+use num_traits::cast::{cast, NumCast};
+use regex::Regex;
 use trust_dns_resolver::config::ResolverConfig;
 use trust_dns_resolver::config::ResolverOpts;
+use trust_dns_resolver::Resolver;
+
+use crate::format;
+use crate::nbt;
+use crate::shared::Position;
+
+pub mod forge;
+pub mod mojang;
 
 pub const SUPPORTED_PROTOCOLS: [i32; 24] = [
     754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 452, 451, 404, 340, 316, 315, 210,
@@ -53,6 +57,45 @@ pub const SUPPORTED_PROTOCOLS: [i32; 24] = [
 
 static CURRENT_PROTOCOL_VERSION: AtomicI32 = AtomicI32::new(SUPPORTED_PROTOCOLS[0]);
 static NETWORK_DEBUG: AtomicBool = AtomicBool::new(false);
+
+/// A list of all supported versions
+#[derive(PartialOrd, PartialEq, Debug)]
+pub enum Version {
+    Old,
+    V1_7,
+    V1_8,
+    V1_9,
+    V1_10,
+    V1_11,
+    V1_12,
+    V1_13,
+    V1_14,
+    V1_15,
+    V1_16,
+    New,
+}
+
+impl Version {
+    const NEWEST: Version = Version::V1_16;
+    /// This is only the newest *supported* version
+
+    pub fn from_id(protocol_version: u32) -> Version {
+        match protocol_version {
+            0..=4 => Version::Old,
+            5 => Version::V1_7,
+            47 => Version::V1_8,
+            107..=110 => Version::V1_9,
+            210 => Version::V1_10,
+            315..=316 => Version::V1_11,
+            335..=340 => Version::V1_12,
+            393..=404 => Version::V1_13,
+            477..=498 => Version::V1_14,
+            573..=578 => Version::V1_15,
+            735..=754 => Version::V1_16,
+            _ => Version::NEWEST,
+        }
+    }
+}
 
 pub fn current_protocol_version() -> i32 {
     CURRENT_PROTOCOL_VERSION.load(Ordering::Relaxed)
@@ -666,10 +709,6 @@ impl Lengthable for i32 {
     }
 }
 
-use num_traits::cast::{cast, NumCast};
-use std::sync::{Arc, Mutex, RwLock};
-use trust_dns_resolver::Resolver;
-
 /// `FixedPoint5` has the 5 least-significant bits for the fractional
 /// part, upper for integer part: https://wiki.vg/Data_types#Fixed-point_numbers
 #[derive(Clone, Copy)]
@@ -953,18 +992,35 @@ impl fmt::Debug for VarLong {
 }
 
 impl Serializable for Position {
-    fn read_from<R: io::Read>(buf: &mut R) -> Result<Position, Error> {
-        let pos = buf.read_u64::<BigEndian>()?;
+fn read_from<R: io::Read>(buf: &mut R) -> Result<Position, Error> {
+    let pos = buf.read_u64::<BigEndian>()?;
+    let protocol_version = current_protocol_version();
+    if Version::from_id(protocol_version as u32) < Version::V1_14 {
         Ok(Position::new(
             ((pos as i64) >> 38) as i32,
-            ((pos as i64) & 0xFFF) as i32,
+            (((pos as i64) >> 26) & 0xFFF) as i32,
+            ((pos as i64) << 38 >> 38) as i32,
+        ))
+    } else {
+        Ok(Position::new(
+            ((pos as i64) >> 38) as i32,
+            ((pos as i64) << 52 >> 52) as i32,
             ((pos as i64) << 26 >> 38) as i32,
         ))
     }
+}
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
-        let pos = (((self.x as u64) & 0x3FFFFFF) << 38)
-            | ((self.y as u64) & 0xFFF)
-            | (((self.z as u64) & 0x3FFFFFF) << 12);
+        let pos;
+        let protocol_version = current_protocol_version();
+        if Version::from_id(protocol_version as u32) < Version::V1_14 {
+            pos = (((self.x as u64) & 0x3FFFFFF) << 38)
+                | ((self.y as u64) & 0xFFF)
+                | (((self.z as u64) & 0x3FFFFFF) << 12);
+        } else {
+            pos = (((self.x as u64) & 0x3FFFFFF) << 38)
+                | (((self.y as u64) & 0xFFF) << 26)
+                | ((self.z as u64) & 0x3FFFFFF);
+        }
 
         buf.write_u64::<BigEndian>(pos)?;
         Ok(())
