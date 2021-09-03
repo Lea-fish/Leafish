@@ -1,4 +1,4 @@
-# Leafish
+# <img src="resources/assets/leafish/logo/leafish-logo.svg" width="75" alt="Leafish logo"> Leafish
 
 Multi-version Minecraft-compatible client written in Rust, forked from [Stevenarella](https://github.com/iceiix/stevenarella/).
 
