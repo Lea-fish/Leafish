@@ -18,11 +18,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::debug;
 use parking_lot::RwLock;
-use rand::Rng;
 use rand::rngs::ThreadRng;
+use rand::Rng;
 
-use crate::inventory::{Inventory, Item};
 use crate::inventory::player_inventory::PlayerInventory;
+use crate::inventory::{Inventory, Item};
 use crate::render;
 use crate::render::Renderer;
 use crate::screen::Screen;
