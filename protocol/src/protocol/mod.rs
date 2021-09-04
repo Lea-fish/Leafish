@@ -25,15 +25,15 @@ use std::fs;
 use std::io;
 use std::io::{Read, Write};
 use std::net::TcpStream;
-use std::sync::{Arc, Mutex, RwLock};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
+use std::sync::{Arc, Mutex, RwLock};
 
 use aes::Aes128;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use cfb8::Cfb8;
 use cfb8::cipher::{AsyncStreamCipher, NewCipher};
-use flate2::Compression;
+use cfb8::Cfb8;
 use flate2::read::{ZlibDecoder, ZlibEncoder};
+use flate2::Compression;
 use instant::{Duration, Instant};
 use lazy_static::lazy_static;
 use log::{debug, warn};
@@ -992,23 +992,23 @@ impl fmt::Debug for VarLong {
 }
 
 impl Serializable for Position {
-fn read_from<R: io::Read>(buf: &mut R) -> Result<Position, Error> {
-    let pos = buf.read_u64::<BigEndian>()?;
-    let protocol_version = current_protocol_version();
-    if Version::from_id(protocol_version as u32) < Version::V1_14 {
-        Ok(Position::new(
-            ((pos as i64) >> 38) as i32,
-            (((pos as i64) >> 26) & 0xFFF) as i32,
-            ((pos as i64) << 38 >> 38) as i32,
-        ))
-    } else {
-        Ok(Position::new(
-            ((pos as i64) >> 38) as i32,
-            ((pos as i64) << 52 >> 52) as i32,
-            ((pos as i64) << 26 >> 38) as i32,
-        ))
+    fn read_from<R: io::Read>(buf: &mut R) -> Result<Position, Error> {
+        let pos = buf.read_u64::<BigEndian>()?;
+        let protocol_version = current_protocol_version();
+        if Version::from_id(protocol_version as u32) < Version::V1_14 {
+            Ok(Position::new(
+                ((pos as i64) >> 38) as i32,
+                (((pos as i64) >> 26) & 0xFFF) as i32,
+                ((pos as i64) << 38 >> 38) as i32,
+            ))
+        } else {
+            Ok(Position::new(
+                ((pos as i64) >> 38) as i32,
+                ((pos as i64) << 52 >> 52) as i32,
+                ((pos as i64) << 26 >> 38) as i32,
+            ))
+        }
     }
-}
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         let pos;
         let protocol_version = current_protocol_version();
