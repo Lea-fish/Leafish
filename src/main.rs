@@ -143,7 +143,7 @@ impl Game {
             )
         })
         .join();
-        return match result {
+        match result {
             Ok(result) => {
                 match result {
                     Ok(srv) => {
