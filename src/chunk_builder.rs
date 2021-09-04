@@ -5,12 +5,12 @@ use crate::shared::Direction;
 use crate::types::bit::Set;
 use crate::world;
 use crate::world::{block, CPos, ComposedSection, World};
-use rand::{self, Rng, SeedableRng};
-use std::sync::Arc;
-use std::thread;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use parking_lot::RwLock;
+use rand::{self, Rng, SeedableRng};
+use std::sync::Arc;
+use std::thread;
 
 const NUM_WORKERS: usize = 8;
 

@@ -103,7 +103,7 @@ impl Version {
             Version::Old => false,
             Version::New => false,
             Version::Other => false,
-            _ => true
+            _ => true,
         }
     }
 }

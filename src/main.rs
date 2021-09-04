@@ -95,7 +95,11 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn connect_to(&mut self, address: &str, hud_context: Arc<RwLock<HudContext>>) -> Result<(), Error> {
+    pub fn connect_to(
+        &mut self,
+        address: &str,
+        hud_context: Arc<RwLock<HudContext>>
+    ) -> Result<(), Error> {
         let (protocol_version, forge_mods, fml_network_version) =
             match protocol::Conn::new(address, self.default_protocol_version)
                 .and_then(|conn| conn.do_status())
@@ -120,7 +124,10 @@ impl Game {
                 }
             };
         if !Version::from_id(protocol_version as u32).is_supported() {
-            return Err(Error::Err(format!("The server's version isn't supported!\n(protocol version: {})", protocol_version)));
+            return Err(Error::Err(format!(
+                "The server's version isn't supported!\n(protocol version: {})",
+                protocol_version
+            )));
         }
         let address = address.to_owned();
         let resources = self.resource_manager.clone();
