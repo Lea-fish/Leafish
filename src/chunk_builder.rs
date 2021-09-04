@@ -8,7 +8,6 @@ use crate::world::{block, CPos, ComposedSection, World};
 use rand::{self, Rng, SeedableRng};
 use std::sync::Arc;
 use std::thread;
-// use rayon::prelude::*;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use parking_lot::RwLock;
@@ -127,7 +126,7 @@ impl ChunkBuilder {
 
     pub fn reset(&mut self) {
         // TODO: Find a safer solution!
-        // Drain built chunk data
+        // Drain the built chunk data
         loop {
             let curr_data = self.built_recv.try_recv();
             if curr_data.is_err() {

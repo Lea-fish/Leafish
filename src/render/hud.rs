@@ -721,25 +721,20 @@ impl Hud {
     fn render_slots_items(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         for i in 0..9 {
-            let player_inventory = self
-                .hud_context
-                .clone()
-                .read()
-                .player_inventory
-                .as_ref()
-                .unwrap()
-                .clone();
-            let player_inventory = player_inventory.read();
-            let item = player_inventory.get_item(36 + i as i16);
-            if let Some(item) = item {
-                let slot = self.draw_item(
-                    item,
-                    -(icon_scale * 90.0) + (i as f64 * (icon_scale * 20.0)) + icon_scale * 11.0,
-                    icon_scale * 3.0,
-                    ui_container,
-                    renderer,
-                );
-                self.slot_elements.push(slot);
+            if let Some(player_inventory) = self.hud_context.clone().read().player_inventory.as_ref() {
+                let player_inventory = player_inventory.clone();
+                let player_inventory = player_inventory.read();
+                let item = player_inventory.get_item(36 + i as i16);
+                if let Some(item) = item {
+                    let slot = self.draw_item(
+                        item,
+                        -(icon_scale * 90.0) + (i as f64 * (icon_scale * 20.0)) + icon_scale * 11.0,
+                        icon_scale * 3.0,
+                        ui_container,
+                        renderer,
+                    );
+                    self.slot_elements.push(slot);
+                }
             }
         }
         self.hud_context.clone().write().dirty_slots = false;

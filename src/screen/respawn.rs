@@ -1,11 +1,10 @@
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::Screen;
-use crate::server::Version;
 use crate::ui;
 use crate::ui::{Container, ImageRef};
 use leafish_protocol::protocol::packet::play::serverbound::ClientStatus;
-use leafish_protocol::protocol::VarInt;
+use leafish_protocol::protocol::{VarInt, Version};
 
 pub struct Respawn {
     elements: Option<UIElements>,

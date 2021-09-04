@@ -61,6 +61,7 @@ static NETWORK_DEBUG: AtomicBool = AtomicBool::new(false);
 /// A list of all supported versions
 #[derive(PartialOrd, PartialEq, Debug)]
 pub enum Version {
+    Other,
     Old,
     V1_7,
     V1_8,
@@ -92,7 +93,17 @@ impl Version {
             477..=498 => Version::V1_14,
             573..=578 => Version::V1_15,
             735..=754 => Version::V1_16,
-            _ => Version::NEWEST,
+            755..=u32::MAX => Version::New,
+            _ => Version::Other,
+        }
+    }
+
+    pub fn is_supported(&self) -> bool {
+        match self {
+            Version::Old => false,
+            Version::New => false,
+            Version::Other => false,
+            _ => true
         }
     }
 }
