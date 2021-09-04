@@ -20,6 +20,15 @@ pub const INVISIBLE: Material = Material {
     collidable: true,
 };
 
+pub const INTERACTABLE: Material = Material {
+    never_cull: false,
+    should_cull_against: false,
+    force_shade: false,
+    transparent: false,
+    collidable: false,
+    ..INVISIBLE
+};
+
 pub const SOLID: Material = Material {
     renderable: true,
     never_cull: false,
@@ -31,19 +40,25 @@ pub const SOLID: Material = Material {
     collidable: true,
 };
 
+pub const PARTIALLY_SOLID: Material = Material {
+    collidable: true,
+    ..NON_SOLID
+};
+
 pub const NON_SOLID: Material = Material {
     should_cull_against: false,
+    collidable: false,
     absorbed_light: 1,
     ..SOLID
 };
 
 pub const TRANSPARENT: Material = Material {
     transparent: true,
-    ..NON_SOLID
+    ..PARTIALLY_SOLID
 };
 
 pub const LEAVES: Material = Material {
     never_cull: true,
     force_shade: true,
-    ..NON_SOLID
+    ..PARTIALLY_SOLID
 };

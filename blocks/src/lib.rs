@@ -821,7 +821,7 @@ define_blocks! {
     }
     Glass {
         props {},
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "glass") },
     }
     LapisOre {
@@ -924,7 +924,7 @@ define_blocks! {
                   + (facing.horizontal_offset() * (2 * 2))
                   + (if occupied { 0 } else { 2 })
                   + (if part == BedPart::Head { 0 } else { 1 })),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "bed") },
         variant format!("facing={},part={}", facing.as_string(), part.as_string()),
         collision vec![Aabb3::new(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 9.0/16.0, 1.0))],
@@ -983,7 +983,7 @@ define_blocks! {
         offset Some(facing.offset() + (if extended { 0 } else { 6 })),
         material Material {
             should_cull_against: !extended,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "sticky_piston") },
         variant format!("extended={},facing={}", extended, facing.as_string()),
@@ -1054,7 +1054,7 @@ define_blocks! {
         offset Some(facing.offset() + (if extended { 0 } else { 6 })),
         material Material {
             should_cull_against: !extended,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "piston") },
         variant format!("extended={},facing={}", extended, facing.as_string()),
@@ -1077,7 +1077,7 @@ define_blocks! {
         offset Some(facing.offset() * 4 +
                     (if short { 0 } else { 2 }) +
                     (if variant == PistonType::Normal { 0 } else { 1 })),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "piston_head") },
         variant format!("facing={},short={},type={}", facing.as_string(), short, variant.as_string()),
         collision {
@@ -1098,56 +1098,6 @@ define_blocks! {
         },
     }
     Wool {
-        props {
-            color: ColoredVariant = [
-                ColoredVariant::White,
-                ColoredVariant::Orange,
-                ColoredVariant::Magenta,
-                ColoredVariant::LightBlue,
-                ColoredVariant::Yellow,
-                ColoredVariant::Lime,
-                ColoredVariant::Pink,
-                ColoredVariant::Gray,
-                ColoredVariant::Silver,
-                ColoredVariant::Cyan,
-                ColoredVariant::Purple,
-                ColoredVariant::Blue,
-                ColoredVariant::Brown,
-                ColoredVariant::Green,
-                ColoredVariant::Red,
-                ColoredVariant::Black
-            ],
-        },
-        data Some(color.data()),
-        model { ("minecraft", format!("{}_wool", color.as_string()) ) },
-    }
-    ThermalExpansionRockwool {
-        modid "ThermalExpansion:Rockwool",
-        props {
-            color: ColoredVariant = [
-                ColoredVariant::White,
-                ColoredVariant::Orange,
-                ColoredVariant::Magenta,
-                ColoredVariant::LightBlue,
-                ColoredVariant::Yellow,
-                ColoredVariant::Lime,
-                ColoredVariant::Pink,
-                ColoredVariant::Gray,
-                ColoredVariant::Silver,
-                ColoredVariant::Cyan,
-                ColoredVariant::Purple,
-                ColoredVariant::Blue,
-                ColoredVariant::Brown,
-                ColoredVariant::Green,
-                ColoredVariant::Red,
-                ColoredVariant::Black
-            ],
-        },
-        data Some(color.data()),
-        model { ("minecraft", format!("{}_wool", color.as_string()) ) },
-    }
-    ThermalFoundationRockwool {
-        modid "thermalfoundation:rockwool",
         props {
             color: ColoredVariant = [
                 ColoredVariant::White,
@@ -1221,14 +1171,14 @@ define_blocks! {
         props {},
         material Material {
             emitted_light: 1,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "brown_mushroom") },
         collision vec![],
     }
     RedMushroom {
         props {},
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "red_mushroom") },
         collision vec![],
     }
@@ -1288,7 +1238,7 @@ define_blocks! {
         },
         data Some(variant.data() | (if half == BlockHalf::Top { 0x8 } else { 0x0 })),
         offset None,
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("half={}", half.as_string()),
         collision slab_collision(half),
@@ -1406,7 +1356,7 @@ define_blocks! {
     }
     MobSpawner {
         props {},
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "mob_spawner") },
     }
     OakStairs {
@@ -1429,7 +1379,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "oak_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -1454,7 +1404,7 @@ define_blocks! {
         offset Some(if waterlogged { 0 } else { 1 } +
             type_.offset() * 2 +
             facing.horizontal_offset() * (2 * 3)),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "chest") },
     }
     RedstoneWire {
@@ -1525,7 +1475,7 @@ define_blocks! {
             moisture: u8 = [0, 1, 2, 3, 4, 5, 6, 7],
         },
         data Some(moisture as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "farmland") },
         variant format!("moisture={}", moisture),
         collision vec![Aabb3::new(
@@ -1609,7 +1559,7 @@ define_blocks! {
                 }
             }
         },
-        material material::INVISIBLE,
+        material material::INTERACTABLE,
         model { ("minecraft", "standing_sign") },
         collision vec![],
     }
@@ -1628,7 +1578,7 @@ define_blocks! {
         },
         data door_data(facing, half, hinge, open, powered),
         offset door_offset(facing, half, hinge, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "wooden_door") },
         variant format!("facing={},half={},hinge={},open={}", facing.as_string(), half.as_string(), hinge.as_string(), open),
         collision door_collision(facing, hinge, open),
@@ -1649,7 +1599,7 @@ define_blocks! {
         },
         data if !waterlogged { Some(facing.index()) } else { None },
         offset Some(if waterlogged { 0 } else { 1 } + facing.horizontal_offset() * 2),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "ladder") },
         variant format!("facing={}", facing.as_string()),
     }
@@ -1694,7 +1644,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "stone_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -1731,7 +1681,7 @@ define_blocks! {
                 }
             }
         },
-        material material::INVISIBLE,
+        material material::INTERACTABLE,
         model { ("minecraft", "wall_sign") },
         variant format!("facing={}", facing.as_string()),
         collision vec![],
@@ -1784,7 +1734,7 @@ define_blocks! {
         },
         data door_data(facing, half, hinge, open, powered),
         offset door_offset(facing, half, hinge, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "iron_door") },
         variant format!("facing={},half={},hinge={},open={}", facing.as_string(), half.as_string(), hinge.as_string(), open),
         collision door_collision(facing, hinge, open),
@@ -1941,7 +1891,7 @@ define_blocks! {
             layers: u8 = [1, 2, 3, 4, 5, 6, 7, 8],
         },
         data Some(layers as usize - 1),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "snow_layer") },
         variant format!("layers={}", layers),
         collision vec![Aabb3::new(
@@ -1966,7 +1916,7 @@ define_blocks! {
             age: u8 = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15],
         },
         data Some(age as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "cactus") },
         collision vec![Aabb3::new(
             Point3::new(1.0/16.0, 0.0, 1.0/16.0),
@@ -2009,7 +1959,7 @@ define_blocks! {
             if south { 0 } else { 1<<2 } +
             if north { 0 } else { 1<<3 } +
             if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "fence") },
         collision fence_collision(north, south, west, east),
         update_state (world, pos) => {
@@ -2051,7 +2001,7 @@ define_blocks! {
     }
     SoulSand {
         props {},
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "soul_sand") },
         collision vec![Aabb3::new(
             Point3::new(0.0, 0.0, 0.0),
@@ -2175,7 +2125,7 @@ define_blocks! {
             bites: u8 = [0, 1, 2, 3, 4, 5, 6],
         },
         data Some(bites as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "cake") },
         variant format!("bites={}", bites),
         collision vec![Aabb3::new(
@@ -2290,7 +2240,7 @@ define_blocks! {
             if half == BlockHalf::Top { 0 } else { 1<<3 } +
             facing.horizontal_offset() * (2 * 2 * 2 * 2) +
             wood.offset() * (2 * 2 * 2 * 2 * 4)),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "trapdoor") },
         variant format!("facing={},half={},open={}", facing.as_string(), half.as_string(), open),
         collision trapdoor_collision(facing, half, open),
@@ -2379,7 +2329,7 @@ define_blocks! {
                     if south { 0 } else { 1<<2 } +
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "iron_bars") },
         collision pane_collision(north, south, east, west),
         update_state (world, pos) => {
@@ -2438,7 +2388,7 @@ define_blocks! {
                     if south { 0 } else { 1<<2 } +
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "glass_pane") },
         collision pane_collision(north, south, east, west),
         update_state (world, pos) => {
@@ -2606,7 +2556,7 @@ define_blocks! {
                     if south { 0 } else { 1<<2 } +
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "vine") },
         variant format!("east={},north={},south={},up={},west={}", east, north, south, up, west),
         tint TintType::Foliage,
@@ -2631,7 +2581,7 @@ define_blocks! {
         },
         data fence_gate_data(facing, in_wall, open, powered),
         offset fence_gate_offset(facing, in_wall, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "fence_gate") },
         variant format!("facing={},in_wall={},open={}", facing.as_string(), in_wall, open),
         collision fence_gate_collision(facing, in_wall, open),
@@ -2662,7 +2612,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "brick_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -2688,7 +2638,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "stone_brick_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -2707,7 +2657,7 @@ define_blocks! {
     }
     Waterlily {
         props {},
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "waterlily") },
         tint TintType::Foliage,
         collision vec![Aabb3::new(
@@ -2733,7 +2683,7 @@ define_blocks! {
             if south { 0 } else { 1<<2 } +
             if north { 0 } else { 1<<3 } +
             if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "nether_brick_fence") },
         collision fence_collision(north, south, west, east),
         update_state (world, pos) => {
@@ -2776,7 +2726,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "nether_brick_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -2794,7 +2744,7 @@ define_blocks! {
     }
     EnchantingTable {
         props {},
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "enchanting_table") },
         collision vec![Aabb3::new(
             Point3::new(0.0, 0.0, 0.0),
@@ -2815,7 +2765,7 @@ define_blocks! {
                     if has_bottle_2 { 0 } else { 1<<2 }),
         material Material {
             emitted_light: 1,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "brewing_stand") },
         multipart (key, val) => match key {
@@ -2830,7 +2780,7 @@ define_blocks! {
             level: u8 = [0, 1, 2, 3],
         },
         data Some(level as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "cauldron") },
         variant format!("level={}", level),
     }
@@ -2857,7 +2807,7 @@ define_blocks! {
         offset Some(facing.horizontal_offset() + (if eye { 0 } else { 4 })),
         material Material {
             emitted_light: 1,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "end_portal_frame") },
         variant format!("eye={},facing={}", eye, facing.as_string()),
@@ -2885,7 +2835,7 @@ define_blocks! {
         props {},
         material Material {
             emitted_light: 1,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "dragon_egg") },
         collision vec![Aabb3::new(
@@ -2901,7 +2851,7 @@ define_blocks! {
         props {},
         material Material {
             emitted_light: 15,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "lit_redstone_lamp") },
     }
@@ -2934,7 +2884,7 @@ define_blocks! {
         },
         data Some(variant.data() | (if half == BlockHalf::Top { 0x8 } else { 0x0 })),
         offset None,
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("half={}", half.as_string()),
         collision slab_collision(half),
@@ -2951,7 +2901,7 @@ define_blocks! {
         },
         data Some(facing.horizontal_index() | ((age as usize) << 2)),
         offset Some(facing.horizontal_offset() + ((age as usize) * 4)),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "cocoa") },
         variant format!("age={},facing={}", age, facing.as_string()),
         collision {
@@ -2993,7 +2943,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "sandstone_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -3018,7 +2968,7 @@ define_blocks! {
         offset Some(if waterlogged { 0 } else { 1 } + facing.horizontal_offset() * 2),
         material Material {
             emitted_light: 7,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "ender_chest") },
         variant format!("facing={}", facing.as_string()),
@@ -3128,7 +3078,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "spruce_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -3154,7 +3104,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "birch_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -3180,7 +3130,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "jungle_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -3207,7 +3157,7 @@ define_blocks! {
         props {},
         material Material {
             emitted_light: 15,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "beacon") },
     }
@@ -3232,7 +3182,7 @@ define_blocks! {
                     if north { 0 } else { 1<<4 } +
                     if east { 0 } else { 1<<5 } +
                     if variant == CobblestoneWallVariant::Normal { 0 } else { 1<<6 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", format!("{}_wall", variant.as_string())) },
         update_state (world, pos) => {
             let f = |block| matches!(block, Block::CobblestoneWall{..} |
@@ -3292,7 +3242,7 @@ define_blocks! {
         offsets |protocol_version | {
             if legacy_data != 0 { None } else { contents.offsets(protocol_version) }
         },
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "flower_pot") },
     }
     Carrots {
@@ -3357,7 +3307,7 @@ define_blocks! {
         },
         data if !nodrop { Some(facing.index()) } else { None },
         offset if !nodrop && facing != Direction::Up { Some(facing.horizontal_offset()) } else { None },
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "skull") },
         variant format!("facing={},nodrop={}", facing.as_string(), nodrop),
         collision {
@@ -3383,7 +3333,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(rotation as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "skull") },
         collision {
             let (min_x, min_y, min_z, max_x, max_y, max_z) = (0.25, 0.0, 0.25, 0.75, 0.5, 0.75);
@@ -3405,7 +3355,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(facing.horizontal_offset()),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "skull") },
         collision {
             let (min_x, min_y, min_z, max_x, max_y, max_z) = match facing {
@@ -3428,7 +3378,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(rotation as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "skull") },
         collision {
             let (min_x, min_y, min_z, max_x, max_y, max_z) = (0.25, 0.0, 0.25, 0.75, 0.5, 0.75);
@@ -3450,7 +3400,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(facing.horizontal_offset()),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "zombie_wall_head") },
     }
     ZombieHead {
@@ -3459,7 +3409,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(rotation as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "zombie_head") },
     }
     PlayerWallHead {
@@ -3473,7 +3423,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(facing.horizontal_offset()),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "player_wall_head") },
     }
     PlayerHead {
@@ -3482,7 +3432,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(rotation as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "player_head") },
     }
     CreeperWallHead {
@@ -3496,7 +3446,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(facing.horizontal_offset()),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "creeper_wall_head") },
     }
     CreeperHead {
@@ -3505,7 +3455,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(rotation as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "creeper_head") },
     }
     DragonWallHead {
@@ -3519,7 +3469,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(facing.horizontal_offset()),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "dragon_wall_head") },
     }
     DragonHead {
@@ -3528,7 +3478,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(rotation as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "dragon_head") },
     }
     Anvil {
@@ -3543,7 +3493,7 @@ define_blocks! {
         },
         data Some(facing.horizontal_index() | (match damage { 0 => 0x0, 1 => 0x4, 2 => 0x8, _ => unreachable!() })),
         offset Some(facing.horizontal_offset() + (damage as usize) * 4),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "anvil") },
         variant format!("damage={},facing={}", damage, facing.as_string()),
         collision match facing.axis() {
@@ -3577,7 +3527,7 @@ define_blocks! {
         offset Some(if waterlogged { 0 } else { 1 } +
             type_.offset() * 2 +
             facing.horizontal_offset() * (2 * 3)),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "trapped_chest") },
         variant format!("facing={}", facing.as_string()),
         collision vec![Aabb3::new(
@@ -3660,7 +3610,7 @@ define_blocks! {
         },
         data if inverted { None } else { Some(power as usize) },
         offset Some((power as usize) + if inverted { 0 } else { 16 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "daylight_detector") },
         variant format!("power={}", power),
         collision vec![Aabb3::new(
@@ -3696,7 +3646,7 @@ define_blocks! {
             Direction::East => 4,
             _ => unreachable!(),
         } + if enabled { 0 } else { 5 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "hopper") },
         variant format!("facing={}", facing.as_string()),
     }
@@ -3740,7 +3690,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "quartz_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -3904,7 +3854,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "acacia_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -3930,7 +3880,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "dark_oak_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -3971,7 +3921,7 @@ define_blocks! {
             if open { 0 } else { 1<<2 } +
             if half == BlockHalf::Top { 0 } else { 1<<3 } +
             facing.horizontal_offset() * (1<<4)),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "iron_trapdoor") },
         variant format!("facing={},half={},open={}", facing.as_string(), half.as_string(), open),
         collision trapdoor_collision(facing, half, open),
@@ -4012,7 +3962,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(stair_offset(facing, half, shape, waterlogged).unwrap() + (2 * 5 * 2 * 4) * variant.data()),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", match variant {
             PrismarineVariant::Normal => "prismarine_stairs",
             PrismarineVariant::Brick => "prismarine_brick_stairs",
@@ -4038,7 +3988,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(if waterlogged { 0 } else { 1 } + type_.offset() * 2 + variant.data() * (2 * 3)),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", match variant {
             PrismarineVariant::Normal => "prismarine_slab",
             PrismarineVariant::Brick => "prismarine_brick_slab",
@@ -4086,7 +4036,7 @@ define_blocks! {
             ],
         },
         data Some(color.data()),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", format!("{}_carpet", color.as_string()) ) },
         collision vec![Aabb3::new(
             Point3::new(0.0, 0.0, 0.0),
@@ -4213,7 +4163,7 @@ define_blocks! {
         },
         data Some(power as usize),
         offset None,
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "daylight_detector_inverted") },
         variant format!("power={}", power),
         collision vec![Aabb3::new(
@@ -4252,7 +4202,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "red_sandstone_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -4277,7 +4227,7 @@ define_blocks! {
         },
         data None::<usize>,
         offset Some(if waterlogged { 0 } else { 1 } + type_.offset() * 2 + variant.data() * (2 * 3)),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("type={}", type_.as_string()),
         collision slab_collision(type_),
@@ -4306,7 +4256,7 @@ define_blocks! {
         offsets |protocol_version| {
             variant.offsets(protocol_version).map(|o| if waterlogged { 0 } else { 1 } + type_.offset() * 2 + o * (2 * 3))
         },
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("type={}", type_.as_string()),
         collision slab_collision(type_),
@@ -4331,7 +4281,7 @@ define_blocks! {
         },
         data Some(variant.data() | (if half == BlockHalf::Top { 0x8 } else { 0x0 })),
         offset None,
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("half={}", half.as_string()),
         collision slab_collision(half),
@@ -4369,7 +4319,7 @@ define_blocks! {
         },
         data fence_gate_data(facing, in_wall, open, powered),
         offset fence_gate_offset(facing, in_wall, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "spruce_fence_gate") },
         variant format!("facing={},in_wall={},open={}", facing.as_string(), in_wall, open),
         collision fence_gate_collision(facing, in_wall, open),
@@ -4394,7 +4344,7 @@ define_blocks! {
         },
         data fence_gate_data(facing, in_wall, open, powered),
         offset fence_gate_offset(facing, in_wall, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "birch_fence_gate") },
         variant format!("facing={},in_wall={},open={}", facing.as_string(), in_wall, open),
         collision fence_gate_collision(facing, in_wall, open),
@@ -4419,7 +4369,7 @@ define_blocks! {
         },
         data fence_gate_data(facing, in_wall, open, powered),
         offset fence_gate_offset(facing, in_wall, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "jungle_fence_gate") },
         variant format!("facing={},in_wall={},open={}", facing.as_string(), in_wall, open),
         collision fence_gate_collision(facing, in_wall, open),
@@ -4444,7 +4394,7 @@ define_blocks! {
         },
         data fence_gate_data(facing, in_wall, open, powered),
         offset fence_gate_offset(facing, in_wall, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "dark_oak_fence_gate") },
         variant format!("facing={},in_wall={},open={}", facing.as_string(), in_wall, open),
         collision fence_gate_collision(facing, in_wall, open),
@@ -4469,7 +4419,7 @@ define_blocks! {
         },
         data fence_gate_data(facing, in_wall, open, powered),
         offset fence_gate_offset(facing, in_wall, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "acacia_fence_gate") },
         variant format!("facing={},in_wall={},open={}", facing.as_string(), in_wall, open),
         collision fence_gate_collision(facing, in_wall, open),
@@ -4494,7 +4444,7 @@ define_blocks! {
                     if south { 0 } else { 1<<2 } +
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "spruce_fence") },
         collision fence_collision(north, south, west, east),
         update_state (world, pos) => {
@@ -4523,7 +4473,7 @@ define_blocks! {
                     if south { 0 } else { 1<<2 } +
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "birch_fence") },
         collision fence_collision(north, south, west, east),
         update_state (world, pos) => {
@@ -4552,7 +4502,7 @@ define_blocks! {
                     if south { 0 } else { 1<<2 } +
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "jungle_fence") },
         collision fence_collision(north, south, west, east),
         update_state (world, pos) => {
@@ -4581,7 +4531,7 @@ define_blocks! {
                     if south { 0 } else { 1<<2 } +
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "dark_oak_fence") },
         collision fence_collision(north, south, west, east),
         update_state (world, pos) => {
@@ -4610,7 +4560,7 @@ define_blocks! {
                     if south { 0 } else { 1<<2 } +
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "acacia_fence") },
         collision fence_collision(north, south, west, east),
         update_state (world, pos) => {
@@ -4640,7 +4590,7 @@ define_blocks! {
         },
         data door_data(facing, half, hinge, open, powered),
         offset door_offset(facing, half, hinge, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "spruce_door") },
         variant format!("facing={},half={},hinge={},open={}", facing.as_string(), half.as_string(), hinge.as_string(), open),
         collision door_collision(facing, hinge, open),
@@ -4664,7 +4614,7 @@ define_blocks! {
         },
         data door_data(facing, half, hinge, open, powered),
         offset door_offset(facing, half, hinge, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "birch_door") },
         variant format!("facing={},half={},hinge={},open={}", facing.as_string(), half.as_string(), hinge.as_string(), open),
         collision door_collision(facing, hinge, open),
@@ -4688,7 +4638,7 @@ define_blocks! {
         },
         data door_data(facing, half, hinge, open, powered),
         offset door_offset(facing, half, hinge, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "jungle_door") },
         variant format!("facing={},half={},hinge={},open={}", facing.as_string(), half.as_string(), hinge.as_string(), open),
         collision door_collision(facing, hinge, open),
@@ -4712,7 +4662,7 @@ define_blocks! {
         },
         data door_data(facing, half, hinge, open, powered),
         offset door_offset(facing, half, hinge, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "acacia_door") },
         variant format!("facing={},half={},hinge={},open={}", facing.as_string(), half.as_string(), hinge.as_string(), open),
         collision door_collision(facing, hinge, open),
@@ -4736,7 +4686,7 @@ define_blocks! {
         },
         data door_data(facing, half, hinge, open, powered),
         offset door_offset(facing, half, hinge, open, powered),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "dark_oak_door") },
         variant format!("facing={},half={},hinge={},open={}", facing.as_string(), half.as_string(), hinge.as_string(), open),
         collision door_collision(facing, hinge, open),
@@ -4760,7 +4710,7 @@ define_blocks! {
         offset Some(facing.offset()),
         material Material {
             emitted_light: 14,
-            ..material::NON_SOLID
+            ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "end_rod") },
         variant format!("facing={}", facing.as_string()),
@@ -4798,7 +4748,7 @@ define_blocks! {
                     if north { 0 } else { 1<<3 } +
                     if east { 0 } else { 1<<4 } +
                     if down { 0 } else { 1<<5 }),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "chorus_plant") },
         collision {
             let mut collision = vec![Aabb3::new(
@@ -4873,7 +4823,7 @@ define_blocks! {
             age: u8 = [0, 1, 2, 3, 4, 5],
         },
         data Some(age as usize),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "chorus_flower") },
         variant format!("age={}", age),
     }
@@ -4910,7 +4860,7 @@ define_blocks! {
         },
         data stair_data(facing, half, shape, waterlogged),
         offset stair_offset(facing, half, shape, waterlogged),
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "purpur_stairs") },
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
@@ -4930,7 +4880,7 @@ define_blocks! {
         },
         data if half == BlockHalf::Top { Some(0x8) } else { Some(0) },
         offset None,
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("half={},variant=default", half.as_string()),
         collision slab_collision(half),
@@ -4951,7 +4901,7 @@ define_blocks! {
     }
     GrassPath {
         props {},
-        material material::NON_SOLID,
+        material material::PARTIALLY_SOLID,
         model { ("minecraft", "grass_path") },
         collision vec![Aabb3::new(
             Point3::new(0.0, 0.0, 0.0),
