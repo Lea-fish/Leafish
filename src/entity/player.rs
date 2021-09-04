@@ -161,6 +161,7 @@ impl ecs::System for PlayerRenderer {
         world: &world::World,
         renderer: &mut render::Renderer,
         _: bool,
+        _: bool,
     ) {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
@@ -642,6 +643,7 @@ impl ecs::System for MovementHandler {
         world: &world::World,
         _: &mut render::Renderer,
         focused: bool,
+        dead: bool,
     ) {
         for e in m.find(&self.filter) {
             let movement = m.get_component_mut(e, self.movement).unwrap();
@@ -652,7 +654,7 @@ impl ecs::System for MovementHandler {
             }
             let gamemode = m.get_component(e, self.gamemode).unwrap();
             movement.flying |= gamemode.always_fly();
-            if !focused
+            if (dead || !focused)
                 && (movement.pressed_keys.len() > 1
                     || (!movement.pressed_keys.is_empty()
                         && !movement.is_key_pressed(Actionkey::OpenInv)))

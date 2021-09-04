@@ -86,7 +86,7 @@ state_packets!(
                 field action_id: VarInt =,
             }
             packet ClientStatus_u8 {
-                field action_id: u8=,
+                field action_id: u8 =,
             }
             /// ClientSettings is sent by the client to update its current settings.
             packet ClientSettings {

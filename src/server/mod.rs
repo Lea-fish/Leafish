@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ecs;
 use crate::entity;
 use crate::format;
 use crate::inventory::{InventoryContext, Item, Material};
@@ -21,6 +20,7 @@ use crate::render;
 use crate::render::hud::HudContext;
 use crate::render::Renderer;
 use crate::resources;
+use crate::screen::respawn::Respawn;
 use crate::screen::ScreenSystem;
 use crate::settings::Actionkey;
 use crate::shared::{Axis, Position};
@@ -28,6 +28,7 @@ use crate::types::hash::FNVHash;
 use crate::types::Gamemode;
 use crate::world;
 use crate::world::{block, CPos, LightData, LightUpdate};
+use crate::{ecs, Game};
 use cgmath::prelude::*;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
@@ -81,7 +82,7 @@ impl Default for WorldData {
 pub struct Server {
     uuid: protocol::UUID,
     conn: Arc<RwLock<Option<protocol::Conn>>>,
-    protocol_version: i32,
+    pub protocol_version: i32,
     forge_mods: Vec<forge::ForgeMod>,
     pub disconnect_data: Arc<RwLock<DisconnectData>>,
 
@@ -119,6 +120,9 @@ pub struct Server {
     pub inventory_context: Arc<RwLock<InventoryContext>>,
     fps: RwLock<u32>,
     fps_start: RwLock<u128>,
+    pub dead: RwLock<bool>,
+    just_died: RwLock<bool>,
+    close_death_screen: RwLock<bool>,
 }
 
 #[derive(Debug)]
@@ -396,15 +400,12 @@ impl Server {
                 Ok(pck) => match pck {
                     Packet::KeepAliveClientbound_i64(keep_alive) => {
                         server.on_keep_alive_i64(keep_alive);
-                        debug!("keep alive!");
                     }
                     Packet::KeepAliveClientbound_VarInt(keep_alive) => {
                         server.on_keep_alive_varint(keep_alive);
-                        debug!("keep alive!");
                     }
                     Packet::KeepAliveClientbound_i32(keep_alive) => {
                         server.on_keep_alive_i32(keep_alive);
-                        debug!("keep alive!");
                     }
                     Packet::ChunkData_NoEntities(chunk_data) => {
                         server.on_chunk_data_no_entities(chunk_data);
@@ -462,7 +463,7 @@ impl Server {
                         server.on_sign_update_u16(update_sign);
                     }
                     Packet::UpdateBlockEntity_Data(block_update) => {
-                        server.on_block_entity_update_data(block_update); // TODO: Do this!
+                        server.on_block_entity_update_data(block_update);
                     }
                     Packet::ChunkUnload(chunk_unload) => {
                         server.on_chunk_unload(chunk_unload);
@@ -576,9 +577,7 @@ impl Server {
                         )
                         .unwrap();
                     }
-                    // unknown: 37, 23, 50, 60, 70, 68, 89, 76
                     Packet::UpdateLight_NoTrust(update_light) => {
-                        // 37 (1.15.2)
                         server.world.clone().lighting_cache.clone().write().insert(
                             CPos(update_light.chunk_x.0, update_light.chunk_z.0),
                             LightData {
@@ -587,9 +586,6 @@ impl Server {
                                 sky_light_mask: update_light.sky_light_mask.0,
                             },
                         );
-                        /*server.world.clone().load_light_with_loc(update_light.chunk_x.0, update_light.chunk_z.0,
-                        update_light.block_light_mask.0, true,
-                        update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));*/
                     }
                     Packet::UpdateLight_WithTrust(update_light) => {
                         // TODO: Add specific stuff!
@@ -601,22 +597,19 @@ impl Server {
                                 sky_light_mask: update_light.sky_light_mask.0,
                             },
                         );
-                        /*server.world.clone().load_light_with_loc(update_light.chunk_x.0, update_light.chunk_z.0,
-                        update_light.block_light_mask.0, true,
-                        update_light.sky_light_mask.0, &mut Cursor::new(update_light.light_arrays));*/
                     }
                     Packet::ChangeGameState(game_state) => {
                         server.on_game_state_change(game_state);
                     }
                     Packet::UpdateHealth(update_health) => {
-                        server.hud_context.clone().write().update_health_and_food(
+                        server.on_update_health(
                             update_health.health,
                             update_health.food.0 as u8,
                             update_health.food_saturation as u8,
                         );
                     }
                     Packet::UpdateHealth_u16(update_health) => {
-                        server.hud_context.clone().write().update_health_and_food(
+                        server.on_update_health(
                             update_health.health,
                             update_health.food as u8,
                             update_health.food_saturation as u8,
@@ -928,9 +921,12 @@ impl Server {
             render_list_computer,
             render_list_computer_notify,
             hud_context,
-            inventory_context, // TODO: Get version from protocol version!
+            inventory_context,
             fps: RwLock::new(0),
             fps_start: RwLock::new(0),
+            dead: RwLock::new(false),
+            just_died: RwLock::new(false),
+            close_death_screen: RwLock::new(false),
         }
     }
 
@@ -948,7 +944,7 @@ impl Server {
         return tmp.read().is_some();
     }
 
-    pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, focused: bool) {
+    pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, game: &mut Game) {
         let start = SystemTime::now();
         let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis();
         if *self.fps_start.read() + 1000 < time {
@@ -960,6 +956,10 @@ impl Server {
             *self.fps.write() = 0;
         } else {
             *self.fps.write() += 1;
+        }
+        if *self.close_death_screen.read() {
+            *self.close_death_screen.write() = false;
+            game.screen_sys.pop_screen();
         }
         let version = self.resources.read().version();
         if version != *self.version.read() {
@@ -991,7 +991,7 @@ impl Server {
             renderer.camera.yaw = rotation.yaw;
             renderer.camera.pitch = rotation.pitch;
         }
-        self.entity_tick(renderer, delta, focused);
+        self.entity_tick(renderer, delta, game.focused, *self.dead.read());
 
         *self.tick_timer.write() += delta;
         while *self.tick_timer.read() >= 3.0 && self.is_connected() {
@@ -1011,6 +1011,11 @@ impl Server {
         world.tick(&mut self.entities.clone().write());
 
         if self.player.clone().read().is_some() {
+            if *self.just_died.read() {
+                *self.just_died.write() = false;
+                game.screen_sys.add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
+                game.focused = false;
+            }
             let world = self.world.clone();
             if let Some((pos, bl, _, _)) = target::trace_ray(
                 &world,
@@ -1028,7 +1033,7 @@ impl Server {
         }
     }
 
-    fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64, focused: bool) {
+    fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64, focused: bool, dead: bool) {
         let world_entity = self.entities.clone().read().get_world();
         // Update the game's state for entities to read
         self.entities
@@ -1047,14 +1052,14 @@ impl Server {
                 self.entities
                     .clone()
                     .write()
-                    .tick(&world, renderer, focused);
+                    .tick(&world, renderer, focused, dead);
                 *self.entity_tick_timer.write() -= 3.0;
             }
             let world = self.world.clone();
             self.entities
                 .clone()
                 .write()
-                .render_tick(&world, renderer, focused);
+                .render_tick(&world, renderer, focused, dead);
         }
     }
 
@@ -1643,8 +1648,6 @@ impl Server {
     }
 
     fn respawn(&self, gamemode_u8: u8) {
-        // world.clone().replace(world::World::new(protocol_version));
-        self.world.clone().reset(self.protocol_version);
         let gamemode = Gamemode::from_int((gamemode_u8 & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
@@ -1660,6 +1663,20 @@ impl Server {
                 .get_component_mut(player, self.player_movement)
                 .unwrap()
                 .flying = gamemode.can_fly();
+        }
+        if *self.dead.read() {
+            *self.close_death_screen.write() = true;
+            *self.dead.write() = false;
+            *self.just_died.write() = false;
+            self.hud_context
+                .clone()
+                .write()
+                .update_health_and_food(20.0, 20, 0); // TODO: Verify this!
+            self.hud_context.clone().write().update_slot_index(0);
+            self.hud_context.clone().write().update_exp(0.0, 0);
+            self.hud_context.clone().write().update_absorbtion(0.0);
+            self.hud_context.clone().write().update_armor(0);
+            // self.hud_context.clone().write().update_breath(-1); // TODO: Fix this!
         }
     }
 
@@ -1682,7 +1699,6 @@ impl Server {
     }
 
     fn on_game_state_change(&self, game_state: packet::play::clientbound::ChangeGameState) {
-        debug!("game state change!");
         if game_state.reason == 3 {
             if let Some(player) = *self.player.write() {
                 let gamemode = Gamemode::from_int(game_state.value as i32);
@@ -2738,6 +2754,17 @@ impl Server {
                 block,
             );*/
             self.on_block_change(Position::new(x, y, z), id as i32);
+        }
+    }
+
+    pub fn on_update_health(&self, health: f32, food: u8, saturation: u8) {
+        self.hud_context
+            .clone()
+            .write()
+            .update_health_and_food(health, food, saturation);
+        if health <= 0.0 && !*self.dead.read() {
+            *self.dead.write() = true;
+            *self.just_died.write() = true;
         }
     }
 }
