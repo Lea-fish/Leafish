@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::debug;
 use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use log::debug;
 use parking_lot::RwLock;
-use rand::rngs::ThreadRng;
 use rand::Rng;
+use rand::rngs::ThreadRng;
 
-use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
+use crate::inventory::player_inventory::PlayerInventory;
 use crate::render;
 use crate::render::Renderer;
 use crate::screen::Screen;
@@ -721,7 +721,9 @@ impl Hud {
     fn render_slots_items(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         for i in 0..9 {
-            if let Some(player_inventory) = self.hud_context.clone().read().player_inventory.as_ref() {
+            if let Some(player_inventory) =
+                self.hud_context.clone().read().player_inventory.as_ref()
+            {
                 let player_inventory = player_inventory.clone();
                 let player_inventory = player_inventory.read();
                 let item = player_inventory.get_item(36 + i as i16);
