@@ -98,7 +98,7 @@ impl Game {
     pub fn connect_to(
         &mut self,
         address: &str,
-        hud_context: Arc<RwLock<HudContext>>
+        hud_context: Arc<RwLock<HudContext>>,
     ) -> Result<(), Error> {
         let (protocol_version, forge_mods, fml_network_version) =
             match protocol::Conn::new(address, self.default_protocol_version)
@@ -165,9 +165,7 @@ impl Game {
                     }
                 }
             }
-            Err(_) => {
-                Err(Error::Err("Unknown".to_string()))
-            }
+            Err(_) => Err(Error::Err("Unknown".to_string())),
         }
     }
 

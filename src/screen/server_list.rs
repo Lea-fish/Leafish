@@ -159,7 +159,10 @@ impl ServerList {
                     let result = game.connect_to(&address, hud_context.clone());
                     game.screen_sys.pop_screen();
                     if let Err(error) = result {
-                        game.screen_sys.add_screen(Box::new(ServerList::new(Some(Component::Text(TextComponent::new(&*error.to_string()))), game.vars.get(settings::BACKGROUND_IMAGE).clone())));
+                        game.screen_sys.add_screen(Box::new(ServerList::new(
+                            Some(Component::Text(TextComponent::new(&*error.to_string()))),
+                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                        )));
                     } else {
                         game.screen_sys.add_screen(Box::new(Hud::new(hud_context)));
                         game.focused = true;
