@@ -48,7 +48,7 @@ pub mod world;
 
 use crate::protocol::mojang;
 use crate::render::hud::HudContext;
-use leafish_protocol::protocol::Error;
+use leafish_protocol::protocol::{Error, Version};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use std::cell::RefCell;
@@ -95,7 +95,11 @@ pub struct Game {
 }
 
 impl Game {
-    pub fn connect_to(&mut self, address: &str, hud_context: Arc<RwLock<HudContext>>) {
+    pub fn connect_to(
+        &mut self,
+        address: &str,
+        hud_context: Arc<RwLock<HudContext>>,
+    ) -> Result<(), Error> {
         let (protocol_version, forge_mods, fml_network_version) =
             match protocol::Conn::new(address, self.default_protocol_version)
                 .and_then(|conn| conn.do_status())
@@ -119,9 +123,12 @@ impl Game {
                     (self.default_protocol_version, vec![], None)
                 }
             };
-        debug!("connecting...?!?!");
-        // let (tx, rx) = mpsc::channel();
-        // self.connect_reply = Some(rx);
+        if !Version::from_id(protocol_version as u32).is_supported() {
+            return Err(Error::Err(format!(
+                "The server's version isn't supported!\n(protocol version: {})",
+                protocol_version
+            )));
+        }
         let address = address.to_owned();
         let resources = self.resource_manager.clone();
         let profile = mojang::Profile {
@@ -142,18 +149,24 @@ impl Game {
                 hud_context.clone(),
             )
         })
-        .join()
-        .unwrap();
+        .join();
         match result {
-            Ok(srv) => {
-                self.server = Some(srv);
+            Ok(result) => {
+                match result {
+                    Ok(srv) => {
+                        self.server = Some(srv);
+                        Ok(())
+                    }
+                    Err(err) => {
+                        let str = err.to_string();
+                        self.connect_error = Some(err);
+                        // self.server.disconnect_reason = Some(Component::from_string(&*err.to_string()));
+                        Err(Error::Err(str))
+                    }
+                }
             }
-            Err(err) => {
-                self.connect_error = Some(err);
-                // self.server.disconnect_reason = Some(Component::from_string(&*err.to_string()));
-            }
+            Err(_) => Err(Error::Err("Unknown".to_string())),
         }
-        debug!("after connect!");
     }
 
     pub fn tick(&mut self /*, delta: f64*/) {
