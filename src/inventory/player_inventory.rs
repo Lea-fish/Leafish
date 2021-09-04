@@ -2,11 +2,11 @@ use crate::inventory::{Inventory, InventoryType, Item, Material, Slot};
 use crate::render::hud::{Hud, HudContext};
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
-use crate::server::Version;
 use crate::ui;
 use crate::ui::{Container, HAttach, VAttach};
 use std::sync::Arc;
 
+use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 
 pub struct PlayerInventory {
@@ -328,7 +328,7 @@ impl Inventory for PlayerInventory {
             for slot in self.slots.iter() {
                 if slot.item.is_some() {
                     inventory_window.draw_item(
-                        &slot.item.as_ref().unwrap(),
+                        slot.item.as_ref().unwrap(),
                         slot.x,
                         slot.y,
                         1,

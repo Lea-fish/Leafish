@@ -4,9 +4,9 @@ use crate::inventory::player_inventory::PlayerInventory;
 use crate::render::hud::HudContext;
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
-use crate::server::Version;
 use crate::ui::Container;
 use leafish_protocol::item::Stack;
+use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 use std::sync::Arc;
 

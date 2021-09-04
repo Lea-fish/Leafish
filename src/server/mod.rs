@@ -37,7 +37,7 @@ use leafish_protocol::protocol::packet::play::serverbound::{
     ClientSettings, ClientSettings_u8_Handsfree,
 };
 use leafish_protocol::protocol::packet::Packet;
-use leafish_protocol::protocol::Conn;
+use leafish_protocol::protocol::{Conn, Version};
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -53,45 +53,6 @@ use std::time::{SystemTime, UNIX_EPOCH};
 pub mod plugin_messages;
 mod sun;
 pub mod target;
-
-/// A list of all supported versions
-#[derive(PartialOrd, PartialEq, Debug)]
-pub enum Version {
-    Old,
-    V1_7,
-    V1_8,
-    V1_9,
-    V1_10,
-    V1_11,
-    V1_12,
-    V1_13,
-    V1_14,
-    V1_15,
-    V1_16,
-    New,
-}
-
-impl Version {
-    const NEWEST: Version = Version::V1_16;
-    /// This is only the newest *supported*
-
-    pub fn from_id(protocol_version: u32) -> Version {
-        match protocol_version {
-            0..=4 => Version::Old,
-            5 => Version::V1_7,
-            47 => Version::V1_8,
-            107..=110 => Version::V1_9,
-            210 => Version::V1_10,
-            315..=316 => Version::V1_11,
-            335..=340 => Version::V1_12,
-            393..=404 => Version::V1_13,
-            477..=498 => Version::V1_14,
-            573..=578 => Version::V1_15,
-            735..=754 => Version::V1_16,
-            _ => Version::NEWEST,
-        }
-    }
-}
 
 #[derive(Default)]
 pub struct DisconnectData {
@@ -2403,8 +2364,7 @@ impl Server {
                                 continue;
                             }
                         };
-                        let skin_blob: serde_json::Value = match serde_json::from_slice(&skin_blob)
-                        {
+                        let skin_blob: serde_json::Value = match serde_json::from_slice(skin_blob) {
                             Ok(val) => val,
                             Err(err) => {
                                 error!("Failed to parse skin blob, {:?}", err);
