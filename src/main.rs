@@ -48,6 +48,7 @@ pub mod world;
 
 use crate::protocol::mojang;
 use crate::render::hud::HudContext;
+use leafish_protocol::format::{Component, TextComponent};
 use leafish_protocol::protocol::{Error, Version};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -167,70 +168,6 @@ impl Game {
             }
             Err(_) => Err(Error::Err("Unknown".to_string())),
         }
-    }
-
-    pub fn tick(&mut self) {
-        if self.server.is_some() {
-            if let Some(disconnect_reason) = self
-                .server
-                .as_ref()
-                .unwrap()
-                .disconnect_data
-                .clone()
-                .write()
-                .disconnect_reason
-                .take()
-            {
-                self.server = None;
-                self.screen_sys
-                    .replace_screen(Box::new(screen::ServerList::new(
-                        Some(disconnect_reason),
-                        self.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                    )));
-                self.renderer.clone().write().reset();
-            }
-        }
-
-        /* // Removed dummy server and thus no camera is needed anymore!
-        if !self.server.is_connected() {
-            self.renderer.camera.yaw += 0.005 * delta;
-            if self.renderer.camera.yaw > ::std::f64::consts::PI * 2.0 {
-                self.renderer.camera.yaw = 0.0;
-            }
-            self.focused = false;
-        }*/
-
-        /*let mut clear_reply = false;
-        if let Some(ref recv) = self.connect_reply {
-            if let Ok(server) = recv.try_recv() { // TODO: Add sender!
-                clear_reply = true;
-                match server {
-                    Ok(val) => {
-                        self.screen_sys.pop_screen();
-                        self.focused = true;
-                        self.server.remove(&mut self.renderer);
-                        self.server = val;
-                        debug!("focused!");
-                    }
-                    Err(err) => {
-                        debug!("trying to disconnect!");
-                        let msg = match err {
-                            protocol::Error::Disconnect(val) => val,
-                            err => {
-                                let mut msg = format::TextComponent::new(&format!("{}", err));
-                                msg.modifier.color = Some(format::Color::Red);
-                                format::Component::Text(msg)
-                            }
-                        };
-                        self.screen_sys
-                            .replace_screen(Box::new(screen::ServerList::new(Some(msg))));
-                    }
-                }
-            }
-        }
-        if clear_reply {
-            self.connect_reply = None;
-        }*/
     }
 }
 
@@ -472,8 +409,31 @@ fn tick_all(
 ) {
     if game.server.is_some() {
         if !game.server.as_ref().unwrap().is_connected() {
+            let disconnect_reason = if let Some(disconnect_reason) = game
+                .server
+                .as_ref()
+                .unwrap()
+                .disconnect_data
+                .clone()
+                .write()
+                .disconnect_reason
+                .take()
+            {
+                disconnect_reason
+            } else {
+                Component::Text(TextComponent::new("Disconnected"))
+            };
+            while game.screen_sys.is_current_closable() {
+                game.screen_sys.pop_screen();
+            }
+            game.screen_sys
+                .replace_screen(Box::new(screen::ServerList::new(
+                    Some(disconnect_reason),
+                    game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                )));
             game.server = None;
             game.renderer.clone().write().reset();
+            game.focused = false;
         }
     } else {
         game.chunk_builder.reset();
@@ -509,7 +469,6 @@ fn tick_all(
     }
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
-    game.tick();
     if game.server.is_some() {
         game.server
             .as_ref()

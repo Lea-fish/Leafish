@@ -700,7 +700,23 @@ impl Server {
                     }
                 },
                 Err(err) => {
-                    panic!("An error occurred while reading a packet: {}", err);
+                    if server
+                        .disconnect_data
+                        .clone()
+                        .read()
+                        .disconnect_reason
+                        .is_none()
+                    {
+                        server
+                            .disconnect_data
+                            .clone()
+                            .write()
+                            .disconnect_reason
+                            .replace(Component::Text(TextComponent::new(&*format!(
+                                "An error occurred while reading a packet: {}",
+                                err
+                            ))));
+                    }
                 }
             }
         });
@@ -1023,6 +1039,9 @@ impl Server {
         if self.player.clone().read().is_some() {
             if *self.just_died.read() {
                 *self.just_died.write() = false;
+                while game.screen_sys.is_current_closable() {
+                    game.screen_sys.pop_screen();
+                }
                 game.screen_sys.add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
                 game.focused = false;
             }
