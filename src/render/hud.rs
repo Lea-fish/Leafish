@@ -69,7 +69,7 @@ pub struct HudContext {
     pub dirty_slots: bool,
     slot_index: u8,
     dirty_slot_index: bool,
-    game_mode: GameMode, // TODO: Update this!
+    game_mode: GameMode,
     dirty_game_mode: bool,
 }
 
@@ -348,13 +348,13 @@ impl Screen for Hud {
             .clone()
             .read()
             .hotbar_index;
-        let new_slot = if y == 1.0 {
+        let new_slot = if y == -1.0 {
             if curr_slot == 8 {
                 0
             } else {
                 curr_slot + 1
             }
-        } else if y == -1.0 {
+        } else if y == 1.0 {
             if curr_slot == 0 {
                 8
             } else {

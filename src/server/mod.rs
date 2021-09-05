@@ -1594,6 +1594,7 @@ impl Server {
                 .unwrap();
             model.set_skin(info.skin_url.clone());
         }
+        self.hud_context.clone().write().update_game_mode(gamemode);
         *self
             .entities
             .clone()
@@ -1661,6 +1662,7 @@ impl Server {
         let gamemode = GameMode::from_int((gamemode_u8 & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
+            self.hud_context.clone().write().update_game_mode(gamemode);
             *self
                 .entities
                 .clone()
@@ -1712,6 +1714,7 @@ impl Server {
         if game_state.reason == 3 {
             if let Some(player) = *self.player.write() {
                 let gamemode = GameMode::from_int(game_state.value as i32);
+                self.hud_context.clone().write().update_game_mode(gamemode);
                 *self
                     .entities
                     .clone()
