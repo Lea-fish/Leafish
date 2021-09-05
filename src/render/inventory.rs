@@ -90,7 +90,7 @@ impl InventoryWindow {
     ) {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
-            .texture_coords((0.0 / 16.0, 0.0 / 16.0, 1.0, 1.0))
+            .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)

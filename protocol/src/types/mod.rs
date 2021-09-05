@@ -20,33 +20,33 @@ pub mod hash;
 pub mod nibble;
 
 #[derive(Clone, Copy, Debug)]
-pub enum Gamemode {
+pub enum GameMode {
     Survival = 0,
     Creative = 1,
     Adventure = 2,
     Spectator = 3,
 }
 
-impl Gamemode {
-    pub fn from_int(val: i32) -> Gamemode {
+impl GameMode {
+    pub fn from_int(val: i32) -> GameMode {
         match val {
-            3 => Gamemode::Spectator,
-            2 => Gamemode::Adventure,
-            1 => Gamemode::Creative,
-            0 => Gamemode::Survival,
-            _ => Gamemode::Survival,
+            3 => GameMode::Spectator,
+            2 => GameMode::Adventure,
+            1 => GameMode::Creative,
+            0 => GameMode::Survival,
+            _ => GameMode::Survival,
         }
     }
 
     pub fn can_fly(&self) -> bool {
-        matches!(*self, Gamemode::Creative | Gamemode::Spectator)
+        matches!(*self, GameMode::Creative | GameMode::Spectator)
     }
 
     pub fn always_fly(&self) -> bool {
-        matches!(*self, Gamemode::Spectator)
+        matches!(*self, GameMode::Spectator)
     }
 
     pub fn noclip(&self) -> bool {
-        matches!(*self, Gamemode::Spectator)
+        matches!(*self, GameMode::Spectator)
     }
 }

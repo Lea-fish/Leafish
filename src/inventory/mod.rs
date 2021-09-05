@@ -80,6 +80,7 @@ impl Slot {
 
 pub struct InventoryContext {
     pub cursor: Option<Item>,
+    pub hotbar_index: u8,
     pub inventory: Option<Arc<RwLock<dyn Inventory + Send + Sync>>>,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
 }
@@ -92,6 +93,7 @@ impl InventoryContext {
     ) -> Self {
         InventoryContext {
             cursor: None,
+            hotbar_index: 0,
             inventory: None,
             player_inventory: Arc::new(RwLock::new(PlayerInventory::new(
                 version,
