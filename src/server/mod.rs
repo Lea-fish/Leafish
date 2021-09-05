@@ -25,7 +25,7 @@ use crate::screen::ScreenSystem;
 use crate::settings::Actionkey;
 use crate::shared::{Axis, Position};
 use crate::types::hash::FNVHash;
-use crate::types::Gamemode;
+use crate::types::GameMode;
 use crate::world;
 use crate::world::{block, CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
@@ -100,7 +100,7 @@ pub struct Server {
     position: ecs::Key<entity::Position>,
     target_position: ecs::Key<entity::TargetPosition>,
     velocity: ecs::Key<entity::Velocity>,
-    gamemode: ecs::Key<Gamemode>,
+    gamemode: ecs::Key<GameMode>,
     pub rotation: ecs::Key<entity::Rotation>,
     target_rotation: ecs::Key<entity::TargetRotation>,
     //
@@ -133,7 +133,7 @@ pub struct PlayerInfo {
 
     display_name: Option<format::Component>,
     ping: i32,
-    gamemode: Gamemode,
+    gamemode: GameMode,
 }
 
 impl Server {
@@ -385,6 +385,7 @@ impl Server {
             hud_context,
             &renderer.read(),
         ));
+        server.clone().hud_context.clone().write().server = Some(server.clone());
 
         let actual_server = server.clone();
         inner_server.replace(actual_server);
@@ -648,6 +649,7 @@ impl Server {
                     }
                     Packet::SetCurrentHotbarSlot(set_slot) => {
                         if set_slot.slot <= 8 {
+                            server.inventory_context.clone().write().hotbar_index = set_slot.slot;
                             server
                                 .hud_context
                                 .clone()
@@ -662,15 +664,23 @@ impl Server {
                     }
                     Packet::WindowSetSlot(set_slot) => {
                         let inventory = server.inventory_context.clone();
-                        let inventory = inventory.write();
-                        let inventory = if let Some(inventory) = inventory.inventory.as_ref() {
+                        let mut top_inventory = inventory.write();
+                        let inventory = if let Some(inventory) = top_inventory.inventory.as_ref() {
                             inventory.clone()
                         } else {
-                            inventory.player_inventory.clone()
+                            top_inventory.player_inventory.clone()
                         };
                         let curr_slots = inventory.clone().read().size();
                         if set_slot.slot < 0 || set_slot.slot >= curr_slots {
-                            warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
+                            if set_slot.slot == -1 {
+                                let item = set_slot.item.map(|stack| Item {
+                                    stack,
+                                    material: Material::Apple, // TODO: map stack.id to material!
+                                });
+                                top_inventory.cursor = item; // TODO: Set to HUD and make it dirty!
+                            } else {
+                                warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
+                            }
                         } else {
                             debug!(
                                 "set item to {}, {}, {}",
@@ -1573,7 +1583,7 @@ impl Server {
     }
 
     fn on_game_join(&self, gamemode: u8, entity_id: i32) {
-        let gamemode = Gamemode::from_int((gamemode & 0x7) as i32);
+        let gamemode = GameMode::from_int((gamemode & 0x7) as i32);
         let player = entity::player::create_local(&mut self.entities.clone().write());
         if let Some(info) = self.players.clone().read().get(&self.uuid) {
             let model = self
@@ -1648,7 +1658,7 @@ impl Server {
     }
 
     fn respawn(&self, gamemode_u8: u8) {
-        let gamemode = Gamemode::from_int((gamemode_u8 & 0x7) as i32);
+        let gamemode = GameMode::from_int((gamemode_u8 & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
             *self
@@ -1701,7 +1711,7 @@ impl Server {
     fn on_game_state_change(&self, game_state: packet::play::clientbound::ChangeGameState) {
         if game_state.reason == 3 {
             if let Some(player) = *self.player.write() {
-                let gamemode = Gamemode::from_int(game_state.value as i32);
+                let gamemode = GameMode::from_int(game_state.value as i32);
                 *self
                     .entities
                     .clone()
@@ -2022,7 +2032,7 @@ impl Server {
 
                 display_name: None,
                 ping: 0, // TODO: don't overwrite from PlayerInfo_String
-                gamemode: Gamemode::from_int(0),
+                gamemode: GameMode::from_int(0),
             });
 
         self.on_player_spawn(
@@ -2355,13 +2365,13 @@ impl Server {
 
                         display_name: display.clone(),
                         ping: ping.0,
-                        gamemode: Gamemode::from_int(gamemode.0),
+                        gamemode: GameMode::from_int(gamemode.0),
                     });
                     // Re-set the props of the player in case of dodgy server implementations
                     info.name = name;
                     info.display_name = display;
                     info.ping = ping.0;
-                    info.gamemode = Gamemode::from_int(gamemode.0);
+                    info.gamemode = GameMode::from_int(gamemode.0);
                     for prop in properties {
                         if prop.name != "textures" {
                             continue;
@@ -2414,7 +2424,7 @@ impl Server {
                 }
                 UpdateGamemode { uuid, gamemode } => {
                     if let Some(info) = self.players.clone().write().get_mut(&uuid) {
-                        info.gamemode = Gamemode::from_int(gamemode.0);
+                        info.gamemode = GameMode::from_int(gamemode.0);
                     }
                 }
                 UpdateLatency { uuid, ping } => {

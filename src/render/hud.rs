@@ -26,8 +26,11 @@ use crate::inventory::{Inventory, Item};
 use crate::render;
 use crate::render::Renderer;
 use crate::screen::Screen;
+use crate::server::Server;
 use crate::ui;
 use crate::ui::{Container, HAttach, ImageRef, TextRef, VAttach};
+use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
+use leafish_protocol::types::GameMode;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
@@ -38,33 +41,36 @@ pub struct HudContext {
     pub debug: bool,
     fps: u32,
     dirty_debug: bool,
-    hardcore: bool,
-    wither: bool,
-    poison: bool,
-    regen: bool,
-    absorbtion: f32,
+    hardcore: bool,  // TODO: Update this!
+    wither: bool,    // TODO: Update this!
+    poison: bool,    // TODO: Update this!
+    regen: bool,     // TODO: Update this!
+    absorbtion: f32, // TODO: Update this!
     last_health_update: u128,
     last_health: f32,
     health: f32,
-    max_health: f32,
+    max_health: f32, // TODO: Update this!
     dirty_health: bool,
-    hunger: bool,
+    hunger: bool, // TODO: Update this!
     saturation: u8,
     last_food_update: u128,
     last_food: u8,
     food: u8,
     dirty_food: bool,
-    armor: u8,
+    armor: u8, // TODO: Update this!
     dirty_armor: bool,
     exp: f32,
     exp_level: i32,
     dirty_exp: bool,
-    breath: i16,
+    breath: i16, // TODO: Update this!
     dirty_breath: bool,
     pub player_inventory: Option<Arc<RwLock<PlayerInventory>>>,
+    pub server: Option<Arc<Server>>,
     pub dirty_slots: bool,
     slot_index: u8,
     dirty_slot_index: bool,
+    game_mode: GameMode, // TODO: Update this!
+    dirty_game_mode: bool,
 }
 
 impl Default for render::hud::HudContext {
@@ -104,9 +110,12 @@ impl HudContext {
             // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble -- -1 is causing crashes when attempting to join servers!
             dirty_breath: false,
             player_inventory: None,
+            server: None,
             dirty_slots: false,
             slot_index: 0,
             dirty_slot_index: false,
+            game_mode: GameMode::Survival,
+            dirty_game_mode: false,
         }
     }
 
@@ -166,6 +175,11 @@ impl HudContext {
             self.dirty_debug = true;
         }
     }
+
+    pub fn update_game_mode(&mut self, game_mode: GameMode) {
+        self.game_mode = game_mode;
+        self.dirty_game_mode = true;
+    }
 }
 
 pub struct Hud {
@@ -209,15 +223,18 @@ impl Hud {
 impl Screen for Hud {
     fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         if self.hud_context.clone().read().enabled {
-            self.render_health(renderer, ui_container);
-            self.render_armor(renderer, ui_container);
             self.render_slots(renderer, ui_container);
-            self.render_exp(renderer, ui_container);
-            self.render_crosshair(renderer, ui_container);
-            self.render_food(renderer, ui_container);
-            self.render_breath(renderer, ui_container);
             self.render_slots_items(renderer, ui_container);
             self.render_slot_index(renderer, ui_container);
+            self.render_crosshair(renderer, ui_container);
+            let game_mode = self.hud_context.clone().read().game_mode.clone();
+            if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
+                self.render_health(renderer, ui_container);
+                self.render_armor(renderer, ui_container);
+                self.render_exp(renderer, ui_container);
+                self.render_food(renderer, ui_container);
+                self.render_breath(renderer, ui_container);
+            }
         }
     }
 
@@ -259,26 +276,48 @@ impl Screen for Hud {
             self.debug_elements.clear();
             self.last_debug_enabled = false;
         }
-        if self.hud_context.clone().read().dirty_health {
-            self.health_elements.clear();
-            self.render_health(renderer, ui_container);
+        let game_mode = self.hud_context.clone().read().game_mode.clone();
+        if self.hud_context.clone().read().dirty_game_mode {
+            self.hud_context.clone().write().dirty_game_mode = false;
+            if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
+                if self.health_elements.is_empty() {
+                    self.render_health(renderer, ui_container);
+                    self.render_armor(renderer, ui_container);
+                    self.render_exp(renderer, ui_container);
+                    self.render_food(renderer, ui_container);
+                    self.render_breath(renderer, ui_container);
+                }
+            } else {
+                self.health_elements.clear();
+                self.armor_elements.clear();
+                self.food_elements.clear();
+                self.exp_elements.clear();
+                self.exp_text_elements.clear();
+                self.breath_elements.clear();
+            }
         }
-        if self.hud_context.clone().read().dirty_armor {
-            self.armor_elements.clear();
-            self.render_armor(renderer, ui_container);
-        }
-        if self.hud_context.clone().read().dirty_food {
-            self.food_elements.clear();
-            self.render_food(renderer, ui_container);
-        }
-        if self.hud_context.clone().read().dirty_exp {
-            self.exp_elements.clear();
-            self.exp_text_elements.clear();
-            self.render_exp(renderer, ui_container);
-        }
-        if self.hud_context.clone().read().dirty_breath {
-            self.breath_elements.clear();
-            self.render_breath(renderer, ui_container);
+        if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
+            if self.hud_context.clone().read().dirty_health {
+                self.health_elements.clear();
+                self.render_health(renderer, ui_container);
+            }
+            if self.hud_context.clone().read().dirty_armor {
+                self.armor_elements.clear();
+                self.render_armor(renderer, ui_container);
+            }
+            if self.hud_context.clone().read().dirty_food {
+                self.food_elements.clear();
+                self.render_food(renderer, ui_container);
+            }
+            if self.hud_context.clone().read().dirty_exp {
+                self.exp_elements.clear();
+                self.exp_text_elements.clear();
+                self.render_exp(renderer, ui_container);
+            }
+            if self.hud_context.clone().read().dirty_breath {
+                self.breath_elements.clear();
+                self.render_breath(renderer, ui_container);
+            }
         }
         if self.hud_context.clone().read().dirty_slots {
             self.slot_elements.clear();
@@ -293,6 +332,60 @@ impl Screen for Hud {
             self.render_debug(renderer, ui_container);
         }
         None
+    }
+
+    fn on_scroll(&mut self, _: f64, y: f64) {
+        // TODO: Is there a threshold we have to implement?
+        let curr_slot = self
+            .hud_context
+            .clone()
+            .read()
+            .server
+            .as_ref()
+            .unwrap()
+            .clone()
+            .inventory_context
+            .clone()
+            .read()
+            .hotbar_index;
+        let new_slot = if y == 1.0 {
+            if curr_slot == 8 {
+                0
+            } else {
+                curr_slot + 1
+            }
+        } else if y == -1.0 {
+            if curr_slot == 0 {
+                8
+            } else {
+                curr_slot - 1
+            }
+        } else {
+            curr_slot
+        };
+        self.hud_context
+            .clone()
+            .read()
+            .server
+            .as_ref()
+            .unwrap()
+            .clone()
+            .write_packet(HeldItemChange {
+                slot: new_slot as i16,
+            });
+        self.hud_context
+            .clone()
+            .read()
+            .server
+            .as_ref()
+            .unwrap()
+            .clone()
+            .inventory_context
+            .clone()
+            .write()
+            .hotbar_index = new_slot;
+        self.hud_context.clone().write().slot_index = new_slot;
+        self.hud_context.clone().write().dirty_slot_index = true;
     }
 
     fn on_resize(

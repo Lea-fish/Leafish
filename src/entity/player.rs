@@ -8,7 +8,7 @@ use crate::render::model::{self, FormatState};
 use crate::settings::Actionkey;
 use crate::shared::Position as BPosition;
 use crate::types::hash::FNVHash;
-use crate::types::Gamemode;
+use crate::types::GameMode;
 use crate::world;
 use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::{Aabb, Aabb3};
@@ -31,7 +31,7 @@ pub fn create_local(m: &mut ecs::Manager) -> ecs::Entity {
     m.add_component_direct(entity, tpos);
     m.add_component_direct(entity, Rotation::new(0.0, 0.0));
     m.add_component_direct(entity, Velocity::new(0.0, 0.0, 0.0));
-    m.add_component_direct(entity, Gamemode::Survival);
+    m.add_component_direct(entity, GameMode::Survival);
     m.add_component_direct(entity, Gravity::new());
     m.add_component_direct(entity, PlayerMovement::new());
     m.add_component_direct(
@@ -600,7 +600,7 @@ struct MovementHandler {
     filter: ecs::Filter,
     movement: ecs::Key<PlayerMovement>,
     gravity: ecs::Key<Gravity>,
-    gamemode: ecs::Key<Gamemode>,
+    gamemode: ecs::Key<GameMode>,
     position: ecs::Key<TargetPosition>,
     velocity: ecs::Key<Velocity>,
     bounds: ecs::Key<Bounds>,

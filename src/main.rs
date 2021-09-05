@@ -169,7 +169,7 @@ impl Game {
         }
     }
 
-    pub fn tick(&mut self /*, delta: f64*/) {
+    pub fn tick(&mut self) {
         if self.server.is_some() {
             if let Some(disconnect_reason) = self
                 .server
@@ -372,7 +372,7 @@ fn main() {
             .unwrap_or_else(|| "".to_string()),
     );
     let game = Game {
-        server: None, // Arc::from(server::Server::dummy_server(resource_manager.clone())),
+        server: None,
         focused: false,
         renderer: Arc::new(RwLock::new(renderer)),
         screen_sys,
