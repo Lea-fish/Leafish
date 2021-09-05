@@ -385,7 +385,7 @@ impl Server {
             hud_context,
             &renderer.read(),
         ));
-        server.clone().hud_context.clone().write().server = Some(server.clone());
+        server.hud_context.clone().write().server = Some(server.clone());
 
         let actual_server = server.clone();
         inner_server.replace(actual_server);

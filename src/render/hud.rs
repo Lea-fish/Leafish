@@ -227,7 +227,7 @@ impl Screen for Hud {
             self.render_slots_items(renderer, ui_container);
             self.render_slot_index(renderer, ui_container);
             self.render_crosshair(renderer, ui_container);
-            let game_mode = self.hud_context.clone().read().game_mode.clone();
+            let game_mode = self.hud_context.clone().read().game_mode;
             if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
                 self.render_health(renderer, ui_container);
                 self.render_armor(renderer, ui_container);
@@ -276,7 +276,7 @@ impl Screen for Hud {
             self.debug_elements.clear();
             self.last_debug_enabled = false;
         }
-        let game_mode = self.hud_context.clone().read().game_mode.clone();
+        let game_mode = self.hud_context.clone().read().game_mode;
         if self.hud_context.clone().read().dirty_game_mode {
             self.hud_context.clone().write().dirty_game_mode = false;
             if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
