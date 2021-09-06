@@ -40,7 +40,7 @@ impl ecs::System for ApplyVelocity {
     ) {
         for e in m.find(&self.filter) {
             if m.get_component(e, self.movement).is_some() {
-                // Player's handle their own physics
+                // Players handle their own physics
                 continue;
             }
             let pos = m.get_component_mut(e, self.position).unwrap();
