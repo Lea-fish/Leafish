@@ -109,7 +109,7 @@ Rust stable version 1.53.0 or newer is required.
 **Debian/Ubuntu**
 
 ```sh
-sudo apt-get install cargo libssl-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-composite0-dev
+sudo apt-get install cargo libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
 ```
 
 **Alpine Linux**
