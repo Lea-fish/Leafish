@@ -1,0 +1,26 @@
+name: Packaging
+on:
+  push:
+    branches: [master]
+  pull_request:
+jobs:
+  flatpak:
+    name: "Flatpak"
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:freedesktop-20.08
+      options: --privileged
+    strategy:
+      matrix:
+        arch: [x86_64, aarch64]
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: true
+    - uses: bilelmoussaoui/flatpak-github-actions/flatpak-builder@v4
+      with:
+        bundle: leafish.flatpak
+        manifest-path: packaging/flatpak/com.github.terrarier2111.Leafish.yaml
+        cache-key: flatpak-builder-${{ github.sha }}
+

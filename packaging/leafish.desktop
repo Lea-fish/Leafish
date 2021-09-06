@@ -1,0 +1,9 @@
+[Desktop Entry]
+Categories=Game
+Comment=Multi-version Minecraft-compatible client written in Rust
+Exec=leafish
+Name=Leafish
+Icon=leafish
+Terminal=false
+Type=Application
+Version=1.0
