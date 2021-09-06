@@ -674,8 +674,8 @@ impl Server {
                         if set_slot.slot < 0 || set_slot.slot >= curr_slots {
                             if set_slot.slot == -1 {
                                 let item = set_slot.item.map(|stack| Item {
+                                    material: Material::from(stack.id), // TODO: map stack.id to material!
                                     stack,
-                                    material: Material::Apple, // TODO: map stack.id to material!
                                 });
                                 top_inventory.cursor = item; // TODO: Set to HUD and make it dirty!
                             } else {
@@ -689,8 +689,8 @@ impl Server {
                                 set_slot.item.as_ref().map_or(0, |s| s.id)
                             );
                             let item = set_slot.item.map(|stack| Item {
+                                material: Material::from(stack.id), // TODO: map stack.id to material!
                                 stack,
-                                material: Material::Apple, // TODO: map stack.id to material!
                             });
                             inventory.clone().write().set_item(set_slot.slot, item);
                         }
