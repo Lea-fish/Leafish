@@ -1,0 +1,38 @@
+app-id: com.github.terrarier2111.Leafish
+runtime: org.freedesktop.Platform
+runtime-version: '20.08'
+sdk: org.freedesktop.Sdk
+sdk-extensions:
+- org.freedesktop.Sdk.Extension.rust-stable
+command: leafish
+rename-icon: leafish-logo
+rename-desktop-file: leafish.desktop
+rename-appdata-file: leafish.metainfo.xml
+finish-args:
+- "--share=ipc"
+- "--share=network"
+- "--socket=fallback-x11"
+- "--socket=wayland"
+- "--device=dri"
+
+modules:
+
+- name: "leafish"
+  buildsystem: simple
+  build-options:
+    append-path: "/usr/lib/sdk/rust-stable/bin"
+    env:
+      CARGO_HOME: "/run/build/leafish/cargo"
+
+  build-commands:
+  - ls -la
+  - cargo --offline fetch --manifest-path Cargo.toml
+  - cargo --offline build --release
+  - install -Dm755 ./target/release/leafish -t /app/bin/
+  - install -Dm644 ./resources/assets/leafish/logo/leafish-logo.svg -t /app/share/icons/hicolor/scalable/apps/
+  - install -Dm644 ./packaging/leafish.desktop -t /app/share/applications/
+  - install -Dm644 ./packaging/leafish.metainfo.xml -t /app/share/metainfo/
+  sources:
+  - cargo-sources.json
+  - type: dir
+    path: "../../"
