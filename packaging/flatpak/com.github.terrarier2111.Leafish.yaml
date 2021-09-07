@@ -33,6 +33,8 @@ modules:
   - install -Dm644 ./packaging/leafish.desktop -t /app/share/applications/
   - install -Dm644 ./packaging/leafish.metainfo.xml -t /app/share/metainfo/
   sources:
+  # From root of repo, run:
+  # `python ./packaging/flatpak/flatpak-builder-tools/cargo/flatpak-cargo-generator.py Cargo.lock -o ./packaging/flatpak/cargo-sources.json`
   - cargo-sources.json
   - type: dir
     path: "../../"
