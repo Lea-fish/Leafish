@@ -25,7 +25,6 @@ modules:
       CARGO_HOME: "/run/build/leafish/cargo"
 
   build-commands:
-  - ls -la
   - cargo --offline fetch --manifest-path Cargo.toml
   - cargo --offline build --release
   - install -Dm755 ./target/release/leafish -t /app/bin/
