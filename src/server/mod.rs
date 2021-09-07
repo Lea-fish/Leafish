@@ -14,6 +14,7 @@
 
 use crate::entity;
 use crate::format;
+use crate::inventory::material::versions::to_material;
 use crate::inventory::{InventoryContext, Item, Material};
 use crate::protocol::{self, forge, mojang, packet};
 use crate::render;
@@ -50,7 +51,6 @@ use std::str::FromStr;
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::inventory::material::versions::to_material;
 
 pub mod plugin_messages;
 mod sun;
@@ -679,7 +679,10 @@ impl Server {
                                     let id = stack.id;
                                     Item {
                                         stack,
-                                        material: to_material(id as u16, server.mapped_protocol_version),
+                                        material: to_material(
+                                            id as u16,
+                                            server.mapped_protocol_version,
+                                        ),
                                     }
                                 });
                                 top_inventory.cursor = item; // TODO: Set to HUD and make it dirty!
@@ -697,7 +700,10 @@ impl Server {
                                 let id = stack.id;
                                 Item {
                                     stack,
-                                    material: to_material(id as u16, server.mapped_protocol_version),
+                                    material: to_material(
+                                        id as u16,
+                                        server.mapped_protocol_version,
+                                    ),
                                 }
                             });
                             inventory.clone().write().set_item(set_slot.slot, item);

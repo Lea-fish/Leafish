@@ -1464,7 +1464,7 @@ impl TextureManager {
             rel_width: 1.0,
             rel_height: 1.0,
             is_rel: false,
-            dummy: false
+            dummy: false,
         };
         self.textures.insert(full_name, tex.clone());
         tex
@@ -1505,7 +1505,7 @@ impl TextureManager {
             rel_width: 1.0,
             rel_height: 1.0,
             is_rel: false,
-            dummy: true
+            dummy: true,
         };
         self.textures.insert(full_name, t.clone());
         t
@@ -1644,7 +1644,7 @@ impl Texture {
             rel_y: self.rel_y + y * self.rel_height,
             rel_width: width * self.rel_width,
             rel_height: height * self.rel_height,
-            dummy: self.dummy
+            dummy: self.dummy,
         }
     }
 }

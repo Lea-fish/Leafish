@@ -426,7 +426,7 @@ pub fn to_id(mat: Material) -> u16 {
         Material::Record10 => 2265,
         Material::Record11 => 2266,
         Material::Record12 => 2267,
-        _ => 0
+        _ => 0,
     }
 }
 
@@ -856,6 +856,6 @@ pub fn to_material(material_id: u16) -> Material {
         2265 => Material::Record10,
         2266 => Material::Record11,
         2267 => Material::Record12,
-        _ => Material::Air
+        _ => Material::Air,
     }
 }

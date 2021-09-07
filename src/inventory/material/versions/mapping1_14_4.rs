@@ -1156,7 +1156,7 @@ pub fn to_id(mat: Material) -> u16 {
         Material::ZombieSpawnEgg => 5814,
         Material::ZombieVillagerSpawnEgg => 10311,
         Material::ZombieWallHead => 16296,
-        _ => 0
+        _ => 0,
     }
 }
 
@@ -2316,6 +2316,6 @@ pub fn to_material(material_id: u16) -> Material {
         5814 => Material::ZombieSpawnEgg,
         10311 => Material::ZombieVillagerSpawnEgg,
         16296 => Material::ZombieWallHead,
-        _ => Material::Air
+        _ => Material::Air,
     }
 }

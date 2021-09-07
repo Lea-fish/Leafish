@@ -943,17 +943,18 @@ impl Hud {
         // TODO: Fix following textures: carrot_rod
         let icon_scale = Hud::icon_scale(renderer);
         let textures = item.material.texture_locations();
-        let texture = if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
-            if tex.dummy {
+        let texture =
+            if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
+                if tex.dummy {
+                    println!("other texture: {}", textures.1);
+                    textures.1
+                } else {
+                    textures.0
+                }
+            } else {
                 println!("other texture: {}", textures.1);
                 textures.1
-            } else {
-                textures.0
-            }
-        } else {
-            println!("other texture: {}", textures.1);
-            textures.1
-        };
+            };
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)

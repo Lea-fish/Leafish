@@ -90,11 +90,12 @@ impl InventoryWindow {
     ) {
         let icon_scale = Hud::icon_scale(renderer);
         let textures = item.material.texture_locations();
-        let texture = if let Some(_) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
-            textures.0
-        } else {
-            textures.1
-        };
+        let texture =
+            if let Some(_) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
+                textures.0
+            } else {
+                textures.1
+            };
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)
