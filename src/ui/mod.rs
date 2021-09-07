@@ -16,7 +16,6 @@ pub mod logo;
 
 use crate::format;
 use crate::render;
-use copypasta::{ClipboardContext, ClipboardProvider};
 use parking_lot::RwLock;
 use std::cell::{RefCell, RefMut};
 use std::rc::{Rc, Weak};
@@ -1619,12 +1618,10 @@ impl UIElement for TextBox {
                 }
                 self.submit_funcs.append(&mut temp);
             }
-            (VirtualKeyCode::V, true) => {
-                if ctrl_pressed {
-                    let mut clipboard: ClipboardContext = ClipboardContext::new().unwrap();
-                    if let Ok(text) = clipboard.get_contents() {
-                        self.input.push_str(&text)
-                    }
+            (VirtualKeyCode::V, true) if ctrl_pressed => {
+                let mut clipboard = game.clipboard_provider.write();
+                if let Ok(text) = clipboard.get_contents() {
+                    self.input.push_str(&text)
                 }
             }
             _ => {}

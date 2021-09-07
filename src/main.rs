@@ -17,6 +17,11 @@
 #![allow(clippy::many_single_char_names)] // short variable names provide concise clarity
 #![allow(clippy::float_cmp)] // float comparison used to check if changed
 
+use copypasta::nop_clipboard;
+use copypasta::ClipboardContext;
+use copypasta::ClipboardProvider;
+#[cfg(target_os = "linux")]
+use glutin::platform::unix::EventLoopWindowTargetExtUnix;
 use instant::{Duration, Instant};
 use log::{debug, error, info, warn};
 use std::fs;
@@ -74,6 +79,7 @@ pub struct Game {
     renderer: Arc<RwLock<render::Renderer>>,
     screen_sys: screen::ScreenSystem,
     resource_manager: Arc<RwLock<resources::Manager>>,
+    clipboard_provider: Arc<RwLock<Box<dyn copypasta::ClipboardProvider>>>,
     console: Arc<Mutex<console::Console>>,
     vars: Rc<console::Vars>,
     should_close: bool,
@@ -293,6 +299,22 @@ fn main() {
         opt.default_protocol_version
             .unwrap_or_else(|| "".to_string()),
     );
+
+    #[cfg(target_os = "linux")]
+    let clipboard: Box<dyn ClipboardProvider> = match events_loop.wayland_display() {
+        Some(display) => {
+            debug!("Configured with wayland clipboard");
+            // NOTE: Since this takes a pointer to the winit event loop, it MUST be dropped first.
+            unsafe {
+                Box::new(copypasta::wayland_clipboard::create_clipboards_from_external(display).1)
+            }
+        }
+        None => create_clipboard(),
+    };
+
+    #[cfg(not(target_os = "linux"))]
+    let clipboard = create_clipboard();
+
     let game = Game {
         server: None,
         focused: false,
@@ -313,6 +335,7 @@ fn main() {
         is_logo_pressed: false,
         is_fullscreen: false,
         default_protocol_version,
+        clipboard_provider: Arc::new(RwLock::new(clipboard)),
     };
     game.renderer.write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {
@@ -781,4 +804,20 @@ fn handle_window_event<T>(
     }
 
     false
+}
+
+fn create_clipboard() -> Box<dyn ClipboardProvider> {
+    match ClipboardContext::new() {
+        Ok(clipboard) => {
+            debug!("Configured with normal clipboard");
+            Box::new(clipboard)
+        }
+        Err(_) => {
+            debug!("Could not create clipboard running with no operation clipboard");
+            Box::new(
+                nop_clipboard::NopClipboardContext::new()
+                    .expect("no operation clipboard can never fail"),
+            )
+        }
+    }
 }
