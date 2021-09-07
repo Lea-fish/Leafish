@@ -89,12 +89,18 @@ impl InventoryWindow {
         renderer: &Renderer,
     ) {
         let icon_scale = Hud::icon_scale(renderer);
+        let textures = item.material.texture_locations();
+        let texture = if let Some(_) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
+            textures.0
+        } else {
+            textures.1
+        };
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)
-            .texture(format!("minecraft:{}", item.material.texture_location()))
+            .texture(format!("minecraft:{}", texture))
             .create(ui_container);
         self.elements.get_mut(elements_idx).unwrap().push(image);
     }

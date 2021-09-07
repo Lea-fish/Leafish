@@ -59,7 +59,7 @@ static CURRENT_PROTOCOL_VERSION: AtomicI32 = AtomicI32::new(SUPPORTED_PROTOCOLS[
 static NETWORK_DEBUG: AtomicBool = AtomicBool::new(false);
 
 /// A list of all supported versions
-#[derive(PartialOrd, PartialEq, Debug)]
+#[derive(PartialOrd, PartialEq, Debug, Copy, Clone)]
 pub enum Version {
     Other,
     Old,
