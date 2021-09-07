@@ -15,7 +15,7 @@
 use crate::entity;
 use crate::format;
 use crate::inventory::material::versions::to_material;
-use crate::inventory::{InventoryContext, Item, Material};
+use crate::inventory::{InventoryContext, Item};
 use crate::protocol::{self, forge, mojang, packet};
 use crate::render;
 use crate::render::hud::HudContext;
