@@ -91,7 +91,7 @@ impl InventoryWindow {
         let icon_scale = Hud::icon_scale(renderer);
         let textures = item.material.texture_locations();
         let texture =
-            if let Some(_) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
+            if Renderer::get_texture_optional(&renderer.textures, &*textures.0).is_some() {
                 textures.0
             } else {
                 textures.1
