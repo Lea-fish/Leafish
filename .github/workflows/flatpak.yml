@@ -1,8 +1,9 @@
 name: Packaging
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
+    branches: [main]
 jobs:
   flatpak:
     name: "Flatpak"
@@ -23,4 +24,3 @@ jobs:
         bundle: leafish.flatpak
         manifest-path: packaging/flatpak/com.github.terrarier2111.Leafish.yaml
         cache-key: flatpak-builder-${{ github.sha }}
-
