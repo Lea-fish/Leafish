@@ -1298,12 +1298,10 @@ impl Server {
                 animation: 0,
             });
         } else if self.mapped_protocol_version < Version::V1_9 {
-            self.write_packet(packet::play::serverbound::ArmSwing_Handsfree {
-                empty: (),
-            })
+            self.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
         } else {
             self.write_packet(packet::play::serverbound::ArmSwing {
-                hand: Default::default()
+                hand: Default::default(),
             });
         }
         // TODO: Implement clientside animation.
