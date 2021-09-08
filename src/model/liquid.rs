@@ -36,16 +36,16 @@ pub fn render_liquid<W: Write>(
 
     let tex = match snapshot.get_block(x, y, z) {
         block::Block::Water { .. } => {
-            render::Renderer::get_texture(&textures, "minecraft:blocks/water_still")
+            render::Renderer::get_texture(&textures, "minecraft:block/water_still")
         }
         block::Block::FlowingWater { .. } => {
-            render::Renderer::get_texture(&textures, "minecraft:blocks/water_flow")
+            render::Renderer::get_texture(&textures, "minecraft:block/water_flow")
         }
         block::Block::Lava { .. } => {
-            render::Renderer::get_texture(&textures, "minecraft:blocks/lava_still")
+            render::Renderer::get_texture(&textures, "minecraft:block/lava_still")
         }
         block::Block::FlowingLava { .. } => {
-            render::Renderer::get_texture(&textures, "minecraft:blocks/lava_flow")
+            render::Renderer::get_texture(&textures, "minecraft:block/lava_flow")
         }
         _ => unreachable!(),
     };

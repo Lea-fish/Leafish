@@ -5005,7 +5005,7 @@ define_blocks! {
         variant format!("facing={},powered={}", facing.as_string(), powered),
     }
     // TODO: Shulker box textures (1.11+), since there is no model, we use wool for now
-    // The textures should be built from textures/blocks/shulker_top_<color>.png
+    // The textures should be built from textures/block/shulker_top_<color>.png
     // and textures/entity/shulker/shulker_<color>.png
     ShulkerBox {
         props {

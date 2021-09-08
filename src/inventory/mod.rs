@@ -1550,7 +1550,7 @@ pub enum Material {
 }
 
 impl Material {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> String { // TODO: We have to make this version dependent once we got the assets of all versions
         format!("{:?}", self)
     }
 
@@ -1567,6 +1567,6 @@ impl Material {
                 result.push(c);
             }
         }
-        (format!("items/{}", result), format!("blocks/{}", result))
+        (format!("item/{}", result), format!("block/{}", result))
     }
 }

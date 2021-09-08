@@ -28,11 +28,12 @@ use crate::ui;
 use std::fs::File;
 use std::path::Path;
 
-const RESOURCES_VERSION: &str = "1.12.2";
+// You can get these from: https://launchermeta.mojang.com/mc/game/version_manifest.json
+const RESOURCES_VERSION: &str = "1.16.5";
 const VANILLA_CLIENT_URL: &str =
-    "https://launcher.mojang.com/v1/objects/0f275bc1547d01fa5f56ba34bdc87d981ee12daf/client.jar";
-const ASSET_VERSION: &str = "1.12";
-const ASSET_INDEX_URL: &str = "https://launchermeta.mojang.com/mc/assets/1.12/67e29e024e664064c1f04c728604f83c24cbc218/1.12.json";
+    "https://launcher.mojang.com/v1/objects/37fd3c903861eeff3bc24b71eed48f828b5269c8/client.jar";
+const ASSET_VERSION: &str = "1.16";
+const ASSET_INDEX_URL: &str = "https://launchermeta.mojang.com/v1/packages/ad75fb46ff5c89aa5f9c90e12481e963854f9a6e/1.16.json";
 
 pub trait Pack: Sync + Send {
     fn open(&self, name: &str) -> Option<Box<dyn io::Read>>;

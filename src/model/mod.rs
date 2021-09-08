@@ -306,13 +306,13 @@ impl Factory {
         let file = match self
             .resources
             .read()
-            .open(plugin, &format!("models/block/{}.json", model_name))
+            .open(plugin, &format!("models/block/{}.json", model_name.replace("minecraft:block/", "")))
         {
             Some(val) => val,
             None => {
                 error!(
                     "Couldn't find model {}",
-                    format!("models/block/{}.json", model_name)
+                    format!("models/block/{}.json", model_name.replace("minecraft:block/", ""))
                 );
                 return None;
             }
@@ -324,7 +324,7 @@ impl Factory {
             None => {
                 error!(
                     "Failed to parse model {}",
-                    format!("models/block/{}.json", model_name)
+                    format!("models/block/{}.json", model_name.replace("minecraft:block/", ""))
                 );
                 return None;
             }
@@ -343,11 +343,11 @@ impl Factory {
             let file = match self
                 .resources
                 .read()
-                .open(plugin, &format!("models/{}.json", parent))
+                .open(plugin, &format!("models/{}.json", parent.replace("minecraft:", "")))
             {
                 Some(val) => val,
                 None => {
-                    error!("Couldn't find model {}", format!("models/{}.json", parent));
+                    error!("Couldn't find model {}", format!("models/{}.json", parent.replace("minecraft:", "")));
                     return None;
                 }
             };
@@ -357,7 +357,7 @@ impl Factory {
                 None => {
                     error!(
                         "Failed to parse model {}",
-                        format!("models/{}.json", parent)
+                        format!("models/{}.json", parent.replace("minecraft:", ""))
                     );
                     return None;
                 }
