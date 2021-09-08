@@ -669,6 +669,14 @@ fn handle_window_event<T>(
                                 .on_right_click(game.renderer.clone());
                         }
                     }
+                    (ElementState::Pressed, MouseButton::Left) => {
+                        if game.focused && game.server.is_some() {
+                            game.server
+                                .as_ref()
+                                .unwrap()
+                                .on_left_click(game.renderer.clone());
+                        }
+                    }
                     (_, _) => (),
                 },
                 WindowEvent::CursorMoved { position, .. } => {
