@@ -755,7 +755,6 @@ impl Server {
         server: Arc<Mutex<Option<Arc<Server>>>>,
         renderer: Arc<RwLock<Renderer>>,
     ) -> (Sender<bool>, Receiver<bool>) {
-        // TODO: Use fair rwlock!
         let (tx, rx) = unbounded();
         let (etx, erx) = unbounded();
         thread::spawn(move || loop {

@@ -29,6 +29,7 @@ pub fn to_material(id: u16, version: Version) -> Material {
     }
 }
 
+#[allow(dead_code)]
 pub fn to_id(material: Material, version: Version) -> u16 {
     match version {
         Version::V1_7 => mapping1_7_10::to_id(material),
