@@ -1385,7 +1385,7 @@ impl Conn {
             .replace(write_cipher);
     }
 
-    pub fn set_compresssion(&mut self, threshold: i32) {
+    pub fn set_compression(&mut self, threshold: i32) {
         self.compression_threshold = threshold;
     }
 
