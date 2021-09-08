@@ -75,3 +75,12 @@ version = "0"
 [dependencies.leafish_protocol]
 path = "./protocol"
 version = "0"
+
+[target.i686-linux-android.dependencies]
+openssl = { version = "*", features = ["vendored"] }
+
+[target.armv7a-linux-android.dependencies]
+openssl = { version = "*", features = ["vendored"] }
+
+[target.aarch64-linux-android.dependencies]
+openssl = { version = "*", features = ["vendored"] }
