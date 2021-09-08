@@ -180,6 +180,10 @@ impl HudContext {
         self.game_mode = game_mode;
         self.dirty_game_mode = true;
     }
+
+    pub fn get_slot_index(&self) -> u8 {
+        self.slot_index
+    }
 }
 
 pub struct Hud {
