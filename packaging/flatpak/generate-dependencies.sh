@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Bash script to generate a manifest containing dependencies for Rust.
+# If it works, it outputs exactly in $LEAFISH_REPO/packaging/flatpak/cargo-sources.json .
+
 git submodule update --init
 
 # Check if user is in root of repo directory
