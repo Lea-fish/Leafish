@@ -14,7 +14,8 @@
 
 use crate::entity;
 use crate::format;
-use crate::inventory::{InventoryContext, Item, Material};
+use crate::inventory::material::versions::to_material;
+use crate::inventory::{InventoryContext, Item};
 use crate::protocol::{self, forge, mojang, packet};
 use crate::render;
 use crate::render::hud::HudContext;
@@ -83,6 +84,7 @@ pub struct Server {
     uuid: protocol::UUID,
     conn: Arc<RwLock<Option<protocol::Conn>>>,
     pub protocol_version: i32,
+    mapped_protocol_version: Version,
     forge_mods: Vec<forge::ForgeMod>,
     pub disconnect_data: Arc<RwLock<DisconnectData>>,
 
@@ -673,9 +675,15 @@ impl Server {
                         let curr_slots = inventory.clone().read().size();
                         if set_slot.slot < 0 || set_slot.slot >= curr_slots {
                             if set_slot.slot == -1 {
-                                let item = set_slot.item.map(|stack| Item {
-                                    stack,
-                                    material: Material::Apple, // TODO: map stack.id to material!
+                                let item = set_slot.item.map(|stack| {
+                                    let id = stack.id;
+                                    Item {
+                                        stack,
+                                        material: to_material(
+                                            id as u16,
+                                            server.mapped_protocol_version,
+                                        ),
+                                    }
                                 });
                                 top_inventory.cursor = item; // TODO: Set to HUD and make it dirty!
                             } else {
@@ -688,9 +696,15 @@ impl Server {
                                 set_slot.slot,
                                 set_slot.item.as_ref().map_or(0, |s| s.id)
                             );
-                            let item = set_slot.item.map(|stack| Item {
-                                stack,
-                                material: Material::Apple, // TODO: map stack.id to material!
+                            let item = set_slot.item.map(|stack| {
+                                let id = stack.id;
+                                Item {
+                                    stack,
+                                    material: to_material(
+                                        id as u16,
+                                        server.mapped_protocol_version,
+                                    ),
+                                }
                             });
                             inventory.clone().write().set_item(set_slot.slot, item);
                         }
@@ -757,7 +771,6 @@ impl Server {
         server: Arc<Mutex<Option<Arc<Server>>>>,
         renderer: Arc<RwLock<Renderer>>,
     ) -> (Sender<bool>, Receiver<bool>) {
-        // TODO: Use fair rwlock!
         let (tx, rx) = unbounded();
         let (etx, erx) = unbounded();
         thread::spawn(move || loop {
@@ -910,6 +923,7 @@ impl Server {
             uuid,
             conn,
             protocol_version,
+            mapped_protocol_version: Version::from_id(protocol_version as u32),
             forge_mods,
             disconnect_data: Arc::new(RwLock::new(DisconnectData::default())),
 
@@ -986,6 +1000,7 @@ impl Server {
         if *self.close_death_screen.read() {
             *self.close_death_screen.write() = false;
             game.screen_sys.pop_screen();
+            game.focused = true;
         }
         let version = self.resources.read().version();
         if version != *self.version.read() {

@@ -698,7 +698,9 @@ fn handle_window_event<T>(
                 WindowEvent::KeyboardInput { input, .. } => {
                     match (input.state, input.virtual_keycode) {
                         (ElementState::Released, Some(VirtualKeyCode::Escape)) => {
-                            if !*game.server.as_ref().unwrap().clone().dead.read() {
+                            if game.server.is_some()
+                                && !*game.server.as_ref().unwrap().clone().dead.read()
+                            {
                                 if game.focused {
                                     window.set_cursor_grab(false).unwrap();
                                     window.set_cursor_visible(true);
