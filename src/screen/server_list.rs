@@ -372,6 +372,7 @@ impl ServerList {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *add);
             add.add_text(txt);
+
             add.add_click_func(move |_, game| {
                 game.screen_sys
                     .replace_screen(Box::new(super::edit_server::EditServerEntry::new(None)));
@@ -394,7 +395,7 @@ impl ServerList {
                 .size(40.0, 40.0)
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *options);
-            options.add_click_func(|_, game| {
+            options.add_click_func(move |_, game| {
                 game.screen_sys
                     .add_screen(Box::new(super::SettingsMenu::new(false)));
                 true
@@ -452,6 +453,7 @@ impl ServerList {
                 ui::ImageBuilder::new()
                     .texture(&*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)))
                     .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                    .draw_index(-1)
                     .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                     .create(ui_container),
             )

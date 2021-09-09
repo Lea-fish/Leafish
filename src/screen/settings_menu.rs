@@ -1,9 +1,10 @@
 use crate::render;
+use crate::render::Renderer;
 use crate::settings;
 use crate::ui;
 
 pub struct UIElements {
-    background: ui::ImageRef,
+    _background: Option<ui::ImageRef>,
     _buttons: Vec<ui::ButtonRef>,
 }
 
@@ -22,14 +23,7 @@ impl SettingsMenu {
 }
 
 impl super::Screen for SettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        let background = ui::ImageBuilder::new()
-            .texture("leafish:solid")
-            .position(0.0, 0.0)
-            .size(854.0, 480.0)
-            .colour((0, 0, 0, 100))
-            .create(ui_container);
-
+    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let mut buttons = vec![];
 
         // From top and down
@@ -170,8 +164,36 @@ impl super::Screen for SettingsMenu {
             buttons.push(disconnect_button);
         }
 
+        let background = match self.show_disconnect_button {
+            false => {
+                let vars = settings::Vars::new();
+                let background = if Renderer::get_texture_optional(
+                    renderer.get_textures_ref(),
+                    &*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)),
+                )
+                .is_some()
+                {
+                    Some(
+                        ui::ImageBuilder::new()
+                            .texture(&*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)))
+                            .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                            .draw_index(-1)
+                            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                            .create(ui_container),
+                    )
+                } else {
+                    None
+                };
+
+                background
+            }
+            // TODO: don't show no background, but overlay the background with some transparent
+            // layer
+            true => None,
+        };
+
         self.elements = Some(UIElements {
-            background,
+            _background: background,
             _buttons: buttons,
         });
     }
@@ -184,22 +206,9 @@ impl super::Screen for SettingsMenu {
     fn tick(
         &mut self,
         _delta: f64,
-        renderer: &mut render::Renderer,
-        ui_container: &mut ui::Container,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
     ) -> Option<Box<dyn super::Screen>> {
-        let elements = self.elements.as_mut().unwrap();
-        {
-            let mode = ui_container.mode;
-            let mut background = elements.background.borrow_mut();
-            background.width = match mode {
-                ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
-            };
-            background.height = match mode {
-                ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
-            };
-        }
         None
     }
 
@@ -223,14 +232,7 @@ impl VideoSettingsMenu {
 }
 
 impl super::Screen for VideoSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        let background = ui::ImageBuilder::new()
-            .texture("leafish:solid")
-            .position(0.0, 0.0)
-            .size(854.0, 480.0)
-            .colour((0, 0, 0, 100))
-            .create(ui_container);
-
+    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let mut buttons = vec![];
 
         // Load defaults
@@ -330,8 +332,28 @@ impl super::Screen for VideoSettingsMenu {
             });
         }
         buttons.push(done_button);
+
+        let vars = settings::Vars::new();
+        let background = if Renderer::get_texture_optional(
+            renderer.get_textures_ref(),
+            &*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)),
+        )
+        .is_some()
+        {
+            Some(
+                ui::ImageBuilder::new()
+                    .texture(&*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)))
+                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                    .draw_index(-1)
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .create(ui_container),
+            )
+        } else {
+            None
+        };
+
         self.elements = Some(UIElements {
-            background,
+            _background: background,
             _buttons: buttons,
         });
     }
@@ -343,22 +365,9 @@ impl super::Screen for VideoSettingsMenu {
     fn tick(
         &mut self,
         _delta: f64,
-        renderer: &mut render::Renderer,
-        ui_container: &mut ui::Container,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
     ) -> Option<Box<dyn super::Screen>> {
-        let elements = self.elements.as_mut().unwrap();
-        {
-            let mode = ui_container.mode;
-            let mut background = elements.background.borrow_mut();
-            background.width = match mode {
-                ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
-            };
-            background.height = match mode {
-                ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
-            };
-        }
         None
     }
 
@@ -382,14 +391,7 @@ impl AudioSettingsMenu {
 }
 
 impl super::Screen for AudioSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        let background = ui::ImageBuilder::new()
-            .texture("leafish:solid")
-            .position(0.0, 0.0)
-            .size(854.0, 480.0)
-            .colour((0, 0, 0, 100))
-            .create(ui_container);
-
+    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let mut buttons = vec![];
 
         // TODO
@@ -413,8 +415,27 @@ impl super::Screen for AudioSettingsMenu {
         }
         buttons.push(done_button);
 
+        let vars = settings::Vars::new();
+        let background = if Renderer::get_texture_optional(
+            renderer.get_textures_ref(),
+            &*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)),
+        )
+        .is_some()
+        {
+            Some(
+                ui::ImageBuilder::new()
+                    .texture(&*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)))
+                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                    .draw_index(-1)
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .create(ui_container),
+            )
+        } else {
+            None
+        };
+
         self.elements = Some(UIElements {
-            background,
+            _background: background,
             _buttons: buttons,
         });
     }
@@ -426,22 +447,9 @@ impl super::Screen for AudioSettingsMenu {
     fn tick(
         &mut self,
         _delta: f64,
-        renderer: &mut render::Renderer,
-        ui_container: &mut ui::Container,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
     ) -> Option<Box<dyn super::Screen>> {
-        let elements = self.elements.as_mut().unwrap();
-        {
-            let mode = ui_container.mode;
-            let mut background = elements.background.borrow_mut();
-            background.width = match mode {
-                ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
-            };
-            background.height = match mode {
-                ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
-            };
-        }
         None
     }
 
@@ -465,14 +473,7 @@ impl SkinSettingsMenu {
 }
 
 impl super::Screen for SkinSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        let background = ui::ImageBuilder::new()
-            .texture("leafish:solid")
-            .position(0.0, 0.0)
-            .size(854.0, 480.0)
-            .colour((0, 0, 0, 100))
-            .create(ui_container);
-
+    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let mut buttons = vec![];
 
         // Load defaults
@@ -589,8 +590,28 @@ impl super::Screen for SkinSettingsMenu {
             });
         }
         buttons.push(done_button);
+
+        let vars = settings::Vars::new();
+        let background = if Renderer::get_texture_optional(
+            renderer.get_textures_ref(),
+            &*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)),
+        )
+        .is_some()
+        {
+            Some(
+                ui::ImageBuilder::new()
+                    .texture(&*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)))
+                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                    .draw_index(-1)
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .create(ui_container),
+            )
+        } else {
+            None
+        };
+
         self.elements = Some(UIElements {
-            background,
+            _background: background,
             _buttons: buttons,
         });
     }
@@ -602,22 +623,9 @@ impl super::Screen for SkinSettingsMenu {
     fn tick(
         &mut self,
         _delta: f64,
-        renderer: &mut render::Renderer,
-        ui_container: &mut ui::Container,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
     ) -> Option<Box<dyn super::Screen>> {
-        let elements = self.elements.as_mut().unwrap();
-        {
-            let mode = ui_container.mode;
-            let mut background = elements.background.borrow_mut();
-            background.width = match mode {
-                ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
-            };
-            background.height = match mode {
-                ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
-            };
-        }
         None
     }
 

@@ -17,6 +17,8 @@ use std::fs;
 
 use crate::paths;
 use crate::render;
+use crate::render::Renderer;
+use crate::settings;
 use crate::ui;
 
 use serde_json::{self, Value};
@@ -28,6 +30,7 @@ pub struct EditServerEntry {
 
 struct UIElements {
     logo: ui::logo::Logo,
+    _background: Option<ui::ImageRef>,
 
     _name: ui::TextBoxRef,
     _address: ui::TextBoxRef,
@@ -158,8 +161,28 @@ impl super::Screen for EditServerEntry {
             });
         }
 
+        let vars = settings::Vars::new();
+        let background = if Renderer::get_texture_optional(
+            renderer.get_textures_ref(),
+            &*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)),
+        )
+        .is_some()
+        {
+            Some(
+                ui::ImageBuilder::new()
+                    .texture(&*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)))
+                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                    .draw_index(-1)
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .create(ui_container),
+            )
+        } else {
+            None
+        };
+
         self.elements = Some(UIElements {
             logo,
+            _background: background,
             _name: server_name,
             _address: server_address,
             _done: done,

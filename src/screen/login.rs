@@ -23,6 +23,7 @@ use crate::auth;
 use crate::protocol;
 use crate::protocol::mojang;
 use crate::render;
+use crate::render::Renderer;
 use crate::settings;
 use crate::ui;
 
@@ -40,6 +41,7 @@ struct UIElements {
     username_txt: ui::TextBoxRef,
     password_txt: ui::TextBoxRef,
     _disclaimer: ui::TextRef,
+    _background: Option<ui::ImageRef>,
     try_login: Rc<Cell<bool>>,
     refresh: bool,
     login_res: Option<mpsc::Receiver<Result<mojang::Profile, protocol::Error>>>,
@@ -135,6 +137,25 @@ impl super::Screen for Login {
         let refresh = profile.is_complete();
         try_login.set(refresh);
 
+        let vars = settings::Vars::new();
+        let background = if Renderer::get_texture_optional(
+            renderer.get_textures_ref(),
+            &*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)),
+        )
+        .is_some()
+        {
+            Some(
+                ui::ImageBuilder::new()
+                    .texture(&*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)))
+                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                    .draw_index(-1)
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .create(ui_container),
+            )
+        } else {
+            None
+        };
+
         self.elements = Some(UIElements {
             logo,
             profile,
@@ -146,6 +167,7 @@ impl super::Screen for Login {
             login_res: None,
 
             _disclaimer: disclaimer,
+            _background: background,
 
             username_txt,
             password_txt,
