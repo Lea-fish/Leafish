@@ -444,7 +444,6 @@ impl Server {
                         server.on_block_entity_update(block_update);
                     }
                     Packet::ChunkData_Biomes3D(chunk_data) => {
-                        // debug!("data x {} z {}", chunk_data.chunk_x, chunk_data.chunk_z);
                         server.on_chunk_data_biomes3d(chunk_data);
                     }
                     Packet::ChunkData_Biomes3D_VarInt(chunk_data) => {
