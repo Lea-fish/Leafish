@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.github.terrarier2111.Leafish</id>
-  <url type="homepage">https://github.com/terrarier2111/Leafish</url>
+  <id>com.github.Lea-fish.Leafish</id>
+  <url type="homepage">https://github.com/Lea-fish/Leafish</url>
 
   <name>Leafish</name>
   <summary>Multi-version Minecraft-compatible client written in Rust.</summary>
@@ -14,10 +14,10 @@
     <p>Minecraft is originally written by Mojang in Java for PC, but nowadays also has a so-called "Bedrock edition" which has ports to various alternative platforms. Leafish attempts to provide everything from the Java-edition and tries to be compatible with it so you can join regular servers and play alongside people using the official Java-based clients. Being written in Rust with support for modern graphic API's like Vulkan means performance improvements and enhancements that are not possible in the original game. It's also completely community driven!</p>
   </description>
 
-  <launchable type="desktop-id">com.github.terrarier2111.Leafish.desktop</launchable>
+  <launchable type="desktop-id">com.github.Lea-fish.Leafish.desktop</launchable>
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/terrarier2111/Leafish/main/.github/readme-resources/screenshot-mainmenu.jpg</image>
+      <image>https://raw.githubusercontent.com/Lea-fish/Leafish/main/.github/readme-resources/screenshot-mainmenu.jpg</image>
     </screenshot>
   </screenshots>
   <content_rating type="oars-1.1" />

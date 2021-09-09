@@ -176,7 +176,7 @@ impl Server {
         loop {
             match conn.read_packet()? {
                 protocol::packet::Packet::SetInitialCompression(val) => {
-                    conn.set_compresssion(val.threshold.0);
+                    conn.set_compression(val.threshold.0);
                 }
                 protocol::packet::Packet::EncryptionRequest(val) => {
                     server_id = Rc::new(val.server_id);
@@ -258,7 +258,7 @@ impl Server {
         loop {
             match conn.read_packet()? {
                 protocol::packet::Packet::SetInitialCompression(val) => {
-                    conn.set_compresssion(val.threshold.0);
+                    conn.set_compression(val.threshold.0);
                 }
                 protocol::packet::Packet::LoginSuccess_String(val) => {
                     debug!("Login: {} {}", val.username, val.uuid);
@@ -444,7 +444,6 @@ impl Server {
                         server.on_block_entity_update(block_update);
                     }
                     Packet::ChunkData_Biomes3D(chunk_data) => {
-                        // debug!("data x {} z {}", chunk_data.chunk_x, chunk_data.chunk_z);
                         server.on_chunk_data_biomes3d(chunk_data);
                     }
                     Packet::ChunkData_Biomes3D_VarInt(chunk_data) => {
@@ -1288,6 +1287,23 @@ impl Server {
                 _ => {}
             };
         }
+    }
+
+    pub fn on_left_click(&self, _renderer: Arc<RwLock<render::Renderer>>) {
+        // TODO: Check these values!
+        if self.mapped_protocol_version < Version::V1_8 {
+            self.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
+                entity_id: 0,
+                animation: 0,
+            });
+        } else if self.mapped_protocol_version < Version::V1_9 {
+            self.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
+        } else {
+            self.write_packet(packet::play::serverbound::ArmSwing {
+                hand: Default::default(),
+            });
+        }
+        // TODO: Implement clientside animation.
     }
 
     pub fn on_right_click(&self, renderer: Arc<RwLock<render::Renderer>>) {

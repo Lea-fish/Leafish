@@ -47,7 +47,7 @@ Being written in Rust with support for modern graphic API's like Vulkan means pe
 It's also completely community driven!
 
 Note that currently not everything from the original game is supported yet so Leafish can't currently be seen as a fully fledged alternative.
-A list of missing features is available on the [issues page](https://github.com/terrarier2111/Leafish/issues).
+A list of missing features is available on the [issues page](https://github.com/Lea-fish/Leafish/issues).
 
 ## Version support
 
@@ -97,7 +97,7 @@ Support for older protocols will _not_ be dropped as newer protocols are added.
 ### Downloading a pre-built version
 
 Since there currently is no release yet, pre-built binaries have to be downloaded from Github Actions.
-The latest actions can always be seen [here](https://github.com/terrarier2111/Leafish/actions).
+The latest actions can always be seen [here](https://github.com/Lea-fish/Leafish/actions).
 Click on a workflow run from the main branch and download the artifact for your platform.
 
 ### Building the game
@@ -109,7 +109,7 @@ Rust stable version 1.53.0 or newer is required.
 **Debian/Ubuntu**
 
 ```sh
-sudo apt-get install cargo libssl-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxcb-composite0-dev
+sudo apt-get install cargo libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
 ```
 
 **Alpine Linux**
@@ -141,7 +141,7 @@ If nothing happens consider running the executable from the command-line, `./lea
 
 ## Contributing
 
-A list of bugs and missing features can be found on the [issue tracker](https://github.com/terrarier2111/Leafish/issues/).
+A list of bugs and missing features can be found on the [issue tracker](https://github.com/Lea-fish/Leafish/issues/).
 Feel free to work on any bug and submit a pull request to the `main` branch with the fix.
 Mentioning that you intend to fix a bug on the issue will prevent other people from trying as well and makes sure no duplicated work is done.
 

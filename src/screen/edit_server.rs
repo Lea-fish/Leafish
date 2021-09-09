@@ -15,6 +15,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 
+use crate::paths;
 use crate::ui;
 use crate::{render, settings};
 
@@ -43,7 +44,7 @@ impl EditServerEntry {
     }
 
     fn save_servers(index: Option<usize>, name: &str, address: &str) {
-        let mut servers_info = match fs::File::open("servers.json") {
+        let mut servers_info = match fs::File::open(paths::get_data_dir().join("servers.json")) {
             Ok(val) => serde_json::from_reader(val).unwrap(),
             Err(_) => {
                 let mut info = BTreeMap::default();

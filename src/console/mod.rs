@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::paths;
+
 use std::any::Any;
 use std::cell::{Ref, RefCell};
 use std::collections::HashMap;
@@ -179,7 +181,7 @@ impl Vars {
     }
 
     pub fn load_config(&mut self) {
-        if let Ok(file) = fs::File::open("conf.cfg") {
+        if let Ok(file) = fs::File::open(paths::get_config_dir().join("conf.cfg")) {
             let reader = BufReader::new(file);
             for line in reader.lines() {
                 let line = line.unwrap();
@@ -203,7 +205,8 @@ impl Vars {
     }
 
     pub fn save_config(&self) {
-        let mut file = BufWriter::new(fs::File::create("conf.cfg").unwrap());
+        let mut file =
+            BufWriter::new(fs::File::create(paths::get_config_dir().join("conf.cfg")).unwrap());
         for (name, var) in &self.vars {
             if !var.can_serialize() {
                 continue;
@@ -250,7 +253,8 @@ impl Console {
         Console {
             history: vec![Component::Text(TextComponent::new("")); 200],
             dirty: false,
-            logfile: fs::File::create("client.log").expect("failed to open log file"),
+            logfile: fs::File::create(paths::get_cache_dir().join("client.log"))
+                .expect("failed to open log file"),
             log_level_term: log::Level::Info,
             log_level_file: log::Level::Trace,
 

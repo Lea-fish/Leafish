@@ -20,6 +20,7 @@ use std::thread;
 
 use crate::format;
 use crate::format::{Component, TextComponent};
+use crate::paths;
 use crate::protocol;
 use crate::render;
 use crate::settings;
@@ -122,7 +123,7 @@ impl ServerList {
         }
         elements.servers.clear();
 
-        let file = match fs::File::open("servers.json") {
+        let file = match fs::File::open(paths::get_data_dir().join("servers.json")) {
             Ok(val) => val,
             Err(_) => return,
         };

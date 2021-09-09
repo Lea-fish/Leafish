@@ -5,12 +5,12 @@ authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>", "iceiix <ice_ix@protonma
 edition = "2018"
 resolver = "2"
 description = "Multi-protocol multi-platform Minecraft-compatible client"
-repository = "https://github.com/terrarier2111/Leafish"
+repository = "https://github.com/Lea-fish/Leafish"
 license = "MIT/Apache-2.0"
 
 [package.metadata.bundle]
 name = "Leafish"
-identifier = "io.github.terrarier2111.leafish"
+identifier = "com.github.Lea-fish.Leafish"
 icon = ["resources/icon*.png"]
 category = "Game"
 osx_minimum_system_version = "10.14"
@@ -41,7 +41,7 @@ lazy_static = "1.4.0"
 collision = "0.20.1"
 rsa_public_encrypt_pkcs1 = "0.4.0"
 structopt = "0.3.22"
-clipboard = "0.5.0"
+copypasta = "0.7.1"
 instant = "0.1.10"
 dirs = "3.0.2"
 

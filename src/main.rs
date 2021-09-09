@@ -38,6 +38,7 @@ pub mod console;
 pub mod entity;
 mod inventory;
 pub mod model;
+pub mod paths;
 pub mod render;
 pub mod resources;
 pub mod screen;
@@ -195,20 +196,6 @@ struct Opt {
     default_protocol_version: Option<String>,
 }
 
-fn init_config_dir() {
-    if std::path::Path::new("conf.cfg").exists() {
-        return;
-    }
-
-    if let Some(mut path) = dirs::config_dir() {
-        path.push("leafish");
-        if !path.exists() {
-            std::fs::create_dir_all(path.clone()).unwrap();
-        }
-        std::env::set_current_dir(path).unwrap();
-    }
-}
-
 // TODO: Hide own character and show only the right hand. (with an item)
 // TODO: Simplify error messages in server list.
 // TODO: Render skin of players joining after one self.
@@ -218,7 +205,6 @@ fn init_config_dir() {
 // TODO: Improve clouds.
 // TODO: Fix pistons.
 fn main() {
-    init_config_dir();
     let opt = Opt::from_args();
     let con = Arc::new(Mutex::new(console::Console::new()));
     let proxy = console::ConsoleProxy::new(con.clone());
@@ -667,6 +653,14 @@ fn handle_window_event<T>(
                                 .as_ref()
                                 .unwrap()
                                 .on_right_click(game.renderer.clone());
+                        }
+                    }
+                    (ElementState::Pressed, MouseButton::Left) => {
+                        if game.focused && game.server.is_some() {
+                            game.server
+                                .as_ref()
+                                .unwrap()
+                                .on_left_click(game.renderer.clone());
                         }
                     }
                     (_, _) => (),
