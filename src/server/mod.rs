@@ -15,7 +15,7 @@
 use crate::entity;
 use crate::format;
 use crate::inventory::material::versions::to_material;
-use crate::inventory::{InventoryContext, Item};
+use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::protocol::{self, forge, mojang, packet};
 use crate::render;
 use crate::render::hud::HudContext;
@@ -1307,7 +1307,6 @@ impl Server {
     }
 
     pub fn on_right_click(&self, renderer: Arc<RwLock<render::Renderer>>) {
-        use crate::shared::Direction;
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
             let renderer = &mut renderer.write();
@@ -1322,15 +1321,7 @@ impl Server {
                     self.write_packet(
                         packet::play::serverbound::PlayerBlockPlacement_insideblock {
                             location: pos,
-                            face: protocol::VarInt(match face {
-                                Direction::Down => 0,
-                                Direction::Up => 1,
-                                Direction::North => 2,
-                                Direction::South => 3,
-                                Direction::West => 4,
-                                Direction::East => 5,
-                                _ => unreachable!(),
-                            }),
+                            face: protocol::VarInt(face.index() as i32),
                             hand: protocol::VarInt(0),
                             cursor_x: at.x as f32,
                             cursor_y: at.y as f32,
@@ -1341,15 +1332,7 @@ impl Server {
                 } else if self.protocol_version >= 315 {
                     self.write_packet(packet::play::serverbound::PlayerBlockPlacement_f32 {
                         location: pos,
-                        face: protocol::VarInt(match face {
-                            Direction::Down => 0,
-                            Direction::Up => 1,
-                            Direction::North => 2,
-                            Direction::South => 3,
-                            Direction::West => 4,
-                            Direction::East => 5,
-                            _ => unreachable!(),
-                        }),
+                        face: protocol::VarInt(face.index() as i32),
                         hand: protocol::VarInt(0),
                         cursor_x: at.x as f32,
                         cursor_y: at.y as f32,
@@ -1358,58 +1341,70 @@ impl Server {
                 } else if self.protocol_version >= 49 {
                     self.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8 {
                         location: pos,
-                        face: protocol::VarInt(match face {
-                            Direction::Down => 0,
-                            Direction::Up => 1,
-                            Direction::North => 2,
-                            Direction::South => 3,
-                            Direction::West => 4,
-                            Direction::East => 5,
-                            _ => unreachable!(),
-                        }),
+                        face: protocol::VarInt(face.index() as i32),
                         hand: protocol::VarInt(0),
                         cursor_x: (at.x * 16.0) as u8,
                         cursor_y: (at.y * 16.0) as u8,
                         cursor_z: (at.z * 16.0) as u8,
                     });
                 } else if self.protocol_version >= 47 {
+                    let item = self
+                        .hud_context
+                        .clone()
+                        .read()
+                        .player_inventory
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .read()
+                        .get_item((36 + self.hud_context.clone().read().get_slot_index()) as i16)
+                        .as_ref()
+                        .map(|item| item.stack.clone());
                     self.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8_Item {
                         location: pos,
-                        face: match face {
-                            Direction::Down => 0,
-                            Direction::Up => 1,
-                            Direction::North => 2,
-                            Direction::South => 3,
-                            Direction::West => 4,
-                            Direction::East => 5,
-                            _ => unreachable!(),
-                        },
-                        hand: None,
+                        face: face.index() as u8,
+                        hand: item,
                         cursor_x: (at.x * 16.0) as u8,
                         cursor_y: (at.y * 16.0) as u8,
                         cursor_z: (at.z * 16.0) as u8,
                     });
                 } else {
+                    let item = self
+                        .hud_context
+                        .clone()
+                        .read()
+                        .player_inventory
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .read()
+                        .get_item((36 + self.hud_context.clone().read().get_slot_index()) as i16)
+                        .as_ref()
+                        .map(|item| item.stack.clone());
                     self.write_packet(
                         packet::play::serverbound::PlayerBlockPlacement_u8_Item_u8y {
                             x: pos.x,
                             y: pos.y as u8,
                             z: pos.x,
-                            face: match face {
-                                Direction::Down => 0,
-                                Direction::Up => 1,
-                                Direction::North => 2,
-                                Direction::South => 3,
-                                Direction::West => 4,
-                                Direction::East => 5,
-                                _ => unreachable!(),
-                            },
-                            hand: None,
+                            face: face.index() as u8,
+                            hand: item,
                             cursor_x: (at.x * 16.0) as u8,
                             cursor_y: (at.y * 16.0) as u8,
                             cursor_z: (at.z * 16.0) as u8,
                         },
                     );
+                }
+                if self.mapped_protocol_version < Version::V1_8 {
+                    self.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
+                        entity_id: 0,
+                        animation: 0,
+                    });
+                } else if self.mapped_protocol_version < Version::V1_9 {
+                    self.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
+                } else {
+                    self.write_packet(packet::play::serverbound::ArmSwing {
+                        hand: Default::default(),
+                    });
                 }
             }
         }

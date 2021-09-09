@@ -1025,12 +1025,12 @@ impl Serializable for Position {
         let protocol_version = current_protocol_version();
         if Version::from_id(protocol_version as u32) < Version::V1_14 {
             pos = (((self.x as u64) & 0x3FFFFFF) << 38)
-                | ((self.y as u64) & 0xFFF)
-                | (((self.z as u64) & 0x3FFFFFF) << 12);
-        } else {
-            pos = (((self.x as u64) & 0x3FFFFFF) << 38)
                 | (((self.y as u64) & 0xFFF) << 26)
                 | ((self.z as u64) & 0x3FFFFFF);
+        } else {
+            pos = (((self.x as u64) & 0x3FFFFFF) << 38)
+                | ((self.y as u64) & 0xFFF)
+                | (((self.z as u64) & 0x3FFFFFF) << 12);
         }
 
         buf.write_u64::<BigEndian>(pos)?;
