@@ -1291,11 +1291,10 @@ impl Server {
     }
 
     pub fn on_right_click(&self, renderer: Arc<RwLock<render::Renderer>>) {
-        use crate::shared::Direction;
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
             let renderer = &mut renderer.write();
-            if let Some((mut pos, _, face, at)) = target::trace_ray(
+            if let Some((pos, _, face, at)) = target::trace_ray(
                 &world,
                 4.0,
                 renderer.camera.pos.to_vec(),
