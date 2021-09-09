@@ -22,5 +22,5 @@ jobs:
     - uses: bilelmoussaoui/flatpak-github-actions/flatpak-builder@v4
       with:
         bundle: leafish.flatpak
-        manifest-path: packaging/flatpak/com.github.terrarier2111.Leafish.yaml
+        manifest-path: packaging/flatpak/com.github.Lea-fish.Leafish.yaml
         cache-key: flatpak-builder-${{ github.sha }}
