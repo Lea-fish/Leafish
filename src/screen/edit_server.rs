@@ -75,7 +75,7 @@ impl EditServerEntry {
             }
         }
 
-        let mut out = fs::File::create("servers.json").unwrap();
+        let mut out = fs::File::create(paths::get_data_dir().join("servers.json")).unwrap();
         serde_json::to_writer_pretty(&mut out, &servers_info).unwrap();
     }
 }
