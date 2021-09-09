@@ -15,6 +15,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 
+use crate::paths;
 use crate::render;
 use crate::settings;
 use crate::ui;
@@ -56,7 +57,7 @@ impl DeleteServerEntry {
     }
 
     fn delete_server(index: usize) {
-        let mut servers_info = match fs::File::open("servers.json") {
+        let mut servers_info = match fs::File::open(paths::get_data_dir().join("servers.json")) {
             Ok(val) => serde_json::from_reader(val).unwrap(),
             Err(_) => {
                 let mut info = BTreeMap::default();
@@ -76,7 +77,7 @@ impl DeleteServerEntry {
             servers.remove(index);
         }
 
-        let mut out = fs::File::create("servers.json").unwrap();
+        let mut out = fs::File::create(paths::get_data_dir().join("servers.json")).unwrap();
         serde_json::to_writer_pretty(&mut out, &servers_info).unwrap();
     }
 }

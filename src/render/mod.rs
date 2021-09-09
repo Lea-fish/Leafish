@@ -23,6 +23,7 @@ pub mod model;
 pub mod ui;
 
 use crate::gl;
+use crate::paths;
 use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::prelude::*;
@@ -1111,7 +1112,7 @@ impl TextureManager {
         use std::io::Read;
         use std::io::{Error, ErrorKind};
         use std::path::Path;
-        let path = format!("skin-cache/{}/{}.png", &hash[..2], hash);
+        let path = paths::get_cache_dir().join(format!("skin-cache/{}/{}.png", &hash[..2], hash));
         let cache_path = Path::new(&path);
         fs::create_dir_all(cache_path.parent().unwrap())?;
         let mut buf = vec![];

@@ -14,6 +14,8 @@
 
 extern crate leafish_resources as internal;
 
+use crate::paths;
+
 use std::collections::HashMap;
 use std::fs;
 use std::hash::BuildHasherDefault;
@@ -26,7 +28,6 @@ use std::thread;
 use crate::types::hash::FNVHash;
 use crate::ui;
 use std::fs::File;
-use std::path::Path;
 
 const RESOURCES_VERSION: &str = "1.12.2";
 const VANILLA_CLIENT_URL: &str =
@@ -105,7 +106,7 @@ impl Manager {
 
     pub fn open(&self, plugin: &str, name: &str) -> Option<Box<dyn io::Read>> {
         if plugin == "global" {
-            let file = File::open(Path::new(name));
+            let file = File::open(paths::get_data_dir().join(name));
             if let Ok(file) = file {
                 Some(Box::new(file))
             } else {
@@ -118,6 +119,7 @@ impl Manager {
                     return Some(val);
                 }
             }
+
             None
         }
     }
@@ -286,14 +288,9 @@ impl Manager {
     }
 
     fn load_vanilla(&mut self) {
-        let loc = format!("./resources-{}", RESOURCES_VERSION);
-        let location = path::Path::new(&loc);
-        self.packs.insert(
-            1,
-            Box::new(DirPack {
-                root: location.to_path_buf(),
-            }),
-        );
+        let loc = format!("resources-{}", RESOURCES_VERSION);
+        let location = paths::get_data_dir().join(&loc);
+        self.packs.insert(1, Box::new(DirPack { root: location }));
         self.version += 1;
     }
 
@@ -303,7 +300,7 @@ impl Manager {
     }
 
     fn download_assets(&mut self) {
-        let loc = format!("./index/{}.json", ASSET_VERSION);
+        let loc = paths::get_data_dir().join(format!("index/{}.json", ASSET_VERSION));
         let location = path::Path::new(&loc).to_owned();
         let progress_info = self.vanilla_progress.clone();
         let (send, recv) = mpsc::channel();
@@ -332,9 +329,9 @@ impl Manager {
                     &*location.to_string_lossy(),
                     length,
                 );
+                let tmp_file = paths::get_cache_dir().join(format!("index-{}.tmp", ASSET_VERSION));
                 {
-                    let mut file =
-                        fs::File::create(format!("index-{}.tmp", ASSET_VERSION)).unwrap();
+                    let mut file = fs::File::create(tmp_file.clone()).unwrap();
                     let mut progress = ProgressRead {
                         read: res,
                         progress: &progress_info,
@@ -343,17 +340,18 @@ impl Manager {
                     };
                     io::copy(&mut progress, &mut file).unwrap();
                 }
-                fs::rename(format!("index-{}.tmp", ASSET_VERSION), &location).unwrap();
+                fs::rename(tmp_file, &location).unwrap();
                 send.send(true).unwrap();
             }
+
             let file = fs::File::open(&location).unwrap();
             let index: serde_json::Value = serde_json::from_reader(&file).unwrap();
-            let root_location = path::Path::new("./objects/");
+            let root_location = paths::get_data_dir().join("objects");
             let objects = index.get("objects").and_then(|v| v.as_object()).unwrap();
             Self::add_task(
                 &progress_info,
                 "Downloading Assets",
-                "./objects",
+                &*root_location.to_string_lossy(),
                 objects.len() as u64,
             );
             for (k, v) in objects {
@@ -385,13 +383,18 @@ impl Manager {
                     }
                     fs::rename(&tmp_file, &location).unwrap();
                 }
-                Self::add_task_progress(&progress_info, "Downloading Assets", "./objects", 1);
+                Self::add_task_progress(
+                    &progress_info,
+                    "Downloading Assets",
+                    &*root_location.to_string_lossy(),
+                    1,
+                );
             }
         });
     }
 
     fn download_vanilla(&mut self) {
-        let loc = format!("./resources-{}", RESOURCES_VERSION);
+        let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
         let location = path::Path::new(&loc);
         if fs::metadata(location.join("leafish.assets")).is_ok() {
             self.load_vanilla();
@@ -404,7 +407,8 @@ impl Manager {
         thread::spawn(move || {
             let client = reqwest::blocking::Client::new();
             let res = client.get(VANILLA_CLIENT_URL).send().unwrap();
-            let mut file = fs::File::create(format!("{}.tmp", RESOURCES_VERSION)).unwrap();
+            let tmp_file_path = paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION));
+            let mut file = fs::File::create(tmp_file_path.clone()).unwrap();
 
             let length = res
                 .headers()
@@ -414,7 +418,9 @@ impl Manager {
                 .unwrap()
                 .parse::<u64>()
                 .unwrap();
-            let task_file = format!("./resources-{}", RESOURCES_VERSION);
+            let task_file_path =
+                paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
+            let task_file = task_file_path.into_os_string().into_string().unwrap();
             Self::add_task(
                 &progress_info,
                 "Downloading Core Assets",
@@ -432,10 +438,12 @@ impl Manager {
             }
 
             // Copy the resources from the zip
-            let file = fs::File::open(format!("{}.tmp", RESOURCES_VERSION)).unwrap();
+            let file = fs::File::open(tmp_file_path).unwrap();
             let mut zip = zip::ZipArchive::new(file).unwrap();
 
-            let task_file = format!("./resources-{}", RESOURCES_VERSION);
+            let task_file_path =
+                paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
+            let task_file = task_file_path.into_os_string().into_string().unwrap();
             Self::add_task(
                 &progress_info,
                 "Unpacking Core Assets",
@@ -443,7 +451,7 @@ impl Manager {
                 zip.len() as u64,
             );
 
-            let loc = format!("./resources-{}", RESOURCES_VERSION);
+            let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
             let location = path::Path::new(&loc);
             let count = zip.len();
             for i in 0..count {
@@ -461,7 +469,8 @@ impl Manager {
             fs::File::create(location.join("leafish.assets")).unwrap(); // Marker file
             send.send(true).unwrap();
 
-            fs::remove_file(format!("{}.tmp", RESOURCES_VERSION)).unwrap();
+            fs::remove_file(paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION)))
+                .unwrap();
         });
     }
 
@@ -518,7 +527,7 @@ struct ObjectPack {
 
 impl ObjectPack {
     fn new() -> ObjectPack {
-        let loc = format!("./index/{}.json", ASSET_VERSION);
+        let loc = paths::get_data_dir().join(format!("index/{}.json", ASSET_VERSION));
         let location = path::Path::new(&loc);
         let file = fs::File::open(&location).unwrap();
         let index: serde_json::Value = serde_json::from_reader(&file).unwrap();
