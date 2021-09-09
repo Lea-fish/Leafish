@@ -47,6 +47,7 @@ pub mod settings;
 pub mod ui;
 pub mod world;
 
+use crate::console::VarType;
 use crate::protocol::mojang;
 use crate::render::hud::HudContext;
 use leafish_protocol::format::{Component, TextComponent};
@@ -77,6 +78,7 @@ pub struct Game {
     resource_manager: Arc<RwLock<resources::Manager>>,
     console: Arc<Mutex<console::Console>>,
     vars: Rc<console::Vars>,
+    auth_vars: Rc<console::Vars>,
     should_close: bool,
 
     server: Option<Arc<server::Server>>,
@@ -134,9 +136,9 @@ impl Game {
         let address = address.to_owned();
         let resources = self.resource_manager.clone();
         let profile = mojang::Profile {
-            username: self.vars.get(auth::CL_USERNAME).clone(),
-            id: self.vars.get(auth::CL_UUID).clone(),
-            access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
+            username: self.auth_vars.get(auth::CL_USERNAME).clone(),
+            id: self.auth_vars.get(auth::CL_UUID).clone(),
+            access_token: self.auth_vars.get(auth::AUTH_TOKEN).clone(),
         };
         let renderer = self.renderer.clone();
         let result = thread::spawn(move || {
@@ -215,16 +217,22 @@ fn main() {
     info!("Starting Leafish...");
 
     let (vars, mut vsync) = {
-        let mut vars = console::Vars::new();
+        let mut vars = console::Vars::default();
         vars.register(CL_BRAND);
         console::register_vars(&mut vars);
-        auth::register_vars(&mut vars);
         settings::register_vars(&mut vars);
         vars.load_config();
         vars.save_config();
         con.lock().configure(&vars);
         let vsync = *vars.get(settings::R_VSYNC);
         (Rc::new(vars), vsync)
+    };
+    let auth_vars = {
+        let mut vars = console::Vars::new(VarType::Authentication);
+        auth::register_vars(&mut vars);
+        vars.load_config();
+        vars.save_config();
+        Rc::new(vars)
     };
 
     let (res, mut resui) = resources::Manager::new();
@@ -282,11 +290,14 @@ fn main() {
 
     let mut screen_sys = screen::ScreenSystem::new();
     if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
+        screen_sys.add_screen(Box::new(screen::Login::new(
+            vars.clone(),
+            auth_vars.clone(),
+        )));
     }
 
     if let Some(username) = opt.username {
-        vars.set(auth::CL_USERNAME, username);
+        auth_vars.set(auth::CL_USERNAME, username);
     }
 
     let textures = renderer.get_textures();
@@ -302,6 +313,7 @@ fn main() {
         resource_manager: resource_manager.clone(),
         console: con,
         vars,
+        auth_vars,
         should_close: false,
         chunk_builder: chunk_builder::ChunkBuilder::new(resource_manager, textures),
         connect_error: None,
