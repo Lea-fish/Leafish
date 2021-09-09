@@ -15,7 +15,7 @@
 use crate::entity;
 use crate::format;
 use crate::inventory::material::versions::to_material;
-use crate::inventory::{InventoryContext, Item, Inventory};
+use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::protocol::{self, forge, mojang, packet};
 use crate::render;
 use crate::render::hud::HudContext;
@@ -1295,22 +1295,6 @@ impl Server {
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
             let renderer = &mut renderer.write();
-            if let Some(player) = *self.player.clone().write() {
-                let position = self
-                    .entities
-                    .clone()
-                    .write()
-                    .get_component_mut(player, self.target_position)
-                    .unwrap();
-                let rotation = self
-                    .entities
-                    .clone()
-                    .write()
-                    .get_component_mut(player, self.rotation)
-                    .unwrap();
-                println!("curr actual loc {:?}", position);
-            }
-            println!("curr camera loc {:?}", renderer.camera.pos.to_vec());
             if let Some((mut pos, _, face, at)) = target::trace_ray(
                 &world,
                 4.0,
@@ -1318,12 +1302,7 @@ impl Server {
                 renderer.view_vector.cast().unwrap(),
                 target::test_block,
             ) {
-                /*let face_offsets = face.get_offset();
-                (&mut pos).x += face_offsets.0;
-                (&mut pos).y += face_offsets.1;
-                (&mut pos).z += face_offsets.2;*/
                 if self.protocol_version >= 477 {
-                    println!("place block at {:?} 1", pos);
                     self.write_packet(
                         packet::play::serverbound::PlayerBlockPlacement_insideblock {
                             location: pos,
@@ -1336,7 +1315,6 @@ impl Server {
                         },
                     );
                 } else if self.protocol_version >= 315 {
-                    println!("place block at {:?} 2", pos);
                     self.write_packet(packet::play::serverbound::PlayerBlockPlacement_f32 {
                         location: pos,
                         face: protocol::VarInt(face.index() as i32),
@@ -1346,7 +1324,6 @@ impl Server {
                         cursor_z: at.z as f32,
                     });
                 } else if self.protocol_version >= 49 {
-                    println!("place block at {:?} 3", pos);
                     self.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8 {
                         location: pos,
                         face: protocol::VarInt(face.index() as i32),
@@ -1356,9 +1333,18 @@ impl Server {
                         cursor_z: (at.z * 16.0) as u8,
                     });
                 } else if self.protocol_version >= 47 {
-                    println!("place block at {:?} 4", pos);
-                    let item = self.hud_context.clone().read().player_inventory.as_ref().unwrap().clone().read().get_item(
-                        (36 + self.hud_context.clone().read().get_slot_index()) as i16).as_ref().map(|item| item.stack.clone());
+                    let item = self
+                        .hud_context
+                        .clone()
+                        .read()
+                        .player_inventory
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .read()
+                        .get_item((36 + self.hud_context.clone().read().get_slot_index()) as i16)
+                        .as_ref()
+                        .map(|item| item.stack.clone());
                     self.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8_Item {
                         location: pos,
                         face: face.index() as u8,
@@ -1368,9 +1354,18 @@ impl Server {
                         cursor_z: (at.z * 16.0) as u8,
                     });
                 } else {
-                    println!("place block at {:?}", pos);
-                    let item = self.hud_context.clone().read().player_inventory.as_ref().unwrap().clone().read().get_item(
-                        (36 + self.hud_context.clone().read().get_slot_index()) as i16).as_ref().map(|item| item.stack.clone());
+                    let item = self
+                        .hud_context
+                        .clone()
+                        .read()
+                        .player_inventory
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .read()
+                        .get_item((36 + self.hud_context.clone().read().get_slot_index()) as i16)
+                        .as_ref()
+                        .map(|item| item.stack.clone());
                     self.write_packet(
                         packet::play::serverbound::PlayerBlockPlacement_u8_Item_u8y {
                             x: pos.x,
@@ -1383,6 +1378,18 @@ impl Server {
                             cursor_z: (at.z * 16.0) as u8,
                         },
                     );
+                }
+                if self.mapped_protocol_version < Version::V1_8 {
+                    self.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
+                        entity_id: 0,
+                        animation: 0,
+                    });
+                } else if self.mapped_protocol_version < Version::V1_9 {
+                    self.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
+                } else {
+                    self.write_packet(packet::play::serverbound::ArmSwing {
+                        hand: Default::default(),
+                    });
                 }
             }
         }
