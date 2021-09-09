@@ -2706,7 +2706,6 @@ impl Server {
     }
 
     fn on_block_change_in_world(&self, location: Position, id: i32) {
-        println!("set block to {:?}", location);
         let world = self.world.clone();
         let modded_block_ids = world.modded_block_ids.clone();
         let block = world.id_map.by_vanilla_id(id as usize, modded_block_ids);
