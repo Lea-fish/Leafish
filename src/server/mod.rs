@@ -24,11 +24,11 @@ use crate::resources;
 use crate::screen::respawn::Respawn;
 use crate::screen::ScreenSystem;
 use crate::settings::Actionkey;
-use crate::shared::{Axis, Position};
+use crate::shared::Position;
 use crate::types::hash::FNVHash;
 use crate::types::GameMode;
 use crate::world;
-use crate::world::{block, CPos, LightData, LightUpdate};
+use crate::world::{CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
 use cgmath::prelude::*;
 use crossbeam_channel::unbounded;
@@ -747,10 +747,9 @@ impl Server {
         });
     }
 
-    fn spawn_light_updater(_server: Arc<Mutex<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
+    fn spawn_light_updater(server: Arc<Mutex<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
         let (tx, rx) = unbounded();
         thread::spawn(move || loop {
-            /*
             let server = server.clone().lock().as_ref().unwrap().clone();
             let mut done = false; // TODO: Improve performance!
             while !done {
@@ -761,7 +760,8 @@ impl Server {
                 while let Ok(update) = rx.try_recv() {
                     updates_performed += 1;
                     world_cloned.do_light_update(update);
-                    if (updates_performed & 0xFFF == 0) && start.elapsed().subsec_nanos() >= 5000000 {
+                    if (updates_performed & 0xFFF == 0) && start.elapsed().subsec_nanos() >= 5000000
+                    {
                         // 5 ms for light updates
                         interrupt = true;
                         break;
@@ -771,9 +771,9 @@ impl Server {
                     done = true;
                 }
                 thread::sleep(Duration::from_millis(1));
-            }*/
-            while let Ok(_update) = rx.try_recv() {}
-            thread::sleep(Duration::from_millis(1000));
+            }
+            // while let Ok(_update) = rx.try_recv() {}
+            // thread::sleep(Duration::from_millis(1000));
         });
         tx
     }
@@ -793,112 +793,6 @@ impl Server {
             etx.send(true).unwrap();
         });
         (tx, erx)
-    }
-
-    pub fn dummy_server(
-        resources: Arc<RwLock<resources::Manager>>,
-        renderer: Arc<RwLock<Renderer>>,
-    ) -> Arc<Server> {
-        let server_callback = Arc::new(Mutex::new(None));
-        let inner_server = server_callback.clone();
-        let mut inner_server = inner_server.lock();
-        let _window_size = Arc::new(RwLock::new((0, 0)));
-        let render_list =
-            Self::spawn_render_list_computer(server_callback.clone(), renderer.clone());
-        let server = Arc::new(Server::new(
-            protocol::SUPPORTED_PROTOCOLS[0],
-            vec![],
-            protocol::UUID::default(),
-            resources,
-            Arc::new(RwLock::new(None)),
-            Self::spawn_light_updater(server_callback),
-            render_list.0,
-            render_list.1,
-            Arc::new(RwLock::new(HudContext::new())),
-            &renderer.read(),
-        ));
-        inner_server.replace(server.clone());
-        let mut rng = rand::thread_rng();
-
-        for x in (-7 * 16)..(7 * 16) {
-            for z in -7 * 16..7 * 16 {
-                let h = 5 + (6.0 * (x as f64 / 16.0).cos() * (z as f64 / 16.0).sin()) as i32;
-                for y in 0..h {
-                    server.world.clone().set_block(
-                        Position::new(x, y, z),
-                        block::Dirt {
-                            snowy: false,
-                            variant: block::DirtVariant::Normal,
-                        },
-                    );
-                }
-                server
-                    .world
-                    .clone()
-                    .set_block(Position::new(x, h, z), block::Grass { snowy: false });
-
-                if x * x + z * z > 16 * 16 && rng.gen_bool(1.0 / 80.0) {
-                    for i in 0..5 {
-                        server.world.clone().set_block(
-                            Position::new(x, h + 1 + i, z),
-                            block::Log {
-                                axis: Axis::Y,
-                                variant: block::TreeVariant::Oak,
-                            },
-                        );
-                    }
-                    for xx in -2..3 {
-                        for zz in -2..3 {
-                            if xx == 0 && z == 0 {
-                                continue;
-                            }
-                            let world = server.world.clone();
-                            world.set_block(
-                                Position::new(x + xx, h + 3, z + zz),
-                                block::Leaves {
-                                    variant: block::TreeVariant::Oak,
-                                    check_decay: false,
-                                    decayable: false,
-                                    distance: 1,
-                                },
-                            );
-                            world.set_block(
-                                Position::new(x + xx, h + 4, z + zz),
-                                block::Leaves {
-                                    variant: block::TreeVariant::Oak,
-                                    check_decay: false,
-                                    decayable: false,
-                                    distance: 1,
-                                },
-                            );
-                            if xx.abs() <= 1 && zz.abs() <= 1 {
-                                world.set_block(
-                                    Position::new(x + xx, h + 5, z + zz),
-                                    block::Leaves {
-                                        variant: block::TreeVariant::Oak,
-                                        check_decay: false,
-                                        decayable: false,
-                                        distance: 1,
-                                    },
-                                );
-                            }
-                            if xx * xx + zz * zz <= 1 {
-                                world.set_block(
-                                    Position::new(x + xx, h + 6, z + zz),
-                                    block::Leaves {
-                                        variant: block::TreeVariant::Oak,
-                                        check_decay: false,
-                                        decayable: false,
-                                        distance: 1,
-                                    },
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        server
     }
 
     fn new(
