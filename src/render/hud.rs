@@ -992,15 +992,17 @@ impl Hud {
                 .scale_x(scale)
                 .scale_y(scale)
                 .position(
-                    scale * 5.0,
-                    scale * 80.0 + ((component_lines as f64) * 10.5) * scale,
+                    0.0,
+                    scale * 80.0
+                        + ((component_lines as f64)
+                            * (10.0 + (cmp::min(component_lines, 1) as f64 * 0.5)))
+                            * scale,
                 )
                 .text(message)
                 .max_width(CHAT_WIDTH * scale)
                 .create(ui_container);
             component_lines += lines;
             self.chat_elements.push(text);
-            //TODO: Figure out the height of the text before drawing it so we can position it properly instead of on top of one another...
         }
     }
 
@@ -1012,19 +1014,16 @@ impl Hud {
         ui_container: &mut Container,
         renderer: &Renderer,
     ) -> ImageRef {
-        // TODO: Fix following textures: carrot_rod
         let icon_scale = Hud::icon_scale(renderer);
         let textures = item.material.texture_locations();
         let texture =
             if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
                 if tex.dummy {
-                    println!("other texture: {}", textures.1);
                     textures.1
                 } else {
                     textures.0
                 }
             } else {
-                println!("other texture: {}", textures.1);
                 textures.1
             };
         let image = ui::ImageBuilder::new()
