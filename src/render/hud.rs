@@ -968,6 +968,7 @@ impl Hud {
         let history_size = hud_context.chat_history.len();
 
         if history_size > 0 {
+            // TODO: Only do this in chat-view mode (where the entire chat is shown)
             self.chat_background_elements.push(
                 ui::ImageBuilder::new()
                     .texture("leafish:solid")
@@ -975,23 +976,29 @@ impl Hud {
                     .position(0.0, scale * 85.0)
                     .size(
                         500.0 * scale,
-                        6.0 * scale + 10.0 * scale * (history_size as f64),
+                        6.0 * scale + 10.0 * scale * (cmp::min(10, history_size) as f64),
                     )
                     .colour((0, 0, 0, 100))
                     .create(ui_container),
             );
         }
-
+        let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
             let message = hud_context.chat_history[history_size - 1 - i].clone();
+            let lines =
+                (renderer.ui.size_of_string(&*message.to_string()) / CHAT_WIDTH).ceil() as u8;
             let text = ui::FormattedBuilder::new()
                 .alignment(VAttach::Bottom, HAttach::Left)
                 .scale_x(scale)
                 .scale_y(scale)
-                .position(scale * 5.0, scale * 80.0 + ((i * 10) as f64) * scale)
+                .position(
+                    scale * 5.0,
+                    scale * 80.0 + ((component_lines as f64) * 10.5) * scale,
+                )
                 .text(message)
-                .max_width(490.0 * scale)
+                .max_width(CHAT_WIDTH * scale)
                 .create(ui_container);
+            component_lines += lines;
             self.chat_elements.push(text);
             //TODO: Figure out the height of the text before drawing it so we can position it properly instead of on top of one another...
         }
@@ -1030,3 +1037,5 @@ impl Hud {
         image
     }
 }
+
+const CHAT_WIDTH: f64 = 490.0;
