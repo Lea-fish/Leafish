@@ -2511,6 +2511,10 @@ impl Server {
         _sender: Option<protocol::UUID>,
     ) {
         info!("Received chat message: {}", message);
+        self.hud_context
+            .clone()
+            .write()
+            .display_message_in_chat(message.clone());
         self.received_chat_at
             .clone()
             .write()
