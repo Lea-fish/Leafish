@@ -2672,7 +2672,7 @@ impl Server {
         _position: Option<u8>,
         _sender: Option<protocol::UUID>,
     ) {
-        info!("Received chat message: {}", message);
+        debug!("Received chat message: {}", message);
         self.hud_context
             .clone()
             .write()
