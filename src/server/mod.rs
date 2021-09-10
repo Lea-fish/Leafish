@@ -122,11 +122,11 @@ pub struct Server {
     pub render_list_computer_notify: Receiver<bool>,
     pub hud_context: Arc<RwLock<HudContext>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
-    fps: RwLock<u32>,
-    fps_start: RwLock<u128>,
+    fps: Mutex<u32>,
+    fps_start: Mutex<u128>,
     pub dead: RwLock<bool>,
-    just_died: RwLock<bool>,
-    close_death_screen: RwLock<bool>,
+    just_died: Mutex<bool>,
+    close_death_screen: Mutex<bool>,
     last_chat_open: AtomicBool,
     pub chat_open: AtomicBool,
     pub chat_ctx: Arc<ChatContext>,
@@ -922,11 +922,11 @@ impl Server {
             render_list_computer_notify,
             hud_context,
             inventory_context,
-            fps: RwLock::new(0),
-            fps_start: RwLock::new(0),
+            fps: Mutex::new(0),
+            fps_start: Mutex::new(0),
             dead: RwLock::new(false),
-            just_died: RwLock::new(false),
-            close_death_screen: RwLock::new(false),
+            just_died: Mutex::new(false),
+            close_death_screen: Mutex::new(false),
             block_break_info: Mutex::new(BlockBreakInfo {
                 break_position: Default::default(),
                 break_face: BlockDirection::Invalid,
@@ -957,19 +957,19 @@ impl Server {
     pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, game: &mut Game) {
         let start = SystemTime::now();
         let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis();
-        if *self.fps_start.read() + 1000 < time {
+        if *self.fps_start.lock() + 1000 < time {
             self.hud_context
                 .clone()
                 .write()
-                .update_fps(*self.fps.read());
-            *self.fps_start.write() = time;
-            *self.fps.write() = 0;
+                .update_fps(*self.fps.lock());
+            *self.fps_start.lock() = time;
+            *self.fps.lock() = 0;
         } else {
-            *self.fps.write() += 1;
+            *self.fps.lock() += 1;
         }
-        if *self.close_death_screen.read() {
-            *self.close_death_screen.write() = false;
-            game.screen_sys.clone().pop_screen();
+        if *self.close_death_screen.lock() {
+            *self.close_death_screen.lock() = false;
+            game.screen_sys.pop_screen();
             game.focused = true;
         }
         let chat_open = self.chat_open.load(Ordering::Acquire);
@@ -1035,12 +1035,12 @@ impl Server {
         world.tick(&mut self.entities.clone().write());
 
         if self.player.clone().read().is_some() {
-            if *self.just_died.read() {
-                *self.just_died.write() = false;
-                game.screen_sys.close_closable_screens();
-                game.screen_sys
-                    .clone()
-                    .add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
+            if *self.just_died.lock() {
+                *self.just_died.lock() = false;
+                while game.screen_sys.is_current_closable() {
+                    game.screen_sys.pop_screen();
+                }
+                game.screen_sys.add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
                 game.focused = false;
             }
             let world = self.world.clone();
@@ -1706,9 +1706,9 @@ impl Server {
                 .flying = gamemode.can_fly();
         }
         if *self.dead.read() {
-            *self.close_death_screen.write() = true;
+            *self.close_death_screen.lock() = true;
             *self.dead.write() = false;
-            *self.just_died.write() = false;
+            *self.just_died.lock() = false;
             self.hud_context
                 .clone()
                 .write()
@@ -2810,7 +2810,7 @@ impl Server {
             .update_health_and_food(health, food, saturation);
         if health <= 0.0 && !*self.dead.read() {
             *self.dead.write() = true;
-            *self.just_died.write() = true;
+            *self.just_died.lock() = true;
         }
     }
 }
