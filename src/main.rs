@@ -61,7 +61,7 @@ use std::thread;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
-const CL_BRAND: console::CVar<String> = console::CVar {
+const CL_BRAND: settings::CVar<String> = settings::CVar {
     ty: PhantomData,
     name: "cl_brand",
     description: "cl_brand has the value of the clients current 'brand'. e.g. \"Leafish\" or \
@@ -76,7 +76,7 @@ pub struct Game {
     screen_sys: screen::ScreenSystem,
     resource_manager: Arc<RwLock<resources::Manager>>,
     console: Arc<Mutex<console::Console>>,
-    vars: Rc<console::Vars>,
+    vars: Rc<settings::Vars>,
     should_close: bool,
 
     server: Option<Arc<server::Server>>,
@@ -133,10 +133,12 @@ impl Game {
         }
         let address = address.to_owned();
         let resources = self.resource_manager.clone();
+
+        let vars = settings::Vars::new();
         let profile = mojang::Profile {
-            username: self.vars.get(auth::CL_USERNAME).clone(),
-            id: self.vars.get(auth::CL_UUID).clone(),
-            access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
+            username: vars.get(auth::CL_USERNAME).clone(),
+            id: vars.get(auth::CL_UUID).clone(),
+            access_token: vars.get(auth::AUTH_TOKEN).clone(),
         };
         let renderer = self.renderer.clone();
         let result = thread::spawn(move || {
@@ -212,18 +214,13 @@ fn main() {
     log::set_boxed_logger(Box::new(proxy)).unwrap();
     log::set_max_level(log::LevelFilter::Trace);
 
-    info!("Starting Leafish...");
+    info!("Starting Leafish");
 
     let (vars, mut vsync) = {
-        let mut vars = console::Vars::new();
+        let mut vars = settings::Vars::new();
         vars.register(CL_BRAND);
-        console::register_vars(&mut vars);
-        auth::register_vars(&mut vars);
-        settings::register_vars(&mut vars);
-        vars.load_config();
-        vars.save_config();
-        con.lock().configure(&vars);
-        let vsync = *vars.get(settings::R_VSYNC);
+        con.lock().configure();
+        let vsync = *vars.get(settings::vars::R_VSYNC);
         (Rc::new(vars), vsync)
     };
 
@@ -282,11 +279,12 @@ fn main() {
 
     let mut screen_sys = screen::ScreenSystem::new();
     if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
+        screen_sys.add_screen(Box::new(screen::Login::new()));
     }
 
     if let Some(username) = opt.username {
-        vars.set(auth::CL_USERNAME, username);
+        let vars_new = settings::Vars::new();
+        vars_new.set(auth::CL_USERNAME, username);
     }
 
     let textures = renderer.get_textures();
@@ -413,10 +411,7 @@ fn tick_all(
                 game.screen_sys.pop_screen();
             }
             game.screen_sys
-                .replace_screen(Box::new(screen::ServerList::new(
-                    Some(disconnect_reason),
-                    game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                )));
+                .replace_screen(Box::new(screen::ServerList::new(Some(disconnect_reason))));
             game.server = None;
             game.renderer.clone().write().reset();
             game.focused = false;
@@ -446,14 +441,14 @@ fn tick_all(
     };
     *last_resource_version = version;
 
-    let vsync_changed = *game.vars.get(settings::R_VSYNC);
+    let vsync_changed = *game.vars.get(settings::vars::R_VSYNC);
     if *vsync != vsync_changed {
         error!("Changing vsync currently requires restarting");
         game.should_close = true;
         // TODO: after https://github.com/tomaka/glutin/issues/693 Allow changing vsync on a Window
         //vsync = vsync_changed;
     }
-    let fps_cap = *game.vars.get(settings::R_MAX_FPS);
+    let fps_cap = *game.vars.get(settings::vars::R_MAX_FPS);
 
     if game.server.is_some() {
         game.server
@@ -702,9 +697,8 @@ fn handle_window_event<T>(
                                     window.set_cursor_grab(false).unwrap();
                                     window.set_cursor_visible(true);
                                     game.focused = false;
-                                    game.screen_sys.add_screen(Box::new(
-                                        screen::SettingsMenu::new(game.vars.clone(), true),
-                                    ));
+                                    game.screen_sys
+                                        .add_screen(Box::new(screen::SettingsMenu::new(true)));
                                 } else if game.screen_sys.is_current_closable() {
                                     window.set_cursor_grab(true).unwrap();
                                     window.set_cursor_visible(false);
@@ -731,7 +725,7 @@ fn handle_window_event<T>(
                         }
                         (ElementState::Pressed, Some(key)) => {
                             if let Some(action_key) =
-                                settings::Actionkey::get_by_keycode(key, &game.vars)
+                                settings::vars::Actionkey::get_by_keycode(key, &game.vars)
                             {
                                 if game.server.is_some() {
                                     game.server.as_ref().unwrap().key_press(
@@ -749,7 +743,7 @@ fn handle_window_event<T>(
                         }
                         (ElementState::Released, Some(key)) => {
                             if let Some(action_key) =
-                                settings::Actionkey::get_by_keycode(key, &game.vars)
+                                settings::vars::Actionkey::get_by_keycode(key, &game.vars)
                             {
                                 if game.server.is_some() {
                                     game.server.as_ref().unwrap().key_press(

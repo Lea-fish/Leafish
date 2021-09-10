@@ -12,10 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::console;
+use crate::settings;
 use std::marker::PhantomData;
 
-pub const CL_USERNAME: console::CVar<String> = console::CVar {
+pub const CL_USERNAME: settings::CVar<String> = settings::CVar {
     ty: PhantomData,
     name: "cl_username",
     description: r#"cl_username is the username that the client will use to connect
@@ -25,7 +25,7 @@ to servers."#,
     default: &|| "".to_owned(),
 };
 
-pub const CL_UUID: console::CVar<String> = console::CVar {
+pub const CL_UUID: settings::CVar<String> = settings::CVar {
     ty: PhantomData,
     name: "cl_uuid",
     description: r#"cl_uuid is the uuid of the client. This is unique to a player
@@ -35,7 +35,7 @@ unlike their username."#,
     default: &|| "".to_owned(),
 };
 
-pub const AUTH_TOKEN: console::CVar<String> = console::CVar {
+pub const AUTH_TOKEN: settings::CVar<String> = settings::CVar {
     ty: PhantomData,
     name: "auth_token",
     description: r#"auth_token is the token used for this session to auth to servers
@@ -45,7 +45,7 @@ or relogin to this account."#,
     default: &|| "".to_owned(),
 };
 
-pub const AUTH_CLIENT_TOKEN: console::CVar<String> = console::CVar {
+pub const AUTH_CLIENT_TOKEN: settings::CVar<String> = settings::CVar {
     ty: PhantomData,
     name: "auth_client_token",
     description: r#"auth_client_token is a token that stays static between sessions.
@@ -55,7 +55,7 @@ Used to identify this client vs others."#,
     default: &|| "".to_owned(),
 };
 
-pub fn register_vars(vars: &mut console::Vars) {
+pub fn register_vars(vars: &mut settings::Vars) {
     vars.register(CL_USERNAME);
     vars.register(CL_UUID);
     vars.register(AUTH_TOKEN);

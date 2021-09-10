@@ -1,9 +1,6 @@
-use crate::console;
 use crate::render;
 use crate::settings;
 use crate::ui;
-
-use std::rc::Rc;
 
 pub struct UIElements {
     background: ui::ImageRef,
@@ -11,15 +8,13 @@ pub struct UIElements {
 }
 
 pub struct SettingsMenu {
-    _vars: Rc<console::Vars>,
     elements: Option<UIElements>,
     show_disconnect_button: bool,
 }
 
 impl SettingsMenu {
-    pub fn new(vars: Rc<console::Vars>, show_disconnect_button: bool) -> Self {
+    pub fn new(show_disconnect_button: bool) -> Self {
         SettingsMenu {
-            _vars: vars,
             elements: None,
             show_disconnect_button,
         }
@@ -52,7 +47,7 @@ impl super::Screen for SettingsMenu {
             audio_settings.add_text(txt);
             audio_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .add_screen(Box::new(AudioSettingsMenu::new(game.vars.clone())));
+                    .add_screen(Box::new(AudioSettingsMenu::new()));
                 true
             });
         }
@@ -72,7 +67,7 @@ impl super::Screen for SettingsMenu {
             video_settings.add_text(txt);
             video_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .add_screen(Box::new(VideoSettingsMenu::new(game.vars.clone())));
+                    .add_screen(Box::new(VideoSettingsMenu::new()));
                 true
             });
         }
@@ -122,7 +117,7 @@ impl super::Screen for SettingsMenu {
             skin_settings.add_text(txt);
             skin_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .add_screen(Box::new(SkinSettingsMenu::new(game.vars.clone())));
+                    .add_screen(Box::new(SkinSettingsMenu::new()));
                 true
             });
         }
@@ -168,10 +163,7 @@ impl super::Screen for SettingsMenu {
                     game.server.as_ref().unwrap().disconnect(None);
                     game.screen_sys.pop_screen();
                     game.screen_sys
-                        .replace_screen(Box::new(super::ServerList::new(
-                            None,
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                        )));
+                        .replace_screen(Box::new(super::ServerList::new(None)));
                     true
                 });
             }
@@ -219,17 +211,14 @@ impl super::Screen for SettingsMenu {
     }
 }
 
+#[derive(Default)]
 pub struct VideoSettingsMenu {
-    vars: Rc<console::Vars>,
     elements: Option<UIElements>,
 }
 
 impl VideoSettingsMenu {
-    pub fn new(vars: Rc<console::Vars>) -> Self {
-        VideoSettingsMenu {
-            vars,
-            elements: None,
-        }
+    pub fn new() -> Self {
+        VideoSettingsMenu { elements: None }
     }
 }
 
@@ -245,9 +234,10 @@ impl super::Screen for VideoSettingsMenu {
         let mut buttons = vec![];
 
         // Load defaults
-        let r_max_fps = *self.vars.get(settings::R_MAX_FPS);
-        let r_fov = *self.vars.get(settings::R_FOV);
-        let r_vsync = *self.vars.get(settings::R_VSYNC);
+        let vars = settings::Vars::new();
+        let r_max_fps = *vars.get(settings::vars::R_MAX_FPS);
+        let r_fov = *vars.get(settings::vars::R_FOV);
+        let r_vsync = *vars.get(settings::vars::R_VSYNC);
 
         // Setting buttons
         // TODO: Slider
@@ -289,11 +279,12 @@ impl super::Screen for VideoSettingsMenu {
                 .attach(&mut *vsync_setting);
             let txt_vsync = txt.clone();
             vsync_setting.add_text(txt);
-            vsync_setting.add_click_func(move |_, game| {
-                let r_vsync = !*game.vars.get(settings::R_VSYNC);
+            vsync_setting.add_click_func(move |_, _game| {
+                let vars = settings::Vars::new();
+                let r_vsync = !*vars.get(settings::vars::R_VSYNC);
                 txt_vsync.borrow_mut().text =
                     format!("VSync: {}", if r_vsync { "Enabled" } else { "Disabled" });
-                game.vars.set(settings::R_VSYNC, r_vsync);
+                vars.set(settings::vars::R_VSYNC, r_vsync);
                 true
             });
         }
@@ -379,17 +370,14 @@ impl super::Screen for VideoSettingsMenu {
     }
 }
 
+#[derive(Default)]
 pub struct AudioSettingsMenu {
-    _vars: Rc<console::Vars>,
     elements: Option<UIElements>,
 }
 
 impl AudioSettingsMenu {
-    pub fn new(vars: Rc<console::Vars>) -> AudioSettingsMenu {
-        AudioSettingsMenu {
-            _vars: vars,
-            elements: None,
-        }
+    pub fn new() -> AudioSettingsMenu {
+        AudioSettingsMenu { elements: None }
     }
 }
 
@@ -465,17 +453,14 @@ impl super::Screen for AudioSettingsMenu {
     }
 }
 
+#[derive(Default)]
 pub struct SkinSettingsMenu {
-    vars: Rc<console::Vars>,
     elements: Option<UIElements>,
 }
 
 impl SkinSettingsMenu {
-    pub fn new(vars: Rc<console::Vars>) -> Self {
-        SkinSettingsMenu {
-            vars,
-            elements: None,
-        }
+    pub fn new() -> Self {
+        SkinSettingsMenu { elements: None }
     }
 }
 
@@ -491,13 +476,14 @@ impl super::Screen for SkinSettingsMenu {
         let mut buttons = vec![];
 
         // Load defaults
-        let s_hat = *self.vars.get(settings::S_HAT);
-        let _s_jacket = *self.vars.get(settings::S_JACKET);
-        let _s_cape = *self.vars.get(settings::S_CAPE);
-        let _s_right_sleeve = *self.vars.get(settings::S_RIGHT_SLEEVE);
-        let _s_left_sleeve = *self.vars.get(settings::S_LEFT_SLEEVE);
-        let _s_right_pants = *self.vars.get(settings::S_RIGHT_PANTS);
-        let _s_left_pants = *self.vars.get(settings::S_LEFT_PANTS);
+        let vars = settings::Vars::new();
+        let s_hat = *vars.get(settings::vars::S_HAT);
+        let _s_jacket = *vars.get(settings::vars::S_JACKET);
+        let _s_cape = *vars.get(settings::vars::S_CAPE);
+        let _s_right_sleeve = *vars.get(settings::vars::S_RIGHT_SLEEVE);
+        let _s_left_sleeve = *vars.get(settings::vars::S_LEFT_SLEEVE);
+        let _s_right_pants = *vars.get(settings::vars::S_RIGHT_PANTS);
+        let _s_left_pants = *vars.get(settings::vars::S_LEFT_PANTS);
 
         // Setting buttons
         let hat_setting = ui::ButtonBuilder::new()
@@ -519,8 +505,9 @@ impl super::Screen for SkinSettingsMenu {
                 .attach(&mut *hat_setting);
             let txt_hat = txt.clone();
             hat_setting.add_text(txt);
-            hat_setting.add_click_func(move |_, game| {
-                let s_hat = !*game.vars.get(settings::S_HAT);
+            hat_setting.add_click_func(move |_, _game| {
+                let vars = settings::Vars::new();
+                let s_hat = !*vars.get(settings::vars::S_HAT);
                 txt_hat.borrow_mut().text = format!(
                     "Hat: {}",
                     match s_hat {
@@ -528,7 +515,7 @@ impl super::Screen for SkinSettingsMenu {
                         false => "Off",
                     }
                 );
-                game.vars.set(settings::S_HAT, s_hat);
+                vars.set(settings::vars::S_HAT, s_hat);
                 false
             });
         }
@@ -552,10 +539,11 @@ impl super::Screen for SkinSettingsMenu {
             let txt_vsync = txt.clone();
             vsync_setting.add_text(txt);
             vsync_setting.add_click_func(move |_, game| {
-                let r_vsync = !*game.vars.get(settings::R_VSYNC);
+                let vars = settings::Vars::new();
+                let r_vsync = !*vars.get(settings::vars::R_VSYNC);
                 txt_vsync.borrow_mut().text =
                     format!("VSync: {}", if r_vsync { "Enabled" } else { "Disabled" });
-                game.vars.set(settings::R_VSYNC, r_vsync);
+                vars.set(settings::vars::R_VSYNC, r_vsync);
                 true
             });
         }

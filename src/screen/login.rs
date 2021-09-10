@@ -20,16 +20,15 @@ use std::thread;
 use rand::{self, Rng};
 
 use crate::auth;
-use crate::console;
 use crate::protocol;
 use crate::protocol::mojang;
 use crate::render;
 use crate::settings;
 use crate::ui;
 
+#[derive(Default)]
 pub struct Login {
     elements: Option<UIElements>,
-    vars: Rc<console::Vars>,
 }
 
 struct UIElements {
@@ -49,11 +48,8 @@ struct UIElements {
 }
 
 impl Login {
-    pub fn new(vars: Rc<console::Vars>) -> Login {
-        Login {
-            elements: None,
-            vars,
-        }
+    pub fn new() -> Login {
+        Login { elements: None }
     }
 }
 
@@ -129,10 +125,12 @@ impl super::Screen for Login {
             .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
             .create(ui_container);
 
+        let vars = settings::Vars::new();
+
         let profile = mojang::Profile {
-            username: self.vars.get(auth::CL_USERNAME).clone(),
-            id: self.vars.get(auth::CL_UUID).clone(),
-            access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
+            username: vars.get(auth::CL_USERNAME).clone(),
+            id: vars.get(auth::CL_UUID).clone(),
+            access_token: vars.get(auth::AUTH_TOKEN).clone(),
         };
         let refresh = profile.is_complete();
         try_login.set(refresh);
@@ -172,15 +170,18 @@ impl super::Screen for Login {
             elements.login_res = Some(rx);
             elements.login_btn.borrow_mut().disabled = true;
             elements.login_btn_text.borrow_mut().text = "Logging in...".into();
-            let mut client_token = self.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+
+            let vars = settings::Vars::new();
+
+            let mut client_token = vars.get(auth::AUTH_CLIENT_TOKEN).clone();
             if client_token.is_empty() {
                 client_token = std::iter::repeat(())
                     .map(|()| rand::thread_rng().sample(&rand::distributions::Alphanumeric) as char)
                     .take(20)
                     .collect();
-                self.vars.set(auth::AUTH_CLIENT_TOKEN, client_token);
+                vars.set(auth::AUTH_CLIENT_TOKEN, client_token);
             }
-            let client_token = self.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+            let client_token = vars.get(auth::AUTH_CLIENT_TOKEN).clone();
             let username = elements.username_txt.borrow().input.clone();
             let password = elements.password_txt.borrow().input.clone();
             let refresh = elements.refresh;
@@ -202,14 +203,13 @@ impl super::Screen for Login {
                 elements.login_btn_text.borrow_mut().text = "Login".into();
                 match res {
                     Ok(val) => {
-                        self.vars.set(auth::CL_USERNAME, val.username.clone());
-                        self.vars.set(auth::CL_UUID, val.id.clone());
-                        self.vars.set(auth::AUTH_TOKEN, val.access_token.clone());
+                        let vars = settings::Vars::new();
+
+                        vars.set(auth::CL_USERNAME, val.username.clone());
+                        vars.set(auth::CL_UUID, val.id.clone());
+                        vars.set(auth::AUTH_TOKEN, val.access_token.clone());
                         elements.profile = val;
-                        return Some(Box::new(super::ServerList::new(
-                            None,
-                            self.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                        )));
+                        return Some(Box::new(super::ServerList::new(None)));
                     }
                     Err(err) => {
                         elements.login_error.borrow_mut().text = format!("{}", err);
