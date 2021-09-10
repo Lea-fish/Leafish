@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::cmp;
 use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -21,6 +22,7 @@ use parking_lot::RwLock;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
+use crate::format;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
 use crate::render;
@@ -28,7 +30,7 @@ use crate::render::Renderer;
 use crate::screen::Screen;
 use crate::server::Server;
 use crate::ui;
-use crate::ui::{Container, HAttach, ImageRef, TextRef, VAttach};
+use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
 use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
 
@@ -71,6 +73,8 @@ pub struct HudContext {
     dirty_slot_index: bool,
     game_mode: GameMode,
     dirty_game_mode: bool,
+    chat_history: Vec<format::Component>,
+    dirty_chat: bool,
 }
 
 impl Default for render::hud::HudContext {
@@ -116,6 +120,8 @@ impl HudContext {
             dirty_slot_index: false,
             game_mode: GameMode::Survival,
             dirty_game_mode: false,
+            chat_history: Vec::new(),
+            dirty_chat: false,
         }
     }
 
@@ -184,6 +190,11 @@ impl HudContext {
     pub fn get_slot_index(&self) -> u8 {
         self.slot_index
     }
+
+    pub fn display_message_in_chat(&mut self, message: format::Component) {
+        self.chat_history.push(message);
+        self.dirty_chat = true;
+    }
 }
 
 pub struct Hud {
@@ -199,6 +210,8 @@ pub struct Hud {
     slot_elements: Vec<ImageRef>,
     slot_index_elements: Vec<ImageRef>,
     debug_elements: Vec<TextRef>,
+    chat_elements: Vec<FormattedRef>,
+    chat_background_elements: Vec<ImageRef>,
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
 }
@@ -218,6 +231,8 @@ impl Hud {
             slot_elements: vec![],
             slot_index_elements: vec![],
             debug_elements: vec![],
+            chat_elements: vec![],
+            chat_background_elements: vec![],
             hud_context,
             random: rand::thread_rng(),
         }
@@ -231,6 +246,7 @@ impl Screen for Hud {
             self.render_slots_items(renderer, ui_container);
             self.render_slot_index(renderer, ui_container);
             self.render_crosshair(renderer, ui_container);
+            self.render_chat(renderer, ui_container);
             let game_mode = self.hud_context.clone().read().game_mode;
             if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
                 self.render_health(renderer, ui_container);
@@ -253,6 +269,8 @@ impl Screen for Hud {
         self.slot_elements.clear();
         self.slot_index_elements.clear();
         self.debug_elements.clear();
+        self.chat_elements.clear();
+        self.chat_background_elements.clear();
     }
 
     fn tick(
@@ -334,6 +352,11 @@ impl Screen for Hud {
         if self.hud_context.clone().read().dirty_debug {
             self.debug_elements.clear();
             self.render_debug(renderer, ui_container);
+        }
+        if self.hud_context.clone().read().dirty_chat {
+            self.chat_elements.clear();
+            self.chat_background_elements.clear();
+            self.render_chat(renderer, ui_container);
         }
         None
     }
@@ -934,6 +957,44 @@ impl Hud {
                 .shadow(false)
                 .create(ui_container),
         );
+    }
+
+    pub fn render_chat(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        let hud_context = self.hud_context.clone();
+        let hud_context = hud_context.read();
+        let icon_scale = Hud::icon_scale(renderer);
+        let scale = icon_scale / 2.0;
+
+        let history_size = hud_context.chat_history.len();
+
+        if history_size > 0 {
+            self.chat_background_elements.push(
+                ui::ImageBuilder::new()
+                    .texture("leafish:solid")
+                    .alignment(VAttach::Bottom, HAttach::Left)
+                    .position(0.0, scale * 85.0)
+                    .size(
+                        500.0 * scale,
+                        6.0 * scale + 10.0 * scale * (history_size as f64),
+                    )
+                    .colour((0, 0, 0, 100))
+                    .create(ui_container),
+            );
+        }
+
+        for i in 0..cmp::min(10, history_size) {
+            let message = hud_context.chat_history[history_size - 1 - i].clone();
+            let text = ui::FormattedBuilder::new()
+                .alignment(VAttach::Bottom, HAttach::Left)
+                .scale_x(scale)
+                .scale_y(scale)
+                .position(scale * 5.0, scale * 80.0 + ((i * 10) as f64) * scale)
+                .text(message)
+                .max_width(490.0 * scale)
+                .create(ui_container);
+            self.chat_elements.push(text);
+            //TODO: Figure out the height of the text before drawing it so we can position it properly instead of on top of one another...
+        }
     }
 
     pub fn draw_item(
