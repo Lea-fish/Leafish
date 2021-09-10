@@ -646,6 +646,9 @@ fn handle_window_event<T>(
                                 height,
                             );
                         }
+                        if game.focused && game.server.is_some() {
+                            game.server.as_ref().unwrap().on_release_left_click();
+                        }
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
                         if game.focused && game.server.is_some() {
