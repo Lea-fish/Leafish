@@ -1278,6 +1278,18 @@ impl Server {
                 self.block_break_info.lock().active = false;
                 self.block_break_info.lock().delay = 5;
             } else {
+                if self.mapped_protocol_version < Version::V1_8 {
+                    self.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
+                        entity_id: 0, // TODO: Check these values!
+                        animation: 0,
+                    });
+                } else if self.mapped_protocol_version < Version::V1_9 {
+                    self.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
+                } else {
+                    self.write_packet(packet::play::serverbound::ArmSwing {
+                        hand: protocol::VarInt(0),
+                    });
+                }
                 self.block_break_info.lock().progress += 0.1; // TODO: Make this value meaningful
             }
         }
