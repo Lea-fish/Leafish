@@ -39,7 +39,7 @@ use leafish_protocol::protocol::packet::play::serverbound::{
     ClientSettings, ClientSettings_u8_Handsfree,
 };
 use leafish_protocol::protocol::packet::{DigType, Packet};
-use leafish_protocol::protocol::{Conn, Direction, VarInt, Version};
+use leafish_protocol::protocol::{Conn, VarInt, Version};
 use leafish_shared::direction::Direction as BlockDirection;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
