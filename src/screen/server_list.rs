@@ -40,7 +40,6 @@ pub struct ServerList {
     disconnect_reason: Option<Component>,
 
     needs_reload: Rc<RefCell<bool>>,
-    background_image: String,
 }
 
 struct UIElements {
@@ -96,12 +95,11 @@ impl Server {
 }
 
 impl ServerList {
-    pub fn new(disconnect_reason: Option<Component>, background_image: String) -> ServerList {
+    pub fn new(disconnect_reason: Option<Component>) -> ServerList {
         ServerList {
             elements: None,
             disconnect_reason,
             needs_reload: Rc::new(RefCell::new(false)),
-            background_image,
         }
     }
 
@@ -160,10 +158,9 @@ impl ServerList {
                     let result = game.connect_to(&address, hud_context.clone());
                     game.screen_sys.pop_screen();
                     if let Err(error) = result {
-                        game.screen_sys.add_screen(Box::new(ServerList::new(
-                            Some(Component::Text(TextComponent::new(&*error.to_string()))),
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                        )));
+                        game.screen_sys.add_screen(Box::new(ServerList::new(Some(
+                            Component::Text(TextComponent::new(&*error.to_string())),
+                        ))));
                     } else {
                         game.screen_sys.add_screen(Box::new(Hud::new(hud_context)));
                         game.focused = true;
@@ -234,12 +231,7 @@ impl ServerList {
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
                     game.screen_sys.replace_screen(Box::new(
-                        super::delete_server::DeleteServerEntry::new(
-                            index,
-                            &sname,
-                            &saddr,
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                        ),
+                        super::delete_server::DeleteServerEntry::new(index, &sname, &saddr),
                     ));
                     true
                 })
@@ -404,7 +396,7 @@ impl ServerList {
                 .attach(&mut *options);
             options.add_click_func(|_, game| {
                 game.screen_sys
-                    .add_screen(Box::new(super::SettingsMenu::new(game.vars.clone(), false)));
+                    .add_screen(Box::new(super::SettingsMenu::new(false)));
                 true
             });
         }
@@ -449,15 +441,16 @@ impl ServerList {
             None
         };
 
+        let vars = settings::Vars::new();
         let background = if Renderer::get_texture_optional(
             renderer.get_textures_ref(),
-            &*format!("#{}", self.background_image),
+            &*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)),
         )
         .is_some()
         {
             Some(
                 ui::ImageBuilder::new()
-                    .texture(&*format!("#{}", self.background_image))
+                    .texture(&*format!("#{}", vars.get(settings::vars::BACKGROUND_IMAGE)))
                     .size(renderer.safe_width as f64, renderer.safe_height as f64)
                     .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                     .create(ui_container),

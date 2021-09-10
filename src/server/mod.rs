@@ -23,7 +23,7 @@ use crate::render::Renderer;
 use crate::resources;
 use crate::screen::respawn::Respawn;
 use crate::screen::ScreenSystem;
-use crate::settings::Actionkey;
+use crate::settings::vars::Actionkey;
 use crate::shared::{Axis, Position};
 use crate::types::hash::FNVHash;
 use crate::types::GameMode;
