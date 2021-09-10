@@ -3299,3 +3299,25 @@ impl Serializable for CommandNode {
         unimplemented!()
     }
 }
+
+pub enum DigType {
+    StartDestroyBlock,
+    AbortDestroyBlock,
+    StopDestroyBlock,
+    DropAllItems,
+    DropItem,
+    ReleaseUseItem,
+}
+
+impl DigType {
+    pub fn ordinal(&self) -> u8 {
+        match self {
+            DigType::StartDestroyBlock => 0,
+            DigType::AbortDestroyBlock => 1,
+            DigType::StopDestroyBlock => 2,
+            DigType::DropAllItems => 3,
+            DigType::DropItem => 4,
+            DigType::ReleaseUseItem => 5,
+        }
+    }
+}
