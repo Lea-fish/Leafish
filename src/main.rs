@@ -49,7 +49,6 @@ pub mod world;
 
 use crate::protocol::mojang;
 use crate::render::hud::HudContext;
-use leafish_protocol::format::{Component, TextComponent};
 use leafish_protocol::protocol::{Error, Version};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -395,7 +394,7 @@ fn tick_all(
 ) {
     if game.server.is_some() {
         if !game.server.as_ref().unwrap().is_connected() {
-            let disconnect_reason = if let Some(disconnect_reason) = game
+            let disconnect_reason = game
                 .server
                 .as_ref()
                 .unwrap()
@@ -403,20 +402,26 @@ fn tick_all(
                 .clone()
                 .write()
                 .disconnect_reason
-                .take()
-            {
-                disconnect_reason
-            } else {
-                Component::Text(TextComponent::new("Disconnected"))
-            };
+                .take();
             while game.screen_sys.is_current_closable() {
                 game.screen_sys.pop_screen();
             }
             game.screen_sys
                 .replace_screen(Box::new(screen::ServerList::new(
-                    Some(disconnect_reason),
+                    disconnect_reason,
                     game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                 )));
+            game.server
+                .as_ref()
+                .unwrap()
+                .clone()
+                .entities
+                .clone()
+                .write()
+                .remove_all_entities(
+                    &*game.server.as_ref().unwrap().clone().world.clone(),
+                    &mut *game.renderer.clone().write(),
+                );
             game.server = None;
             game.renderer.clone().write().reset();
             game.focused = false;

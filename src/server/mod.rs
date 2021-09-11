@@ -50,6 +50,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
 use std::str::FromStr;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -95,7 +96,7 @@ pub struct Server {
     world_data: Arc<RwLock<WorldData>>,
 
     resources: Arc<RwLock<resources::Manager>>,
-    version: RwLock<usize>,
+    version: AtomicUsize,
 
     // Entity accessors
     game_info: ecs::Key<entity::GameInfo>,
@@ -850,7 +851,7 @@ impl Server {
 
             world: Arc::new(world::World::new(protocol_version, light_updater)),
             world_data: Arc::new(RwLock::new(WorldData::default())),
-            version: RwLock::new(version),
+            version: AtomicUsize::new(version),
             resources,
 
             // Entity accessors
@@ -900,7 +901,7 @@ impl Server {
     }
 
     pub fn disconnect(&self, reason: Option<format::Component>) {
-        self.conn.clone().write().take();
+        self.conn.clone().write().take().unwrap().close();
         self.disconnect_data.clone().write().disconnect_reason = reason;
         if let Some(player) = self.player.clone().write().take() {
             self.entities.clone().write().remove_entity(player);
@@ -909,8 +910,7 @@ impl Server {
     }
 
     pub fn is_connected(&self) -> bool {
-        let tmp = self.conn.clone();
-        return tmp.read().is_some();
+        return self.conn.clone().read().is_some();
     }
 
     pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, game: &mut Game) {
@@ -932,8 +932,8 @@ impl Server {
             game.focused = true;
         }
         let version = self.resources.read().version();
-        if version != *self.version.read() {
-            *self.version.write() = version;
+        if version != self.version.load(Ordering::Acquire) {
+            self.version.store(version, Ordering::Release);
             self.world.clone().flag_dirty_all();
         }
         let renderer = &mut renderer.write();
