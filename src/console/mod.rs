@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::format::{Color, Component, TextComponent};
@@ -264,33 +265,27 @@ impl Console {
         }
     }
 
-    fn set_log_level_from_enviroment_variable(
-        level: &mut log::Level,
-        iter: std::slice::Iter<&str>,
-        default: log::Level,
-    ) {
-        for name in iter {
-            if let Ok(var) = std::env::var(name) {
-                *level = log_level_from_str(&var, default);
-            }
-        }
+    fn log_level_from_env(name: &str) -> Option<log::Level> {
+        let variable_string = std::env::var(name).ok()?;
+        log::Level::from_str(&variable_string).ok()
     }
 
     pub fn configure(&mut self, vars: &Vars) {
         self.log_level_term = log_level_from_str(&vars.get(LOG_LEVEL_TERM), log::Level::Info);
         self.log_level_file = log_level_from_str(&vars.get(LOG_LEVEL_FILE), log::Level::Debug);
 
-        Console::set_log_level_from_enviroment_variable(
-            &mut self.log_level_term,
-            ["RUST_LOG", "LOG_LEVEL", "LOG_LEVEL_TERM"].iter(),
-            log::Level::Info,
-        );
-
-        Console::set_log_level_from_enviroment_variable(
-            &mut self.log_level_file,
-            ["RUST_LOG", "LOG_LEVEL", "LOG_LEVEL_FILE"].iter(),
-            log::Level::Debug,
-        );
+        for name in ["RUST_LOG", "LOG_LEVEL"].iter() {
+            if let Some(level) = Console::log_level_from_env(name) {
+                self.log_level_term = level;
+                self.log_level_file = level;
+            }
+        }
+        if let Some(level) = Console::log_level_from_env("RUST_LOG") {
+            self.log_level_term = level;
+        }
+        if let Some(level) = Console::log_level_from_env("LOG_LEVEL_FILE") {
+            self.log_level_file = level;
+        }
     }
 
     pub fn is_active(&self) -> bool {
