@@ -1036,7 +1036,7 @@ impl Hud {
                 .draw_index(HUD_PRIORITY + 1)
                 .alignment(VAttach::Bottom, HAttach::Left)
                 .position(
-                    0.0,
+                    1.0 * scale,
                     scale * 85.0 / 2.0
                         + ((component_lines as f64) * 5.0) * scale
                         + i as f64 * 0.4 * scale,
