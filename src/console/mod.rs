@@ -33,6 +33,18 @@ const FILTERED_CRATES: &[&str] = &[
     "mime",
 ];
 
+#[derive(Debug)]
+pub enum VarType {
+    Default,
+    Authentication,
+}
+
+impl Default for VarType {
+    fn default() -> Self {
+        VarType::Default
+    }
+}
+
 pub struct CVar<T: Sized + Any + 'static> {
     pub name: &'static str,
     pub ty: PhantomData<T>,
@@ -141,13 +153,17 @@ pub trait Var {
 #[derive(Default)]
 pub struct Vars {
     names: HashMap<String, &'static str>,
+    vartype: VarType,
     vars: HashMap<&'static str, Box<dyn Var>>,
     var_values: HashMap<&'static str, RefCell<Box<dyn Any>>>,
 }
 
 impl Vars {
-    pub fn new() -> Vars {
-        Default::default()
+    pub fn new(vartype: VarType) -> Vars {
+        Vars {
+            vartype,
+            ..Default::default()
+        }
     }
 
     pub fn register<T: Sized + Any>(&mut self, var: CVar<T>)
@@ -181,7 +197,12 @@ impl Vars {
     }
 
     pub fn load_config(&mut self) {
-        if let Ok(file) = fs::File::open(paths::get_config_dir().join("conf.cfg")) {
+        let config_file = match self.vartype {
+            VarType::Default => paths::get_config_dir().join("conf.cfg"),
+            VarType::Authentication => paths::get_data_dir().join("auth.cfg"),
+        };
+
+        if let Ok(file) = fs::File::open(config_file) {
             let reader = BufReader::new(file);
             for line in reader.lines() {
                 let line = line.unwrap();
@@ -205,8 +226,12 @@ impl Vars {
     }
 
     pub fn save_config(&self) {
-        let mut file =
-            BufWriter::new(fs::File::create(paths::get_config_dir().join("conf.cfg")).unwrap());
+        let config_file = match self.vartype {
+            VarType::Default => paths::get_config_dir().join("conf.cfg"),
+            VarType::Authentication => paths::get_data_dir().join("auth.cfg"),
+        };
+
+        let mut file = BufWriter::new(fs::File::create(config_file).unwrap());
         for (name, var) in &self.vars {
             if !var.can_serialize() {
                 continue;
