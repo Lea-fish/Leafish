@@ -378,41 +378,41 @@ impl Console {
 
         if record.level() <= self.log_level_term {
             println!("{}", line);
-        }
 
-        self.history.remove(0);
-        let mut msg = TextComponent::new("");
-        msg.modifier.extra = Some(vec![
-            Component::Text(TextComponent::new("[")),
-            {
-                let mut msg = TextComponent::new(file);
-                msg.modifier.color = Some(Color::Green);
-                Component::Text(msg)
-            },
-            Component::Text(TextComponent::new(":")),
-            {
-                let mut msg = TextComponent::new(&format!("{}", record.line().unwrap_or(0)));
-                msg.modifier.color = Some(Color::Aqua);
-                Component::Text(msg)
-            },
-            Component::Text(TextComponent::new("]")),
-            Component::Text(TextComponent::new("[")),
-            {
-                let mut msg = TextComponent::new(&format!("{}", record.level()));
-                msg.modifier.color = Some(match record.level() {
-                    log::Level::Debug => Color::Green,
-                    log::Level::Error => Color::Red,
-                    log::Level::Warn => Color::Yellow,
-                    log::Level::Info => Color::Aqua,
-                    log::Level::Trace => Color::Blue,
-                });
-                Component::Text(msg)
-            },
-            Component::Text(TextComponent::new("] ")),
-            Component::Text(TextComponent::new(&format!("{}", record.args()))),
-        ]);
-        self.history.push(Component::Text(msg));
-        self.dirty = true;
+            self.history.remove(0);
+            let mut msg = TextComponent::new("");
+            msg.modifier.extra = Some(vec![
+                Component::Text(TextComponent::new("[")),
+                {
+                    let mut msg = TextComponent::new(file);
+                    msg.modifier.color = Some(Color::Green);
+                    Component::Text(msg)
+                },
+                Component::Text(TextComponent::new(":")),
+                {
+                    let mut msg = TextComponent::new(&format!("{}", record.line().unwrap_or(0)));
+                    msg.modifier.color = Some(Color::Aqua);
+                    Component::Text(msg)
+                },
+                Component::Text(TextComponent::new("]")),
+                Component::Text(TextComponent::new("[")),
+                {
+                    let mut msg = TextComponent::new(&format!("{}", record.level()));
+                    msg.modifier.color = Some(match record.level() {
+                        log::Level::Debug => Color::Green,
+                        log::Level::Error => Color::Red,
+                        log::Level::Warn => Color::Yellow,
+                        log::Level::Info => Color::Aqua,
+                        log::Level::Trace => Color::Blue,
+                    });
+                    Component::Text(msg)
+                },
+                Component::Text(TextComponent::new("] ")),
+                Component::Text(TextComponent::new(&format!("{}", record.args()))),
+            ]);
+            self.history.push(Component::Text(msg));
+            self.dirty = true;
+        }
     }
 }
 
