@@ -270,11 +270,8 @@ impl Console {
         default: log::Level,
     ) {
         for name in iter {
-            match std::env::var(name) {
-                Ok(var) => {
-                    *level = log_level_from_str(&var, default);
-                }
-                Err(_) => {}
+            if let Ok(var) = std::env::var(name) {
+                *level = log_level_from_str(&var, default);
             }
         }
     }

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::{debug, warn};
+use log::warn;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -585,8 +585,6 @@ impl World {
         });
         if !out.read().is_empty() {
             self.do_render_queue(out, frustum, frame_id, valid_dirs, render_queue);
-        } else {
-            debug!("finished!");
         }
     }
 
