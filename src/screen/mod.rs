@@ -53,16 +53,13 @@ pub trait Screen {
     // Events
     fn on_scroll(&mut self, _x: f64, _y: f64) {}
 
-    fn on_resize(
-        &mut self,
-        _width: u32,
-        _height: u32,
-        _renderer: &mut Renderer,
-        _ui_container: &mut Container,
-    ) {
-    } // TODO: make non-optional!
+    fn on_resize(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {} // TODO: make non-optional!
 
     fn is_closable(&self) -> bool {
+        false
+    }
+
+    fn is_tick_always(&self) -> bool {
         false
     }
 }
@@ -156,17 +153,27 @@ impl ScreenSystem {
                 || current.last_height != renderer.safe_height as i32
             {
                 if current.last_width != -1 && current.last_height != -1 {
-                    current.screen.on_resize(
-                        renderer.safe_width,
-                        renderer.safe_height,
-                        renderer,
-                        ui_container,
-                    );
+                    for screen in self.screens.iter_mut().enumerate() {
+                        if screen.1.screen.is_tick_always() || screen.0 == len - 1 {
+                            screen.1.screen.on_resize(renderer, ui_container);
+                            screen.1.last_width = renderer.safe_width as i32;
+                            screen.1.last_height = renderer.safe_height as i32;
+                        }
+                    }
+                } else {
+                    current.last_width = renderer.safe_width as i32;
+                    current.last_height = renderer.safe_height as i32;
                 }
-                current.last_width = renderer.safe_width as i32;
-                current.last_height = renderer.safe_height as i32;
             }
-            current.screen.tick(delta, renderer, ui_container)
+            let mut result = None;
+            for screen in self.screens.iter_mut().enumerate() {
+                if screen.1.screen.is_tick_always() && screen.0 != len - 1 {
+                    screen.1.screen.tick(delta, renderer, ui_container);
+                } else if screen.0 == len - 1 {
+                    result = screen.1.screen.tick(delta, renderer, ui_container);
+                }
+            }
+            result
         };
         // Handle current
         if let Some(swap) = swap {
