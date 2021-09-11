@@ -996,12 +996,17 @@ impl Hud {
     }
 
     pub fn render_chat(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let hud_context = self.hud_context.clone();
-        let hud_context = hud_context.read();
-        let icon_scale = Hud::icon_scale(renderer);
-        let scale = icon_scale / 2.0;
+        let scale = Hud::icon_scale(renderer);
+        let history_size = self.hud_context.clone().read().chat_history.len();
 
-        let history_size = hud_context.chat_history.len();
+        let mut component_lines = 0;
+        for i in 0..cmp::min(10, history_size) {
+            let message =
+                self.hud_context.clone().read().chat_history[history_size - 1 - i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.to_string()) / (CHAT_WIDTH * scale))
+                .ceil() as u8;
+            component_lines += lines;
+        }
 
         if history_size > 0 {
             // TODO: Only do this in chat-view mode (where the entire chat is shown)
@@ -1010,38 +1015,39 @@ impl Hud {
                     .draw_index(HUD_PRIORITY + 1)
                     .texture("leafish:solid")
                     .alignment(VAttach::Bottom, HAttach::Left)
-                    .position(0.0, scale * 85.0)
+                    .position(0.0, scale * 85.0 / 2.0)
                     .size(
-                        500.0 * scale,
-                        6.0 * scale + 10.0 * scale * (cmp::min(10, history_size) as f64),
+                        500.0 / 2.0 * scale,
+                        5.0 * scale * (component_lines as f64)
+                            + cmp::min(10, history_size) as f64 * 0.4 * scale,
                     )
                     .colour((0, 0, 0, 100))
                     .create(ui_container),
             );
         }
+
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message = hud_context.chat_history[history_size - 1 - i].clone();
-            let lines =
-                (renderer.ui.size_of_string(&*message.to_string()) / CHAT_WIDTH).ceil() as u8;
+            let message =
+                self.hud_context.clone().read().chat_history[history_size - 1 - i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.to_string()) / (CHAT_WIDTH * scale))
+                .ceil() as u8;
             let text = ui::FormattedBuilder::new()
                 .draw_index(HUD_PRIORITY + 1)
                 .alignment(VAttach::Bottom, HAttach::Left)
-                .scale_x(scale)
-                .scale_y(scale)
                 .position(
                     0.0,
-                    scale * 80.0
-                        + ((component_lines as f64)
-                            * (10.0 + (cmp::min(component_lines, 1) as f64 * 0.5)))
-                            * scale,
+                    scale * 85.0 / 2.0
+                        + ((component_lines as f64) * 5.0) * scale
+                        + i as f64 * 0.4 * scale,
                 )
                 .text(message)
                 .max_width(CHAT_WIDTH * scale)
                 .create(ui_container);
-            component_lines += lines;
             self.chat_elements.push(text);
+            component_lines += lines;
         }
+        self.hud_context.clone().write().dirty_chat = false;
     }
 
     pub fn draw_item(
@@ -1076,5 +1082,5 @@ impl Hud {
     }
 }
 
-const CHAT_WIDTH: f64 = 490.0;
+const CHAT_WIDTH: f64 = 490.0 / 2.0;
 const HUD_PRIORITY: isize = -2;
