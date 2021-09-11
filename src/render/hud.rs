@@ -76,7 +76,7 @@ pub struct HudContext {
     dirty_slot_index: bool,
     game_mode: GameMode,
     dirty_game_mode: bool,
-    chat_history: Vec<format::Component>,
+    chat_history: Vec<format::Component>, // TODO: Make components fade away after a certain amount of time (but keep them in here to render them if necessary)
     dirty_chat: bool,
 }
 
