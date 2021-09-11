@@ -264,9 +264,36 @@ impl Console {
         }
     }
 
+    fn set_log_level_from_enviroment_variable(
+        level: &mut log::Level,
+        iter: std::slice::Iter<&str>,
+        default: log::Level,
+    ) {
+        for name in iter {
+            match std::env::var(name) {
+                Ok(var) => {
+                    *level = log_level_from_str(&var, default);
+                }
+                Err(_) => {}
+            }
+        }
+    }
+
     pub fn configure(&mut self, vars: &Vars) {
         self.log_level_term = log_level_from_str(&vars.get(LOG_LEVEL_TERM), log::Level::Info);
-        self.log_level_file = log_level_from_str(&vars.get(LOG_LEVEL_FILE), log::Level::Trace);
+        self.log_level_file = log_level_from_str(&vars.get(LOG_LEVEL_FILE), log::Level::Debug);
+
+        Console::set_log_level_from_enviroment_variable(
+            &mut self.log_level_term,
+            ["RUST_LOG", "LOG_LEVEL", "LOG_LEVEL_TERM"].iter(),
+            log::Level::Info,
+        );
+
+        Console::set_log_level_from_enviroment_variable(
+            &mut self.log_level_file,
+            ["RUST_LOG", "LOG_LEVEL", "LOG_LEVEL_FILE"].iter(),
+            log::Level::Debug,
+        );
     }
 
     pub fn is_active(&self) -> bool {
