@@ -45,6 +45,7 @@ use log::{debug, error, info, warn};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use rand::{self, Rng};
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
@@ -408,284 +409,319 @@ impl Server {
     }
 
     fn spawn_reader(mut read: protocol::Conn, server: Arc<Mutex<Option<Arc<Server>>>>) {
-        thread::spawn(move || loop {
-            let server = server.clone().lock().as_ref().unwrap().clone();
-            let pck = read.read_packet();
-            match pck {
-                Ok(pck) => match pck {
-                    Packet::KeepAliveClientbound_i64(keep_alive) => {
-                        server.on_keep_alive_i64(keep_alive);
-                    }
-                    Packet::KeepAliveClientbound_VarInt(keep_alive) => {
-                        server.on_keep_alive_varint(keep_alive);
-                    }
-                    Packet::KeepAliveClientbound_i32(keep_alive) => {
-                        server.on_keep_alive_i32(keep_alive);
-                    }
-                    Packet::ChunkData_NoEntities(chunk_data) => {
-                        server.on_chunk_data_no_entities(chunk_data);
-                    }
-                    Packet::ChunkData_NoEntities_u16(chunk_data) => {
-                        server.on_chunk_data_no_entities_u16(chunk_data);
-                    }
-                    Packet::ChunkData_17(chunk_data) => {
-                        server.on_chunk_data_17(chunk_data);
-                    }
-                    Packet::ChunkDataBulk(bulk) => {
-                        server.on_chunk_data_bulk(bulk);
-                    }
-                    Packet::ChunkDataBulk_17(bulk) => {
-                        server.on_chunk_data_bulk_17(bulk);
-                    }
-                    Packet::BlockChange_VarInt(block_change) => {
-                        server.on_block_change_varint(block_change);
-                    }
-                    Packet::BlockChange_u8(block_change) => {
-                        server.on_block_change_u8(block_change);
-                    }
-                    Packet::MultiBlockChange_Packed(block_change) => {
-                        server.on_multi_block_change_packed(block_change);
-                    }
-                    Packet::MultiBlockChange_VarInt(block_change) => {
-                        server.on_multi_block_change_varint(block_change);
-                    }
-                    Packet::MultiBlockChange_u16(block_change) => {
-                        server.on_multi_block_change_u16(block_change);
-                    }
-                    Packet::UpdateBlockEntity(block_update) => {
-                        server.on_block_entity_update(block_update);
-                    }
-                    Packet::ChunkData_Biomes3D(chunk_data) => {
-                        server.on_chunk_data_biomes3d(chunk_data);
-                    }
-                    Packet::ChunkData_Biomes3D_VarInt(chunk_data) => {
-                        server.on_chunk_data_biomes3d_varint(chunk_data);
-                    }
-                    Packet::ChunkData_Biomes3D_bool(chunk_data) => {
-                        server.on_chunk_data_biomes3d_bool(chunk_data);
-                    }
-                    Packet::ChunkData(chunk_data) => {
-                        server.on_chunk_data(chunk_data);
-                    }
-                    Packet::ChunkData_HeightMap(chunk_data) => {
-                        server.on_chunk_data_heightmap(chunk_data);
-                    }
-                    Packet::UpdateSign(update_sign) => {
-                        server.on_sign_update(update_sign);
-                    }
-                    Packet::UpdateSign_u16(update_sign) => {
-                        server.on_sign_update_u16(update_sign);
-                    }
-                    Packet::UpdateBlockEntity_Data(block_update) => {
-                        server.on_block_entity_update_data(block_update);
-                    }
-                    Packet::ChunkUnload(chunk_unload) => {
-                        server.on_chunk_unload(chunk_unload);
-                    }
-                    Packet::EntityDestroy(entity_destroy) => {
-                        server.on_entity_destroy(entity_destroy);
-                    }
-                    Packet::EntityDestroy_u8(entity_destroy) => {
-                        server.on_entity_destroy_u8(entity_destroy);
-                    }
-                    Packet::EntityMove_i8_i32_NoGround(m) => {
-                        server.on_entity_move_i8_i32_noground(m);
-                    }
-                    Packet::EntityMove_i8(m) => {
-                        server.on_entity_move_i8(m);
-                    }
-                    Packet::EntityMove_i16(m) => {
-                        server.on_entity_move_i16(m);
-                    }
-                    Packet::EntityLook_VarInt(look) => {
-                        server.on_entity_look_varint(look);
-                    }
-                    Packet::EntityLook_i32_NoGround(look) => {
-                        server.on_entity_look_i32_noground(look);
-                    }
-                    Packet::JoinGame_HashedSeed_Respawn(join) => {
-                        server.on_game_join_hashedseed_respawn(join);
-                    }
-                    Packet::JoinGame_i8(join) => {
-                        server.on_game_join_i8(join);
-                    }
-                    Packet::JoinGame_i8_NoDebug(join) => {
-                        server.on_game_join_i8_nodebug(join);
-                    }
-                    Packet::JoinGame_i32(join) => {
-                        server.on_game_join_i32(join);
-                    }
-                    Packet::JoinGame_i32_ViewDistance(join) => {
-                        server.on_game_join_i32_viewdistance(join);
-                    }
-                    Packet::JoinGame_WorldNames(join) => {
-                        server.on_game_join_worldnames(join);
-                    }
-                    Packet::JoinGame_WorldNames_IsHard(join) => {
-                        server.on_game_join_worldnames_ishard(join);
-                    }
-                    Packet::TeleportPlayer_WithConfirm(teleport) => {
-                        server.on_teleport_player_withconfirm(teleport);
-                    }
-                    Packet::TeleportPlayer_NoConfirm(teleport) => {
-                        server.on_teleport_player_noconfirm(teleport);
-                    }
-                    Packet::TeleportPlayer_OnGround(teleport) => {
-                        server.on_teleport_player_onground(teleport);
-                    }
-                    Packet::Respawn_Gamemode(respawn) => {
-                        server.on_respawn_gamemode(respawn);
-                    }
-                    Packet::Respawn_HashedSeed(respawn) => {
-                        server.on_respawn_hashedseed(respawn);
-                    }
-                    Packet::Respawn_NBT(respawn) => {
-                        server.on_respawn_nbt(respawn);
-                    }
-                    Packet::Respawn_WorldName(respawn) => {
-                        server.on_respawn_worldname(respawn);
-                    }
-                    Packet::EntityTeleport_f64(entity_teleport) => {
-                        server.on_entity_teleport_f64(entity_teleport);
-                    }
-                    Packet::EntityTeleport_i32(entity_teleport) => {
-                        server.on_entity_teleport_i32(entity_teleport);
-                    }
-                    Packet::EntityTeleport_i32_i32_NoGround(entity_teleport) => {
-                        server.on_entity_teleport_i32_i32_noground(entity_teleport);
-                    }
-                    Packet::EntityLookAndMove_i8_i32_NoGround(lookmove) => {
-                        server.on_entity_look_and_move_i8_i32_noground(lookmove);
-                    }
-                    Packet::EntityLookAndMove_i8(lookmove) => {
-                        server.on_entity_look_and_move_i8(lookmove);
-                    }
-                    Packet::EntityLookAndMove_i16(lookmove) => {
-                        server.on_entity_look_and_move_i16(lookmove);
-                    }
-                    Packet::SpawnPlayer_i32_HeldItem_String(spawn) => {
-                        server.on_player_spawn_i32_helditem_string(spawn);
-                    }
-                    Packet::SpawnPlayer_i32_HeldItem(spawn) => {
-                        server.on_player_spawn_i32_helditem(spawn);
-                    }
-                    Packet::SpawnPlayer_i32(spawn) => {
-                        server.on_player_spawn_i32(spawn);
-                    }
-                    Packet::SpawnPlayer_f64(spawn) => {
-                        server.on_player_spawn_f64(spawn);
-                    }
-                    Packet::SpawnPlayer_f64_NoMeta(spawn) => {
-                        server.on_player_spawn_f64_nometa(spawn);
-                    }
-                    Packet::PlayerInfo(player_info) => {
-                        server.on_player_info(player_info);
-                    }
-                    Packet::ConfirmTransaction(transaction) => {
-                        read.write_packet(
-                            packet::play::serverbound::ConfirmTransactionServerbound {
-                                id: 0, // TODO: Use current container id, if the id of the transaction is not 0.
-                                action_number: transaction.action_number,
-                                accepted: true,
-                            },
-                        )
-                        .unwrap();
-                    }
-                    Packet::UpdateLight_NoTrust(update_light) => {
-                        server.world.clone().lighting_cache.clone().write().insert(
-                            CPos(update_light.chunk_x.0, update_light.chunk_z.0),
-                            LightData {
-                                arrays: Cursor::new(update_light.light_arrays),
-                                block_light_mask: update_light.block_light_mask.0,
-                                sky_light_mask: update_light.sky_light_mask.0,
-                            },
-                        );
-                    }
-                    Packet::UpdateLight_WithTrust(update_light) => {
-                        // TODO: Add specific stuff!
-                        server.world.clone().lighting_cache.clone().write().insert(
-                            CPos(update_light.chunk_x.0, update_light.chunk_z.0),
-                            LightData {
-                                arrays: Cursor::new(update_light.light_arrays),
-                                block_light_mask: update_light.block_light_mask.0,
-                                sky_light_mask: update_light.sky_light_mask.0,
-                            },
-                        );
-                    }
-                    Packet::ChangeGameState(game_state) => {
-                        server.on_game_state_change(game_state);
-                    }
-                    Packet::UpdateHealth(update_health) => {
-                        server.on_update_health(
-                            update_health.health,
-                            update_health.food.0 as u8,
-                            update_health.food_saturation as u8,
-                        );
-                    }
-                    Packet::UpdateHealth_u16(update_health) => {
-                        server.on_update_health(
-                            update_health.health,
-                            update_health.food as u8,
-                            update_health.food_saturation as u8,
-                        );
-                    }
-                    Packet::TimeUpdate(time_update) => {
-                        server.on_time_update(time_update);
-                    }
-                    Packet::Disconnect(disconnect) => {
-                        server.disconnect(Some(disconnect.reason));
-                    }
-                    Packet::ServerMessage_NoPosition(server_message) => {
-                        server.on_servermessage_noposition(server_message);
-                    }
-                    Packet::ServerMessage_Position(server_message) => {
-                        server.on_servermessage_position(server_message);
-                    }
-                    Packet::ServerMessage_Sender(server_message) => {
-                        server.on_servermessage_sender(server_message);
-                    }
-                    Packet::PlayerInfo_String(player_info) => {
-                        server.on_player_info_string(player_info);
-                    }
-                    Packet::PluginMessageClientbound_i16(plugin_message) => {
-                        server.on_plugin_message_clientbound_i16(plugin_message);
-                    }
-                    Packet::PluginMessageClientbound(plugin_message) => {
-                        server.on_plugin_message_clientbound_1(plugin_message);
-                    }
-                    Packet::SetExperience(set_exp) => {
-                        server
-                            .hud_context
-                            .clone()
-                            .write()
-                            .update_exp(set_exp.experience_bar, set_exp.level.0);
-                    }
-                    Packet::SetCurrentHotbarSlot(set_slot) => {
-                        if set_slot.slot <= 8 {
-                            server.inventory_context.clone().write().hotbar_index = set_slot.slot;
+        thread::spawn(move || {
+            let threads = ThreadPoolBuilder::new().num_threads(8).build().unwrap();
+            loop {
+                let server = server.clone().lock().as_ref().unwrap().clone();
+                let pck = read.read_packet();
+                match pck {
+                    Ok(pck) => match pck {
+                        Packet::KeepAliveClientbound_i64(keep_alive) => {
+                            server.on_keep_alive_i64(keep_alive);
+                        }
+                        Packet::KeepAliveClientbound_VarInt(keep_alive) => {
+                            server.on_keep_alive_varint(keep_alive);
+                        }
+                        Packet::KeepAliveClientbound_i32(keep_alive) => {
+                            server.on_keep_alive_i32(keep_alive);
+                        }
+                        Packet::ChunkData_NoEntities(chunk_data) => {
+                            server.on_chunk_data_no_entities(chunk_data);
+                        }
+                        Packet::ChunkData_NoEntities_u16(chunk_data) => {
+                            server.on_chunk_data_no_entities_u16(chunk_data);
+                        }
+                        Packet::ChunkData_17(chunk_data) => {
+                            server.on_chunk_data_17(chunk_data);
+                        }
+                        Packet::ChunkDataBulk(bulk) => {
+                            server.on_chunk_data_bulk(bulk);
+                        }
+                        Packet::ChunkDataBulk_17(bulk) => {
+                            server.on_chunk_data_bulk_17(bulk);
+                        }
+                        Packet::BlockChange_VarInt(block_change) => {
+                            server.on_block_change_varint(block_change);
+                        }
+                        Packet::BlockChange_u8(block_change) => {
+                            server.on_block_change_u8(block_change);
+                        }
+                        Packet::MultiBlockChange_Packed(block_change) => {
+                            server.on_multi_block_change_packed(block_change);
+                        }
+                        Packet::MultiBlockChange_VarInt(block_change) => {
+                            server.on_multi_block_change_varint(block_change);
+                        }
+                        Packet::MultiBlockChange_u16(block_change) => {
+                            server.on_multi_block_change_u16(block_change);
+                        }
+                        Packet::UpdateBlockEntity(block_update) => {
+                            server.on_block_entity_update(block_update);
+                        }
+                        Packet::ChunkData_Biomes3D(chunk_data) => {
+                            threads.spawn(move || {
+                                server.on_chunk_data_biomes3d(chunk_data);
+                            });
+                        }
+                        Packet::ChunkData_Biomes3D_VarInt(chunk_data) => {
+                            threads.spawn(move || {
+                                server.on_chunk_data_biomes3d_varint(chunk_data);
+                            });
+                        }
+                        Packet::ChunkData_Biomes3D_bool(chunk_data) => {
+                            threads.spawn(move || {
+                                server.on_chunk_data_biomes3d_bool(chunk_data);
+                            });
+                        }
+                        Packet::ChunkData(chunk_data) => {
+                            threads.spawn(move || {
+                                server.on_chunk_data(chunk_data);
+                            });
+                        }
+                        Packet::ChunkData_HeightMap(chunk_data) => {
+                            threads.spawn(move || {
+                                server.on_chunk_data_heightmap(chunk_data);
+                            });
+                        }
+                        Packet::UpdateSign(update_sign) => {
+                            server.on_sign_update(update_sign);
+                        }
+                        Packet::UpdateSign_u16(update_sign) => {
+                            server.on_sign_update_u16(update_sign);
+                        }
+                        Packet::UpdateBlockEntity_Data(block_update) => {
+                            server.on_block_entity_update_data(block_update);
+                        }
+                        Packet::ChunkUnload(chunk_unload) => {
+                            server.on_chunk_unload(chunk_unload);
+                        }
+                        Packet::EntityDestroy(entity_destroy) => {
+                            server.on_entity_destroy(entity_destroy);
+                        }
+                        Packet::EntityDestroy_u8(entity_destroy) => {
+                            server.on_entity_destroy_u8(entity_destroy);
+                        }
+                        Packet::EntityMove_i8_i32_NoGround(m) => {
+                            server.on_entity_move_i8_i32_noground(m);
+                        }
+                        Packet::EntityMove_i8(m) => {
+                            server.on_entity_move_i8(m);
+                        }
+                        Packet::EntityMove_i16(m) => {
+                            server.on_entity_move_i16(m);
+                        }
+                        Packet::EntityLook_VarInt(look) => {
+                            server.on_entity_look_varint(look);
+                        }
+                        Packet::EntityLook_i32_NoGround(look) => {
+                            server.on_entity_look_i32_noground(look);
+                        }
+                        Packet::JoinGame_HashedSeed_Respawn(join) => {
+                            server.on_game_join_hashedseed_respawn(join);
+                        }
+                        Packet::JoinGame_i8(join) => {
+                            server.on_game_join_i8(join);
+                        }
+                        Packet::JoinGame_i8_NoDebug(join) => {
+                            server.on_game_join_i8_nodebug(join);
+                        }
+                        Packet::JoinGame_i32(join) => {
+                            server.on_game_join_i32(join);
+                        }
+                        Packet::JoinGame_i32_ViewDistance(join) => {
+                            server.on_game_join_i32_viewdistance(join);
+                        }
+                        Packet::JoinGame_WorldNames(join) => {
+                            server.on_game_join_worldnames(join);
+                        }
+                        Packet::JoinGame_WorldNames_IsHard(join) => {
+                            server.on_game_join_worldnames_ishard(join);
+                        }
+                        Packet::TeleportPlayer_WithConfirm(teleport) => {
+                            server.on_teleport_player_withconfirm(teleport);
+                        }
+                        Packet::TeleportPlayer_NoConfirm(teleport) => {
+                            server.on_teleport_player_noconfirm(teleport);
+                        }
+                        Packet::TeleportPlayer_OnGround(teleport) => {
+                            server.on_teleport_player_onground(teleport);
+                        }
+                        Packet::Respawn_Gamemode(respawn) => {
+                            server.on_respawn_gamemode(respawn);
+                        }
+                        Packet::Respawn_HashedSeed(respawn) => {
+                            server.on_respawn_hashedseed(respawn);
+                        }
+                        Packet::Respawn_NBT(respawn) => {
+                            server.on_respawn_nbt(respawn);
+                        }
+                        Packet::Respawn_WorldName(respawn) => {
+                            server.on_respawn_worldname(respawn);
+                        }
+                        Packet::EntityTeleport_f64(entity_teleport) => {
+                            server.on_entity_teleport_f64(entity_teleport);
+                        }
+                        Packet::EntityTeleport_i32(entity_teleport) => {
+                            server.on_entity_teleport_i32(entity_teleport);
+                        }
+                        Packet::EntityTeleport_i32_i32_NoGround(entity_teleport) => {
+                            server.on_entity_teleport_i32_i32_noground(entity_teleport);
+                        }
+                        Packet::EntityLookAndMove_i8_i32_NoGround(lookmove) => {
+                            server.on_entity_look_and_move_i8_i32_noground(lookmove);
+                        }
+                        Packet::EntityLookAndMove_i8(lookmove) => {
+                            server.on_entity_look_and_move_i8(lookmove);
+                        }
+                        Packet::EntityLookAndMove_i16(lookmove) => {
+                            server.on_entity_look_and_move_i16(lookmove);
+                        }
+                        Packet::SpawnPlayer_i32_HeldItem_String(spawn) => {
+                            server.on_player_spawn_i32_helditem_string(spawn);
+                        }
+                        Packet::SpawnPlayer_i32_HeldItem(spawn) => {
+                            server.on_player_spawn_i32_helditem(spawn);
+                        }
+                        Packet::SpawnPlayer_i32(spawn) => {
+                            server.on_player_spawn_i32(spawn);
+                        }
+                        Packet::SpawnPlayer_f64(spawn) => {
+                            server.on_player_spawn_f64(spawn);
+                        }
+                        Packet::SpawnPlayer_f64_NoMeta(spawn) => {
+                            server.on_player_spawn_f64_nometa(spawn);
+                        }
+                        Packet::PlayerInfo(player_info) => {
+                            server.on_player_info(player_info);
+                        }
+                        Packet::ConfirmTransaction(transaction) => {
+                            read.write_packet(
+                                packet::play::serverbound::ConfirmTransactionServerbound {
+                                    id: 0, // TODO: Use current container id, if the id of the transaction is not 0.
+                                    action_number: transaction.action_number,
+                                    accepted: true,
+                                },
+                            )
+                            .unwrap();
+                        }
+                        Packet::UpdateLight_NoTrust(update_light) => {
+                            server.world.clone().lighting_cache.clone().write().insert(
+                                CPos(update_light.chunk_x.0, update_light.chunk_z.0),
+                                LightData {
+                                    arrays: Cursor::new(update_light.light_arrays),
+                                    block_light_mask: update_light.block_light_mask.0,
+                                    sky_light_mask: update_light.sky_light_mask.0,
+                                },
+                            );
+                        }
+                        Packet::UpdateLight_WithTrust(update_light) => {
+                            // TODO: Add specific stuff!
+                            server.world.clone().lighting_cache.clone().write().insert(
+                                CPos(update_light.chunk_x.0, update_light.chunk_z.0),
+                                LightData {
+                                    arrays: Cursor::new(update_light.light_arrays),
+                                    block_light_mask: update_light.block_light_mask.0,
+                                    sky_light_mask: update_light.sky_light_mask.0,
+                                },
+                            );
+                        }
+                        Packet::ChangeGameState(game_state) => {
+                            server.on_game_state_change(game_state);
+                        }
+                        Packet::UpdateHealth(update_health) => {
+                            server.on_update_health(
+                                update_health.health,
+                                update_health.food.0 as u8,
+                                update_health.food_saturation as u8,
+                            );
+                        }
+                        Packet::UpdateHealth_u16(update_health) => {
+                            server.on_update_health(
+                                update_health.health,
+                                update_health.food as u8,
+                                update_health.food_saturation as u8,
+                            );
+                        }
+                        Packet::TimeUpdate(time_update) => {
+                            server.on_time_update(time_update);
+                        }
+                        Packet::Disconnect(disconnect) => {
+                            server.disconnect(Some(disconnect.reason));
+                        }
+                        Packet::ServerMessage_NoPosition(server_message) => {
+                            server.on_servermessage_noposition(server_message);
+                        }
+                        Packet::ServerMessage_Position(server_message) => {
+                            server.on_servermessage_position(server_message);
+                        }
+                        Packet::ServerMessage_Sender(server_message) => {
+                            server.on_servermessage_sender(server_message);
+                        }
+                        Packet::PlayerInfo_String(player_info) => {
+                            server.on_player_info_string(player_info);
+                        }
+                        Packet::PluginMessageClientbound_i16(plugin_message) => {
+                            server.on_plugin_message_clientbound_i16(plugin_message);
+                        }
+                        Packet::PluginMessageClientbound(plugin_message) => {
+                            server.on_plugin_message_clientbound_1(plugin_message);
+                        }
+                        Packet::SetExperience(set_exp) => {
                             server
                                 .hud_context
                                 .clone()
                                 .write()
-                                .update_slot_index(set_slot.slot);
-                        } else {
-                            warn!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
+                                .update_exp(set_exp.experience_bar, set_exp.level.0);
                         }
-                    }
-                    Packet::WindowItems(_window_items) => {
-                        debug!("items!");
-                    }
-                    Packet::WindowSetSlot(set_slot) => {
-                        let inventory = server.inventory_context.clone();
-                        let mut top_inventory = inventory.write();
-                        let inventory = if let Some(inventory) = top_inventory.inventory.as_ref() {
-                            inventory.clone()
-                        } else {
-                            top_inventory.player_inventory.clone()
-                        };
-                        let curr_slots = inventory.clone().read().size();
-                        if set_slot.slot < 0 || set_slot.slot >= curr_slots {
-                            if set_slot.slot == -1 {
+                        Packet::SetCurrentHotbarSlot(set_slot) => {
+                            if set_slot.slot <= 8 {
+                                server.inventory_context.clone().write().hotbar_index =
+                                    set_slot.slot;
+                                server
+                                    .hud_context
+                                    .clone()
+                                    .write()
+                                    .update_slot_index(set_slot.slot);
+                            } else {
+                                warn!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
+                            }
+                        }
+                        Packet::WindowItems(_window_items) => {
+                            debug!("items!");
+                        }
+                        Packet::WindowSetSlot(set_slot) => {
+                            let top_inventory = server.inventory_context.clone();
+                            let inventory = if let Some(inventory) =
+                                top_inventory.clone().read().inventory.as_ref()
+                            {
+                                inventory.clone()
+                            } else {
+                                top_inventory.clone().read().player_inventory.clone()
+                            };
+                            let curr_slots = inventory.clone().read().size();
+                            if set_slot.slot < 0 || set_slot.slot >= curr_slots {
+                                if set_slot.slot == -1 {
+                                    let item = set_slot.item.map(|stack| {
+                                        let id = stack.id;
+                                        Item {
+                                            stack,
+                                            material: to_material(
+                                                id as u16,
+                                                server.mapped_protocol_version,
+                                            ),
+                                        }
+                                    });
+                                    top_inventory.write().cursor = item; // TODO: Set to HUD and make it dirty!
+                                } else {
+                                    warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
+                                }
+                            } else {
+                                debug!(
+                                    "set item to {}, {}, {}",
+                                    set_slot.id,
+                                    set_slot.slot,
+                                    set_slot.item.as_ref().map_or(0, |s| s.id)
+                                );
                                 let item = set_slot.item.map(|stack| {
                                     let id = stack.id;
                                     Item {
@@ -696,51 +732,31 @@ impl Server {
                                         ),
                                     }
                                 });
-                                top_inventory.cursor = item; // TODO: Set to HUD and make it dirty!
-                            } else {
-                                warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
+                                inventory.clone().write().set_item(set_slot.slot, item);
                             }
-                        } else {
-                            debug!(
-                                "set item to {}, {}, {}",
-                                set_slot.id,
-                                set_slot.slot,
-                                set_slot.item.as_ref().map_or(0, |s| s.id)
-                            );
-                            let item = set_slot.item.map(|stack| {
-                                let id = stack.id;
-                                Item {
-                                    stack,
-                                    material: to_material(
-                                        id as u16,
-                                        server.mapped_protocol_version,
-                                    ),
-                                }
-                            });
-                            inventory.clone().write().set_item(set_slot.slot, item);
                         }
-                    }
-                    _ => {
-                        // debug!("other packet!");
-                    }
-                },
-                Err(err) => {
-                    if server
-                        .disconnect_data
-                        .clone()
-                        .read()
-                        .disconnect_reason
-                        .is_none()
-                    {
-                        server
+                        _ => {
+                            // debug!("other packet!");
+                        }
+                    },
+                    Err(err) => {
+                        if server
                             .disconnect_data
                             .clone()
-                            .write()
+                            .read()
                             .disconnect_reason
-                            .replace(Component::Text(TextComponent::new(&*format!(
-                                "An error occurred while reading a packet: {}",
-                                err
-                            ))));
+                            .is_none()
+                        {
+                            server
+                                .disconnect_data
+                                .clone()
+                                .write()
+                                .disconnect_reason
+                                .replace(Component::Text(TextComponent::new(&*format!(
+                                    "An error occurred while reading a packet: {}",
+                                    err
+                                ))));
+                        }
                     }
                 }
             }
@@ -750,7 +766,7 @@ impl Server {
     fn spawn_light_updater(server: Arc<Mutex<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
         let (tx, rx) = unbounded();
         thread::spawn(move || loop {
-            let server = server.clone().lock().as_ref().unwrap().clone();
+            /*let server = server.clone().lock().as_ref().unwrap().clone();
             let mut done = false; // TODO: Improve performance!
             while !done {
                 let start = Instant::now();
@@ -771,9 +787,9 @@ impl Server {
                     done = true;
                 }
                 thread::sleep(Duration::from_millis(1));
-            }
-            // while let Ok(_update) = rx.try_recv() {}
-            // thread::sleep(Duration::from_millis(1000));
+            }*/
+            while let Ok(_update) = rx.try_recv() {}
+            thread::sleep(Duration::from_millis(1000));
         });
         tx
     }

@@ -33,6 +33,9 @@ use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
 use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
+use std::sync::atomic::AtomicBool;
+
+use std::sync::atomic::Ordering as AtomicOrdering;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
@@ -68,7 +71,7 @@ pub struct HudContext {
     dirty_breath: bool,
     pub player_inventory: Option<Arc<RwLock<PlayerInventory>>>,
     pub server: Option<Arc<Server>>,
-    pub dirty_slots: bool,
+    pub dirty_slots: AtomicBool,
     slot_index: u8,
     dirty_slot_index: bool,
     game_mode: GameMode,
@@ -115,7 +118,7 @@ impl HudContext {
             dirty_breath: false,
             player_inventory: None,
             server: None,
-            dirty_slots: false,
+            dirty_slots: AtomicBool::new(false),
             slot_index: 0,
             dirty_slot_index: false,
             game_mode: GameMode::Survival,
@@ -345,7 +348,13 @@ impl Screen for Hud {
                 self.render_breath(renderer, ui_container);
             }
         }
-        if self.hud_context.clone().read().dirty_slots {
+        if self
+            .hud_context
+            .clone()
+            .read()
+            .dirty_slots
+            .load(AtomicOrdering::Relaxed)
+        {
             self.slot_elements.clear();
             self.render_slots_items(renderer, ui_container);
         }
@@ -865,10 +874,7 @@ impl Hud {
             if let Some(player_inventory) =
                 self.hud_context.clone().read().player_inventory.as_ref()
             {
-                let player_inventory = player_inventory.clone();
-                let player_inventory = player_inventory.read();
-                let item = player_inventory.get_item(36 + i as i16);
-                if let Some(item) = item {
+                if let Some(item) = player_inventory.clone().read().get_item(36 + i as i16) {
                     let slot = self.draw_item(
                         item,
                         -(icon_scale * 90.0) + (i as f64 * (icon_scale * 20.0)) + icon_scale * 11.0,
@@ -880,7 +886,11 @@ impl Hud {
                 }
             }
         }
-        self.hud_context.clone().write().dirty_slots = false;
+        self.hud_context
+            .clone()
+            .write()
+            .dirty_slots
+            .store(false, AtomicOrdering::Relaxed);
     }
 
     fn render_slot_index(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
