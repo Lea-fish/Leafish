@@ -737,7 +737,9 @@ fn handle_window_event<T>(
                                     window.set_cursor_grab(true).unwrap();
                                     window.set_cursor_visible(false);
                                     game.focused = true;
-                                    game.screen_sys.pop_screen();
+                                    while game.screen_sys.is_current_closable() {
+                                        game.screen_sys.pop_screen();
+                                    }
                                 }
                             }
                         }
