@@ -24,7 +24,7 @@ use std::fmt;
 use std::fs;
 use std::io;
 use std::io::{Read, Write};
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 
@@ -1387,6 +1387,10 @@ impl Conn {
 
     pub fn set_compression(&mut self, threshold: i32) {
         self.compression_threshold = threshold;
+    }
+
+    pub fn close(&self) {
+        self.stream.shutdown(Shutdown::Both).unwrap();
     }
 
     pub fn do_status(mut self) -> Result<(Status, Duration), Error> {

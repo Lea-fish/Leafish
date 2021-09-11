@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
+use std::sync::atomic::Ordering;
 
 pub struct PlayerInventory {
     slots: Vec<Slot>,
@@ -255,14 +256,22 @@ impl Inventory for PlayerInventory {
 
     fn get_item_mut(&mut self, slot: i16) -> &mut Option<Item> {
         self.dirty = true;
-        self.hud_context.clone().write().dirty_slots = true;
+        self.hud_context
+            .clone()
+            .read()
+            .dirty_slots
+            .store(true, Ordering::Relaxed);
         &mut self.slots[slot as usize].item
     }
 
     fn set_item(&mut self, slot: i16, item: Option<Item>) {
         self.slots[slot as usize].item = item;
         self.dirty = true;
-        self.hud_context.clone().write().dirty_slots = true;
+        self.hud_context
+            .clone()
+            .read()
+            .dirty_slots
+            .store(true, Ordering::Relaxed);
     }
 
     fn init(
@@ -313,7 +322,11 @@ impl Inventory for PlayerInventory {
         basic_text_elements.push(crafting_text);
         inventory_window.elements.push(vec![]);
         self.update_icons(renderer);
-        self.hud_context.clone().write().dirty_slots = true;
+        self.hud_context
+            .clone()
+            .read()
+            .dirty_slots
+            .store(true, Ordering::Relaxed);
     }
 
     fn tick(

@@ -255,9 +255,9 @@ impl Renderer {
         use std::f64::consts::PI as PI64;
         // Not a sane place to put this but it works
         {
-            let rm = self.resources.read();
-            if rm.version() != self.resource_version {
-                self.resource_version = rm.version();
+            let version = self.resources.read().version();
+            if version != self.resource_version {
+                self.resource_version = version;
                 trace!("Updating textures to {}", self.resource_version);
                 self.textures.write().update_textures(self.resource_version);
 

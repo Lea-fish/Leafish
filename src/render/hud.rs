@@ -33,6 +33,9 @@ use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
 use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
+use std::sync::atomic::AtomicBool;
+
+use std::sync::atomic::Ordering as AtomicOrdering;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
@@ -68,12 +71,12 @@ pub struct HudContext {
     dirty_breath: bool,
     pub player_inventory: Option<Arc<RwLock<PlayerInventory>>>,
     pub server: Option<Arc<Server>>,
-    pub dirty_slots: bool,
+    pub dirty_slots: AtomicBool,
     slot_index: u8,
     dirty_slot_index: bool,
     game_mode: GameMode,
     dirty_game_mode: bool,
-    chat_history: Vec<format::Component>,
+    chat_history: Vec<format::Component>, // TODO: Make components fade away after a certain amount of time (but keep them in here to render them if necessary)
     dirty_chat: bool,
 }
 
@@ -115,7 +118,7 @@ impl HudContext {
             dirty_breath: false,
             player_inventory: None,
             server: None,
-            dirty_slots: false,
+            dirty_slots: AtomicBool::new(false),
             slot_index: 0,
             dirty_slot_index: false,
             game_mode: GameMode::Survival,
@@ -345,7 +348,13 @@ impl Screen for Hud {
                 self.render_breath(renderer, ui_container);
             }
         }
-        if self.hud_context.clone().read().dirty_slots {
+        if self
+            .hud_context
+            .clone()
+            .read()
+            .dirty_slots
+            .load(AtomicOrdering::Relaxed)
+        {
             self.slot_elements.clear();
             self.render_slots_items(renderer, ui_container);
         }
@@ -865,10 +874,7 @@ impl Hud {
             if let Some(player_inventory) =
                 self.hud_context.clone().read().player_inventory.as_ref()
             {
-                let player_inventory = player_inventory.clone();
-                let player_inventory = player_inventory.read();
-                let item = player_inventory.get_item(36 + i as i16);
-                if let Some(item) = item {
+                if let Some(item) = player_inventory.clone().read().get_item(36 + i as i16) {
                     let slot = self.draw_item(
                         item,
                         -(icon_scale * 90.0) + (i as f64 * (icon_scale * 20.0)) + icon_scale * 11.0,
@@ -880,7 +886,11 @@ impl Hud {
                 }
             }
         }
-        self.hud_context.clone().write().dirty_slots = false;
+        self.hud_context
+            .clone()
+            .write()
+            .dirty_slots
+            .store(false, AtomicOrdering::Relaxed);
     }
 
     fn render_slot_index(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
@@ -986,12 +996,17 @@ impl Hud {
     }
 
     pub fn render_chat(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let hud_context = self.hud_context.clone();
-        let hud_context = hud_context.read();
-        let icon_scale = Hud::icon_scale(renderer);
-        let scale = icon_scale / 2.0;
+        let scale = Hud::icon_scale(renderer);
+        let history_size = self.hud_context.clone().read().chat_history.len();
 
-        let history_size = hud_context.chat_history.len();
+        let mut component_lines = 0;
+        for i in 0..cmp::min(10, history_size) {
+            let message =
+                self.hud_context.clone().read().chat_history[history_size - 1 - i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.to_string()) / (CHAT_WIDTH * scale))
+                .ceil() as u8;
+            component_lines += lines;
+        }
 
         if history_size > 0 {
             // TODO: Only do this in chat-view mode (where the entire chat is shown)
@@ -1000,38 +1015,39 @@ impl Hud {
                     .draw_index(HUD_PRIORITY + 1)
                     .texture("leafish:solid")
                     .alignment(VAttach::Bottom, HAttach::Left)
-                    .position(0.0, scale * 85.0)
+                    .position(0.0, scale * 85.0 / 2.0)
                     .size(
-                        500.0 * scale,
-                        6.0 * scale + 10.0 * scale * (cmp::min(10, history_size) as f64),
+                        500.0 / 2.0 * scale,
+                        5.0 * scale * (component_lines as f64)
+                            + cmp::min(10, history_size) as f64 * 0.4 * scale,
                     )
                     .colour((0, 0, 0, 100))
                     .create(ui_container),
             );
         }
+
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message = hud_context.chat_history[history_size - 1 - i].clone();
-            let lines =
-                (renderer.ui.size_of_string(&*message.to_string()) / CHAT_WIDTH).ceil() as u8;
+            let message =
+                self.hud_context.clone().read().chat_history[history_size - 1 - i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.to_string()) / (CHAT_WIDTH * scale))
+                .ceil() as u8;
             let text = ui::FormattedBuilder::new()
                 .draw_index(HUD_PRIORITY + 1)
                 .alignment(VAttach::Bottom, HAttach::Left)
-                .scale_x(scale)
-                .scale_y(scale)
                 .position(
-                    0.0,
-                    scale * 80.0
-                        + ((component_lines as f64)
-                            * (10.0 + (cmp::min(component_lines, 1) as f64 * 0.5)))
-                            * scale,
+                    1.0 * scale,
+                    scale * 85.0 / 2.0
+                        + ((component_lines as f64) * 5.0) * scale
+                        + i as f64 * 0.4 * scale,
                 )
                 .text(message)
                 .max_width(CHAT_WIDTH * scale)
                 .create(ui_container);
-            component_lines += lines;
             self.chat_elements.push(text);
+            component_lines += lines;
         }
+        self.hud_context.clone().write().dirty_chat = false;
     }
 
     pub fn draw_item(
@@ -1066,5 +1082,5 @@ impl Hud {
     }
 }
 
-const CHAT_WIDTH: f64 = 490.0;
+const CHAT_WIDTH: f64 = 490.0 / 2.0;
 const HUD_PRIORITY: isize = -2;

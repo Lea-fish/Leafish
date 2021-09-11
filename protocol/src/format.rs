@@ -42,7 +42,9 @@ impl Component {
                 modifier,
             })
         } else if v.get("text").is_some() {
-            Component::Text(TextComponent::from_value(v, modifier))
+            let mut component = Component::Text(TextComponent::from_value(v, modifier));
+            convert_legacy(&mut component);
+            component
         } else if let Some(translate) = v.get("translate") {
             let translate_key = translate.as_str().unwrap_or_default();
             if let Some(serde_json::Value::Array(args)) = v.get("with") {

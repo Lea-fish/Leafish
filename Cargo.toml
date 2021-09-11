@@ -51,7 +51,7 @@ parking_lot = "0.11.1"
 crossbeam-channel = "0.5.1" # check if flume would be better in terms of performance!
 # flume = "0.10.8" # replaced by crossbeam channel
 # tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
-# rayon = "1.5.1" # this has a massive, negative performance impact!
+rayon = "1.5.1"
 
 reqwest = { version = "0.11.4", features = [ "blocking" ]}
 glutin = "0.27.0"
