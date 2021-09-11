@@ -45,7 +45,7 @@ use log::{debug, error, info, warn};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use rand::{self, Rng};
-use rayon::{ThreadPool, ThreadPoolBuilder};
+use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
@@ -763,7 +763,7 @@ impl Server {
         });
     }
 
-    fn spawn_light_updater(server: Arc<Mutex<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
+    fn spawn_light_updater(_server: Arc<Mutex<Option<Arc<Server>>>>) -> Sender<LightUpdate> {
         let (tx, rx) = unbounded();
         thread::spawn(move || loop {
             /*let server = server.clone().lock().as_ref().unwrap().clone();
