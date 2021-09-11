@@ -626,15 +626,9 @@ impl super::Screen for ServerList {
         }
     }
 
-    fn on_resize(
-        &mut self,
-        _width: u32,
-        _height: u32,
-        _renderer: &mut Renderer,
-        _ui_container: &mut Container,
-    ) {
+    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         // TODO: Don't ping the servers on resize!
-        self.on_deactive(_renderer, _ui_container);
-        self.on_active(_renderer, _ui_container);
+        self.on_deactive(renderer, ui_container);
+        self.on_active(renderer, ui_container);
     }
 }

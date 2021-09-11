@@ -240,7 +240,7 @@ impl Hud {
 }
 
 impl Screen for Hud {
-    fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         if self.hud_context.clone().read().enabled {
             self.render_slots(renderer, ui_container);
             self.render_slots_items(renderer, ui_container);
@@ -258,7 +258,7 @@ impl Screen for Hud {
         }
     }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn deinit(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
         self.elements.clear();
         self.health_elements.clear();
         self.exp_elements.clear();
@@ -272,6 +272,10 @@ impl Screen for Hud {
         self.chat_elements.clear();
         self.chat_background_elements.clear();
     }
+
+    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+
+    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
     fn tick(
         &mut self,
@@ -415,21 +419,19 @@ impl Screen for Hud {
         self.hud_context.clone().write().dirty_slot_index = true;
     }
 
-    fn on_resize(
-        &mut self,
-        _width: u32,
-        _height: u32,
-        _renderer: &mut Renderer,
-        _ui_container: &mut Container,
-    ) {
+    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         if self.hud_context.clone().read().enabled {
-            self.on_deactive(_renderer, _ui_container);
-            self.on_active(_renderer, _ui_container);
+            self.deinit(renderer, ui_container);
+            self.init(renderer, ui_container);
         }
     }
 
     fn is_closable(&self) -> bool {
         false
+    }
+
+    fn is_tick_always(&self) -> bool {
+        true
     }
 }
 
@@ -490,6 +492,7 @@ impl Hud {
             }
 
             let image = ui::ImageBuilder::new()
+                .draw_index(HUD_PRIORITY)
                 .texture_coords((
                     (16.0 + updated_offset) as f64 / 256.0,
                     (9.0 * hardcore_offset) as f64 / 256.0,
@@ -506,6 +509,7 @@ impl Hud {
             if updated_health {
                 if heart as f32 * 2.0 + 1.0 < last_health {
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((
                             (texture_offset + 54) as f64 / 256.0,
                             (9.0 * hardcore_offset) as f64 / 256.0,
@@ -520,6 +524,7 @@ impl Hud {
                     self.health_elements.push(image);
                 } else if heart as f32 * 2.0 + 1.0 == last_health {
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((
                             (texture_offset + 63) as f64 / 256.0,
                             (9.0 * hardcore_offset) as f64 / 256.0,
@@ -538,6 +543,7 @@ impl Hud {
             if tmp_absorbtion > 0.0 {
                 if tmp_absorbtion == absorbtion && absorbtion % 2.0 == 1.0 {
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((
                             (texture_offset + 153) as f64 / 256.0,
                             (9.0 * hardcore_offset) as f64 / 256.0,
@@ -552,6 +558,7 @@ impl Hud {
                     self.health_elements.push(image);
                 } else {
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((
                             (texture_offset + 144) as f64 / 256.0,
                             (9.0 * hardcore_offset) as f64 / 256.0,
@@ -570,6 +577,7 @@ impl Hud {
             } else {
                 if heart * 2 + 1 < hp as isize {
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((
                             (texture_offset + 36) as f64 / 256.0,
                             (9.0 * hardcore_offset) as f64 / 256.0,
@@ -586,6 +594,7 @@ impl Hud {
 
                 if heart * 2 + 1 == hp as isize {
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((
                             (texture_offset + 45) as f64 / 256.0,
                             (9.0 * hardcore_offset) as f64 / 256.0,
@@ -625,6 +634,7 @@ impl Hud {
                     Ordering::Less => 34.0,
                 };
                 let image = ui::ImageBuilder::new()
+                    .draw_index(HUD_PRIORITY)
                     .texture_coords((
                         texture_offset / 256.0,
                         9.0 / 256.0,
@@ -664,6 +674,7 @@ impl Hud {
         for i in 0..10 {
             let x = x_offset - i as f64 * (icon_scale * 8.0) - icon_scale * 9.0;
             let image = ui::ImageBuilder::new()
+                .draw_index(HUD_PRIORITY)
                 .texture_coords((
                     (16.0 + j8 * 9.0) / 256.0,
                     27.0 / 256.0,
@@ -680,6 +691,7 @@ impl Hud {
             match (i * 2 + 1).cmp(&food) {
                 Ordering::Less => {
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((
                             (l7 + 36.0) / 256.0,
                             27.0 / 256.0,
@@ -695,6 +707,7 @@ impl Hud {
                 }
                 Ordering::Equal => {
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((
                             (l7 + 45.0) / 256.0,
                             27.0 / 256.0,
@@ -728,6 +741,7 @@ impl Hud {
         };
         if max_exp > 0 {
             let image = ui::ImageBuilder::new()
+                .draw_index(HUD_PRIORITY)
                 .texture_coords((0.0 / 256.0, 64.0 / 256.0, 182.0 / 256.0, 5.0 / 256.0))
                 .position(0.0, y_offset)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
@@ -740,6 +754,7 @@ impl Hud {
             if scaled_length > 0.0 {
                 let shift = icon_scale * (((182.0) - scaled_length as f64) / 2.0);
                 let image = ui::ImageBuilder::new()
+                    .draw_index(HUD_PRIORITY)
                     .texture_coords((
                         0.0 / 256.0,
                         69.0 / 256.0,
@@ -760,6 +775,7 @@ impl Hud {
             let y = icon_scale * 26.0;
             self.exp_text_elements.push(
                 ui::TextBuilder::new()
+                    .draw_index(HUD_PRIORITY)
                     .alignment(VAttach::Bottom, HAttach::Center)
                     .scale_x(scale)
                     .scale_y(scale)
@@ -771,6 +787,7 @@ impl Hud {
             );
             self.exp_text_elements.push(
                 ui::TextBuilder::new()
+                    .draw_index(HUD_PRIORITY)
                     .alignment(VAttach::Bottom, HAttach::Center)
                     .scale_x(scale)
                     .scale_y(scale)
@@ -782,6 +799,7 @@ impl Hud {
             );
             self.exp_text_elements.push(
                 ui::TextBuilder::new()
+                    .draw_index(HUD_PRIORITY)
                     .alignment(VAttach::Bottom, HAttach::Center)
                     .scale_x(scale)
                     .scale_y(scale)
@@ -793,6 +811,7 @@ impl Hud {
             );
             self.exp_text_elements.push(
                 ui::TextBuilder::new()
+                    .draw_index(HUD_PRIORITY)
                     .alignment(VAttach::Bottom, HAttach::Center)
                     .scale_x(scale)
                     .scale_y(scale)
@@ -804,6 +823,7 @@ impl Hud {
             );
             self.exp_text_elements.push(
                 ui::TextBuilder::new()
+                    .draw_index(HUD_PRIORITY)
                     .alignment(VAttach::Bottom, HAttach::Center)
                     .scale_x(scale)
                     .scale_y(scale)
@@ -821,6 +841,7 @@ impl Hud {
     fn render_slots(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
+            .draw_index(HUD_PRIORITY)
             .texture_coords((0.0 / 256.0, 0.0 / 256.0, 182.0 / 256.0, 22.0 / 256.0))
             .position(0.0, 0.0)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
@@ -866,6 +887,7 @@ impl Hud {
         let icon_scale = Hud::icon_scale(renderer);
         let slot = self.hud_context.clone().read().slot_index as f64;
         let image = ui::ImageBuilder::new()
+            .draw_index(HUD_PRIORITY)
             .texture_coords((0.0 / 256.0, 22.0 / 256.0, 24.0 / 256.0, 22.0 / 256.0))
             .position(
                 (icon_scale) * -1.0
@@ -882,13 +904,14 @@ impl Hud {
         self.hud_context.clone().write().dirty_slot_index = false;
     }
 
-    // TODO: make use of "render_item"
+    // TODO: make use of "render_item" (in right hand)
     #[allow(dead_code)]
     fn render_item(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
     fn render_crosshair(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
+            .draw_index(HUD_PRIORITY)
             .texture_coords((0.0 / 256.0, 0.0 / 256.0, 16.0 / 256.0, 16.0 / 256.0))
             .position(0.0, 0.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
@@ -918,6 +941,7 @@ impl Hud {
                 if i < (bubbles as i32) {
                     // normal bubble
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((16.0 / 256.0, 18.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
                         .position(x, y_offset)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
@@ -928,6 +952,7 @@ impl Hud {
                 } else {
                     // broken bubble
                     let image = ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY)
                         .texture_coords((25.0 / 256.0, 18.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
                         .position(x, y_offset)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
@@ -948,6 +973,7 @@ impl Hud {
         let scale = icon_scale / 2.0;
         self.debug_elements.push(
             ui::TextBuilder::new()
+                .draw_index(HUD_PRIORITY)
                 .alignment(VAttach::Top, HAttach::Left)
                 .scale_x(scale)
                 .scale_y(scale)
@@ -971,6 +997,7 @@ impl Hud {
             // TODO: Only do this in chat-view mode (where the entire chat is shown)
             self.chat_background_elements.push(
                 ui::ImageBuilder::new()
+                    .draw_index(HUD_PRIORITY + 1)
                     .texture("leafish:solid")
                     .alignment(VAttach::Bottom, HAttach::Left)
                     .position(0.0, scale * 85.0)
@@ -988,6 +1015,7 @@ impl Hud {
             let lines =
                 (renderer.ui.size_of_string(&*message.to_string()) / CHAT_WIDTH).ceil() as u8;
             let text = ui::FormattedBuilder::new()
+                .draw_index(HUD_PRIORITY + 1)
                 .alignment(VAttach::Bottom, HAttach::Left)
                 .scale_x(scale)
                 .scale_y(scale)
@@ -1027,6 +1055,7 @@ impl Hud {
                 textures.1
             };
         let image = ui::ImageBuilder::new()
+            .draw_index(HUD_PRIORITY)
             .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
@@ -1038,3 +1067,4 @@ impl Hud {
 }
 
 const CHAT_WIDTH: f64 = 490.0;
+const HUD_PRIORITY: isize = -2;

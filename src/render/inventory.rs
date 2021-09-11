@@ -46,17 +46,14 @@ impl Screen for InventoryWindow {
         None
     }
 
-    fn on_resize(
-        &mut self,
-        width: u32,
-        height: u32,
-        renderer: &mut Renderer,
-        ui_container: &mut Container,
-    ) {
-        self.inventory
-            .clone()
-            .write()
-            .resize(width, height, renderer, ui_container, self);
+    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        self.inventory.clone().write().resize(
+            renderer.safe_width,
+            renderer.safe_height,
+            renderer,
+            ui_container,
+            self,
+        );
     }
 
     fn is_closable(&self) -> bool {
