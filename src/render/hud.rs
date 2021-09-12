@@ -22,12 +22,12 @@ use parking_lot::RwLock;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::format;
+use crate::{format, screen, Game, settings};
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
 use crate::render;
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::server::Server;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
@@ -36,6 +36,9 @@ use leafish_protocol::types::GameMode;
 use std::sync::atomic::AtomicBool;
 
 use std::sync::atomic::Ordering as AtomicOrdering;
+use crate::screen::chat::{Chat, ChatContext};
+use glutin::event::VirtualKeyCode;
+use winit::event::ElementState;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
@@ -76,8 +79,6 @@ pub struct HudContext {
     dirty_slot_index: bool,
     game_mode: GameMode,
     dirty_game_mode: bool,
-    chat_history: Vec<format::Component>, // TODO: Make components fade away after a certain amount of time (but keep them in here to render them if necessary)
-    dirty_chat: bool,
 }
 
 impl Default for render::hud::HudContext {
@@ -123,8 +124,6 @@ impl HudContext {
             dirty_slot_index: false,
             game_mode: GameMode::Survival,
             dirty_game_mode: false,
-            chat_history: Vec::new(),
-            dirty_chat: false,
         }
     }
 
@@ -195,11 +194,11 @@ impl HudContext {
     }
 
     pub fn display_message_in_chat(&mut self, message: format::Component) {
-        self.chat_history.push(message);
-        self.dirty_chat = true;
+        self.server.as_ref().unwrap().chat_ctx.clone().push_msg(message);
     }
 }
 
+#[derive(Clone)]
 pub struct Hud {
     last_enabled: bool,
     last_debug_enabled: bool,
@@ -217,6 +216,7 @@ pub struct Hud {
     chat_background_elements: Vec<ImageRef>,
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
+    top_counter: i32,
 }
 
 impl Hud {
@@ -238,6 +238,7 @@ impl Hud {
             chat_background_elements: vec![],
             hud_context,
             random: rand::thread_rng(),
+            top_counter: 0,
         }
     }
 }
@@ -276,9 +277,13 @@ impl Screen for Hud {
         self.chat_background_elements.clear();
     }
 
-    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+        self.top_counter += 1;
+    }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+        self.top_counter -= 1;
+    }
 
     fn tick(
         &mut self,
@@ -366,10 +371,15 @@ impl Screen for Hud {
             self.debug_elements.clear();
             self.render_debug(renderer, ui_container);
         }
-        if self.hud_context.clone().read().dirty_chat {
+        if self.top_counter >= 0 {
+            if self.hud_context.clone().read().server.as_ref().unwrap().clone().chat_ctx.clone().is_dirty() {
+                self.chat_elements.clear();
+                self.chat_background_elements.clear();
+                self.render_chat(renderer, ui_container);
+            }
+        } else if !self.chat_elements.is_empty() {
             self.chat_elements.clear();
             self.chat_background_elements.clear();
-            self.render_chat(renderer, ui_container);
         }
         None
     }
@@ -435,12 +445,48 @@ impl Screen for Hud {
         }
     }
 
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+        if key == VirtualKeyCode::Escape && !down {
+            println!("check focused!");
+            if game.focused {
+                println!("add screen!");
+                game.screen_sys.add_screen(Box::new(
+                    screen::SettingsMenu::new(game.vars.clone(), true),
+                ));
+                return true;
+            }/* else if game.screen_sys.is_current_closable() {
+                if !game.server.as_ref().unwrap().chat_open.load(AtomicOrdering::Acquire) {
+                } else {
+                    game.server.as_ref().unwrap().chat_open.store(false, AtomicOrdering::Relaxed);
+                }
+                return true;
+            }*/
+        }
+        if let Some(action_key) =
+        settings::Actionkey::get_by_keycode(key, &game.vars)
+        {
+            if game.server.is_some() {
+                game.server.as_ref().unwrap().key_press(
+                    down,
+                    action_key,
+                    game.screen_sys.clone(),
+                    &mut game.focused.clone(),
+                );
+            }
+        }
+        return false;
+    }
+
     fn is_closable(&self) -> bool {
         false
     }
 
     fn is_tick_always(&self) -> bool {
         true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }
 
@@ -997,13 +1043,14 @@ impl Hud {
 
     pub fn render_chat(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let scale = Hud::icon_scale(renderer);
-        let history_size = self.hud_context.clone().read().chat_history.len();
+        let messages = self.hud_context.clone().read().server.as_ref().unwrap().chat_ctx.clone().tick_visible_messages();
+        let history_size = messages.len();
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
             let message =
-                self.hud_context.clone().read().chat_history[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.to_string()) / (CHAT_WIDTH * scale))
+                messages[i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (CHAT_WIDTH * scale))
                 .ceil() as u8;
             component_lines += lines;
         }
@@ -1015,7 +1062,7 @@ impl Hud {
                     .draw_index(HUD_PRIORITY + 1)
                     .texture("leafish:solid")
                     .alignment(VAttach::Bottom, HAttach::Left)
-                    .position(0.0, scale * 85.0 / 2.0)
+                    .position(1.0 * scale, scale * 85.0 / 2.0)
                     .size(
                         500.0 / 2.0 * scale,
                         5.0 * scale * (component_lines as f64)
@@ -1029,9 +1076,14 @@ impl Hud {
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
             let message =
-                self.hud_context.clone().read().chat_history[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.to_string()) / (CHAT_WIDTH * scale))
+                messages[i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (CHAT_WIDTH * scale))
                 .ceil() as u8;
+            let transparency = if message.0 >= crate::screen::chat::FADE_OUT_START_TICKS {
+                1.0
+            } else {
+                message.0 as f64 / crate::screen::chat::FADE_OUT_START_TICKS as f64
+            };
             let text = ui::FormattedBuilder::new()
                 .draw_index(HUD_PRIORITY + 1)
                 .alignment(VAttach::Bottom, HAttach::Left)
@@ -1041,13 +1093,13 @@ impl Hud {
                         + ((component_lines as f64) * 5.0) * scale
                         + i as f64 * 0.4 * scale,
                 )
-                .text(message)
+                .text(message.1)
+                .transparency(transparency)
                 .max_width(CHAT_WIDTH * scale)
                 .create(ui_container);
             self.chat_elements.push(text);
             component_lines += lines;
         }
-        self.hud_context.clone().write().dirty_chat = false;
     }
 
     pub fn draw_item(
@@ -1082,5 +1134,5 @@ impl Hud {
     }
 }
 
-const CHAT_WIDTH: f64 = 490.0 / 2.0;
+pub const CHAT_WIDTH: f64 = 490.0 / 2.0;
 const HUD_PRIORITY: isize = -2;

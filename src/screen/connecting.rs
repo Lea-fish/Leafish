@@ -14,10 +14,20 @@
 
 use crate::render;
 use crate::ui;
+use crate::screen::Screen;
 
 pub struct Connecting {
     elements: Option<UIElements>,
     target: String,
+}
+
+impl Clone for Connecting {
+    fn clone(&self) -> Self {
+        Connecting {
+            elements: None,
+            target: self.target.clone(),
+        }
+    }
 }
 
 struct UIElements {
@@ -83,5 +93,9 @@ impl super::Screen for Connecting {
 
         elements.logo.tick(renderer);
         None
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }

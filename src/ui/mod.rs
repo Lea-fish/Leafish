@@ -1092,6 +1092,7 @@ element! {
         pub scale_x: f64,
         pub scale_y: f64,
         pub max_width: f64,
+        pub transparency: f64,
         priv text: format::Component,
         priv text_elements: Vec<Element>,
         priv last_text: format::Component,
@@ -1113,6 +1114,7 @@ element! {
         optional scale_x: f64 = 1.0,
         optional scale_y: f64 = 1.0,
         optional max_width: f64 = -1.0,
+        optional transparency: f64 = 1.0,
     }
 }
 
@@ -1139,6 +1141,7 @@ impl UIElement for Formatted {
                     text: Vec::new(),
                     max_width: self.max_width,
                     renderer,
+                    transparency: self.transparency,
                 };
                 state.build(&self.text, format::Color::White);
                 self.text_elements = state.text;
@@ -1180,7 +1183,7 @@ impl UIElement for Formatted {
     fn tick(&mut self, renderer: &mut render::Renderer) {
         self.super_tick(renderer);
         if self.is_dirty() {
-            let (w, h) = Self::compute_size(renderer, &self.text, self.max_width);
+            let (w, h) = Self::compute_size(renderer, &self.text, self.max_width, self.transparency);
             self.width = w;
             self.height = h;
         }
@@ -1197,6 +1200,7 @@ impl Formatted {
         renderer: &render::Renderer,
         text: &format::Component,
         max_width: f64,
+        transparency: f64,
     ) -> (f64, f64) {
         let mut state = FormatState {
             lines: 0,
@@ -1205,6 +1209,7 @@ impl Formatted {
             text: Vec::new(),
             max_width,
             renderer,
+            transparency,
         };
         state.build(text, format::Color::White);
         (state.width + 2.0, (state.lines + 1) as f64 * 18.0)
@@ -1216,6 +1221,7 @@ struct FormatState<'a> {
     lines: usize,
     offset: f64,
     width: f64,
+    transparency: f64,
     text: Vec<Element>,
     renderer: &'a render::Renderer,
 }
@@ -1252,7 +1258,7 @@ impl<'a> FormatState<'a> {
                 TextBuilder::new()
                     .text(&txt[last..i])
                     .position(self.offset, (self.lines * 18 + 1) as f64)
-                    .colour((rr, gg, bb, 255))
+                    .colour((rr, gg, bb, (self.transparency * 255 as f64) as u8))
                     .create(self);
                 last = i;
                 if c == '\n' {
@@ -1273,7 +1279,7 @@ impl<'a> FormatState<'a> {
             TextBuilder::new()
                 .text(&txt[last..])
                 .position(self.offset, (self.lines * 18 + 1) as f64)
-                .colour((rr, gg, bb, 255))
+                .colour((rr, gg, bb, (self.transparency * 255 as f64) as u8))
                 .create(self);
             self.offset += self.renderer.ui.size_of_string(&txt[last..]) + 2.0;
             if self.offset > self.width {

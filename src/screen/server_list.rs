@@ -34,6 +34,7 @@ use crossbeam_channel::{Receiver, TryRecvError};
 use instant::Duration;
 use parking_lot::RwLock;
 use rand::Rng;
+use crate::screen::Screen;
 
 pub struct ServerList {
     elements: Option<UIElements>,
@@ -41,6 +42,17 @@ pub struct ServerList {
 
     needs_reload: Rc<RefCell<bool>>,
     background_image: String,
+}
+
+impl Clone for ServerList {
+    fn clone(&self) -> Self {
+        ServerList {
+            elements: None,
+            disconnect_reason: self.disconnect_reason.clone(),
+            needs_reload: Rc::new(RefCell::new(false)),
+            background_image: self.background_image.clone(),
+        }
+    }
 }
 
 struct UIElements {
@@ -154,18 +166,18 @@ impl ServerList {
                     false
                 });
                 backr.add_click_func(move |_, game| {
-                    game.screen_sys
+                    game.screen_sys.clone()
                         .replace_screen(Box::new(super::connecting::Connecting::new(&address)));
                     let hud_context = Arc::new(RwLock::new(HudContext::new()));
                     let result = game.connect_to(&address, hud_context.clone());
-                    game.screen_sys.pop_screen();
+                    game.screen_sys.clone().pop_screen();
                     if let Err(error) = result {
-                        game.screen_sys.add_screen(Box::new(ServerList::new(
+                        game.screen_sys.clone().add_screen(Box::new(ServerList::new(
                             Some(Component::Text(TextComponent::new(&*error.to_string()))),
                             game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                         )));
                     } else {
-                        game.screen_sys.add_screen(Box::new(Hud::new(hud_context)));
+                        game.screen_sys.clone().add_screen(Box::new(Hud::new(hud_context)));
                         game.focused = true;
                     }
                     true
@@ -233,7 +245,7 @@ impl ServerList {
                 let sname = name.clone();
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
-                    game.screen_sys.replace_screen(Box::new(
+                    game.screen_sys.clone().replace_screen(Box::new(
                         super::delete_server::DeleteServerEntry::new(
                             index,
                             &sname,
@@ -262,7 +274,7 @@ impl ServerList {
                 let sname = name.clone();
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
-                    game.screen_sys.replace_screen(Box::new(
+                    game.screen_sys.clone().replace_screen(Box::new(
                         super::edit_server::EditServerEntry::new(Some((
                             index,
                             sname.clone(),
@@ -382,7 +394,7 @@ impl ServerList {
             add.add_text(txt);
             add.add_click_func(move |_, game| {
                 game.screen_sys
-                    .replace_screen(Box::new(super::edit_server::EditServerEntry::new(None)));
+                    .clone().replace_screen(Box::new(super::edit_server::EditServerEntry::new(None)));
                 true
             })
         }
@@ -404,7 +416,7 @@ impl ServerList {
                 .attach(&mut *options);
             options.add_click_func(|_, game| {
                 game.screen_sys
-                    .add_screen(Box::new(super::SettingsMenu::new(game.vars.clone(), false)));
+                    .clone().add_screen(Box::new(super::SettingsMenu::new(game.vars.clone(), false)));
                 true
             });
         }
@@ -420,7 +432,7 @@ impl ServerList {
 
         // If we are kicked from a server display the reason
         let disconnected = if let Some(ref disconnect_reason) = self.disconnect_reason {
-            let (width, height) = ui::Formatted::compute_size(renderer, disconnect_reason, 600.0);
+            let (width, height) = ui::Formatted::compute_size(renderer, disconnect_reason, 600.0, 1.0);
             let background = ui::ImageBuilder::new()
                 .texture("leafish:solid")
                 .position(0.0, 3.0)
@@ -630,5 +642,9 @@ impl super::Screen for ServerList {
         // TODO: Don't ping the servers on resize!
         self.on_deactive(renderer, ui_container);
         self.on_active(renderer, ui_container);
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }

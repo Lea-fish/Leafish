@@ -21,6 +21,7 @@ use crate::settings;
 use crate::ui;
 
 use serde_json::{self, Value};
+use crate::screen::Screen;
 
 // TODO: make use of "background_img: String"
 #[allow(dead_code)]
@@ -30,6 +31,18 @@ pub struct DeleteServerEntry {
     name: String,
     address: String,
     background_img: String,
+}
+
+impl Clone for DeleteServerEntry {
+    fn clone(&self) -> Self {
+        DeleteServerEntry {
+            elements: None,
+            index: self.index,
+            name: self.name.clone(),
+            address: self.address.clone(),
+            background_img: self.background_img.clone(),
+        }
+    }
 }
 
 struct UIElements {
@@ -113,7 +126,7 @@ impl super::Screen for DeleteServerEntry {
             confirm.add_click_func(move |_, game| {
                 Self::delete_server(index);
                 game.screen_sys
-                    .replace_screen(Box::new(super::ServerList::new(
+                    .clone().replace_screen(Box::new(super::ServerList::new(
                         None,
                         game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                     )));
@@ -136,7 +149,7 @@ impl super::Screen for DeleteServerEntry {
             cancel.add_text(txt);
             cancel.add_click_func(|_, game| {
                 game.screen_sys
-                    .replace_screen(Box::new(super::ServerList::new(
+                    .clone().replace_screen(Box::new(super::ServerList::new(
                         None,
                         game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                     )));
@@ -170,5 +183,9 @@ impl super::Screen for DeleteServerEntry {
 
     fn is_closable(&self) -> bool {
         true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }
