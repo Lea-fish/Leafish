@@ -450,12 +450,10 @@ impl Screen for Hud {
     }
 
     fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
-        if key == VirtualKeyCode::Escape && !down {
-            if game.focused {
-                game.screen_sys
-                    .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
-                return true;
-            }
+        if key == VirtualKeyCode::Escape && !down && game.focused {
+            game.screen_sys
+                .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
+            return true;
         }
         if let Some(action_key) = settings::Actionkey::get_by_keycode(key, &game.vars) {
             return game.server.as_ref().unwrap().key_press(
