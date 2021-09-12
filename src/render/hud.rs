@@ -26,7 +26,7 @@ use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
 use crate::render;
 use crate::render::Renderer;
-use crate::screen::{Screen, ScreenSystem};
+use crate::screen::Screen;
 use crate::server::Server;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
@@ -35,10 +35,8 @@ use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
 use std::sync::atomic::AtomicBool;
 
-use crate::screen::chat::{Chat, ChatContext};
 use glutin::event::VirtualKeyCode;
 use std::sync::atomic::Ordering as AtomicOrdering;
-use winit::event::ElementState;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 
@@ -463,29 +461,19 @@ impl Screen for Hud {
 
     fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
         if key == VirtualKeyCode::Escape && !down {
-            println!("check focused!");
             if game.focused {
-                println!("add screen!");
                 game.screen_sys
                     .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
                 return true;
-            } /* else if game.screen_sys.is_current_closable() {
-                  if !game.server.as_ref().unwrap().chat_open.load(AtomicOrdering::Acquire) {
-                  } else {
-                      game.server.as_ref().unwrap().chat_open.store(false, AtomicOrdering::Relaxed);
-                  }
-                  return true;
-              }*/
+            }
         }
         if let Some(action_key) = settings::Actionkey::get_by_keycode(key, &game.vars) {
-            if game.server.is_some() {
-                game.server.as_ref().unwrap().key_press(
-                    down,
-                    action_key,
-                    game.screen_sys.clone(),
-                    &mut game.focused.clone(),
-                );
-            }
+            return game.server.as_ref().unwrap().key_press(
+                down,
+                action_key,
+                game.screen_sys.clone(),
+                &mut game.focused.clone(),
+            );
         }
         return false;
     }

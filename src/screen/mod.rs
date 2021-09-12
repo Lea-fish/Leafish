@@ -32,7 +32,7 @@ use crate::ui;
 use crate::ui::Container;
 use crate::{render, Game};
 use parking_lot::{Mutex, RwLock};
-use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
 use winit::event::VirtualKeyCode;
 
@@ -131,9 +131,8 @@ impl ScreenSystem {
     }
 
     pub fn pop_screen(&self) {
-        println!("popping key!");
         if self.pre_computed_screens.clone().read().last().is_some() {
-            // TODO: Improve thread safety (becuz of possible race conditions)
+            // TODO: Improve thread safety (becuz of possible race conditions (which are VERY UNLIKELY to happen - and only if screens get added and removed very fast (in one tick)))
             self.remove_queue
                 .clone()
                 .write()
@@ -161,12 +160,6 @@ impl ScreenSystem {
 
     pub fn press_key(&self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
         if self.screens.clone().read().last().is_some() {
-            println!("testing key!");
-            /*let offset = if self.screens.clone().read().last().as_ref().unwrap().screen.clone().lock().on_key_press(key, down, game) {
-                1
-            } else {
-                0
-            };*/
             self.screens
                 .clone()
                 .read()
@@ -178,8 +171,12 @@ impl ScreenSystem {
                 .lock()
                 .on_key_press(key, down, game);
             let len = self.pre_computed_screens.clone().read().len();
-            return len <= 0/*offset*/ || self.pre_computed_screens.clone().read()[len - 1/* - offset*/].screen.clone().lock().is_closable();
-            // this crashes
+            return len == 0
+                || self.pre_computed_screens.clone().read()[len - 1]
+                    .screen
+                    .clone()
+                    .lock()
+                    .is_closable();
         }
         return false;
     }
@@ -217,7 +214,6 @@ impl ScreenSystem {
                 .iter()
                 .skip(lowest as usize)
             {
-                println!("update screen!");
                 self.screens.write().push(screen.clone());
             }
             self.lowest_offset.store(-1, Ordering::Release);

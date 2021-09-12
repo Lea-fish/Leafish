@@ -12,30 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::Cell;
-use std::rc::Rc;
-use std::sync::{mpsc, Arc};
-use std::thread;
+use std::sync::Arc;
 
-use rand::{self, Rng};
-
-use crate::auth;
-use crate::console;
-use crate::protocol;
-use crate::protocol::mojang;
 use crate::render;
 use crate::render::hud::Hud;
 use crate::render::{hud, Renderer};
 use crate::screen::Screen;
-use crate::settings;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
 use core::cmp;
-use instant::Duration;
 use leafish_protocol::format::Component;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const MAX_MESSAGES: usize = 200;
 pub const START_TICKS: usize = 5 * 20;
@@ -109,6 +97,7 @@ impl Chat {
 
 impl super::Screen for Chat {
     fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+        println!("activate chat!");
         let scale = Hud::icon_scale(renderer);
         let history_size = self.context.messages.clone().read().len();
 

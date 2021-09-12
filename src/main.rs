@@ -60,7 +60,6 @@ use parking_lot::RwLock;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
-use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 
@@ -286,7 +285,7 @@ fn main() {
 
     let mut last_frame = Instant::now();
 
-    let mut screen_sys = screen::ScreenSystem::new();
+    let screen_sys = screen::ScreenSystem::new();
     if opt.server.is_none() {
         screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
     }
@@ -723,29 +722,6 @@ fn handle_window_event<T>(
                 }
                 WindowEvent::KeyboardInput { input, .. } => {
                     match (input.state, input.virtual_keycode) {
-                        /*(ElementState::Released, Some(VirtualKeyCode::Escape)) => {
-                            if game.server.is_some()
-                                && !*game.server.as_ref().unwrap().clone().dead.read()
-                            {
-                                if game.focused {
-                                    window.set_cursor_grab(false).unwrap();
-                                    window.set_cursor_visible(true);
-                                    game.focused = false;
-                                    game.screen_sys.add_screen(Box::new(
-                                        screen::SettingsMenu::new(game.vars.clone(), true),
-                                    ));
-                                } else if game.screen_sys.is_current_closable() {
-                                    window.set_cursor_grab(true).unwrap();
-                                    window.set_cursor_visible(false);
-                                    game.focused = true;
-                                    if !game.server.as_ref().unwrap().chat_open.load(Ordering::Acquire) { // TODO: Handle this in windows!
-                                        game.screen_sys.pop_screen();
-                                    } else {
-                                        game.server.as_ref().unwrap().chat_open.store(false, Ordering::Relaxed);
-                                    }
-                                }
-                            }
-                        }*/
                         (ElementState::Pressed, Some(VirtualKeyCode::Grave)) => {
                             game.console.lock().toggle();
                         }
@@ -763,24 +739,11 @@ fn handle_window_event<T>(
                             game.is_fullscreen = !game.is_fullscreen;
                         }
                         (ElementState::Pressed, Some(key)) => {
-                            /*if game.server.is_some() {
-                                if let Some(action_key) =
-                                settings::Actionkey::get_by_keycode(key, &game.vars)
-                                {
-                                    game.server.as_ref().unwrap().key_press(
-                                        true,
-                                        action_key,
-                                        &mut game.screen_sys,
-                                        &mut game.focused,
-                                    );
-                                }
-                            }*/
                             if !game.focused {
                                 let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
                                 ui_container.key_press(game, key, true, ctrl_pressed);
                             }
                             if game.screen_sys.clone().press_key(key, true, game) {
-                                println!("true! pressed");
                                 window.set_cursor_grab(false).unwrap();
                                 window.set_cursor_visible(true);
                                 game.focused = false;
@@ -791,24 +754,11 @@ fn handle_window_event<T>(
                             }
                         }
                         (ElementState::Released, Some(key)) => {
-                            /*if let Some(action_key) =
-                                settings::Actionkey::get_by_keycode(key, &game.vars)
-                            {
-                                if game.server.is_some() {
-                                    game.server.as_ref().unwrap().key_press(
-                                        false,
-                                        action_key,
-                                        &mut game.screen_sys,
-                                        &mut game.focused,
-                                    );
-                                }
-                            }*/
                             if !game.focused {
                                 let ctrl_pressed = game.is_ctrl_pressed;
                                 ui_container.key_press(game, key, false, ctrl_pressed);
                             }
                             if game.screen_sys.clone().press_key(key, false, game) {
-                                println!("true! released");
                                 window.set_cursor_grab(false).unwrap();
                                 window.set_cursor_visible(true);
                                 game.focused = false;

@@ -1233,7 +1233,7 @@ impl Server {
         key: Actionkey,
         screen_sys: Arc<ScreenSystem>,
         focused: &mut bool,
-    ) {
+    ) -> bool {
         if *focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
             let mut state_changed = false;
             if let Some(player) = *self.player.clone().write() {
@@ -1249,25 +1249,18 @@ impl Server {
             }
             match key {
                 Actionkey::OpenInv => {
-                    if down && state_changed {
-                        if self.inventory_context.clone().read().inventory.is_some() {
-                            screen_sys.pop_screen();
-                            *focused = true;
-                        } else if *focused {
-                            let player_inv = self
-                                .inventory_context
-                                .clone()
-                                .read()
-                                .player_inventory
-                                .clone();
-                            screen_sys.add_screen(Box::new(
-                                render::inventory::InventoryWindow::new(
-                                    player_inv,
-                                    self.inventory_context.clone(),
-                                ),
-                            ));
-                            *focused = false;
-                        }
+                    if down {
+                        let player_inv = self
+                            .inventory_context
+                            .clone()
+                            .read()
+                            .player_inventory
+                            .clone();
+                        screen_sys.add_screen(Box::new(render::inventory::InventoryWindow::new(
+                            player_inv,
+                            self.inventory_context.clone(),
+                        )));
+                        return true;
                     }
                 }
                 Actionkey::ToggleHud => {
@@ -1283,16 +1276,17 @@ impl Server {
                     }
                 }
                 Actionkey::ToggleChat => {
-                    if down && state_changed {
-                        let curr = self.chat_open.load(Ordering::Acquire);
-                        if curr || !screen_sys.is_current_closable() {
-                            self.chat_open.store(!curr, Ordering::Release);
-                        }
+                    if down {
+                        screen_sys
+                            .clone()
+                            .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
+                        return true;
                     }
                 }
                 _ => {}
             };
         }
+        return false;
     }
 
     pub fn on_left_click(&self, renderer: Arc<RwLock<render::Renderer>>) {
