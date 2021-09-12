@@ -20,6 +20,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, BufWriter, Write};
 use std::marker::PhantomData;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use crate::format::{Color, Component, TextComponent};
@@ -264,9 +265,27 @@ impl Console {
         }
     }
 
+    fn log_level_from_env(name: &str) -> Option<log::Level> {
+        let variable_string = std::env::var(name).ok()?;
+        log::Level::from_str(&variable_string).ok()
+    }
+
     pub fn configure(&mut self, vars: &Vars) {
         self.log_level_term = log_level_from_str(&vars.get(LOG_LEVEL_TERM), log::Level::Info);
-        self.log_level_file = log_level_from_str(&vars.get(LOG_LEVEL_FILE), log::Level::Trace);
+        self.log_level_file = log_level_from_str(&vars.get(LOG_LEVEL_FILE), log::Level::Debug);
+
+        for name in ["RUST_LOG", "LOG_LEVEL"].iter() {
+            if let Some(level) = Console::log_level_from_env(name) {
+                self.log_level_term = level;
+                self.log_level_file = level;
+            }
+        }
+        if let Some(level) = Console::log_level_from_env("RUST_LOG") {
+            self.log_level_term = level;
+        }
+        if let Some(level) = Console::log_level_from_env("LOG_LEVEL_FILE") {
+            self.log_level_file = level;
+        }
     }
 
     pub fn is_active(&self) -> bool {
@@ -378,41 +397,41 @@ impl Console {
 
         if record.level() <= self.log_level_term {
             println!("{}", line);
-        }
 
-        self.history.remove(0);
-        let mut msg = TextComponent::new("");
-        msg.modifier.extra = Some(vec![
-            Component::Text(TextComponent::new("[")),
-            {
-                let mut msg = TextComponent::new(file);
-                msg.modifier.color = Some(Color::Green);
-                Component::Text(msg)
-            },
-            Component::Text(TextComponent::new(":")),
-            {
-                let mut msg = TextComponent::new(&format!("{}", record.line().unwrap_or(0)));
-                msg.modifier.color = Some(Color::Aqua);
-                Component::Text(msg)
-            },
-            Component::Text(TextComponent::new("]")),
-            Component::Text(TextComponent::new("[")),
-            {
-                let mut msg = TextComponent::new(&format!("{}", record.level()));
-                msg.modifier.color = Some(match record.level() {
-                    log::Level::Debug => Color::Green,
-                    log::Level::Error => Color::Red,
-                    log::Level::Warn => Color::Yellow,
-                    log::Level::Info => Color::Aqua,
-                    log::Level::Trace => Color::Blue,
-                });
-                Component::Text(msg)
-            },
-            Component::Text(TextComponent::new("] ")),
-            Component::Text(TextComponent::new(&format!("{}", record.args()))),
-        ]);
-        self.history.push(Component::Text(msg));
-        self.dirty = true;
+            self.history.remove(0);
+            let mut msg = TextComponent::new("");
+            msg.modifier.extra = Some(vec![
+                Component::Text(TextComponent::new("[")),
+                {
+                    let mut msg = TextComponent::new(file);
+                    msg.modifier.color = Some(Color::Green);
+                    Component::Text(msg)
+                },
+                Component::Text(TextComponent::new(":")),
+                {
+                    let mut msg = TextComponent::new(&format!("{}", record.line().unwrap_or(0)));
+                    msg.modifier.color = Some(Color::Aqua);
+                    Component::Text(msg)
+                },
+                Component::Text(TextComponent::new("]")),
+                Component::Text(TextComponent::new("[")),
+                {
+                    let mut msg = TextComponent::new(&format!("{}", record.level()));
+                    msg.modifier.color = Some(match record.level() {
+                        log::Level::Debug => Color::Green,
+                        log::Level::Error => Color::Red,
+                        log::Level::Warn => Color::Yellow,
+                        log::Level::Info => Color::Aqua,
+                        log::Level::Trace => Color::Blue,
+                    });
+                    Component::Text(msg)
+                },
+                Component::Text(TextComponent::new("] ")),
+                Component::Text(TextComponent::new(&format!("{}", record.args()))),
+            ]);
+            self.history.push(Component::Text(msg));
+            self.dirty = true;
+        }
     }
 }
 

@@ -28,7 +28,7 @@ use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::prelude::*;
 use image::{GenericImage, GenericImageView, RgbaImage};
-use log::{debug, error, trace};
+use log::{error, trace};
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
@@ -369,11 +369,7 @@ impl Renderer {
                             self.element_buffer_type,
                             0,
                         );
-                    } else {
-                        debug!("1: not rendering solid {:?}", pos);
                     }
-                } else {
-                    debug!("2: not rendering solid {:?}", pos);
                 }
             }
 
@@ -470,11 +466,7 @@ impl Renderer {
                             self.element_buffer_type,
                             0,
                         );
-                    } else {
-                        debug!("1: not rendering trans {:?}", pos);
                     }
-                } else {
-                    debug!("2: not rendering trans {:?}", pos);
                 }
             }
         }
