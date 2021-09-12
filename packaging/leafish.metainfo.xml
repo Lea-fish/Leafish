@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.github.Lea-fish.Leafish</id>
+  <id>com.github.Lea_fish.Leafish</id>
   <url type="homepage">https://github.com/Lea-fish/Leafish</url>
 
   <name>Leafish</name>
   <summary>Multi-version Minecraft-compatible client written in Rust.</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT AND APACHE</project_license>
+  <project_license>MIT</project_license>
 
   <description>
     <p>Leafish is an open-source re-implementation of Minecraft. The game is a open-world sandbox where players explore a blocky, procedurally-generated 3D world with virtually infinite terrain, and may discover and extract raw materials, craft tools and items, and build structures or earthworks. The game has various game modes including survival mode, in which players must acquire resources to build the world and maintain health, and a creative mode, where players have unlimited resources and access to flight.</p>
     <p>Minecraft is originally written by Mojang in Java for PC, but nowadays also has a so-called "Bedrock edition" which has ports to various alternative platforms. Leafish attempts to provide everything from the Java-edition and tries to be compatible with it so you can join regular servers and play alongside people using the official Java-based clients. Being written in Rust with support for modern graphic API's like Vulkan means performance improvements and enhancements that are not possible in the original game. It's also completely community driven!</p>
   </description>
 
-  <launchable type="desktop-id">com.github.Lea-fish.Leafish.desktop</launchable>
+  <launchable type="desktop-id">com.github.Lea_fish.Leafish.desktop</launchable>
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/Lea-fish/Leafish/main/.github/readme-resources/screenshot-mainmenu.jpg</image>
@@ -25,4 +25,3 @@
     <release version="master" date="2021-09-06"/>
   </releases>
 </component>
-
