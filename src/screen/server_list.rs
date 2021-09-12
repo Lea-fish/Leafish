@@ -28,13 +28,13 @@ use crate::ui;
 
 use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
+use crate::screen::Screen;
 use crate::ui::Container;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, TryRecvError};
 use instant::Duration;
 use parking_lot::RwLock;
 use rand::Rng;
-use crate::screen::Screen;
 
 pub struct ServerList {
     elements: Option<UIElements>,
@@ -166,7 +166,8 @@ impl ServerList {
                     false
                 });
                 backr.add_click_func(move |_, game| {
-                    game.screen_sys.clone()
+                    game.screen_sys
+                        .clone()
                         .replace_screen(Box::new(super::connecting::Connecting::new(&address)));
                     let hud_context = Arc::new(RwLock::new(HudContext::new()));
                     let result = game.connect_to(&address, hud_context.clone());
@@ -177,7 +178,9 @@ impl ServerList {
                             game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                         )));
                     } else {
-                        game.screen_sys.clone().add_screen(Box::new(Hud::new(hud_context)));
+                        game.screen_sys
+                            .clone()
+                            .add_screen(Box::new(Hud::new(hud_context)));
                         game.focused = true;
                     }
                     true
@@ -394,7 +397,8 @@ impl ServerList {
             add.add_text(txt);
             add.add_click_func(move |_, game| {
                 game.screen_sys
-                    .clone().replace_screen(Box::new(super::edit_server::EditServerEntry::new(None)));
+                    .clone()
+                    .replace_screen(Box::new(super::edit_server::EditServerEntry::new(None)));
                 true
             })
         }
@@ -416,7 +420,8 @@ impl ServerList {
                 .attach(&mut *options);
             options.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone().add_screen(Box::new(super::SettingsMenu::new(game.vars.clone(), false)));
+                    .clone()
+                    .add_screen(Box::new(super::SettingsMenu::new(game.vars.clone(), false)));
                 true
             });
         }
@@ -432,7 +437,8 @@ impl ServerList {
 
         // If we are kicked from a server display the reason
         let disconnected = if let Some(ref disconnect_reason) = self.disconnect_reason {
-            let (width, height) = ui::Formatted::compute_size(renderer, disconnect_reason, 600.0, 1.0);
+            let (width, height) =
+                ui::Formatted::compute_size(renderer, disconnect_reason, 600.0, 1.0);
             let background = ui::ImageBuilder::new()
                 .texture("leafish:solid")
                 .position(0.0, 3.0)

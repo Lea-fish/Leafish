@@ -20,8 +20,8 @@ use crate::render;
 use crate::settings;
 use crate::ui;
 
-use serde_json::{self, Value};
 use crate::screen::Screen;
+use serde_json::{self, Value};
 
 // TODO: make use of "background_img: String"
 #[allow(dead_code)]
@@ -126,7 +126,8 @@ impl super::Screen for DeleteServerEntry {
             confirm.add_click_func(move |_, game| {
                 Self::delete_server(index);
                 game.screen_sys
-                    .clone().replace_screen(Box::new(super::ServerList::new(
+                    .clone()
+                    .replace_screen(Box::new(super::ServerList::new(
                         None,
                         game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                     )));
@@ -149,7 +150,8 @@ impl super::Screen for DeleteServerEntry {
             cancel.add_text(txt);
             cancel.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone().replace_screen(Box::new(super::ServerList::new(
+                    .clone()
+                    .replace_screen(Box::new(super::ServerList::new(
                         None,
                         game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                     )));

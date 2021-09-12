@@ -60,9 +60,9 @@ use parking_lot::RwLock;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
-use std::sync::atomic::Ordering;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -428,7 +428,8 @@ fn tick_all(
                 .disconnect_reason
                 .take();
             game.screen_sys.close_closable_screens();
-            game.screen_sys.clone()
+            game.screen_sys
+                .clone()
                 .replace_screen(Box::new(screen::ServerList::new(
                     disconnect_reason,
                     game.vars.get(settings::BACKGROUND_IMAGE).clone(),
@@ -513,7 +514,8 @@ fn tick_all(
         gl::viewport(0, 0, physical_width as i32, physical_height as i32);
     }
 
-    game.screen_sys.clone()
+    game.screen_sys
+        .clone()
         .tick(delta, game.renderer.clone(), &mut ui_container);
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {

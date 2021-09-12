@@ -24,18 +24,18 @@ use crate::console;
 use crate::protocol;
 use crate::protocol::mojang;
 use crate::render;
-use crate::settings;
-use crate::ui;
-use parking_lot::RwLock;
-use leafish_protocol::format::Component;
-use crate::ui::{FormattedRef, VAttach, HAttach, ImageRef, TextBuilder, TextRef, Container};
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::{UNIX_EPOCH, SystemTime};
-use instant::Duration;
 use crate::render::hud::Hud;
-use core::cmp;
 use crate::render::{hud, Renderer};
 use crate::screen::Screen;
+use crate::settings;
+use crate::ui;
+use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
+use core::cmp;
+use instant::Duration;
+use leafish_protocol::format::Component;
+use parking_lot::RwLock;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 pub const MAX_MESSAGES: usize = 200;
 pub const START_TICKS: usize = 5 * 20;
@@ -47,7 +47,6 @@ pub struct ChatContext {
 }
 
 impl ChatContext {
-
     pub fn new() -> Self {
         ChatContext {
             messages: Arc::new(Default::default()),
@@ -67,7 +66,8 @@ impl ChatContext {
         self.dirty.load(Ordering::Acquire)
     }
 
-    pub fn tick_visible_messages(&self) -> Vec<(usize, Component)> { // TODO: Provide all non-faded out messages and decrement their life counter
+    pub fn tick_visible_messages(&self) -> Vec<(usize, Component)> {
+        // TODO: Provide all non-faded out messages and decrement their life counter
         let mut ret = vec![];
         for message in self.messages.clone().write().iter_mut().rev() {
             if message.0 == 0 {
@@ -80,7 +80,6 @@ impl ChatContext {
         }
         ret
     }
-
 }
 
 #[derive(Clone)]
@@ -115,9 +114,9 @@ impl super::Screen for Chat {
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message =
-                self.context.messages.clone().read()[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (hud::CHAT_WIDTH * scale))
+            let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+                / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
             component_lines += lines;
         }
@@ -135,7 +134,7 @@ impl super::Screen for Chat {
                             + cmp::min(10, history_size) as f64 * 0.4 * scale,
                     )
                     .colour((0, 0, 0, 100))
-                    .create(ui_container)
+                    .create(ui_container),
             );
         }
         self.background.push(
@@ -146,18 +145,17 @@ impl super::Screen for Chat {
                 .position(1.0 * scale, 1.0 * scale)
                 .size(
                     renderer.safe_width as f64 - 2.0 * scale,
-                    (5.0 * scale
-                        + 0.4 * scale) * 1.5,
+                    (5.0 * scale + 0.4 * scale) * 1.5,
                 )
                 .colour((0, 0, 0, 100))
-                .create(ui_container)
+                .create(ui_container),
         );
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message =
-                self.context.messages.clone().read()[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (hud::CHAT_WIDTH * scale))
+            let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+                / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
             let text = ui::FormattedBuilder::new()
                 .draw_index(0)
@@ -191,11 +189,16 @@ impl super::Screen for Chat {
         let scale = Hud::icon_scale(renderer);
         if self.animation == 0 {
             self.animation = 20;
-            self.animated_tex = Some(TextBuilder::new()
-                .text("_")
-                .alignment(VAttach::Bottom, HAttach::Left)
-                .position(renderer.ui.size_of_string(&*self.written) + 2.0 * scale, 2.0 * scale)
-                .create(ui_container));
+            self.animated_tex = Some(
+                TextBuilder::new()
+                    .text("_")
+                    .alignment(VAttach::Bottom, HAttach::Left)
+                    .position(
+                        renderer.ui.size_of_string(&*self.written) + 2.0 * scale,
+                        2.0 * scale,
+                    )
+                    .create(ui_container),
+            );
         } else {
             if self.animation == 10 {
                 self.animated_tex = None;
@@ -220,16 +223,15 @@ impl super::Screen for Chat {
 }
 
 impl Chat {
-
     fn render_chat(&mut self, renderer: &Renderer, ui_container: &mut Container) {
         let scale = Hud::icon_scale(renderer);
         let history_size = self.context.messages.clone().read().len();
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message =
-                self.context.messages.clone().read()[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (hud::CHAT_WIDTH * scale))
+            let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+                / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
             component_lines += lines;
         }
@@ -247,7 +249,7 @@ impl Chat {
                             + cmp::min(10, history_size) as f64 * 0.4 * scale,
                     )
                     .colour((0, 0, 0, 100))
-                    .create(ui_container)
+                    .create(ui_container),
             );
         }
         self.background.push(
@@ -258,18 +260,17 @@ impl Chat {
                 .position(1.0 * scale, 1.0 * scale)
                 .size(
                     renderer.safe_width as f64 - 2.0 * scale,
-                    (5.0 * scale
-                        + 0.4 * scale) * 1.5,
+                    (5.0 * scale + 0.4 * scale) * 1.5,
                 )
                 .colour((0, 0, 0, 100))
-                .create(ui_container)
+                .create(ui_container),
         );
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message =
-                self.context.messages.clone().read()[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (hud::CHAT_WIDTH * scale))
+            let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
+            let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+                / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
             let text = ui::FormattedBuilder::new()
                 .draw_index(0)
@@ -297,5 +298,4 @@ impl Chat {
             }
         }*/
     }
-
 }

@@ -1183,7 +1183,8 @@ impl UIElement for Formatted {
     fn tick(&mut self, renderer: &mut render::Renderer) {
         self.super_tick(renderer);
         if self.is_dirty() {
-            let (w, h) = Self::compute_size(renderer, &self.text, self.max_width, self.transparency);
+            let (w, h) =
+                Self::compute_size(renderer, &self.text, self.max_width, self.transparency);
             self.width = w;
             self.height = h;
         }

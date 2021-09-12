@@ -24,9 +24,9 @@ use crate::console;
 use crate::protocol;
 use crate::protocol::mojang;
 use crate::render;
+use crate::screen::Screen;
 use crate::settings;
 use crate::ui;
-use crate::screen::Screen;
 
 pub struct Login {
     elements: Option<UIElements>,

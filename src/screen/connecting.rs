@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crate::render;
-use crate::ui;
 use crate::screen::Screen;
+use crate::ui;
 
 pub struct Connecting {
     elements: Option<UIElements>,

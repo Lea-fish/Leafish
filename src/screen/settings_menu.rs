@@ -3,8 +3,8 @@ use crate::render;
 use crate::settings;
 use crate::ui;
 
-use std::rc::Rc;
 use crate::screen::Screen;
+use std::rc::Rc;
 
 pub struct UIElements {
     background: ui::ImageRef,
@@ -63,7 +63,8 @@ impl super::Screen for SettingsMenu {
             audio_settings.add_text(txt);
             audio_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone().add_screen(Box::new(AudioSettingsMenu::new(game.vars.clone())));
+                    .clone()
+                    .add_screen(Box::new(AudioSettingsMenu::new(game.vars.clone())));
                 true
             });
         }
@@ -83,7 +84,8 @@ impl super::Screen for SettingsMenu {
             video_settings.add_text(txt);
             video_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone().add_screen(Box::new(VideoSettingsMenu::new(game.vars.clone())));
+                    .clone()
+                    .add_screen(Box::new(VideoSettingsMenu::new(game.vars.clone())));
                 true
             });
         }
@@ -133,7 +135,8 @@ impl super::Screen for SettingsMenu {
             skin_settings.add_text(txt);
             skin_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone().add_screen(Box::new(SkinSettingsMenu::new(game.vars.clone())));
+                    .clone()
+                    .add_screen(Box::new(SkinSettingsMenu::new(game.vars.clone())));
                 true
             });
         }
@@ -179,7 +182,8 @@ impl super::Screen for SettingsMenu {
                     game.server.as_ref().unwrap().disconnect(None);
                     game.screen_sys.clone().pop_screen();
                     game.screen_sys
-                        .clone().replace_screen(Box::new(super::ServerList::new(
+                        .clone()
+                        .replace_screen(Box::new(super::ServerList::new(
                             None,
                             game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                         )));

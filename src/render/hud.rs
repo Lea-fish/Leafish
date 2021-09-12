@@ -22,7 +22,6 @@ use parking_lot::RwLock;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::{format, screen, Game, settings};
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
 use crate::render;
@@ -31,13 +30,14 @@ use crate::screen::{Screen, ScreenSystem};
 use crate::server::Server;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
+use crate::{format, screen, settings, Game};
 use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
 use std::sync::atomic::AtomicBool;
 
-use std::sync::atomic::Ordering as AtomicOrdering;
 use crate::screen::chat::{Chat, ChatContext};
 use glutin::event::VirtualKeyCode;
+use std::sync::atomic::Ordering as AtomicOrdering;
 use winit::event::ElementState;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
@@ -194,7 +194,12 @@ impl HudContext {
     }
 
     pub fn display_message_in_chat(&mut self, message: format::Component) {
-        self.server.as_ref().unwrap().chat_ctx.clone().push_msg(message);
+        self.server
+            .as_ref()
+            .unwrap()
+            .chat_ctx
+            .clone()
+            .push_msg(message);
     }
 }
 
@@ -372,7 +377,18 @@ impl Screen for Hud {
             self.render_debug(renderer, ui_container);
         }
         if self.top_counter >= 0 {
-            if self.hud_context.clone().read().server.as_ref().unwrap().clone().chat_ctx.clone().is_dirty() {
+            if self
+                .hud_context
+                .clone()
+                .read()
+                .server
+                .as_ref()
+                .unwrap()
+                .clone()
+                .chat_ctx
+                .clone()
+                .is_dirty()
+            {
                 self.chat_elements.clear();
                 self.chat_background_elements.clear();
                 self.render_chat(renderer, ui_container);
@@ -450,21 +466,18 @@ impl Screen for Hud {
             println!("check focused!");
             if game.focused {
                 println!("add screen!");
-                game.screen_sys.add_screen(Box::new(
-                    screen::SettingsMenu::new(game.vars.clone(), true),
-                ));
+                game.screen_sys
+                    .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
                 return true;
-            }/* else if game.screen_sys.is_current_closable() {
-                if !game.server.as_ref().unwrap().chat_open.load(AtomicOrdering::Acquire) {
-                } else {
-                    game.server.as_ref().unwrap().chat_open.store(false, AtomicOrdering::Relaxed);
-                }
-                return true;
-            }*/
+            } /* else if game.screen_sys.is_current_closable() {
+                  if !game.server.as_ref().unwrap().chat_open.load(AtomicOrdering::Acquire) {
+                  } else {
+                      game.server.as_ref().unwrap().chat_open.store(false, AtomicOrdering::Relaxed);
+                  }
+                  return true;
+              }*/
         }
-        if let Some(action_key) =
-        settings::Actionkey::get_by_keycode(key, &game.vars)
-        {
+        if let Some(action_key) = settings::Actionkey::get_by_keycode(key, &game.vars) {
             if game.server.is_some() {
                 game.server.as_ref().unwrap().key_press(
                     down,
@@ -1043,13 +1056,21 @@ impl Hud {
 
     pub fn render_chat(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let scale = Hud::icon_scale(renderer);
-        let messages = self.hud_context.clone().read().server.as_ref().unwrap().chat_ctx.clone().tick_visible_messages();
+        let messages = self
+            .hud_context
+            .clone()
+            .read()
+            .server
+            .as_ref()
+            .unwrap()
+            .chat_ctx
+            .clone()
+            .tick_visible_messages();
         let history_size = messages.len();
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message =
-                messages[i].clone();
+            let message = messages[i].clone();
             let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (CHAT_WIDTH * scale))
                 .ceil() as u8;
             component_lines += lines;
@@ -1075,8 +1096,7 @@ impl Hud {
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message =
-                messages[i].clone();
+            let message = messages[i].clone();
             let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (CHAT_WIDTH * scale))
                 .ceil() as u8;
             let transparency = if message.0 >= crate::screen::chat::FADE_OUT_START_TICKS {

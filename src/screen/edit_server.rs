@@ -19,8 +19,8 @@ use crate::paths;
 use crate::ui;
 use crate::{render, settings};
 
-use serde_json::{self, Value};
 use crate::screen::Screen;
+use serde_json::{self, Value};
 
 pub struct EditServerEntry {
     elements: Option<UIElements>,
@@ -143,7 +143,8 @@ impl super::Screen for EditServerEntry {
                     &server_address.borrow().input,
                 );
                 game.screen_sys
-                    .clone().replace_screen(Box::new(super::ServerList::new(
+                    .clone()
+                    .replace_screen(Box::new(super::ServerList::new(
                         None,
                         game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                     )));
@@ -166,7 +167,8 @@ impl super::Screen for EditServerEntry {
             cancel.add_text(txt);
             cancel.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone().replace_screen(Box::new(super::ServerList::new(
+                    .clone()
+                    .replace_screen(Box::new(super::ServerList::new(
                         None,
                         game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                     )));

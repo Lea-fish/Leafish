@@ -21,7 +21,8 @@ pub enum Component {
 }
 
 impl Component {
-    pub fn from_string(str: &str) -> Self { // TODO: Support: §l, §k, §m, §o, §n, §r
+    pub fn from_string(str: &str) -> Self {
+        // TODO: Support: §l, §k, §m, §o, §n, §r
         let mut component;
         match serde_json::from_str::<serde_json::Value>(str) {
             Ok(value) => component = Component::from_value(&value),

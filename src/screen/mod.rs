@@ -21,20 +21,20 @@ pub mod connecting;
 pub mod delete_server;
 pub mod edit_server;
 
+pub mod chat;
 pub mod respawn;
 pub mod settings_menu;
-pub mod chat;
 
 pub use self::settings_menu::{AudioSettingsMenu, SettingsMenu, VideoSettingsMenu};
 
-use crate::{render, Game};
 use crate::render::Renderer;
 use crate::ui;
 use crate::ui::Container;
-use parking_lot::{RwLock, Mutex};
+use crate::{render, Game};
+use parking_lot::{Mutex, RwLock};
+use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicUsize, Ordering};
 use std::sync::Arc;
 use winit::event::VirtualKeyCode;
-use std::sync::atomic::{AtomicBool, AtomicUsize, AtomicIsize, Ordering};
 
 pub trait Screen {
     // Called once
@@ -132,8 +132,12 @@ impl ScreenSystem {
 
     pub fn pop_screen(&self) {
         println!("popping key!");
-        if self.pre_computed_screens.clone().read().last().is_some() { // TODO: Improve thread safety (becuz of possible race conditions)
-            self.remove_queue.clone().write().push(self.pre_computed_screens.clone().write().pop().unwrap());
+        if self.pre_computed_screens.clone().read().last().is_some() {
+            // TODO: Improve thread safety (becuz of possible race conditions)
+            self.remove_queue
+                .clone()
+                .write()
+                .push(self.pre_computed_screens.clone().write().pop().unwrap());
             let curr_offset = self.lowest_offset.load(Ordering::Acquire);
             let new_offset = self.pre_computed_screens.clone().read().len() as isize;
             if curr_offset == -1 || new_offset < curr_offset {
@@ -163,9 +167,19 @@ impl ScreenSystem {
             } else {
                 0
             };*/
-            self.screens.clone().read().last().as_ref().unwrap().screen.clone().lock().on_key_press(key, down, game);
+            self.screens
+                .clone()
+                .read()
+                .last()
+                .as_ref()
+                .unwrap()
+                .screen
+                .clone()
+                .lock()
+                .on_key_press(key, down, game);
             let len = self.pre_computed_screens.clone().read().len();
-            return len <= 0/*offset*/ || self.pre_computed_screens.clone().read()[len - 1/* - offset*/].screen.clone().lock().is_closable(); // this crashes
+            return len <= 0/*offset*/ || self.pre_computed_screens.clone().read()[len - 1/* - offset*/].screen.clone().lock().is_closable();
+            // this crashes
         }
         return false;
     }
@@ -179,7 +193,11 @@ impl ScreenSystem {
         let renderer = &mut renderer.write();
         for screen in self.remove_queue.clone().write().drain(..) {
             if screen.active {
-                screen.screen.clone().lock().on_deactive(renderer, ui_container);
+                screen
+                    .screen
+                    .clone()
+                    .lock()
+                    .on_deactive(renderer, ui_container);
             }
             if screen.init {
                 screen.screen.clone().lock().deinit(renderer, ui_container);
@@ -193,7 +211,12 @@ impl ScreenSystem {
                     self.screens.clone().write().pop();
                 }
             }
-            for screen in self.pre_computed_screens.read().iter().skip(lowest as usize) {
+            for screen in self
+                .pre_computed_screens
+                .read()
+                .iter()
+                .skip(lowest as usize)
+            {
                 println!("update screen!");
                 self.screens.write().push(screen.clone());
             }
@@ -208,7 +231,11 @@ impl ScreenSystem {
         for screen in &mut self.screens.clone().write()[..len - 1] {
             if screen.active {
                 screen.active = false;
-                screen.screen.clone().lock().on_deactive(renderer, ui_container);
+                screen
+                    .screen
+                    .clone()
+                    .lock()
+                    .on_deactive(renderer, ui_container);
             }
         }
         let swap = {
@@ -221,7 +248,11 @@ impl ScreenSystem {
             }
             if !current.active {
                 current.active = true;
-                current.screen.clone().lock().on_active(renderer, ui_container);
+                current
+                    .screen
+                    .clone()
+                    .lock()
+                    .on_active(renderer, ui_container);
             }
             if current.last_width != renderer.safe_width as i32
                 || current.last_height != renderer.safe_height as i32
@@ -229,7 +260,12 @@ impl ScreenSystem {
                 if current.last_width != -1 && current.last_height != -1 {
                     for screen in tmp.iter_mut().enumerate() {
                         if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
-                            screen.1.screen.clone().lock().on_resize(renderer, ui_container);
+                            screen
+                                .1
+                                .screen
+                                .clone()
+                                .lock()
+                                .on_resize(renderer, ui_container);
                             screen.1.last_width = renderer.safe_width as i32;
                             screen.1.last_height = renderer.safe_height as i32;
                         }
@@ -242,9 +278,19 @@ impl ScreenSystem {
             let mut result = None;
             for screen in tmp.iter_mut().enumerate() {
                 if screen.1.screen.clone().lock().is_tick_always() && screen.0 != len - 1 {
-                    screen.1.screen.clone().lock().tick(delta, renderer, ui_container);
+                    screen
+                        .1
+                        .screen
+                        .clone()
+                        .lock()
+                        .tick(delta, renderer, ui_container);
                 } else if screen.0 == len - 1 {
-                    result = screen.1.screen.clone().lock().tick(delta, renderer, ui_container);
+                    result = screen
+                        .1
+                        .screen
+                        .clone()
+                        .lock()
+                        .tick(delta, renderer, ui_container);
                 }
             }
             result
@@ -259,6 +305,14 @@ impl ScreenSystem {
         if self.screens.clone().read().is_empty() {
             return;
         }
-        self.screens.clone().read().last().unwrap().screen.clone().lock().on_scroll(x, y);
+        self.screens
+            .clone()
+            .read()
+            .last()
+            .unwrap()
+            .screen
+            .clone()
+            .lock()
+            .on_scroll(x, y);
     }
 }
