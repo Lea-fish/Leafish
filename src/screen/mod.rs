@@ -66,6 +66,8 @@ pub trait Screen {
         return false;
     }
 
+    fn on_char_receive(&mut self, _received: char) {}
+
     fn is_closable(&self) -> bool {
         false
     }
@@ -106,7 +108,6 @@ impl ScreenSystem {
     }
 
     pub fn add_screen(&self, screen: Box<dyn Screen>) {
-        println!("add screen!");
         let new_offset = self.pre_computed_screens.clone().read().len() as isize;
         self.pre_computed_screens.clone().write().push(ScreenInfo {
             screen: Arc::new(Mutex::new(screen)),
@@ -155,6 +156,21 @@ impl ScreenSystem {
             last.screen.clone().lock().is_closable()
         } else {
             true
+        }
+    }
+
+    pub fn receive_char(&self, received: char) {
+        if self.screens.clone().read().last().is_some() {
+            self.screens
+                .clone()
+                .read()
+                .last()
+                .as_ref()
+                .unwrap()
+                .screen
+                .clone()
+                .lock()
+                .on_char_receive(received);
         }
     }
 

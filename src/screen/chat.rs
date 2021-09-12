@@ -14,19 +14,21 @@
 
 use std::sync::Arc;
 
-use crate::render;
+use crate::{render, Game};
 use crate::render::hud::Hud;
 use crate::render::{hud, Renderer};
 use crate::screen::Screen;
+use crate::protocol::packet;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
 use core::cmp;
 use leafish_protocol::format::Component;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
+use glutin::event::VirtualKeyCode;
 
 pub const MAX_MESSAGES: usize = 200;
-pub const START_TICKS: usize = 5 * 20;
+pub const START_TICKS: usize = 10 * 20;
 pub const FADE_OUT_START_TICKS: usize = 1 * 20;
 
 pub struct ChatContext {
@@ -75,10 +77,12 @@ pub struct Chat {
     rendered_messages: Vec<FormattedRef>,
     background: Vec<ImageRef>,
     animated_tex: Option<TextRef>,
+    written_text: Option<TextRef>,
     context: Arc<ChatContext>,
     written: String,
     animation: u8,
     offset: f64, // TODO: Implement this!
+    dirty_written: bool,
 }
 
 impl Chat {
@@ -87,17 +91,18 @@ impl Chat {
             rendered_messages: vec![],
             background: vec![],
             animated_tex: None,
+            written_text: None,
             context,
             written: String::new(),
             animation: 0,
             offset: 0.0,
+            dirty_written: false,
         }
     }
 }
 
 impl super::Screen for Chat {
     fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        println!("activate chat!");
         let scale = Hud::icon_scale(renderer);
         let history_size = self.context.messages.clone().read().len();
 
@@ -186,7 +191,7 @@ impl super::Screen for Chat {
                         renderer.ui.size_of_string(&*self.written) + 2.0 * scale,
                         2.0 * scale,
                     )
-                    .create(ui_container),
+                    .create(ui_container)
             );
         } else {
             if self.animation == 10 {
@@ -194,12 +199,67 @@ impl super::Screen for Chat {
             }
             self.animation -= 1;
         }
+        if self.dirty_written {
+            self.dirty_written = false;
+            if self.animated_tex.is_some() {
+                self.animated_tex = Some(
+                    TextBuilder::new()
+                        .text("_")
+                        .alignment(VAttach::Bottom, HAttach::Left)
+                        .position(
+                            renderer.ui.size_of_string(&*self.written) + 2.0 * scale,
+                            2.0 * scale,
+                        )
+                        .create(ui_container)
+                );
+            }
+            self.written_text = Some(TextBuilder::new()
+                .text(self.written.clone())
+                .alignment(VAttach::Bottom, HAttach::Left)
+                .position(
+                    2.0 * scale,
+                    2.0 * scale,
+                )
+                .create(ui_container));
+        }
         if self.context.dirty.load(Ordering::Acquire) {
             self.context.dirty.store(false, Ordering::Release);
             self.rendered_messages.clear();
             self.render_chat(renderer, ui_container);
         }
         None
+    }
+
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+        if key == VirtualKeyCode::Escape && !down {
+            game.screen_sys.clone().pop_screen();
+            return true;
+        }
+        if key == VirtualKeyCode::Return && !down {
+            if !self.written.is_empty() {
+                game.server.as_ref().unwrap().clone().write_packet(packet::play::serverbound::ChatMessage {
+                    message: self.written.clone(),
+                });
+            }
+            game.screen_sys.clone().pop_screen();
+            return true;
+        }
+        return false;
+    }
+
+    fn on_char_receive(&mut self, received: char) {
+        // TODO: Filter illegal chars, add a limit according to the version which is used!
+        if received.is_ascii() {
+            if received == 8 as char {
+                if !self.written.is_empty() {
+                    self.written.pop();
+                    self.dirty_written = true;
+                }
+                return;
+            }
+            self.written.push(received);
+            self.dirty_written = true;
+        }
     }
 
     fn is_closable(&self) -> bool {
@@ -276,15 +336,5 @@ impl Chat {
             self.rendered_messages.push(text);
             component_lines += lines;
         }
-
-        /*for message in self.context.messages.clone().write().iter_mut().rev().enumerate() {
-            if message.1.0 != 0 { // TODO: Should we use size - 1 instead of 0 here?
-                message.1.0 -= 1;
-            } else {
-                if message.0 == 0 {
-                    self.context.dirty.store(false, Ordering::Release);
-                }
-            }
-        }*/
     }
 }
