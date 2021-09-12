@@ -14,18 +14,18 @@
 
 use std::sync::Arc;
 
-use crate::{render, Game};
+use crate::protocol::packet;
 use crate::render::hud::Hud;
 use crate::render::{hud, Renderer};
 use crate::screen::Screen;
-use crate::protocol::packet;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
+use crate::{render, Game};
 use core::cmp;
+use glutin::event::VirtualKeyCode;
 use leafish_protocol::format::Component;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
-use glutin::event::VirtualKeyCode;
 
 pub const MAX_MESSAGES: usize = 200;
 pub const START_TICKS: usize = 10 * 20;
@@ -191,7 +191,7 @@ impl super::Screen for Chat {
                         renderer.ui.size_of_string(&*self.written) + 2.0 * scale,
                         2.0 * scale,
                     )
-                    .create(ui_container)
+                    .create(ui_container),
             );
         } else {
             if self.animation == 10 {
@@ -210,17 +210,16 @@ impl super::Screen for Chat {
                             renderer.ui.size_of_string(&*self.written) + 2.0 * scale,
                             2.0 * scale,
                         )
-                        .create(ui_container)
+                        .create(ui_container),
                 );
             }
-            self.written_text = Some(TextBuilder::new()
-                .text(self.written.clone())
-                .alignment(VAttach::Bottom, HAttach::Left)
-                .position(
-                    2.0 * scale,
-                    2.0 * scale,
-                )
-                .create(ui_container));
+            self.written_text = Some(
+                TextBuilder::new()
+                    .text(self.written.clone())
+                    .alignment(VAttach::Bottom, HAttach::Left)
+                    .position(2.0 * scale, 2.0 * scale)
+                    .create(ui_container),
+            );
         }
         if self.context.dirty.load(Ordering::Acquire) {
             self.context.dirty.store(false, Ordering::Release);
@@ -237,9 +236,11 @@ impl super::Screen for Chat {
         }
         if key == VirtualKeyCode::Return && !down {
             if !self.written.is_empty() {
-                game.server.as_ref().unwrap().clone().write_packet(packet::play::serverbound::ChatMessage {
-                    message: self.written.clone(),
-                });
+                game.server.as_ref().unwrap().clone().write_packet(
+                    packet::play::serverbound::ChatMessage {
+                        message: self.written.clone(),
+                    },
+                );
             }
             game.screen_sys.clone().pop_screen();
             return true;
