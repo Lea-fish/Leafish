@@ -463,7 +463,7 @@ impl Screen for Hud {
                 &mut game.focused.clone(),
             );
         }
-        return false;
+        false
     }
 
     fn is_closable(&self) -> bool {
@@ -1050,8 +1050,7 @@ impl Hud {
             let history_size = messages.len();
 
             let mut component_lines = 0;
-            for i in 0..cmp::min(10, history_size) {
-                let message = messages[i].clone();
+            for message in messages.iter().take(cmp::min(10, history_size)) {
                 let lines = (renderer.ui.size_of_string(&*message.1.to_string())
                     / (CHAT_WIDTH * scale))
                     .ceil() as u8;

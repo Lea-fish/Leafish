@@ -1277,16 +1277,14 @@ impl Server {
                 }
                 Actionkey::ToggleChat => {
                     if down {
-                        screen_sys
-                            .clone()
-                            .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
+                        screen_sys.add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
                         return true;
                     }
                 }
                 _ => {}
             };
         }
-        return false;
+        false
     }
 
     pub fn on_left_click(&self, renderer: Arc<RwLock<render::Renderer>>) {

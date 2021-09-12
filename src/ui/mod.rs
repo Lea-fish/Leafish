@@ -1259,7 +1259,7 @@ impl<'a> FormatState<'a> {
                 TextBuilder::new()
                     .text(&txt[last..i])
                     .position(self.offset, (self.lines * 18 + 1) as f64)
-                    .colour((rr, gg, bb, (self.transparency * 255 as f64) as u8))
+                    .colour((rr, gg, bb, (self.transparency * 255_f64) as u8))
                     .create(self);
                 last = i;
                 if c == '\n' {
@@ -1280,7 +1280,7 @@ impl<'a> FormatState<'a> {
             TextBuilder::new()
                 .text(&txt[last..])
                 .position(self.offset, (self.lines * 18 + 1) as f64)
-                .colour((rr, gg, bb, (self.transparency * 255 as f64) as u8))
+                .colour((rr, gg, bb, (self.transparency * 255_f64) as u8))
                 .create(self);
             self.offset += self.renderer.ui.size_of_string(&txt[last..]) + 2.0;
             if self.offset > self.width {

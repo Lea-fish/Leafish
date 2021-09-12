@@ -63,7 +63,7 @@ pub trait Screen {
             game.screen_sys.pop_screen();
             return true;
         }
-        return false;
+        false
     }
 
     fn on_char_receive(&mut self, _received: char, _game: &mut Game) {}
@@ -194,7 +194,7 @@ impl ScreenSystem {
                     .lock()
                     .is_closable();
         }
-        return false;
+        false
     }
 
     pub fn tick(

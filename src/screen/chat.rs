@@ -73,6 +73,12 @@ impl ChatContext {
     }
 }
 
+impl Default for ChatContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Clone)]
 pub struct Chat {
     rendered_messages: Vec<FormattedRef>,
@@ -270,7 +276,7 @@ impl super::Screen for Chat {
                 self.dirty_written = true;
             }
         }
-        return false;
+        false
     }
 
     fn on_char_receive(&mut self, received: char, game: &mut Game) {

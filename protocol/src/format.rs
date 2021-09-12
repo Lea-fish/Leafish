@@ -79,7 +79,8 @@ impl Component {
                     match translate_key {
                         "chat.type.text" => format!("<{}> {}", text_args[0], text_args[1]),
                         "chat.type.announcement" => format!("[{}] {}", text_args[0], text_args[1]),
-                        _ => format!("unhandled: {}", translate_key),
+                        "chat.type.admin" => format!("You were opped by {}", text_args[0]), // TODO: Check if this is only happening when you get opped!
+                        _ => format!("unhandled: {}", translate_key), // "De-opped %s", "Opped %s"
                     }
                     .as_str(),
                 ))
