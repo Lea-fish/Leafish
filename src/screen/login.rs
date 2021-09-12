@@ -24,12 +24,22 @@ use crate::console;
 use crate::protocol;
 use crate::protocol::mojang;
 use crate::render;
+use crate::screen::Screen;
 use crate::settings;
 use crate::ui;
 
 pub struct Login {
     elements: Option<UIElements>,
     vars: Rc<console::Vars>,
+}
+
+impl Clone for Login {
+    fn clone(&self) -> Self {
+        Login {
+            elements: None,
+            vars: self.vars.clone(),
+        }
+    }
 }
 
 struct UIElements {
@@ -49,7 +59,7 @@ struct UIElements {
 }
 
 impl Login {
-    pub fn new(vars: Rc<console::Vars>) -> Login {
+    pub fn new(vars: Rc<console::Vars>) -> Self {
         Login {
             elements: None,
             vars,
@@ -223,5 +233,9 @@ impl super::Screen for Login {
 
         elements.logo.tick(renderer);
         None
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }

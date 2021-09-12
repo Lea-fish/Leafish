@@ -19,11 +19,21 @@ use crate::paths;
 use crate::ui;
 use crate::{render, settings};
 
+use crate::screen::Screen;
 use serde_json::{self, Value};
 
 pub struct EditServerEntry {
     elements: Option<UIElements>,
     entry_info: Option<(usize, String, String)>,
+}
+
+impl Clone for EditServerEntry {
+    fn clone(&self) -> Self {
+        EditServerEntry {
+            elements: None,
+            entry_info: self.entry_info.clone(),
+        }
+    }
 }
 
 struct UIElements {
@@ -133,6 +143,7 @@ impl super::Screen for EditServerEntry {
                     &server_address.borrow().input,
                 );
                 game.screen_sys
+                    .clone()
                     .replace_screen(Box::new(super::ServerList::new(
                         None,
                         game.vars.get(settings::BACKGROUND_IMAGE).clone(),
@@ -156,6 +167,7 @@ impl super::Screen for EditServerEntry {
             cancel.add_text(txt);
             cancel.add_click_func(|_, game| {
                 game.screen_sys
+                    .clone()
                     .replace_screen(Box::new(super::ServerList::new(
                         None,
                         game.vars.get(settings::BACKGROUND_IMAGE).clone(),
@@ -191,5 +203,9 @@ impl super::Screen for EditServerEntry {
 
     fn is_closable(&self) -> bool {
         true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }

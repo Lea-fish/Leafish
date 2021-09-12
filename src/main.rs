@@ -77,7 +77,7 @@ const CL_BRAND: console::CVar<String> = console::CVar {
 
 pub struct Game {
     renderer: Arc<RwLock<render::Renderer>>,
-    screen_sys: screen::ScreenSystem,
+    screen_sys: Arc<screen::ScreenSystem>,
     resource_manager: Arc<RwLock<resources::Manager>>,
     clipboard_provider: Arc<RwLock<Box<dyn copypasta::ClipboardProvider>>>,
     console: Arc<Mutex<console::Console>>,
@@ -285,7 +285,7 @@ fn main() {
 
     let mut last_frame = Instant::now();
 
-    let mut screen_sys = screen::ScreenSystem::new();
+    let screen_sys = screen::ScreenSystem::new();
     if opt.server.is_none() {
         screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
     }
@@ -319,7 +319,7 @@ fn main() {
         server: None,
         focused: false,
         renderer: Arc::new(RwLock::new(renderer)),
-        screen_sys,
+        screen_sys: Arc::new(screen_sys),
         resource_manager: resource_manager.clone(),
         console: con,
         vars,
@@ -426,10 +426,9 @@ fn tick_all(
                 .write()
                 .disconnect_reason
                 .take();
-            while game.screen_sys.is_current_closable() {
-                game.screen_sys.pop_screen();
-            }
+            game.screen_sys.close_closable_screens();
             game.screen_sys
+                .clone()
                 .replace_screen(Box::new(screen::ServerList::new(
                     disconnect_reason,
                     game.vars.get(settings::BACKGROUND_IMAGE).clone(),
@@ -515,6 +514,7 @@ fn tick_all(
     }
 
     game.screen_sys
+        .clone()
         .tick(delta, game.renderer.clone(), &mut ui_container);
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {
@@ -640,6 +640,7 @@ fn handle_window_event<T>(
                 WindowEvent::ReceivedCharacter(codepoint) => {
                     if !game.focused && !game.is_ctrl_pressed && !game.is_logo_pressed {
                         ui_container.key_type(game, codepoint);
+                        game.screen_sys.clone().receive_char(codepoint, game);
                     }
 
                     #[cfg(target_os = "macos")]
@@ -657,7 +658,7 @@ fn handle_window_event<T>(
                         if game.server.is_some()
                             && game.server.as_ref().unwrap().is_connected()
                             && !game.focused
-                            && !game.screen_sys.is_current_closable()
+                            && !game.screen_sys.clone().is_current_closable()
                         {
                             game.focused = true;
                             window.set_cursor_grab(true).unwrap();
@@ -712,35 +713,16 @@ fn handle_window_event<T>(
                     // TODO: line vs pixel delta? does pixel scrolling (e.g. touchpad) need scaling?
                     match delta {
                         MouseScrollDelta::LineDelta(x, y) => {
-                            game.screen_sys.on_scroll(x.into(), y.into());
+                            game.screen_sys.clone().on_scroll(x.into(), y.into());
                         }
                         MouseScrollDelta::PixelDelta(position) => {
                             let (x, y) = position.into();
-                            game.screen_sys.on_scroll(x, y);
+                            game.screen_sys.clone().on_scroll(x, y);
                         }
                     }
                 }
                 WindowEvent::KeyboardInput { input, .. } => {
                     match (input.state, input.virtual_keycode) {
-                        (ElementState::Released, Some(VirtualKeyCode::Escape)) => {
-                            if game.server.is_some()
-                                && !*game.server.as_ref().unwrap().clone().dead.read()
-                            {
-                                if game.focused {
-                                    window.set_cursor_grab(false).unwrap();
-                                    window.set_cursor_visible(true);
-                                    game.focused = false;
-                                    game.screen_sys.add_screen(Box::new(
-                                        screen::SettingsMenu::new(game.vars.clone(), true),
-                                    ));
-                                } else if game.screen_sys.is_current_closable() {
-                                    window.set_cursor_grab(true).unwrap();
-                                    window.set_cursor_visible(false);
-                                    game.focused = true;
-                                    game.screen_sys.pop_screen();
-                                }
-                            }
-                        }
                         (ElementState::Pressed, Some(VirtualKeyCode::Grave)) => {
                             game.console.lock().toggle();
                         }
@@ -758,39 +740,33 @@ fn handle_window_event<T>(
                             game.is_fullscreen = !game.is_fullscreen;
                         }
                         (ElementState::Pressed, Some(key)) => {
-                            if let Some(action_key) =
-                                settings::Actionkey::get_by_keycode(key, &game.vars)
-                            {
-                                if game.server.is_some() {
-                                    game.server.as_ref().unwrap().key_press(
-                                        true,
-                                        action_key,
-                                        &mut game.screen_sys,
-                                        &mut game.focused,
-                                    );
-                                }
-                            }
                             if !game.focused {
                                 let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
                                 ui_container.key_press(game, key, true, ctrl_pressed);
                             }
+                            if game.screen_sys.clone().press_key(key, true, game) {
+                                window.set_cursor_grab(false).unwrap();
+                                window.set_cursor_visible(true);
+                                game.focused = false;
+                            } else {
+                                window.set_cursor_grab(true).unwrap();
+                                window.set_cursor_visible(false);
+                                game.focused = true;
+                            }
                         }
                         (ElementState::Released, Some(key)) => {
-                            if let Some(action_key) =
-                                settings::Actionkey::get_by_keycode(key, &game.vars)
-                            {
-                                if game.server.is_some() {
-                                    game.server.as_ref().unwrap().key_press(
-                                        false,
-                                        action_key,
-                                        &mut game.screen_sys,
-                                        &mut game.focused,
-                                    );
-                                }
-                            }
                             if !game.focused {
                                 let ctrl_pressed = game.is_ctrl_pressed;
                                 ui_container.key_press(game, key, false, ctrl_pressed);
+                            }
+                            if game.screen_sys.clone().press_key(key, false, game) {
+                                window.set_cursor_grab(false).unwrap();
+                                window.set_cursor_visible(true);
+                                game.focused = false;
+                            } else {
+                                window.set_cursor_grab(true).unwrap();
+                                window.set_cursor_visible(false);
+                                game.focused = true;
                             }
                         }
                         (_, None) => (),

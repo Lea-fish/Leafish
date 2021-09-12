@@ -22,7 +22,6 @@ use parking_lot::RwLock;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::format;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
 use crate::render;
@@ -31,10 +30,13 @@ use crate::screen::Screen;
 use crate::server::Server;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
+use crate::{format, screen, settings, Game};
 use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
 use std::sync::atomic::AtomicBool;
 
+use glutin::event::VirtualKeyCode;
+use instant::Instant;
 use std::sync::atomic::Ordering as AtomicOrdering;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
@@ -76,8 +78,6 @@ pub struct HudContext {
     dirty_slot_index: bool,
     game_mode: GameMode,
     dirty_game_mode: bool,
-    chat_history: Vec<format::Component>, // TODO: Make components fade away after a certain amount of time (but keep them in here to render them if necessary)
-    dirty_chat: bool,
 }
 
 impl Default for render::hud::HudContext {
@@ -123,8 +123,6 @@ impl HudContext {
             dirty_slot_index: false,
             game_mode: GameMode::Survival,
             dirty_game_mode: false,
-            chat_history: Vec::new(),
-            dirty_chat: false,
         }
     }
 
@@ -195,11 +193,16 @@ impl HudContext {
     }
 
     pub fn display_message_in_chat(&mut self, message: format::Component) {
-        self.chat_history.push(message);
-        self.dirty_chat = true;
+        self.server
+            .as_ref()
+            .unwrap()
+            .chat_ctx
+            .clone()
+            .push_msg(message);
     }
 }
 
+#[derive(Clone)]
 pub struct Hud {
     last_enabled: bool,
     last_debug_enabled: bool,
@@ -217,6 +220,7 @@ pub struct Hud {
     chat_background_elements: Vec<ImageRef>,
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
+    last_tick: Instant,
 }
 
 impl Hud {
@@ -238,6 +242,7 @@ impl Hud {
             chat_background_elements: vec![],
             hud_context,
             random: rand::thread_rng(),
+            last_tick: Instant::now(),
         }
     }
 }
@@ -366,9 +371,18 @@ impl Screen for Hud {
             self.debug_elements.clear();
             self.render_debug(renderer, ui_container);
         }
-        if self.hud_context.clone().read().dirty_chat {
-            self.chat_elements.clear();
-            self.chat_background_elements.clear();
+        if self // TODO: Fix overlapping with chat window!
+            .hud_context
+            .clone()
+            .read()
+            .server
+            .as_ref()
+            .unwrap()
+            .clone()
+            .chat_ctx
+            .clone()
+            .is_dirty()
+        {
             self.render_chat(renderer, ui_container);
         }
         None
@@ -435,12 +449,33 @@ impl Screen for Hud {
         }
     }
 
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+        if key == VirtualKeyCode::Escape && !down && game.focused {
+            game.screen_sys
+                .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
+            return true;
+        }
+        if let Some(action_key) = settings::Actionkey::get_by_keycode(key, &game.vars) {
+            return game.server.as_ref().unwrap().key_press(
+                down,
+                action_key,
+                game.screen_sys.clone(),
+                &mut game.focused.clone(),
+            );
+        }
+        false
+    }
+
     fn is_closable(&self) -> bool {
         false
     }
 
     fn is_tick_always(&self) -> bool {
         true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }
 
@@ -996,58 +1031,76 @@ impl Hud {
     }
 
     pub fn render_chat(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let scale = Hud::icon_scale(renderer);
-        let history_size = self.hud_context.clone().read().chat_history.len();
+        let now = Instant::now();
+        if now.duration_since(self.last_tick).as_millis() >= 50 {
+            self.last_tick = now;
+            self.chat_elements.clear();
+            self.chat_background_elements.clear();
+            let scale = Hud::icon_scale(renderer);
+            let messages = self
+                .hud_context
+                .clone()
+                .read()
+                .server
+                .as_ref()
+                .unwrap()
+                .chat_ctx
+                .clone()
+                .tick_visible_messages();
+            let history_size = messages.len();
 
-        let mut component_lines = 0;
-        for i in 0..cmp::min(10, history_size) {
-            let message =
-                self.hud_context.clone().read().chat_history[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.to_string()) / (CHAT_WIDTH * scale))
-                .ceil() as u8;
-            component_lines += lines;
-        }
+            let mut component_lines = 0;
+            for message in messages.iter().take(cmp::min(10, history_size)) {
+                let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+                    / (CHAT_WIDTH * scale))
+                    .ceil() as u8;
+                component_lines += lines;
+            }
 
-        if history_size > 0 {
-            // TODO: Only do this in chat-view mode (where the entire chat is shown)
-            self.chat_background_elements.push(
-                ui::ImageBuilder::new()
+            if history_size > 0 {
+                self.chat_background_elements.push(
+                    ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY + 1)
+                        .texture("leafish:solid")
+                        .alignment(VAttach::Bottom, HAttach::Left)
+                        .position(1.0 * scale, scale * 85.0 / 2.0)
+                        .size(
+                            500.0 / 2.0 * scale,
+                            5.0 * scale * (component_lines as f64)
+                                + cmp::min(10, history_size) as f64 * 0.4 * scale,
+                        )
+                        .colour((0, 0, 0, 100))
+                        .create(ui_container),
+                );
+            }
+
+            let mut component_lines = 0;
+            for message in messages.iter().take(cmp::min(10, history_size)).enumerate() {
+                let lines = (renderer.ui.size_of_string(&*message.1 .1.to_string())
+                    / (CHAT_WIDTH * scale))
+                    .ceil() as u8;
+                let transparency = if message.1 .0 >= FADE_OUT_START_TICKS {
+                    1.0
+                } else {
+                    message.1 .0 as f64 / FADE_OUT_START_TICKS as f64
+                };
+                let text = ui::FormattedBuilder::new()
                     .draw_index(HUD_PRIORITY + 1)
-                    .texture("leafish:solid")
                     .alignment(VAttach::Bottom, HAttach::Left)
-                    .position(0.0, scale * 85.0 / 2.0)
-                    .size(
-                        500.0 / 2.0 * scale,
-                        5.0 * scale * (component_lines as f64)
-                            + cmp::min(10, history_size) as f64 * 0.4 * scale,
+                    .position(
+                        1.0 * scale,
+                        scale * 85.0 / 2.0
+                            + ((component_lines as f64) * 5.0) * scale
+                            + message.0 as f64 * 0.4 * scale,
                     )
-                    .colour((0, 0, 0, 100))
-                    .create(ui_container),
-            );
+                    .text(message.1 .1.clone())
+                    .transparency(transparency)
+                    .max_width(CHAT_WIDTH * scale)
+                    .create(ui_container);
+                self.chat_elements.push(text);
+                component_lines += lines;
+            }
         }
-
-        let mut component_lines = 0;
-        for i in 0..cmp::min(10, history_size) {
-            let message =
-                self.hud_context.clone().read().chat_history[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.to_string()) / (CHAT_WIDTH * scale))
-                .ceil() as u8;
-            let text = ui::FormattedBuilder::new()
-                .draw_index(HUD_PRIORITY + 1)
-                .alignment(VAttach::Bottom, HAttach::Left)
-                .position(
-                    1.0 * scale,
-                    scale * 85.0 / 2.0
-                        + ((component_lines as f64) * 5.0) * scale
-                        + i as f64 * 0.4 * scale,
-                )
-                .text(message)
-                .max_width(CHAT_WIDTH * scale)
-                .create(ui_container);
-            self.chat_elements.push(text);
-            component_lines += lines;
-        }
-        self.hud_context.clone().write().dirty_chat = false;
     }
 
     pub fn draw_item(
@@ -1082,5 +1135,7 @@ impl Hud {
     }
 }
 
-const CHAT_WIDTH: f64 = 490.0 / 2.0;
+pub const CHAT_WIDTH: f64 = 490.0 / 2.0;
 const HUD_PRIORITY: isize = -2;
+pub const START_TICKS: usize = 10 * 20;
+pub const FADE_OUT_START_TICKS: usize = 20;

@@ -11,6 +11,15 @@ pub struct Respawn {
     score: u32,
 }
 
+impl Clone for Respawn {
+    fn clone(&self) -> Self {
+        Respawn {
+            elements: None,
+            score: self.score,
+        }
+    }
+}
+
 struct UIElements {
     _background: ImageRef,
 
@@ -126,5 +135,9 @@ impl super::Screen for Respawn {
 
     fn is_closable(&self) -> bool {
         true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }

@@ -152,6 +152,11 @@ pub const CL_KEYBIND_TOGGLE_DEBUG: console::CVar<i64> = create_keybind!(
     "cl_keybind_toggle_debug",
     "Keybinding for toggling the debug info"
 );
+pub const CL_KEYBIND_TOGGLE_CHAT: console::CVar<i64> = create_keybind!(
+    T,
+    "cl_keybind_toggle_chat",
+    "Keybinding for toggling the chat"
+);
 
 pub const BACKGROUND_IMAGE: console::CVar<String> = CVar {
     ty: PhantomData,
@@ -179,6 +184,7 @@ pub fn register_vars(vars: &mut console::Vars) {
     vars.register(CL_KEYBIND_JUMP);
     vars.register(CL_KEYBIND_TOGGLE_HUD);
     vars.register(CL_KEYBIND_TOGGLE_DEBUG);
+    vars.register(CL_KEYBIND_TOGGLE_CHAT);
     vars.register(S_CAPE);
     vars.register(S_JACKET);
     vars.register(S_LEFT_SLEEVE);
@@ -201,6 +207,7 @@ pub enum Actionkey {
     Jump,
     ToggleHud,
     ToggleDebug,
+    ToggleChat,
 }
 
 impl Actionkey {
@@ -216,13 +223,14 @@ impl Actionkey {
             Actionkey::Jump,
             Actionkey::ToggleHud,
             Actionkey::ToggleDebug,
+            Actionkey::ToggleChat,
         ]
     }
 
     pub fn get_by_keycode(keycode: VirtualKeyCode, vars: &console::Vars) -> Option<Actionkey> {
-        for steven_key in Actionkey::values() {
-            if keycode as i64 == *vars.get(steven_key.get_cvar()) {
-                return Some(steven_key);
+        for action_key in Actionkey::values() {
+            if keycode as i64 == *vars.get(action_key.get_cvar()) {
+                return Some(action_key);
             }
         }
         None
@@ -240,6 +248,7 @@ impl Actionkey {
             Actionkey::Jump => CL_KEYBIND_JUMP,
             Actionkey::ToggleHud => CL_KEYBIND_TOGGLE_HUD,
             Actionkey::ToggleDebug => CL_KEYBIND_TOGGLE_DEBUG,
+            Actionkey::ToggleChat => CL_KEYBIND_TOGGLE_CHAT,
         }
     }
 }

@@ -3,6 +3,7 @@ use crate::render;
 use crate::settings;
 use crate::ui;
 
+use crate::screen::Screen;
 use std::rc::Rc;
 
 pub struct UIElements {
@@ -14,6 +15,16 @@ pub struct SettingsMenu {
     _vars: Rc<console::Vars>,
     elements: Option<UIElements>,
     show_disconnect_button: bool,
+}
+
+impl Clone for SettingsMenu {
+    fn clone(&self) -> Self {
+        SettingsMenu {
+            _vars: self._vars.clone(),
+            elements: None,
+            show_disconnect_button: self.show_disconnect_button,
+        }
+    }
 }
 
 impl SettingsMenu {
@@ -52,6 +63,7 @@ impl super::Screen for SettingsMenu {
             audio_settings.add_text(txt);
             audio_settings.add_click_func(|_, game| {
                 game.screen_sys
+                    .clone()
                     .add_screen(Box::new(AudioSettingsMenu::new(game.vars.clone())));
                 true
             });
@@ -72,6 +84,7 @@ impl super::Screen for SettingsMenu {
             video_settings.add_text(txt);
             video_settings.add_click_func(|_, game| {
                 game.screen_sys
+                    .clone()
                     .add_screen(Box::new(VideoSettingsMenu::new(game.vars.clone())));
                 true
             });
@@ -122,6 +135,7 @@ impl super::Screen for SettingsMenu {
             skin_settings.add_text(txt);
             skin_settings.add_click_func(|_, game| {
                 game.screen_sys
+                    .clone()
                     .add_screen(Box::new(SkinSettingsMenu::new(game.vars.clone())));
                 true
             });
@@ -142,7 +156,7 @@ impl super::Screen for SettingsMenu {
                 .attach(&mut *done_button);
             done_button.add_text(txt);
             done_button.add_click_func(|_, game| {
-                game.screen_sys.pop_screen();
+                game.screen_sys.clone().pop_screen();
                 if game.server.is_some() {
                     game.focused = true;
                 }
@@ -166,8 +180,9 @@ impl super::Screen for SettingsMenu {
                 disconnect_button.add_text(txt);
                 disconnect_button.add_click_func(|_, game| {
                     game.server.as_ref().unwrap().disconnect(None);
-                    game.screen_sys.pop_screen();
+                    game.screen_sys.clone().pop_screen();
                     game.screen_sys
+                        .clone()
                         .replace_screen(Box::new(super::ServerList::new(
                             None,
                             game.vars.get(settings::BACKGROUND_IMAGE).clone(),
@@ -217,11 +232,24 @@ impl super::Screen for SettingsMenu {
     fn is_closable(&self) -> bool {
         true
     }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
+    }
 }
 
 pub struct VideoSettingsMenu {
     vars: Rc<console::Vars>,
     elements: Option<UIElements>,
+}
+
+impl Clone for VideoSettingsMenu {
+    fn clone(&self) -> Self {
+        VideoSettingsMenu {
+            vars: self.vars.clone(),
+            elements: None,
+        }
+    }
 }
 
 impl VideoSettingsMenu {
@@ -334,7 +362,7 @@ impl super::Screen for VideoSettingsMenu {
                 .attach(&mut *done_button);
             done_button.add_text(txt);
             done_button.add_click_func(|_, game| {
-                game.screen_sys.pop_screen();
+                game.screen_sys.clone().pop_screen();
                 true
             });
         }
@@ -377,11 +405,24 @@ impl super::Screen for VideoSettingsMenu {
     fn is_closable(&self) -> bool {
         true
     }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
+    }
 }
 
 pub struct AudioSettingsMenu {
     _vars: Rc<console::Vars>,
     elements: Option<UIElements>,
+}
+
+impl Clone for AudioSettingsMenu {
+    fn clone(&self) -> Self {
+        AudioSettingsMenu {
+            _vars: self._vars.clone(),
+            elements: None,
+        }
+    }
 }
 
 impl AudioSettingsMenu {
@@ -419,7 +460,7 @@ impl super::Screen for AudioSettingsMenu {
                 .attach(&mut *done_button);
             done_button.add_text(txt);
             done_button.add_click_func(|_, game| {
-                game.screen_sys.pop_screen();
+                game.screen_sys.clone().pop_screen();
                 true
             });
         }
@@ -463,11 +504,24 @@ impl super::Screen for AudioSettingsMenu {
     fn is_closable(&self) -> bool {
         true
     }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
+    }
 }
 
 pub struct SkinSettingsMenu {
     vars: Rc<console::Vars>,
     elements: Option<UIElements>,
+}
+
+impl Clone for SkinSettingsMenu {
+    fn clone(&self) -> Self {
+        SkinSettingsMenu {
+            vars: self.vars.clone(),
+            elements: None,
+        }
+    }
 }
 
 impl SkinSettingsMenu {
@@ -596,7 +650,7 @@ impl super::Screen for SkinSettingsMenu {
                 .attach(&mut *done_button);
             done_button.add_text(txt);
             done_button.add_click_func(|_, game| {
-                game.screen_sys.pop_screen();
+                game.screen_sys.clone().pop_screen();
                 true
             });
         }
@@ -638,5 +692,9 @@ impl super::Screen for SkinSettingsMenu {
 
     fn is_closable(&self) -> bool {
         true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }

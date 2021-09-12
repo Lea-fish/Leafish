@@ -7,6 +7,7 @@ use rand::{self, seq::SliceRandom};
 use std::f64::consts;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct Logo {
     _shadow: ui::BatchRef,
     _layer0: ui::BatchRef,

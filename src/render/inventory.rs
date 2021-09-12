@@ -7,6 +7,7 @@ use crate::ui::{Container, ImageRef, TextRef};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct InventoryWindow {
     pub elements: Vec<Vec<ImageRef>>,
     pub text_elements: Vec<Vec<TextRef>>,
@@ -58,6 +59,10 @@ impl Screen for InventoryWindow {
 
     fn is_closable(&self) -> bool {
         true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }
 

@@ -21,6 +21,7 @@ use crate::render;
 use crate::render::hud::HudContext;
 use crate::render::Renderer;
 use crate::resources;
+use crate::screen::chat::{Chat, ChatContext};
 use crate::screen::respawn::Respawn;
 use crate::screen::ScreenSystem;
 use crate::settings::Actionkey;
@@ -50,7 +51,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -87,7 +88,7 @@ pub struct Server {
     uuid: protocol::UUID,
     conn: Arc<RwLock<Option<protocol::Conn>>>,
     pub protocol_version: i32,
-    mapped_protocol_version: Version,
+    pub mapped_protocol_version: Version,
     forge_mods: Vec<forge::ForgeMod>,
     pub disconnect_data: Arc<RwLock<DisconnectData>>,
 
@@ -129,6 +130,9 @@ pub struct Server {
     pub dead: RwLock<bool>,
     just_died: RwLock<bool>,
     close_death_screen: RwLock<bool>,
+    last_chat_open: AtomicBool,
+    pub chat_open: AtomicBool,
+    pub chat_ctx: Arc<ChatContext>,
 }
 
 #[derive(Debug)]
@@ -897,6 +901,9 @@ impl Server {
                 delay: 0,
                 active: false,
             }),
+            last_chat_open: AtomicBool::new(false),
+            chat_open: AtomicBool::new(false),
+            chat_ctx: Arc::new(ChatContext::new()),
         }
     }
 
@@ -928,8 +935,23 @@ impl Server {
         }
         if *self.close_death_screen.read() {
             *self.close_death_screen.write() = false;
-            game.screen_sys.pop_screen();
+            game.screen_sys.clone().pop_screen();
             game.focused = true;
+        }
+        let chat_open = self.chat_open.load(Ordering::Acquire);
+        if chat_open != self.last_chat_open.load(Ordering::Acquire) {
+            self.last_chat_open.store(chat_open, Ordering::Release);
+            if chat_open {
+                println!("open chat!");
+                game.screen_sys
+                    .clone()
+                    .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
+                game.focused = false;
+            } else {
+                println!("close chat!");
+                game.screen_sys.clone().pop_screen();
+                game.focused = true;
+            }
         }
         let version = self.resources.read().version();
         if version != self.version.load(Ordering::Acquire) {
@@ -983,10 +1005,10 @@ impl Server {
         if self.player.clone().read().is_some() {
             if *self.just_died.read() {
                 *self.just_died.write() = false;
-                while game.screen_sys.is_current_closable() {
-                    game.screen_sys.pop_screen();
-                }
-                game.screen_sys.add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
+                game.screen_sys.close_closable_screens();
+                game.screen_sys
+                    .clone()
+                    .add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
                 game.focused = false;
             }
             let world = self.world.clone();
@@ -1209,10 +1231,10 @@ impl Server {
         &self,
         down: bool,
         key: Actionkey,
-        screen_sys: &mut ScreenSystem,
+        screen_sys: Arc<ScreenSystem>,
         focused: &mut bool,
-    ) {
-        if *focused || key == Actionkey::OpenInv {
+    ) -> bool {
+        if *focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
             let mut state_changed = false;
             if let Some(player) = *self.player.clone().write() {
                 if let Some(movement) = self
@@ -1227,25 +1249,18 @@ impl Server {
             }
             match key {
                 Actionkey::OpenInv => {
-                    if down && state_changed {
-                        if self.inventory_context.clone().read().inventory.is_some() {
-                            screen_sys.pop_screen();
-                            *focused = true;
-                        } else if *focused {
-                            let player_inv = self
-                                .inventory_context
-                                .clone()
-                                .read()
-                                .player_inventory
-                                .clone();
-                            screen_sys.add_screen(Box::new(
-                                render::inventory::InventoryWindow::new(
-                                    player_inv,
-                                    self.inventory_context.clone(),
-                                ),
-                            ));
-                            *focused = false;
-                        }
+                    if down {
+                        let player_inv = self
+                            .inventory_context
+                            .clone()
+                            .read()
+                            .player_inventory
+                            .clone();
+                        screen_sys.add_screen(Box::new(render::inventory::InventoryWindow::new(
+                            player_inv,
+                            self.inventory_context.clone(),
+                        )));
+                        return true;
                     }
                 }
                 Actionkey::ToggleHud => {
@@ -1260,9 +1275,16 @@ impl Server {
                         self.hud_context.write().debug = !curr;
                     }
                 }
+                Actionkey::ToggleChat => {
+                    if down {
+                        screen_sys.add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
+                        return true;
+                    }
+                }
                 _ => {}
             };
         }
+        false
     }
 
     pub fn on_left_click(&self, renderer: Arc<RwLock<render::Renderer>>) {
