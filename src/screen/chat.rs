@@ -24,10 +24,13 @@ use crate::{render, Game};
 use core::cmp;
 use glutin::event::VirtualKeyCode;
 use leafish_protocol::format::Component;
+use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub const MAX_MESSAGES: usize = 200;
+const MAX_MESSAGE_LENGTH_PRE_1_11: usize = 100;
+const MAX_MESSAGE_LENGTH_SINCE_1_11: usize = 256;
 
 pub struct ChatContext {
     messages: Arc<RwLock<Vec<(usize, Component)>>>,
@@ -81,6 +84,7 @@ pub struct Chat {
     animation: u8,
     offset: f64, // TODO: Implement this!
     dirty_written: bool,
+    ctrl: bool,
 }
 
 impl Chat {
@@ -95,6 +99,7 @@ impl Chat {
             animation: 0,
             offset: 0.0,
             dirty_written: false,
+            ctrl: false,
         }
     }
 }
@@ -243,17 +248,64 @@ impl super::Screen for Chat {
             game.screen_sys.clone().pop_screen();
             return true;
         }
+        println!("isctrl: {}", game.is_ctrl_pressed);
+        if key == VirtualKeyCode::V && game.is_ctrl_pressed {
+            println!("checking clipboard");
+            if let Ok(clipboard) = game.clipboard_provider.clone().write().get_contents() {
+                for c in clipboard.chars() {
+                    if self.written.len()
+                        >= if game
+                            .server
+                            .as_ref()
+                            .unwrap()
+                            .clone()
+                            .mapped_protocol_version
+                            >= Version::V1_11
+                        {
+                            MAX_MESSAGE_LENGTH_SINCE_1_11
+                        } else {
+                            MAX_MESSAGE_LENGTH_PRE_1_11
+                        }
+                    {
+                        break;
+                    }
+                    self.written.push(c);
+                }
+                self.dirty_written = true;
+            }
+        }
         return false;
     }
 
-    fn on_char_receive(&mut self, received: char) {
-        // TODO: Filter illegal chars, add a limit according to the version which is used!
-        if received.is_ascii() {
+    fn on_char_receive(&mut self, received: char, game: &mut Game) {
+        if received != 13 as char
+            && received != 127 as char
+            && received != 167 as char
+            && received != '§'
+            && received <= 255 as char
+        {
             if received == 8 as char {
+                // Handle backspace
                 if !self.written.is_empty() {
                     self.written.pop();
                     self.dirty_written = true;
                 }
+                return;
+            }
+            if self.written.len()
+                >= if game
+                    .server
+                    .as_ref()
+                    .unwrap()
+                    .clone()
+                    .mapped_protocol_version
+                    >= Version::V1_11
+                {
+                    MAX_MESSAGE_LENGTH_SINCE_1_11
+                } else {
+                    MAX_MESSAGE_LENGTH_PRE_1_11
+                }
+            {
                 return;
             }
             self.written.push(received);

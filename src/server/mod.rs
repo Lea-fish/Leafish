@@ -88,7 +88,7 @@ pub struct Server {
     uuid: protocol::UUID,
     conn: Arc<RwLock<Option<protocol::Conn>>>,
     pub protocol_version: i32,
-    mapped_protocol_version: Version,
+    pub mapped_protocol_version: Version,
     forge_mods: Vec<forge::ForgeMod>,
     pub disconnect_data: Arc<RwLock<DisconnectData>>,
 

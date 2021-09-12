@@ -66,7 +66,7 @@ pub trait Screen {
         return false;
     }
 
-    fn on_char_receive(&mut self, _received: char) {}
+    fn on_char_receive(&mut self, _received: char, _game: &mut Game) {}
 
     fn is_closable(&self) -> bool {
         false
@@ -159,7 +159,7 @@ impl ScreenSystem {
         }
     }
 
-    pub fn receive_char(&self, received: char) {
+    pub fn receive_char(&self, received: char, game: &mut Game) {
         if self.screens.clone().read().last().is_some() {
             self.screens
                 .clone()
@@ -170,7 +170,7 @@ impl ScreenSystem {
                 .screen
                 .clone()
                 .lock()
-                .on_char_receive(received);
+                .on_char_receive(received, game);
         }
     }
 

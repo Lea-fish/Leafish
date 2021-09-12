@@ -640,7 +640,7 @@ fn handle_window_event<T>(
                 WindowEvent::ReceivedCharacter(codepoint) => {
                     if !game.focused && !game.is_ctrl_pressed && !game.is_logo_pressed {
                         ui_container.key_type(game, codepoint);
-                        game.screen_sys.clone().receive_char(codepoint);
+                        game.screen_sys.clone().receive_char(codepoint, game);
                     }
 
                     #[cfg(target_os = "macos")]
