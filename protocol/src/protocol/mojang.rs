@@ -54,12 +54,21 @@ impl Profile {
                 ret.get("errorMessage").and_then(|v| v.as_str()).unwrap()
             )));
         }
+
+        let username = match ret
+            .pointer("/selectedProfile/name")
+            .and_then(|v| v.as_str())
+        {
+            Some(username) => username,
+            None => {
+                return Err(super::Error::Err(format!(
+                    "{}: {}",
+                    "Authentication error", "This account doesn't seem to own the game"
+                )))
+            }
+        };
         Ok(Profile {
-            username: ret
-                .pointer("/selectedProfile/name")
-                .and_then(|v| v.as_str())
-                .unwrap()
-                .to_owned(),
+            username: username.to_string(),
             id: ret
                 .pointer("/selectedProfile/id")
                 .and_then(|v| v.as_str())
