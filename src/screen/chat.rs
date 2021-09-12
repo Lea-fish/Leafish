@@ -248,9 +248,7 @@ impl super::Screen for Chat {
             game.screen_sys.clone().pop_screen();
             return true;
         }
-        println!("isctrl: {}", game.is_ctrl_pressed);
         if key == VirtualKeyCode::V && game.is_ctrl_pressed {
-            println!("checking clipboard");
             if let Ok(clipboard) = game.clipboard_provider.clone().write().get_contents() {
                 for c in clipboard.chars() {
                     if self.written.len()
