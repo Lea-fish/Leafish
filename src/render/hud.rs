@@ -1075,14 +1075,14 @@ impl Hud {
             }
 
             let mut component_lines = 0;
-            for message in messages.iter().take(cmp::min(10, history_size)) {
-                let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+            for message in messages.iter().take(cmp::min(10, history_size)).enumerate() {
+                let lines = (renderer.ui.size_of_string(&*message.1.1.to_string())
                     / (CHAT_WIDTH * scale))
                     .ceil() as u8;
-                let transparency = if message.0 >= FADE_OUT_START_TICKS {
+                let transparency = if message.1.0 >= FADE_OUT_START_TICKS {
                     1.0
                 } else {
-                    message.0 as f64 / FADE_OUT_START_TICKS as f64
+                    message.1.0 as f64 / FADE_OUT_START_TICKS as f64
                 };
                 let text = ui::FormattedBuilder::new()
                     .draw_index(HUD_PRIORITY + 1)
@@ -1091,9 +1091,9 @@ impl Hud {
                         1.0 * scale,
                         scale * 85.0 / 2.0
                             + ((component_lines as f64) * 5.0) * scale
-                            + i as f64 * 0.4 * scale,
+                            + message.0 as f64 * 0.4 * scale,
                     )
-                    .text(message.1.clone())
+                    .text(message.1.1.clone())
                     .transparency(transparency)
                     .max_width(CHAT_WIDTH * scale)
                     .create(ui_container);
@@ -1138,4 +1138,4 @@ impl Hud {
 pub const CHAT_WIDTH: f64 = 490.0 / 2.0;
 const HUD_PRIORITY: isize = -2;
 pub const START_TICKS: usize = 10 * 20;
-pub const FADE_OUT_START_TICKS: usize = 20;
+pub const FADE_OUT_START_TICKS: usize = 1 * 20;
