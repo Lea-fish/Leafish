@@ -82,9 +82,8 @@ pub struct Chat {
     context: Arc<ChatContext>,
     written: String,
     animation: u8,
-    offset: f64, // TODO: Implement this!
+    offset: f64, // TODO: Implement this (scrolling in chat)!
     dirty_written: bool,
-    ctrl: bool,
 }
 
 impl Chat {
@@ -99,7 +98,6 @@ impl Chat {
             animation: 0,
             offset: 0.0,
             dirty_written: false,
-            ctrl: false,
         }
     }
 }
