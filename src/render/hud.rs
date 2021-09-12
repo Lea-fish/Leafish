@@ -1138,4 +1138,4 @@ impl Hud {
 pub const CHAT_WIDTH: f64 = 490.0 / 2.0;
 const HUD_PRIORITY: isize = -2;
 pub const START_TICKS: usize = 10 * 20;
-pub const FADE_OUT_START_TICKS: usize = 1 * 20;
+pub const FADE_OUT_START_TICKS: usize = 20;
