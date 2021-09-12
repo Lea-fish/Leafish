@@ -36,6 +36,7 @@ use leafish_protocol::types::GameMode;
 use std::sync::atomic::AtomicBool;
 
 use glutin::event::VirtualKeyCode;
+use instant::Instant;
 use std::sync::atomic::Ordering as AtomicOrdering;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
@@ -219,7 +220,7 @@ pub struct Hud {
     chat_background_elements: Vec<ImageRef>,
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
-    top_counter: i32,
+    last_tick: Instant,
 }
 
 impl Hud {
@@ -241,7 +242,7 @@ impl Hud {
             chat_background_elements: vec![],
             hud_context,
             random: rand::thread_rng(),
-            top_counter: 0,
+            last_tick: Instant::now(),
         }
     }
 }
@@ -280,13 +281,9 @@ impl Screen for Hud {
         self.chat_background_elements.clear();
     }
 
-    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
-        self.top_counter += 1;
-    }
+    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
-        self.top_counter -= 1;
-    }
+    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
     fn tick(
         &mut self,
@@ -374,26 +371,19 @@ impl Screen for Hud {
             self.debug_elements.clear();
             self.render_debug(renderer, ui_container);
         }
-        if self.top_counter >= 0 {
-            if self
-                .hud_context
-                .clone()
-                .read()
-                .server
-                .as_ref()
-                .unwrap()
-                .clone()
-                .chat_ctx
-                .clone()
-                .is_dirty()
-            {
-                self.chat_elements.clear();
-                self.chat_background_elements.clear();
-                self.render_chat(renderer, ui_container);
-            }
-        } else if !self.chat_elements.is_empty() {
-            self.chat_elements.clear();
-            self.chat_background_elements.clear();
+        if self // TODO: Fix overlapping with chat window!
+            .hud_context
+            .clone()
+            .read()
+            .server
+            .as_ref()
+            .unwrap()
+            .clone()
+            .chat_ctx
+            .clone()
+            .is_dirty()
+        {
+            self.render_chat(renderer, ui_container);
         }
         None
     }
@@ -1043,70 +1033,77 @@ impl Hud {
     }
 
     pub fn render_chat(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let scale = Hud::icon_scale(renderer);
-        let messages = self
-            .hud_context
-            .clone()
-            .read()
-            .server
-            .as_ref()
-            .unwrap()
-            .chat_ctx
-            .clone()
-            .tick_visible_messages();
-        let history_size = messages.len();
+        let now = Instant::now();
+        if now.duration_since(self.last_tick).as_millis() >= 50 {
+            self.last_tick = now;
+            self.chat_elements.clear();
+            self.chat_background_elements.clear();
+            let scale = Hud::icon_scale(renderer);
+            let messages = self
+                .hud_context
+                .clone()
+                .read()
+                .server
+                .as_ref()
+                .unwrap()
+                .chat_ctx
+                .clone()
+                .tick_visible_messages();
+            let history_size = messages.len();
 
-        let mut component_lines = 0;
-        for i in 0..cmp::min(10, history_size) {
-            let message = messages[i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (CHAT_WIDTH * scale))
-                .ceil() as u8;
-            component_lines += lines;
-        }
+            let mut component_lines = 0;
+            for i in 0..cmp::min(10, history_size) {
+                let message = messages[i].clone();
+                let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+                    / (CHAT_WIDTH * scale))
+                    .ceil() as u8;
+                component_lines += lines;
+            }
 
-        if history_size > 0 {
-            // TODO: Only do this in chat-view mode (where the entire chat is shown)
-            self.chat_background_elements.push(
-                ui::ImageBuilder::new()
+            if history_size > 0 {
+                self.chat_background_elements.push(
+                    ui::ImageBuilder::new()
+                        .draw_index(HUD_PRIORITY + 1)
+                        .texture("leafish:solid")
+                        .alignment(VAttach::Bottom, HAttach::Left)
+                        .position(1.0 * scale, scale * 85.0 / 2.0)
+                        .size(
+                            500.0 / 2.0 * scale,
+                            5.0 * scale * (component_lines as f64)
+                                + cmp::min(10, history_size) as f64 * 0.4 * scale,
+                        )
+                        .colour((0, 0, 0, 100))
+                        .create(ui_container),
+                );
+            }
+
+            let mut component_lines = 0;
+            for i in 0..cmp::min(10, history_size) {
+                let message = messages[i].clone();
+                let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+                    / (CHAT_WIDTH * scale))
+                    .ceil() as u8;
+                let transparency = if message.0 >= FADE_OUT_START_TICKS {
+                    1.0
+                } else {
+                    message.0 as f64 / FADE_OUT_START_TICKS as f64
+                };
+                let text = ui::FormattedBuilder::new()
                     .draw_index(HUD_PRIORITY + 1)
-                    .texture("leafish:solid")
                     .alignment(VAttach::Bottom, HAttach::Left)
-                    .position(1.0 * scale, scale * 85.0 / 2.0)
-                    .size(
-                        500.0 / 2.0 * scale,
-                        5.0 * scale * (component_lines as f64)
-                            + cmp::min(10, history_size) as f64 * 0.4 * scale,
+                    .position(
+                        1.0 * scale,
+                        scale * 85.0 / 2.0
+                            + ((component_lines as f64) * 5.0) * scale
+                            + i as f64 * 0.4 * scale,
                     )
-                    .colour((0, 0, 0, 100))
-                    .create(ui_container),
-            );
-        }
-
-        let mut component_lines = 0;
-        for i in 0..cmp::min(10, history_size) {
-            let message = messages[i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.1.to_string()) / (CHAT_WIDTH * scale))
-                .ceil() as u8;
-            let transparency = if message.0 >= crate::screen::chat::FADE_OUT_START_TICKS {
-                1.0
-            } else {
-                message.0 as f64 / crate::screen::chat::FADE_OUT_START_TICKS as f64
-            };
-            let text = ui::FormattedBuilder::new()
-                .draw_index(HUD_PRIORITY + 1)
-                .alignment(VAttach::Bottom, HAttach::Left)
-                .position(
-                    1.0 * scale,
-                    scale * 85.0 / 2.0
-                        + ((component_lines as f64) * 5.0) * scale
-                        + i as f64 * 0.4 * scale,
-                )
-                .text(message.1)
-                .transparency(transparency)
-                .max_width(CHAT_WIDTH * scale)
-                .create(ui_container);
-            self.chat_elements.push(text);
-            component_lines += lines;
+                    .text(message.1)
+                    .transparency(transparency)
+                    .max_width(CHAT_WIDTH * scale)
+                    .create(ui_container);
+                self.chat_elements.push(text);
+                component_lines += lines;
+            }
         }
     }
 
@@ -1144,3 +1141,5 @@ impl Hud {
 
 pub const CHAT_WIDTH: f64 = 490.0 / 2.0;
 const HUD_PRIORITY: isize = -2;
+pub const START_TICKS: usize = 10 * 20;
+pub const FADE_OUT_START_TICKS: usize = 1 * 20;

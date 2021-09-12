@@ -15,7 +15,7 @@
 use std::sync::Arc;
 
 use crate::protocol::packet;
-use crate::render::hud::Hud;
+use crate::render::hud::{Hud, START_TICKS};
 use crate::render::{hud, Renderer};
 use crate::screen::Screen;
 use crate::ui;
@@ -28,8 +28,6 @@ use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub const MAX_MESSAGES: usize = 200;
-pub const START_TICKS: usize = 10 * 20;
-pub const FADE_OUT_START_TICKS: usize = 1 * 20;
 
 pub struct ChatContext {
     messages: Arc<RwLock<Vec<(usize, Component)>>>,
