@@ -197,7 +197,8 @@ impl ScreenSystem {
         false
     }
 
-    pub fn tick( // no deadlocks in here
+    pub fn tick(
+        // no deadlocks in here
         &self,
         delta: f64,
         renderer: Arc<RwLock<render::Renderer>>,
