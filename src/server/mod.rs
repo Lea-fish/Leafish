@@ -742,7 +742,8 @@ impl Server {
                             }
                         }
                         Packet::EntityVelocity(velocity) => {
-                            if let Some(entity) =
+                            // TODO: Only apply the velocity to the local player due to jittering of ther players
+                            /* if let Some(entity) =
                                 server.entity_map.clone().read().get(&velocity.entity_id.0)
                             {
                                 let entity_velocity = server
@@ -756,9 +757,11 @@ impl Server {
                                     velocity.velocity_y as f64 / 8000.0,
                                     velocity.velocity_z as f64 / 8000.0,
                                 );
-                            }
+                            }*/
                         }
                         Packet::EntityVelocity_i32(velocity) => {
+                            // TODO: Only apply the velocity to the local player due to jittering of ther players
+                            /*
                             if let Some(entity) =
                                 server.entity_map.clone().read().get(&velocity.entity_id)
                             {
@@ -773,7 +776,7 @@ impl Server {
                                     velocity.velocity_y as f64 / 8000.0,
                                     velocity.velocity_z as f64 / 8000.0,
                                 );
-                            }
+                            }*/
                         }
                         _ => {
                             // debug!("other packet!");
