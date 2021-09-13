@@ -32,7 +32,6 @@ use crate::world;
 use crate::world::{CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
 use cgmath::prelude::*;
-use cgmath::Vector3;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use instant::{Duration, Instant};
@@ -741,8 +740,8 @@ impl Server {
                                 inventory.clone().write().set_item(set_slot.slot, item);
                             }
                         }
-                        Packet::EntityVelocity(velocity) => {
-                            // TODO: Only apply the velocity to the local player due to jittering of ther players
+                        Packet::EntityVelocity(_velocity) => {
+                            // TODO: Only apply the velocity to the local player due to jittering of other players
                             /* if let Some(entity) =
                                 server.entity_map.clone().read().get(&velocity.entity_id.0)
                             {
@@ -759,8 +758,8 @@ impl Server {
                                 );
                             }*/
                         }
-                        Packet::EntityVelocity_i32(velocity) => {
-                            // TODO: Only apply the velocity to the local player due to jittering of ther players
+                        Packet::EntityVelocity_i32(_velocity) => {
+                            // TODO: Only apply the velocity to the local player due to jittering of other players
                             /*
                             if let Some(entity) =
                                 server.entity_map.clone().read().get(&velocity.entity_id)

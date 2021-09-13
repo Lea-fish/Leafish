@@ -123,8 +123,8 @@ impl ScreenSystem {
     }
 
     pub fn close_closable_screens(&self) {
-        for screen in self.pre_computed_screens.read().iter().rev() {
-            if !screen.screen.lock().is_closable() {
+        loop {
+            if !self.is_current_closable() {
                 break;
             }
             self.pop_screen();
@@ -197,7 +197,7 @@ impl ScreenSystem {
         false
     }
 
-    pub fn tick(
+    pub fn tick( // no deadlocks in here
         &self,
         delta: f64,
         renderer: Arc<RwLock<render::Renderer>>,
