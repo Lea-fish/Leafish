@@ -32,6 +32,7 @@ use crate::world;
 use crate::world::{CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
 use cgmath::prelude::*;
+use cgmath::Vector3;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use instant::{Duration, Instant};
@@ -740,6 +741,40 @@ impl Server {
                                 inventory.clone().write().set_item(set_slot.slot, item);
                             }
                         }
+                        Packet::EntityVelocity(velocity) => {
+                            if let Some(entity) =
+                                server.entity_map.clone().read().get(&velocity.entity_id.0)
+                            {
+                                let entity_velocity = server
+                                    .entities
+                                    .clone()
+                                    .write()
+                                    .get_component_mut(*entity, server.velocity)
+                                    .unwrap();
+                                entity_velocity.velocity = Vector3::new(
+                                    velocity.velocity_x as f64 / 8000.0,
+                                    velocity.velocity_y as f64 / 8000.0,
+                                    velocity.velocity_z as f64 / 8000.0,
+                                );
+                            }
+                        }
+                        Packet::EntityVelocity_i32(velocity) => {
+                            if let Some(entity) =
+                                server.entity_map.clone().read().get(&velocity.entity_id)
+                            {
+                                let entity_velocity = server
+                                    .entities
+                                    .clone()
+                                    .write()
+                                    .get_component_mut(*entity, server.velocity)
+                                    .unwrap();
+                                entity_velocity.velocity = Vector3::new(
+                                    velocity.velocity_x as f64 / 8000.0,
+                                    velocity.velocity_y as f64 / 8000.0,
+                                    velocity.velocity_z as f64 / 8000.0,
+                                );
+                            }
+                        }
                         _ => {
                             // debug!("other packet!");
                         }
@@ -1162,7 +1197,7 @@ impl Server {
                     y: position.position.y,
                     z: position.position.z,
                     yaw: -(rotation.yaw as f32) * (180.0 / PI),
-                    pitch: (-rotation.pitch as f32) * (180.0 / PI) + 180.0,
+                    pitch: ((-rotation.pitch as f32) * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
                     on_ground,
                 };
                 self.write_packet(packet);
@@ -1173,7 +1208,7 @@ impl Server {
                     head_y: position.position.y + 1.62,
                     z: position.position.z,
                     yaw: -(rotation.yaw as f32) * (180.0 / PI),
-                    pitch: (-rotation.pitch as f32) * (180.0 / PI) + 180.0,
+                    pitch: ((-rotation.pitch as f32) * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
                     on_ground,
                 };
                 self.write_packet(packet);

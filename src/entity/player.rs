@@ -736,6 +736,8 @@ impl ecs::System for MovementHandler {
                     }
                 }
                 velocity.velocity.y *= 0.98;
+                velocity.velocity.x *= 0.98;
+                velocity.velocity.z *= 0.98;
                 // position.position.x += look_vec.0 * speed;
                 // position.position.z -= look_vec.1 * speed;
                 position.position.x +=
@@ -743,6 +745,17 @@ impl ecs::System for MovementHandler {
                 position.position.z -=
                     forward * yaw.sin() * (speed + looking_vec.1 * additional_speed);
                 position.position.y += velocity.velocity.y;
+                if (velocity.velocity.x.abs() * 0.2) < 0.005 {
+                    velocity.velocity.x = 0.0;
+                }
+
+                if (velocity.velocity.y.abs() * 0.2) < 0.005 {
+                    velocity.velocity.y = 0.0;
+                }
+
+                if (velocity.velocity.z.abs() * 0.2) < 0.005 {
+                    velocity.velocity.z = 0.0;
+                }
 
                 if !gamemode.noclip() {
                     let mut target = position.position;
