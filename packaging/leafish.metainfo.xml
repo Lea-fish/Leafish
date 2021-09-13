@@ -7,7 +7,7 @@
   <summary>Multi-version Minecraft-compatible client written in Rust.</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
-  <project_license>MIT</project_license>
+  <project_license>MIT AND Apache-2.0</project_license>
 
   <description>
     <p>Leafish is an open-source re-implementation of Minecraft. The game is a open-world sandbox where players explore a blocky, procedurally-generated 3D world with virtually infinite terrain, and may discover and extract raw materials, craft tools and items, and build structures or earthworks. The game has various game modes including survival mode, in which players must acquire resources to build the world and maintain health, and a creative mode, where players have unlimited resources and access to flight.</p>
