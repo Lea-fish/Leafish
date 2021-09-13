@@ -19,7 +19,6 @@ use std::thread;
 
 use rand::{self, Rng};
 
-use crate::auth;
 use crate::console;
 use crate::protocol;
 use crate::protocol::mojang;
@@ -27,6 +26,8 @@ use crate::render;
 use crate::screen::Screen;
 use crate::settings;
 use crate::ui;
+use crate::{auth, Game};
+use glutin::event::VirtualKeyCode;
 
 pub struct Login {
     elements: Option<UIElements>,
@@ -233,6 +234,14 @@ impl super::Screen for Login {
 
         elements.logo.tick(renderer);
         None
+    }
+
+    fn on_key_press(&mut self, _: VirtualKeyCode, _: bool, _: &mut Game) -> bool {
+        false
+    }
+
+    fn is_closable(&self) -> bool {
+        true
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {
