@@ -34,7 +34,9 @@ use crate::{render, Game};
 use parking_lot::{Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
+use winit::dpi::{PhysicalPosition, Position};
 use winit::event::VirtualKeyCode;
+use winit::window::Window;
 
 pub trait Screen {
     // Called once
@@ -197,12 +199,13 @@ impl ScreenSystem {
         false
     }
 
+    #[allow(unused_must_use)]
     pub fn tick(
-        // no deadlocks in here
         &self,
         delta: f64,
         renderer: Arc<RwLock<render::Renderer>>,
         ui_container: &mut ui::Container,
+        window: &Window,
     ) {
         let renderer = &mut renderer.write();
         for screen in self.remove_queue.clone().write().drain(..) {
@@ -220,6 +223,18 @@ impl ScreenSystem {
         let lowest = self.lowest_offset.load(Ordering::Acquire);
         if lowest != -1 {
             let screens_len = self.screens.read().len();
+            let was_closable = if screens_len > 0 {
+                self.screens
+                    .read()
+                    .last()
+                    .as_ref()
+                    .unwrap()
+                    .screen
+                    .lock()
+                    .is_closable()
+            } else {
+                false
+            };
             if lowest <= screens_len as isize {
                 for _ in 0..(screens_len as isize - lowest) {
                     self.screens.clone().write().pop();
@@ -234,6 +249,12 @@ impl ScreenSystem {
                 self.screens.write().push(screen.clone());
             }
             self.lowest_offset.store(-1, Ordering::Release);
+            if !was_closable {
+                window.set_cursor_position(Position::Physical(PhysicalPosition::new(
+                    (renderer.safe_width / 2) as i32,
+                    (renderer.safe_height / 2) as i32,
+                )));
+            }
         }
 
         if self.screens.clone().read().is_empty() {

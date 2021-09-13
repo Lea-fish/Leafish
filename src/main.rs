@@ -515,7 +515,7 @@ fn tick_all(
 
     game.screen_sys
         .clone()
-        .tick(delta, game.renderer.clone(), &mut ui_container);
+        .tick(delta, game.renderer.clone(), &mut ui_container, window);
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {
         if Instant::now().duration_since(received_chat_at).as_secs() < 5 {
