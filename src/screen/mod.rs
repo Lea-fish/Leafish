@@ -34,9 +34,9 @@ use crate::{render, Game};
 use parking_lot::{Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
+use winit::dpi::{PhysicalPosition, Position};
 use winit::event::VirtualKeyCode;
 use winit::window::Window;
-use winit::dpi::{Position, PhysicalPosition};
 
 pub trait Screen {
     // Called once
@@ -224,7 +224,14 @@ impl ScreenSystem {
         if lowest != -1 {
             let screens_len = self.screens.read().len();
             let was_closable = if screens_len > 0 {
-                self.screens.read().last().as_ref().unwrap().screen.lock().is_closable()
+                self.screens
+                    .read()
+                    .last()
+                    .as_ref()
+                    .unwrap()
+                    .screen
+                    .lock()
+                    .is_closable()
             } else {
                 false
             };
@@ -244,7 +251,9 @@ impl ScreenSystem {
             self.lowest_offset.store(-1, Ordering::Release);
             if !was_closable {
                 window.set_cursor_position(Position::Physical(PhysicalPosition::new(
-                    (renderer.safe_width / 2) as i32, (renderer.safe_height / 2) as i32)));
+                    (renderer.safe_width / 2) as i32,
+                    (renderer.safe_height / 2) as i32,
+                )));
             }
         }
 
