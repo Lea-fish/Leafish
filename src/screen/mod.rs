@@ -35,6 +35,8 @@ use parking_lot::{Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
 use winit::event::VirtualKeyCode;
+use winit::window::Window;
+use winit::dpi::{Position, PhysicalPosition};
 
 pub trait Screen {
     // Called once
@@ -197,12 +199,13 @@ impl ScreenSystem {
         false
     }
 
+    #[allow(unused_must_use)]
     pub fn tick(
-        // no deadlocks in here
         &self,
         delta: f64,
         renderer: Arc<RwLock<render::Renderer>>,
         ui_container: &mut ui::Container,
+        window: &Window,
     ) {
         let renderer = &mut renderer.write();
         for screen in self.remove_queue.clone().write().drain(..) {
@@ -234,6 +237,8 @@ impl ScreenSystem {
                 self.screens.write().push(screen.clone());
             }
             self.lowest_offset.store(-1, Ordering::Release);
+            window.set_cursor_position(Position::Physical(PhysicalPosition::new(
+                (renderer.safe_width / 2) as i32, (renderer.safe_height / 2) as i32)));
         }
 
         if self.screens.clone().read().is_empty() {
