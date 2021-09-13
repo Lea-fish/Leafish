@@ -160,7 +160,7 @@ jobs:
 
       - name: Package binary
         run: |
-          cargo install --force cargo-bundle
+          cargo install cargo-bundle || echo "cargo-bundle already installed"
           cargo bundle --release
           chmod a+x target/release/bundle/osx/Leafish.app/Contents/MacOS/leafish
           cd target/release/bundle/osx
