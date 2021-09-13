@@ -1138,12 +1138,9 @@ impl Conn {
         let mut address = target.to_string();
         let mut port = 25565;
 
-        if target.contains(':') {
-            let (l_address, l_port) = target
-                .split_once(':')
-                .expect("already checked for ':' so this would never crash");
-            address = l_address.to_string();
-            if let Ok(l_port) = l_port.parse() {
+        if let Some(fields) = target.split_once(':') {
+            address = fields.0.to_string();
+            if let Ok(l_port) = fields.1.parse() {
                 port = l_port;
             } else {
                 return Err(Error::Err("Bad port".to_string()));
@@ -1165,11 +1162,11 @@ impl Conn {
         Conn::try_stream(&address, port, protocol_version)
     }
 
-    fn try_stream(addres: &str, port: u16, protocol_version: i32) -> Result<Conn, Error> {
-        let stream = TcpStream::connect(format!("{}:{}", addres, port))?;
+    fn try_stream(address: &str, port: u16, protocol_version: i32) -> Result<Conn, Error> {
+        let stream = TcpStream::connect(format!("{}:{}", address, port))?;
         Ok(Conn {
             stream,
-            host: addres.to_string(),
+            host: address.to_string(),
             port,
             direction: Direction::Serverbound,
             state: State::Handshaking,
