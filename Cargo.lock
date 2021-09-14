@@ -1213,6 +1213,7 @@ dependencies = [
  "aes",
  "byteorder",
  "cfb8",
+ "cgmath",
  "flate2",
  "hex",
  "instant",

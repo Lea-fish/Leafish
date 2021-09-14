@@ -36,11 +36,8 @@ use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use instant::{Duration, Instant};
 use leafish_protocol::format::{Component, TextComponent};
-use leafish_protocol::protocol::packet::play::serverbound::{
-    ClientSettings, ClientSettings_u8_Handsfree,
-};
-use leafish_protocol::protocol::packet::{DigType, Packet};
-use leafish_protocol::protocol::{Conn, VarInt, Version};
+use leafish_protocol::protocol::packet::{DigType, Hand, Packet};
+use leafish_protocol::protocol::{Conn, Version};
 use leafish_shared::direction::Direction as BlockDirection;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
@@ -86,7 +83,7 @@ impl Default for WorldData {
 
 pub struct Server {
     uuid: protocol::UUID,
-    conn: Arc<RwLock<Option<protocol::Conn>>>,
+    pub conn: Arc<RwLock<Option<protocol::Conn>>>,
     pub protocol_version: i32,
     pub mapped_protocol_version: Version,
     forge_mods: Vec<forge::ForgeMod>,
@@ -979,13 +976,11 @@ impl Server {
         if chat_open != self.last_chat_open.load(Ordering::Acquire) {
             self.last_chat_open.store(chat_open, Ordering::Release);
             if chat_open {
-                println!("open chat!");
                 game.screen_sys
                     .clone()
                     .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
                 game.focused = false;
             } else {
-                println!("close chat!");
                 game.screen_sys.clone().pop_screen();
                 game.focused = true;
             }
@@ -1154,7 +1149,6 @@ impl Server {
     }
 
     pub fn minecraft_tick(&self) {
-        use std::f32::consts::PI;
         if let Some(player) = *self.player.clone().write() {
             let movement = self
                 .entities
@@ -1193,28 +1187,15 @@ impl Server {
 
             // Sync our position to the server
             // Use the smaller packets when possible
-            if self.protocol_version >= 47 {
-                let packet = packet::play::serverbound::PlayerPositionLook {
-                    x: position.position.x,
-                    y: position.position.y,
-                    z: position.position.z,
-                    yaw: -(rotation.yaw as f32) * (180.0 / PI),
-                    pitch: ((-rotation.pitch as f32) * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
-                    on_ground,
-                };
-                self.write_packet(packet);
-            } else {
-                let packet = packet::play::serverbound::PlayerPositionLook_HeadY {
-                    x: position.position.x,
-                    feet_y: position.position.y,
-                    head_y: position.position.y + 1.62,
-                    z: position.position.z,
-                    yaw: -(rotation.yaw as f32) * (180.0 / PI),
-                    pitch: ((-rotation.pitch as f32) * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
-                    on_ground,
-                };
-                self.write_packet(packet);
-            }
+            packet::send_position_look(
+                self.conn.clone().write().as_mut().unwrap(),
+                self.mapped_protocol_version,
+                &position.position,
+                rotation.yaw as f32,
+                rotation.pitch as f32,
+                on_ground,
+            )
+            .unwrap();
         }
         let break_delay = self.block_break_info.lock().delay;
         if break_delay > 0 {
@@ -1222,43 +1203,23 @@ impl Server {
         } else if self.block_break_info.lock().active {
             if self.block_break_info.lock().progress >= 1.0 {
                 let face_idx = self.block_break_info.lock().break_face.index() as u8;
-                if self.mapped_protocol_version < Version::V1_8 {
-                    let pos = self.block_break_info.lock().break_position;
-                    self.write_packet(packet::play::serverbound::PlayerDigging_u8_u8y {
-                        status: DigType::StopDestroyBlock.ordinal(),
-                        x: pos.x,
-                        y: pos.y as u8,
-                        z: pos.z,
-                        face: face_idx,
-                    });
-                } else if self.mapped_protocol_version < Version::V1_9 {
-                    self.write_packet(packet::play::serverbound::PlayerDigging_u8 {
-                        status: DigType::StopDestroyBlock.ordinal(),
-                        location: self.block_break_info.lock().break_position,
-                        face: face_idx,
-                    });
-                } else {
-                    self.write_packet(packet::play::serverbound::PlayerDigging {
-                        status: VarInt(DigType::StopDestroyBlock.ordinal() as i32),
-                        location: self.block_break_info.lock().break_position,
-                        face: face_idx,
-                    });
-                }
+                packet::send_digging(
+                    self.conn.clone().write().as_mut().unwrap(),
+                    self.mapped_protocol_version,
+                    DigType::StopDestroyBlock,
+                    self.block_break_info.lock().break_position,
+                    face_idx,
+                )
+                .unwrap();
                 self.block_break_info.lock().active = false;
                 self.block_break_info.lock().delay = 5;
             } else {
-                if self.mapped_protocol_version < Version::V1_8 {
-                    self.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
-                        entity_id: 0, // TODO: Check these values!
-                        animation: 0,
-                    });
-                } else if self.mapped_protocol_version < Version::V1_9 {
-                    self.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
-                } else {
-                    self.write_packet(packet::play::serverbound::ArmSwing {
-                        hand: protocol::VarInt(0),
-                    });
-                }
+                packet::send_arm_swing(
+                    self.conn.clone().write().as_mut().unwrap(),
+                    self.mapped_protocol_version,
+                    Hand::MainHand,
+                )
+                .unwrap();
                 self.block_break_info.lock().progress += 0.1; // TODO: Make this value meaningful
             }
         }
@@ -1325,18 +1286,12 @@ impl Server {
     }
 
     pub fn on_left_click(&self, renderer: Arc<RwLock<render::Renderer>>) {
-        if self.mapped_protocol_version < Version::V1_8 {
-            self.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
-                entity_id: 0, // TODO: Check these values!
-                animation: 0,
-            });
-        } else if self.mapped_protocol_version < Version::V1_9 {
-            self.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
-        } else {
-            self.write_packet(packet::play::serverbound::ArmSwing {
-                hand: protocol::VarInt(0),
-            });
-        }
+        packet::send_arm_swing(
+            self.conn.clone().write().as_mut().unwrap(),
+            self.mapped_protocol_version,
+            Hand::MainHand,
+        )
+        .unwrap();
         // TODO: Implement clientside animation.
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
@@ -1355,27 +1310,14 @@ impl Server {
                     renderer.read().view_vector.cast().unwrap(),
                     target::test_block,
                 ) {
-                    if self.mapped_protocol_version < Version::V1_8 {
-                        self.write_packet(packet::play::serverbound::PlayerDigging_u8_u8y {
-                            status: DigType::StartDestroyBlock.ordinal(),
-                            x: pos.x,
-                            y: pos.y as u8,
-                            z: pos.z,
-                            face: face.index() as u8,
-                        });
-                    } else if self.mapped_protocol_version < Version::V1_9 {
-                        self.write_packet(packet::play::serverbound::PlayerDigging_u8 {
-                            status: DigType::StartDestroyBlock.ordinal(),
-                            location: pos,
-                            face: face.index() as u8,
-                        });
-                    } else {
-                        self.write_packet(packet::play::serverbound::PlayerDigging {
-                            status: VarInt(DigType::StartDestroyBlock.ordinal() as i32),
-                            location: pos,
-                            face: face.index() as u8,
-                        });
-                    }
+                    packet::send_digging(
+                        self.conn.clone().write().as_mut().unwrap(),
+                        self.mapped_protocol_version,
+                        DigType::StartDestroyBlock,
+                        pos,
+                        face.index() as u8,
+                    )
+                    .unwrap();
                     self.block_break_info.lock().break_face = face;
                     self.block_break_info.lock().break_position = pos;
                     self.block_break_info.lock().progress = 0.0;
@@ -1397,27 +1339,14 @@ impl Server {
             self.block_break_info.lock().delay = 5;
             let pos = self.block_break_info.lock().break_position;
             let face = self.block_break_info.lock().break_face;
-            if self.mapped_protocol_version < Version::V1_8 {
-                self.write_packet(packet::play::serverbound::PlayerDigging_u8_u8y {
-                    status: DigType::AbortDestroyBlock.ordinal(),
-                    x: pos.x,
-                    y: pos.y as u8,
-                    z: pos.z,
-                    face: face.index() as u8,
-                });
-            } else if self.mapped_protocol_version < Version::V1_9 {
-                self.write_packet(packet::play::serverbound::PlayerDigging_u8 {
-                    status: DigType::AbortDestroyBlock.ordinal(),
-                    location: pos,
-                    face: face.index() as u8,
-                });
-            } else {
-                self.write_packet(packet::play::serverbound::PlayerDigging {
-                    status: VarInt(DigType::AbortDestroyBlock.ordinal() as i32),
-                    location: pos,
-                    face: face.index() as u8,
-                });
-            }
+            packet::send_digging(
+                self.conn.clone().write().as_mut().unwrap(),
+                self.mapped_protocol_version,
+                DigType::AbortDestroyBlock,
+                pos,
+                face.index() as u8,
+            )
+            .unwrap();
         }
     }
 
@@ -1439,103 +1368,35 @@ impl Server {
                     renderer.read().view_vector.cast().unwrap(),
                     target::test_block,
                 ) {
-                    if self.protocol_version >= 477 {
-                        self.write_packet(
-                            packet::play::serverbound::PlayerBlockPlacement_insideblock {
-                                location: pos,
-                                face: protocol::VarInt(face.index() as i32),
-                                hand: protocol::VarInt(0),
-                                cursor_x: at.x as f32,
-                                cursor_y: at.y as f32,
-                                cursor_z: at.z as f32,
-                                inside_block: false,
-                            },
-                        );
-                    } else if self.protocol_version >= 315 {
-                        self.write_packet(packet::play::serverbound::PlayerBlockPlacement_f32 {
-                            location: pos,
-                            face: protocol::VarInt(face.index() as i32),
-                            hand: protocol::VarInt(0),
-                            cursor_x: at.x as f32,
-                            cursor_y: at.y as f32,
-                            cursor_z: at.z as f32,
-                        });
-                    } else if self.protocol_version >= 49 {
-                        self.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8 {
-                            location: pos,
-                            face: protocol::VarInt(face.index() as i32),
-                            hand: protocol::VarInt(0),
-                            cursor_x: (at.x * 16.0) as u8,
-                            cursor_y: (at.y * 16.0) as u8,
-                            cursor_z: (at.z * 16.0) as u8,
-                        });
-                    } else if self.protocol_version >= 47 {
-                        let item = self
-                            .hud_context
-                            .clone()
-                            .read()
-                            .player_inventory
-                            .as_ref()
-                            .unwrap()
-                            .clone()
-                            .read()
-                            .get_item(
-                                (36 + self.hud_context.clone().read().get_slot_index()) as i16,
-                            )
-                            .as_ref()
-                            .map(|item| item.stack.clone());
-                        self.write_packet(
-                            packet::play::serverbound::PlayerBlockPlacement_u8_Item {
-                                location: pos,
-                                face: face.index() as u8,
-                                hand: item,
-                                cursor_x: (at.x * 16.0) as u8,
-                                cursor_y: (at.y * 16.0) as u8,
-                                cursor_z: (at.z * 16.0) as u8,
-                            },
-                        );
-                    } else {
-                        let item = self
-                            .hud_context
-                            .clone()
-                            .read()
-                            .player_inventory
-                            .as_ref()
-                            .unwrap()
-                            .clone()
-                            .read()
-                            .get_item(
-                                (36 + self.hud_context.clone().read().get_slot_index()) as i16,
-                            )
-                            .as_ref()
-                            .map(|item| item.stack.clone());
-                        self.write_packet(
-                            packet::play::serverbound::PlayerBlockPlacement_u8_Item_u8y {
-                                x: pos.x,
-                                y: pos.y as u8,
-                                z: pos.x,
-                                face: face.index() as u8,
-                                hand: item,
-                                cursor_x: (at.x * 16.0) as u8,
-                                cursor_y: (at.y * 16.0) as u8,
-                                cursor_z: (at.z * 16.0) as u8,
-                            },
-                        );
-                    }
-                    if self.mapped_protocol_version < Version::V1_8 {
-                        self.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
-                            entity_id: 0,
-                            animation: 0,
-                        });
-                    } else if self.mapped_protocol_version < Version::V1_9 {
-                        self.write_packet(packet::play::serverbound::ArmSwing_Handsfree {
-                            empty: (),
-                        })
-                    } else {
-                        self.write_packet(packet::play::serverbound::ArmSwing {
-                            hand: protocol::VarInt(0),
-                        });
-                    }
+                    let hud_context = self.hud_context.clone();
+                    packet::send_block_place(
+                        self.conn.clone().write().as_mut().unwrap(),
+                        self.mapped_protocol_version,
+                        pos,
+                        face.index() as u8,
+                        at,
+                        Hand::MainHand,
+                        Box::new(move || {
+                            hud_context
+                                .clone()
+                                .read()
+                                .player_inventory
+                                .as_ref()
+                                .unwrap()
+                                .clone()
+                                .read()
+                                .get_item((36 + hud_context.clone().read().get_slot_index()) as i16)
+                                .as_ref()
+                                .map(|item| item.stack.clone())
+                        }),
+                    )
+                    .unwrap();
+                    packet::send_arm_swing(
+                        self.conn.clone().write().as_mut().unwrap(),
+                        self.mapped_protocol_version,
+                        Hand::MainHand,
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -1797,25 +1658,17 @@ impl Server {
         } else {
             self.write_packet(brand.into_message17());
         }
-        if self.protocol_version <= 48 {
-            // 1 snapshot after 1.8
-            self.write_packet(ClientSettings_u8_Handsfree {
-                locale: "en_us".to_string(), // TODO: Make this configurable!
-                view_distance: 8,            // TODO: Make this configurable!
-                chat_mode: 0,                // TODO: Make this configurable!
-                chat_colors: true,           // TODO: Make this configurable!
-                displayed_skin_parts: 127,   // TODO: Make this configurable!
-            });
-        } else {
-            self.write_packet(ClientSettings {
-                locale: "en_us".to_string(),   // TODO: Make this configurable!
-                view_distance: 8,              // TODO: Make this configurable!
-                chat_mode: Default::default(), // TODO: Make this configurable!
-                chat_colors: true,             // TODO: Make this configurable!
-                displayed_skin_parts: 127,     // TODO: Make this configurable!
-                main_hand: Default::default(), // TODO: Make this configurable!
-            });
-        }
+        packet::send_client_settings(
+            self.conn.clone().write().as_mut().unwrap(),
+            self.mapped_protocol_version,
+            "en_us".to_string(),
+            8,
+            0,
+            true,
+            127,
+            Hand::MainHand,
+        )
+        .unwrap(); // TODO: Make these configurable!
     }
 
     fn on_respawn_hashedseed(&self, respawn: packet::play::clientbound::Respawn_HashedSeed) {
