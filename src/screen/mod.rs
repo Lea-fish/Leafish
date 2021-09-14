@@ -74,6 +74,10 @@ pub trait Screen {
         false
     }
 
+    fn is_in_game(&self) -> bool {
+        false
+    }
+
     fn is_tick_always(&self) -> bool {
         false
     }
