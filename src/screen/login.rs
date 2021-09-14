@@ -236,14 +236,6 @@ impl super::Screen for Login {
         None
     }
 
-    fn on_key_press(&mut self, _: VirtualKeyCode, _: bool, _: &mut Game) -> bool {
-        false
-    }
-
-    fn is_closable(&self) -> bool {
-        true
-    }
-
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
     }
