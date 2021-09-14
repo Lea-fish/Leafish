@@ -19,6 +19,7 @@ use std::thread;
 
 use rand::{self, Rng};
 
+use crate::auth;
 use crate::console;
 use crate::protocol;
 use crate::protocol::mojang;
@@ -26,8 +27,6 @@ use crate::render;
 use crate::screen::Screen;
 use crate::settings;
 use crate::ui;
-use crate::{auth, Game};
-use glutin::event::VirtualKeyCode;
 
 pub struct Login {
     elements: Option<UIElements>,
