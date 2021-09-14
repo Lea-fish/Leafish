@@ -1121,7 +1121,7 @@ impl TextureManager {
                     return Err(Error::new(ErrorKind::ConnectionAborted, err));
                 }
             };
-            let mut buf = vec![];
+
             match res.read_to_end(&mut buf) {
                 Ok(_) => {}
                 Err(err) => {
