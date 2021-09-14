@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::format;
+use cgmath::Vector3;
 
 state_packets!(
     handshake Handshaking {
@@ -2790,6 +2791,9 @@ pub struct PlayerProperty {
 }
 
 use crate::item;
+use crate::item::Stack;
+use std::f32::consts::PI;
+
 type RecipeIngredient = LenPrefixed<VarInt, Option<item::Stack>>;
 
 #[derive(Debug)]
@@ -3319,5 +3323,195 @@ impl DigType {
             DigType::DropItem => 4,
             DigType::ReleaseUseItem => 5,
         }
+    }
+}
+
+pub enum Hand {
+    MainHand,
+    OffHand,
+}
+
+impl Hand {
+    pub fn ordinal(&self) -> u8 {
+        match self {
+            Hand::MainHand => 0,
+            Hand::OffHand => 1,
+        }
+    }
+}
+
+pub fn send_position_look(
+    conn: &mut Conn,
+    version: Version,
+    position: &Vector3<f64>,
+    yaw: f32,
+    pitch: f32,
+    on_ground: bool,
+) -> Result<(), Error> {
+    if version >= Version::V1_8 {
+        conn.write_packet(
+            crate::protocol::packet::play::serverbound::PlayerPositionLook {
+                x: position.x,
+                y: position.y,
+                z: position.z,
+                yaw: -(yaw as f32) * (180.0 / PI),
+                pitch: ((-pitch as f32) * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
+                on_ground,
+            },
+        )
+    } else {
+        conn.write_packet(
+            crate::protocol::packet::play::serverbound::PlayerPositionLook_HeadY {
+                x: position.x,
+                feet_y: position.y,
+                head_y: position.y + 1.62,
+                z: position.z,
+                yaw: -(yaw as f32) * (180.0 / PI),
+                pitch: ((-pitch as f32) * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
+                on_ground,
+            },
+        )
+    }
+}
+
+pub fn send_arm_swing(conn: &mut Conn, version: Version, hand: Hand) -> Result<(), Error> {
+    if version < Version::V1_8 {
+        conn.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
+            entity_id: 0, // TODO: Check these values!
+            animation: 0,
+        })
+    } else if version < Version::V1_9 {
+        conn.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
+    } else {
+        conn.write_packet(packet::play::serverbound::ArmSwing {
+            hand: VarInt(hand.ordinal() as i32),
+        })
+    }
+}
+
+pub fn send_digging(
+    conn: &mut Conn,
+    version: Version,
+    status: DigType,
+    pos: Position,
+    face_index: u8,
+) -> Result<(), Error> {
+    if version < Version::V1_8 {
+        conn.write_packet(packet::play::serverbound::PlayerDigging_u8_u8y {
+            status: status.ordinal(),
+            x: pos.x,
+            y: pos.y as u8,
+            z: pos.z,
+            face: face_index,
+        })
+    } else if version < Version::V1_9 {
+        conn.write_packet(packet::play::serverbound::PlayerDigging_u8 {
+            status: status.ordinal(),
+            location: pos,
+            face: face_index,
+        })
+    } else {
+        conn.write_packet(packet::play::serverbound::PlayerDigging {
+            status: VarInt(status.ordinal() as i32),
+            location: pos,
+            face: face_index,
+        })
+    }
+}
+
+pub fn send_block_place(
+    conn: &mut Conn,
+    version: Version,
+    pos: Position,
+    face: u8,
+    cursor_position: Vector3<f64>,
+    hand: Hand,
+    item: Box<dyn Fn() -> Option<Stack>>,
+) -> Result<(), Error> {
+    if version >= Version::V1_14 {
+        conn.write_packet(
+            packet::play::serverbound::PlayerBlockPlacement_insideblock {
+                location: pos,
+                face: VarInt(face as i32),
+                hand: VarInt(hand.ordinal() as i32),
+                cursor_x: cursor_position.x as f32,
+                cursor_y: cursor_position.y as f32,
+                cursor_z: cursor_position.z as f32,
+                inside_block: false,
+            },
+        )
+    } else if version >= Version::V1_11 {
+        conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_f32 {
+            location: pos,
+            face: VarInt(face as i32),
+            hand: VarInt(hand.ordinal() as i32),
+            cursor_x: cursor_position.x as f32,
+            cursor_y: cursor_position.y as f32,
+            cursor_z: cursor_position.z as f32,
+        })
+    } else if version >= Version::V1_9 {
+        // TODO: for protocol version >= 49
+        conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8 {
+            location: pos,
+            face: VarInt(face as i32),
+            hand: VarInt(hand.ordinal() as i32),
+            cursor_x: (cursor_position.x * 16.0) as u8,
+            cursor_y: (cursor_position.y * 16.0) as u8,
+            cursor_z: (cursor_position.z * 16.0) as u8,
+        })
+    } else if version >= Version::V1_8 {
+        conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8_Item {
+            location: pos,
+            face: face as u8,
+            hand: item(),
+            cursor_x: (cursor_position.x * 16.0) as u8,
+            cursor_y: (cursor_position.y * 16.0) as u8,
+            cursor_z: (cursor_position.z * 16.0) as u8,
+        })
+    } else {
+        conn.write_packet(
+            packet::play::serverbound::PlayerBlockPlacement_u8_Item_u8y {
+                x: pos.x,
+                y: pos.y as u8,
+                z: pos.x,
+                face: face as u8,
+                hand: item(),
+                cursor_x: (cursor_position.x * 16.0) as u8,
+                cursor_y: (cursor_position.y * 16.0) as u8,
+                cursor_z: (cursor_position.z * 16.0) as u8,
+            },
+        )
+    }
+}
+
+pub fn send_client_settings(
+    conn: &mut Conn,
+    version: Version,
+    locale: String,
+    view_distance: u8,
+    chat_mode: u8,
+    chat_colors: bool,
+    displayed_skin_parts: u8,
+    main_hand: Hand,
+) -> Result<(), Error> {
+    if version >= Version::V1_9 {
+        // TODO: Do this for protocol version 48
+        // 1 snapshot after 1.8
+        conn.write_packet(packet::play::serverbound::ClientSettings_u8_Handsfree {
+            locale,
+            view_distance,
+            chat_mode,
+            chat_colors,
+            displayed_skin_parts,
+        })
+    } else {
+        conn.write_packet(packet::play::serverbound::ClientSettings {
+            locale,
+            view_distance,
+            chat_mode: VarInt(chat_mode as i32),
+            chat_colors,
+            displayed_skin_parts,
+            main_hand: VarInt(main_hand.ordinal() as i32),
+        })
     }
 }
