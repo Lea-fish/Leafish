@@ -133,10 +133,6 @@ impl super::Screen for Respawn {
         None
     }
 
-    fn is_closable(&self) -> bool {
-        true
-    }
-
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
     }
