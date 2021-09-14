@@ -22,11 +22,12 @@ use std::hash::BuildHasherDefault;
 use std::io;
 use std::path;
 use std::sync::mpsc;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::thread;
 
 use crate::types::hash::FNVHash;
 use crate::ui;
+use parking_lot::Mutex;
 use std::fs::File;
 
 const RESOURCES_VERSION: &str = "1.12.2";
@@ -162,7 +163,7 @@ impl Manager {
 
         const UI_HEIGHT: f64 = 32.0;
 
-        let mut progress = self.vanilla_progress.lock().unwrap();
+        let mut progress = self.vanilla_progress.lock();
         progress.tasks.retain(|v| v.progress < v.total);
         // Find out what we have to work with
         for task in &progress.tasks {
@@ -475,7 +476,7 @@ impl Manager {
     }
 
     fn add_task(progress: &Arc<Mutex<Progress>>, name: &str, file: &str, length: u64) {
-        let mut info = progress.lock().unwrap();
+        let mut info = progress.lock();
         info.tasks.push(Task {
             task_name: name.into(),
             task_file: file.into(),
@@ -485,7 +486,7 @@ impl Manager {
     }
 
     fn add_task_progress(progress: &Arc<Mutex<Progress>>, name: &str, file: &str, prog: u64) {
-        let mut progress = progress.lock().unwrap();
+        let mut progress = progress.lock();
         for task in progress
             .tasks
             .iter_mut()

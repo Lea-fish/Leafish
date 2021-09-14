@@ -26,7 +26,7 @@ use std::io;
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 
 use aes::Aes128;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -46,6 +46,7 @@ use trust_dns_resolver::Resolver;
 use crate::format;
 use crate::nbt;
 use crate::shared::Position;
+use parking_lot::{Mutex, RwLock};
 
 pub mod forge;
 pub mod mojang;
@@ -1373,16 +1374,8 @@ impl Conn {
     pub fn enable_encyption(&mut self, key: &[u8]) {
         let read_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
         let write_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
-        self.read_cipher
-            .clone()
-            .write()
-            .unwrap()
-            .replace(read_cipher);
-        self.write_cipher
-            .clone()
-            .write()
-            .unwrap()
-            .replace(write_cipher);
+        self.read_cipher.clone().write().replace(read_cipher);
+        self.write_cipher.clone().write().replace(write_cipher);
     }
 
     pub fn set_compression(&mut self, threshold: i32) {
@@ -1600,7 +1593,7 @@ pub struct StatusPlayer {
 
 impl Read for Conn {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.read_cipher.clone().write().unwrap().as_mut() {
+        match &mut *self.read_cipher.clone().write() {
             Option::None => self.stream.read(buf),
             Option::Some(cipher) => {
                 let ret = self.stream.read(buf)?;
@@ -1614,7 +1607,7 @@ impl Read for Conn {
 
 impl Write for Conn {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.write_cipher.clone().write().unwrap().as_mut() {
+        match &mut *self.write_cipher.clone().write() {
             Option::None => self.stream.write(buf),
             Option::Some(cipher) => {
                 let mut data = vec![0; buf.len()];

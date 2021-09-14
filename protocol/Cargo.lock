@@ -552,6 +552,7 @@ dependencies = [
  "leafish_shared",
  "log",
  "num-traits",
+ "parking_lot",
  "regex",
  "reqwest",
  "serde",
