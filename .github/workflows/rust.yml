@@ -160,6 +160,7 @@ jobs:
 
       - name: Package binary
         run: |
+          cargo install cargo-bundle
           cargo bundle --release
           chmod a+x target/release/bundle/osx/Leafish.app/Contents/MacOS/leafish
           cd target/release/bundle/osx
