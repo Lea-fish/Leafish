@@ -3494,7 +3494,7 @@ pub fn send_client_settings(
     displayed_skin_parts: u8,
     main_hand: Hand,
 ) -> Result<(), Error> {
-    if version >= Version::V1_9 {
+    if version < Version::V1_9 {
         // TODO: Do this for protocol version 48
         // 1 snapshot after 1.8
         conn.write_packet(packet::play::serverbound::ClientSettings_u8_Handsfree {
