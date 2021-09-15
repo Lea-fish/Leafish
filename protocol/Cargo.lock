@@ -21,7 +21,6 @@ dependencies = [
 ]
 
 [[package]]
-<<<<<<< HEAD
 name = "aho-corasick"
 version = "0.7.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -40,8 +39,6 @@ dependencies = [
 ]
 
 [[package]]
-=======
->>>>>>> b7aae0f (Remove regex for parsing ip's using rust default lib)
 name = "async-trait"
 version = "0.1.51"
 source = "registry+https://github.com/rust-lang/crates.io-index"
