@@ -74,6 +74,10 @@ pub trait Screen {
         false
     }
 
+    fn is_in_game(&self) -> bool {
+        false
+    }
+
     fn is_tick_always(&self) -> bool {
         false
     }
@@ -190,11 +194,11 @@ impl ScreenSystem {
                 .on_key_press(key, down, game);
             let len = self.pre_computed_screens.clone().read().len();
             return len == 0
-                || self.pre_computed_screens.clone().read()[len - 1]
+                || !self.pre_computed_screens.clone().read()[len - 1]
                     .screen
                     .clone()
                     .lock()
-                    .is_closable();
+                    .is_in_game();
         }
         false
     }
