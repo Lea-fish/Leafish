@@ -16,7 +16,6 @@
 #![allow(non_camel_case_types)]
 
 extern crate lazy_static;
-extern crate regex;
 
 use std::convert;
 use std::default;
@@ -38,7 +37,6 @@ use instant::{Duration, Instant};
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use num_traits::cast::{cast, NumCast};
-use regex::Regex;
 use trust_dns_resolver::config::ResolverConfig;
 use trust_dns_resolver::config::ResolverOpts;
 use trust_dns_resolver::Resolver;
@@ -1116,59 +1114,60 @@ pub struct Conn {
 }
 
 lazy_static! {
-    static ref IPADDRESS_PATTERN: Regex = Regex::new(
-        format!(
-            "{}{}{}{}",
-            "^([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
-            "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
-            "([01]?\\d\\d?|2[0-4]\\d|25[0-5])\\.",
-            "([01]?\\d\\d?|2[0-4]\\d|25[0-5])$"
-        )
-        .as_str()
-    )
-    .unwrap();
     static ref RESOLVER: Resolver =
         Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
 }
 
 impl Conn {
-    fn get_server_addresses(mut hostname: &str) -> Vec<String> {
+    fn get_server_addresses(hostname: &str) -> Vec<(String, u16)> {
         let mut addresses = vec![];
-        let parts = hostname.split(':').collect::<Vec<&str>>();
-        if parts.len() > 1 {
-            addresses.push(hostname.to_string());
-            hostname = parts[0];
-        }
+
         let records = RESOLVER.srv_lookup(format!("_minecraft._tcp.{}", hostname));
         if records.is_ok() {
             for record in records.unwrap() {
                 debug!("{}:{}", record.target(), record.port());
-                addresses.push(format!("{}:{}", record.target(), record.port()));
+                addresses.push((record.target().to_string(), record.port()));
             }
         }
-        addresses.push(format!("{}:25565", hostname));
+        addresses.push((hostname.to_string(), 25565));
         addresses
     }
 
     pub fn new(target: &str, protocol_version: i32) -> Result<Conn, Error> {
         CURRENT_PROTOCOL_VERSION.store(protocol_version, Ordering::Relaxed);
-
         let mut address = target.to_string();
-        if !IPADDRESS_PATTERN.is_match(target) {
-            debug!("{} has an no address! :(", address);
-            let result = Conn::get_server_addresses(target);
-            // TODO: Try all possible ips not just the first!
-            let next = result.iter().next().unwrap();
-            debug!("{}'s ip may be {}.", address, next);
-            address = next.to_string();
+        let mut port = 25565;
+
+        if let Some(fields) = target.split_once(':') {
+            address = fields.0.to_string();
+            if let Ok(l_port) = fields.1.parse() {
+                port = l_port;
+            } else {
+                return Err(Error::Err("Bad port".to_string()));
+            }
         }
 
-        let stream = TcpStream::connect(&*address)?;
-        let parts = address.split(':').collect::<Vec<&str>>();
+        use std::str::FromStr;
+        if let Err(_) = std::net::IpAddr::from_str(&address) {
+            debug!("address: {} is not an IP", address);
+            for (adresse, port) in Conn::get_server_addresses(&address) {
+                debug!("{}'s ip may be {}:{}.", target, adresse, port);
+                if let Ok(conn) = Conn::try_stream(&adresse, port, protocol_version) {
+                    return Ok(conn);
+                }
+            }
+        }
+
+        debug!("{}'s ip may be {}:{}.", target, address, port);
+        Conn::try_stream(&address, port, protocol_version)
+    }
+
+    fn try_stream(address: &str, port: u16, protocol_version: i32) -> Result<Conn, Error> {
+        let stream = TcpStream::connect(format!("{}:{}", address, port))?;
         Ok(Conn {
-            stream: stream,
-            host: parts[0].to_owned(),
-            port: parts[1].parse().unwrap(),
+            stream,
+            host: address.to_string(),
+            port,
             direction: Direction::Serverbound,
             state: State::Handshaking,
             protocol_version,

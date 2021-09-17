@@ -18,7 +18,6 @@ num-traits = "0.2.14"
 instant = "0.1.9"
 cgmath = "0.17.0"
 
-regex = "1.5.4"
 lazy_static = "1.4.0"
 trust-dns-resolver = "0.20.3"
 # srv-rs = { version = "0.2.0", features = ["libresolv"] }
