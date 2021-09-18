@@ -1,0 +1,12 @@
+[package]
+name = "leafish_modding"
+version = "0.0.1"
+edition = "2018"
+authors = [ "terrarier2111" ]
+
+[dependencies]
+serde = { version = "1.0.130", features = ["derive"] }
+serde_json = "1.0.68"
+libloading = "0.7"
+dashmap = "4.0.2"
+log = { version = "0.4.14", features = ["std"] }
