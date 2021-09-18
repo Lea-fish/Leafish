@@ -15,6 +15,8 @@ pub trait Plugin: Any + Send + Sync {
 
     fn get_name(&self) -> &'static str;
 
+    fn handle_event(&self, event: ClientEvent) -> bool;
+
 }
 
 pub struct PluginManager {
@@ -100,6 +102,11 @@ impl WrappedPlugin {
         &self.meta.permissions
     }
 
+    /// handles an event, returns whether or not the result is `cancel`
+    pub fn handle_event(&self, event: ClientEvent) -> bool {
+        self.plugin.handle_event(event)
+    }
+
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -120,5 +127,14 @@ pub enum PluginPermission {
     Network,
     Device, // grants permission for devices and drivers
     All,
+
+}
+
+#[repr(C)]
+pub enum ClientEvent {
+
+    UserInput, // INPUTTYPE: Mouse, Keyboard | down: bool | input: (mousekey or keyboardkey)
+    Resize, // dimensions maybe?
+    Screen, // SUBTYPE: Open, Close
 
 }
