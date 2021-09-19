@@ -222,10 +222,12 @@ impl ecs::System for SignRenderer {
         _: &world::World,
         renderer: &mut render::Renderer,
     ) {
-        let info = m.get_component_mut(e, self.sign_info).unwrap();
-        if let Some(model) = info.model {
-            renderer.model.remove_model(model);
+        let info = m.get_component_mut(e, self.sign_info);
+        if let Some(info) = info {
+            if let Some(model) = info.model {
+                renderer.model.remove_model(model);
+            }
+            info.model = None;
         }
-        info.model = None;
     }
 }

@@ -331,6 +331,19 @@ impl Manager {
         self.process_entity_changes(world, renderer);
     }
 
+    pub fn remove_all_entities_gracefully(&mut self) {
+        for (id, e) in self.entities[1..].iter_mut().enumerate() {
+            if let Some(set) = e.0.as_mut() {
+                set.components = BSet::new(self.components.len());
+                set.removed = true;
+                self.changed_entity_components.insert(Entity {
+                    id: id + 1,
+                    generation: e.1,
+                });
+            }
+        }
+    }
+
     /// Returns whether an entity reference is valid.
     pub fn is_entity_valid(&self, e: Entity) -> bool {
         match self.entities.get(e.id) {

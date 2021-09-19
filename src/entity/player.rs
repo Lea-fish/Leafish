@@ -15,9 +15,8 @@ use collision::{Aabb, Aabb3};
 use instant::Instant;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
-use crate::entity::{CustomEntityRenderer, EntityRenderer, EntityType};
+use crate::entity::{CustomEntityRenderer, EntityRenderer, EntityType, resolve_textures};
 use crate::ecs::Entity;
-use crate::entity::slime::resolve_textures;
 
 pub fn add_systems(m: &mut ecs::Manager) {
     let sys = MovementHandler::new(m);
@@ -334,6 +333,7 @@ impl CustomEntityRenderer for PlayerRenderer {
             render::Renderer::get_texture(renderer.get_textures_ref(), "entity/steve")
         };
 
+        // TODO: Replace this shit entirely!
         macro_rules! srel {
             ($x:expr, $y:expr, $w:expr, $h:expr) => {
                 Some(skin.relative(($x) / 64.0, ($y) / 64.0, ($w) / 64.0, ($h) / 64.0))
@@ -350,15 +350,7 @@ impl CustomEntityRenderer for PlayerRenderer {
                 8.0 / 16.0,
                 8.0 / 16.0,
                 8.0 / 16.0,
-                /*[
-                    srel!(16.0, 0.0, 8.0, 8.0), // Down
-                    srel!(8.0, 0.0, 8.0, 8.0),  // Up
-                    srel!(8.0, 8.0, 8.0, 8.0),  // North
-                    srel!(24.0, 8.0, 8.0, 8.0), // South
-                    srel!(16.0, 8.0, 8.0, 8.0), // West
-                    srel!(0.0, 8.0, 8.0, 8.0),  // East
-                ],*/
-                resolve_textures(&skin, 8.0, 8.0, 0.0, 0.0)
+                resolve_textures(&skin, 8.0, 8.0, 8.0, 0.0, 0.0)
             );
             model::append_box(
                 &mut head_verts,
@@ -368,15 +360,7 @@ impl CustomEntityRenderer for PlayerRenderer {
                 8.4 / 16.0,
                 8.4 / 16.0,
                 8.4 / 16.0,
-                /*[
-                    srel!((16.0 + 32.0), 0.0, 8.0, 8.0), // Down
-                    srel!((8.0 + 32.0), 0.0, 8.0, 8.0),  // Up
-                    srel!((8.0 + 32.0), 8.0, 8.0, 8.0),  // North
-                    srel!((24.0 + 32.0), 8.0, 8.0, 8.0), // South
-                    srel!((16.0 + 32.0), 8.0, 8.0, 8.0), // West
-                    srel!((0.0 + 32.0), 8.0, 8.0, 8.0),  // East
-                ],*/
-                resolve_textures(&skin, 8.0, 8.0, 32.0, 0.0)
+                resolve_textures(&skin, 8.0, 8.0, 8.0, 32.0, 0.0)
             );
         }
 
@@ -390,14 +374,7 @@ impl CustomEntityRenderer for PlayerRenderer {
             8.0 / 16.0,
             12.0 / 16.0,
             4.0 / 16.0,
-            [
-                srel!(28.0, 16.0, 8.0, 4.0),  // Down
-                srel!(20.0, 16.0, 8.0, 4.0),  // Up
-                srel!(20.0, 20.0, 8.0, 12.0), // North
-                srel!(32.0, 20.0, 8.0, 12.0), // South
-                srel!(16.0, 20.0, 4.0, 12.0), // West
-                srel!(28.0, 20.0, 4.0, 12.0), // East
-            ],
+            resolve_textures(&skin, 8.0, 12.0, 4.0, 16.0, 16.0)
         );
         model::append_box(
             &mut body_verts,
@@ -407,14 +384,7 @@ impl CustomEntityRenderer for PlayerRenderer {
             8.4 / 16.0,
             12.4 / 16.0,
             4.4 / 16.0,
-            [
-                srel!(28.0, 16.0 + 16.0, 8.0, 4.0),  // Down
-                srel!(20.0, 16.0 + 16.0, 8.0, 4.0),  // Up
-                srel!(20.0, 20.0 + 16.0, 8.0, 12.0), // North
-                srel!(32.0, 20.0 + 16.0, 8.0, 12.0), // South
-                srel!(16.0, 20.0 + 16.0, 4.0, 12.0), // West
-                srel!(28.0, 20.0 + 16.0, 4.0, 12.0), // East
-            ],
+            resolve_textures(&skin, 8.0, 12.0, 4.0, 16.0, 16.0)
         );
 
         let mut part_verts = vec![vec![]; 4];

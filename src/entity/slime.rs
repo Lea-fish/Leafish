@@ -15,18 +15,9 @@ use collision::{Aabb, Aabb3};
 use instant::Instant;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
-use crate::entity::{CustomEntityRenderer, EntityType};
+use crate::entity::{CustomEntityRenderer, EntityType, resolve_textures};
 use crate::render::{Renderer, Texture};
 use crate::ecs::Entity;
-
-static TEXTURE_MATRIX: [[f32; 2]; 6] = [
-    [2.0, 0.0],
-    [1.0, 0.0],
-    [1.0, 1.0],
-    [3.0, 1.0],
-    [2.0, 1.0],
-    [0.0, 1.0],
-];
 
 pub struct SlimeModel {
     model: Option<model::ModelKey>,
@@ -95,14 +86,8 @@ impl SlimeRenderer {
 }
 
 enum SlimeModelPart {
-    Head = 0,
-    Body = 1,
-    LegLeft = 2,
-    LegRight = 3,
-    ArmLeft = 4,
-    ArmRight = 5,
-    NameTag = 6,
-    // Cape = 7, // TODO
+    Body = 0,
+    Eyes = 1,
 }
 
 // TODO: Setup culling
@@ -118,7 +103,6 @@ impl CustomEntityRenderer for SlimeRenderer {
     ) {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
-        println!("render slime!");
         let world_entity = m.get_world();
         let delta = m
             .get_component_mut(world_entity, self.game_info)
@@ -133,8 +117,6 @@ impl CustomEntityRenderer for SlimeRenderer {
                 self.entity_removed(m, e, world, renderer);
                 self.entity_added(m, e, world, renderer);
             }*/
-        /*self.entity_removed(m, e, _world, renderer);
-        self.entity_added(m, e, _world, renderer);*/
 
             if let Some(pmodel) = slime_model.model {
                 let mdl = renderer.model.get_model(pmodel).unwrap();
@@ -153,7 +135,14 @@ impl CustomEntityRenderer for SlimeRenderer {
                     disp: offset,
                 });
 
-                mdl.matrix[0/*SlimeModelPart::Body as usize*/] = offset_matrix // TODO readd
+                mdl.matrix[SlimeModelPart::Body as usize] = offset_matrix
+                    * Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(0.0)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+                });
+
+                mdl.matrix[SlimeModelPart::Eyes as usize] = offset_matrix
                     * Matrix4::from(Decomposed {
                     scale: 1.0,
                     rot: Quaternion::from_angle_x(Rad(0.0)),
@@ -172,101 +161,12 @@ impl CustomEntityRenderer for SlimeRenderer {
                     });
                 }*/
 
-               /* mdl.matrix[SlimeModelPart::Head as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(-rotation.pitch as f32)),
-                    disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
-                });
-                mdl.matrix[SlimeModelPart::Body as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(0.0)),
-                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-                });
-
-                let mut time = slime_model.time;
-                let mut dir = slime_model.dir;
-                if dir == 0 {
-                    dir = 1;
-                    time = 15.0;
-                }
-                let ang = ((time / 15.0) - 1.0) * (PI64 / 4.0);
-
-                mdl.matrix[SlimeModelPart::LegRight as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(ang as f32)),
-                    disp: Vector3::new(2.0 / 16.0, -12.0 / 16.0, 0.0),
-                });
-                mdl.matrix[SlimeModelPart::LegLeft as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(-ang as f32)),
-                    disp: Vector3::new(-2.0 / 16.0, -12.0 / 16.0, 0.0),
-                });*/
-
                 let mut i_time = slime_model.idle_time;
                 i_time += delta * 0.02;
                 if i_time > PI64 * 2.0 {
                     i_time -= PI64 * 2.0;
                 }
                 slime_model.idle_time = i_time;
-
-                /*
-                mdl.matrix[SlimeModelPart::ArmRight as usize] = offset_matrix
-                    * Matrix4::from_translation(Vector3::new(
-                    6.0 / 16.0,
-                    -12.0 / 16.0 - 12.0 / 16.0,
-                    0.0,
-                ))
-                    * Matrix4::from(Quaternion::from_angle_x(Rad(-(ang * 0.75) as f32)))
-                    * Matrix4::from(Quaternion::from_angle_z(Rad(
-                    (i_time.cos() * 0.06 - 0.06) as f32
-                )))
-                    * Matrix4::from(Quaternion::from_angle_x(Rad((i_time.sin() * 0.06
-                    - (1.0 / 7.5))
-                    as f32)));
-
-                mdl.matrix[SlimeModelPart::ArmLeft as usize] = offset_matrix
-                    * Matrix4::from_translation(Vector3::new(
-                    -6.0 / 16.0,
-                    -12.0 / 16.0 - 12.0 / 16.0,
-                    0.0,
-                ))
-                    * Matrix4::from(Quaternion::from_angle_x(Rad((ang * 0.75) as f32)))
-                    * Matrix4::from(Quaternion::from_angle_z(Rad(
-                    -(i_time.cos() * 0.06 - 0.06) as f32
-                )))
-                    * Matrix4::from(Quaternion::from_angle_x(Rad(-(i_time.sin() * 0.06) as f32)));
-
-                */
-                /*
-                let mut update = true;
-                if position.moved {
-                    slime_model.still_time = 0.0;
-                } else if slime_model.still_time > 2.0 {
-                    if (time - 15.0).abs() <= 1.5 * delta {
-                        time = 15.0;
-                        update = false;
-                    }
-                    dir = (15.0 - time).signum() as i32;
-                } else {
-                    slime_model.still_time += delta;
-                }
-
-                if update {
-                    time += delta * 1.5 * (dir as f64);
-                    if time > 30.0 {
-                        time = 30.0;
-                        dir = -1;
-                    } else if time < 0.0 {
-                        time = 0.0;
-                        dir = 1;
-                    }
-                }
-                slime_model.time = time;
-                slime_model.dir = dir;*/
             }
     }
 
@@ -279,161 +179,50 @@ impl CustomEntityRenderer for SlimeRenderer {
     ) {
         let slime_model = m.get_component_mut(e, self.slime_model).unwrap();
         let tex = Renderer::get_texture(renderer.get_textures_ref(), "minecraft:entity/slime/slime");
-
-        macro_rules! srel {
-            ($x:expr, $y:expr, $w:expr, $h:expr) => {
-                Some(tex.relative(($x) / 64.0, ($y) / 32.0, ($w) / 64.0, ($h) / 32.0))
-            };
-        }
-
-
-        /*
-        if player_model.has_head {
-            model::append_box(
-                &mut head_verts,
-                -4.0 / 16.0,
-                0.0,
-                -4.0 / 16.0,
-                8.0 / 16.0,
-                8.0 / 16.0,
-                8.0 / 16.0,
-                [
-                    srel!(16.0, 0.0, 8.0, 8.0), // Down
-                    srel!(8.0, 0.0, 8.0, 8.0),  // Up
-                    srel!(8.0, 8.0, 8.0, 8.0),  // North
-                    srel!(24.0, 8.0, 8.0, 8.0), // South
-                    srel!(16.0, 8.0, 8.0, 8.0), // West
-                    srel!(0.0, 8.0, 8.0, 8.0),  // East
-                ],
-            );
-            model::append_box(
-                &mut head_verts,
-                -4.2 / 16.0,
-                -0.2 / 16.0,
-                -4.2 / 16.0,
-                8.4 / 16.0,
-                8.4 / 16.0,
-                8.4 / 16.0,
-                [
-                    srel!((16.0 + 32.0), 0.0, 8.0, 8.0), // Down
-                    srel!((8.0 + 32.0), 0.0, 8.0, 8.0),  // Up
-                    srel!((8.0 + 32.0), 8.0, 8.0, 8.0),  // North
-                    srel!((24.0 + 32.0), 8.0, 8.0, 8.0), // South
-                    srel!((16.0 + 32.0), 8.0, 8.0, 8.0), // West
-                    srel!((0.0 + 32.0), 8.0, 8.0, 8.0),  // East
-                ],
-            );
-        }
-        */
-
-        // TODO: Cape
         let mut body_verts = vec![];
         model::append_box(
             &mut body_verts,
-            -4.0 / 8.0,
-            -4.0 / 8.0,
-            -4.0 / 8.0,
-            8.0 / 8.0,
-            8.0 / 8.0,
-            8.0 / 8.0,
-            resolve_textures(&tex, 8.0, 8.0, 0.0, 0.0)
-            /*[
-                /*srel!(8.0, 8.0, 8.0, 8.0),  // Down
-                srel!(16.0, 8.0, 8.0, 8.0),  // Up
-                srel!(0.0, 16.0, 8.0, 8.0), // North
-                srel!(0.0, 8.0, 8.0, 8.0), // South
-                srel!(0.0, 24.0, 8.0, 8.0), // West
-                srel!(0.0, 24.0, 8.0, 8.0),*/ // East
-                srel!(16.0, 0.0, 8.0, 8.0),  // Down
-                srel!(8.0, 0.0, 8.0, 8.0),  // Up
-                srel!(8.0, 8.0, 8.0, 8.0), // North
-                srel!(24.0, 8.0, 8.0, 8.0), // South
-                srel!(16.0, 8.0, 8.0, 8.0), // West
-                srel!(0.0, 8.0, 8.0, 8.0), // East
-            ],*/
-        );
-        /*model::append_box(
-            &mut body_verts,
             -4.0 / 16.0,
-            -6.0 / 16.0,
-            -2.0 / 16.0,
+            16.0 / 16.0,
+            -4.0 / 16.0,
             8.0 / 16.0,
-            12.0 / 16.0,
-            4.0 / 16.0,
-            [
-                srel!(28.0, 16.0, 8.0, 4.0),  // Down
-                srel!(20.0, 16.0, 8.0, 4.0),  // Up
-                srel!(20.0, 20.0, 8.0, 12.0), // North
-                srel!(32.0, 20.0, 8.0, 12.0), // South
-                srel!(16.0, 20.0, 4.0, 12.0), // West
-                srel!(28.0, 20.0, 4.0, 12.0), // East
-            ],
-        );*/
-        /*model::append_box(
-            &mut body_verts,
-            -4.2 / 16.0,
-            -6.2 / 16.0,
-            -2.2 / 16.0,
-            8.4 / 16.0,
-            12.4 / 16.0,
-            4.4 / 16.0,
-            [
-                srel!(28.0, 16.0 + 16.0, 8.0, 4.0),  // Down
-                srel!(20.0, 16.0 + 16.0, 8.0, 4.0),  // Up
-                srel!(20.0, 20.0 + 16.0, 8.0, 12.0), // North
-                srel!(32.0, 20.0 + 16.0, 8.0, 12.0), // South
-                srel!(16.0, 20.0 + 16.0, 4.0, 12.0), // West
-                srel!(28.0, 20.0 + 16.0, 4.0, 12.0), // East
-            ],
-        );*/
+            8.0 / 16.0,
+            8.0 / 16.0,
+            resolve_textures(&tex, 8.0, 8.0, 8.0, 0.0, 0.0)
+        );
+        model::append_box(
+                           &mut body_verts,
+                           -3.0 / 16.0,
+                           17.0 / 16.0,
+                           -3.0 / 16.0,
+                           6.0 / 16.0,
+                           6.0 / 16.0,
+                           6.0 / 16.0,
+                           resolve_textures(&tex, 6.0, 6.0, 6.0, 0.0, 0.0)
+        );
 
-        /*
-        for (i, offsets) in [
-            [16.0, 48.0, 0.0, 48.0],  // Left leg
-            [0.0, 16.0, 0.0, 32.0],   // Right Leg
-            [32.0, 48.0, 48.0, 48.0], // Left arm
-            [40.0, 16.0, 40.0, 32.0], // Right arm
-        ]
-            .iter()
-            .enumerate()
-        {
-            let (ox, oy) = (offsets[0], offsets[1]);
-            model::append_box(
-                &mut part_verts[i],
-                -2.0 / 16.0,
-                -12.0 / 16.0,
-                -2.0 / 16.0,
-                4.0 / 16.0,
-                12.0 / 16.0,
-                4.0 / 16.0,
-                [
-                    srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),     // Down
-                    srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),     // Up
-                    srel!(ox + 4.0, oy + 4.0, 4.0, 12.0),  // North
-                    srel!(ox + 12.0, oy + 4.0, 4.0, 12.0), // South
-                    srel!(ox + 8.0, oy + 4.0, 4.0, 12.0),  // West
-                    srel!(ox + 0.0, oy + 4.0, 4.0, 12.0),  // East
-                ],
-            );
-            let (ox, oy) = (offsets[2], offsets[3]);
-            model::append_box(
-                &mut part_verts[i],
-                -2.2 / 16.0,
-                -12.2 / 16.0,
-                -2.2 / 16.0,
-                4.4 / 16.0,
-                12.4 / 16.0,
-                4.4 / 16.0,
-                [
-                    srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),   // Down
-                    srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),   // Up
-                    srel!(ox + 4.0, oy + 4.0, 4.0, 12.0),  // North
-                    srel!(ox + 12.0, oy + 4.0, 4.0, 12.0), // South
-                    srel!(ox + 8.0, oy + 4.0, 4.0, 12.0),  // West
-                    srel!(ox + 0.0, oy + 4.0, 4.0, 12.0),  // East
-                ],
-            );
-        }*/
+        let mut eye_verts = vec![];
+
+        model::append_box( // right eye
+                           &mut eye_verts,
+                           -3.25 / 16.0,
+                           18.0 / 16.0,
+                           -3.5 / 16.0,
+                           2.0 / 16.0,
+                           2.0 / 16.0,
+                           2.0 / 16.0,
+                           resolve_textures(&tex, 2.0, 2.0, 2.0, 32.0, 0.0)
+        );
+        model::append_box( // left eye
+                           &mut eye_verts,
+                           1.25 / 16.0,
+                           18.0 / 16.0,
+                           -3.5 / 16.0,
+                           2.0 / 16.0,
+                           2.0 / 16.0,
+                           2.0 / 16.0,
+                           resolve_textures(&tex, 2.0, 2.0, 2.0, 32.0, 4.0)
+        );
 
        // let mut name_verts = vec![];
         /*if slime_model.has_name_tag {
@@ -473,6 +262,7 @@ impl CustomEntityRenderer for SlimeRenderer {
             model::DEFAULT,
             vec![
                 body_verts,
+                eye_verts,
                 // name_verts,
             ],
         ));
@@ -490,68 +280,4 @@ impl CustomEntityRenderer for SlimeRenderer {
             renderer.model.remove_model(model);
         }
     }
-}
-
-trait Collidable<T> {
-    fn collides(&self, t: &T) -> bool;
-    fn move_out_of(self, other: Self, dir: cgmath::Vector3<f64>) -> Self;
-}
-
-impl Collidable<Aabb3<f64>> for Aabb3<f64> {
-    fn collides(&self, t: &Aabb3<f64>) -> bool {
-        !(t.min.x >= self.max.x
-            || t.max.x <= self.min.x
-            || t.min.y >= self.max.y
-            || t.max.y <= self.min.y
-            || t.min.z >= self.max.z
-            || t.max.z <= self.min.z)
-    }
-
-    fn move_out_of(mut self, other: Self, dir: cgmath::Vector3<f64>) -> Self {
-        if dir.x != 0.0 {
-            if dir.x > 0.0 {
-                let ox = self.max.x;
-                self.max.x = other.min.x - 0.0001;
-                self.min.x += self.max.x - ox;
-            } else {
-                let ox = self.min.x;
-                self.min.x = other.max.x + 0.0001;
-                self.max.x += self.min.x - ox;
-            }
-        }
-        if dir.y != 0.0 {
-            if dir.y > 0.0 {
-                let oy = self.max.y;
-                self.max.y = other.min.y - 0.0001;
-                self.min.y += self.max.y - oy;
-            } else {
-                let oy = self.min.y;
-                self.min.y = other.max.y + 0.0001;
-                self.max.y += self.min.y - oy;
-            }
-        }
-        if dir.z != 0.0 {
-            if dir.z > 0.0 {
-                let oz = self.max.z;
-                self.max.z = other.min.z - 0.0001;
-                self.min.z += self.max.z - oz;
-            } else {
-                let oz = self.min.z;
-                self.min.z = other.max.z + 0.0001;
-                self.max.z += self.min.z - oz;
-            }
-        }
-        self
-    }
-}
-
-pub fn resolve_textures(texture: &Texture, width: f32, height: f32, offset_x: f32, offset_y: f32) -> [Option<Texture>; 6] {
-    [
-        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[0][0]) / (texture.get_width() as f32), (offset_y + height * TEXTURE_MATRIX[0][1]) / (texture.get_height() as f32), width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
-        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[1][0]) / (texture.get_width() as f32), (offset_y + height * TEXTURE_MATRIX[1][1]) / (texture.get_height() as f32), width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
-        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[2][0]) / (texture.get_width() as f32), (offset_y + height * TEXTURE_MATRIX[2][1]) / (texture.get_height() as f32), width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
-        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[3][0]) / (texture.get_width() as f32), (offset_y + height * TEXTURE_MATRIX[3][1]) / (texture.get_height() as f32), width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
-        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[4][0]) / (texture.get_width() as f32), (offset_y + height * TEXTURE_MATRIX[4][1]) / (texture.get_height() as f32), width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
-        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[5][0]) / (texture.get_width() as f32), (offset_y + height * TEXTURE_MATRIX[5][1]) / (texture.get_height() as f32), width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
-    ]
 }

@@ -53,7 +53,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::entity::EntityType;
-use crate::entity::slime::create_slime;
+use crate::entity::player::create_local;
+use crate::entity::zombie::create_zombie;
 
 pub mod plugin_messages;
 mod sun;
@@ -1637,7 +1638,6 @@ impl Server {
                 .unwrap();
             model.set_skin(info.skin_url.clone());
         }
-        let slime = create_slime(&mut self.entities.clone().write());
         self.hud_context.clone().write().update_game_mode(gamemode);
         *self
             .entities
@@ -1712,6 +1712,9 @@ impl Server {
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
+        self.entities.clone().write().remove_all_entities_gracefully();
+        *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
+        let _ = create_zombie(&mut self.entities.clone().write());
         if *self.dead.read() {
             *self.close_death_screen.write() = true;
             *self.dead.write() = false;

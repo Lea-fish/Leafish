@@ -5,7 +5,7 @@ use crate::ecs;
 use cgmath::Vector3;
 use collision::Aabb3;
 use crate::ecs::{Manager, System, Filter, Entity};
-use crate::render::Renderer;
+use crate::render::{Renderer, Texture};
 use crate::world::World;
 use lazy_static::lazy_static;
 use std::sync::Arc;
@@ -15,9 +15,48 @@ use crate::entity::slime::SlimeRenderer;
 use parking_lot::Mutex;
 use std::borrow::BorrowMut;
 use crate::entity::player::PlayerRenderer;
+use crate::entity::zombie::ZombieRenderer;
 
 mod systems;
 pub mod slime;
+pub mod zombie;
+
+// TODO: There may be wrong entries in this!
+static TEXTURE_MATRIX: [[[f32; 3]; 6]; 2] = [
+    [
+        [0.0, 1.0, 0.0], // OR 0 1 0 [1.0, 0.0, 1.0], // OR 0 1 0
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 1.0, 1.0],
+        [0.0, 0.0, 0.0],
+        [1.0, 0.0, 1.0], // OR 1 0 1 [0.0, 1.0, 0.0], // OR 1 0 1
+    ],
+    [
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 1.0],
+    ],
+];
+
+
+/*
+resolve_textures(&tex, 8.0, 12.0, 4.0, 16.0, 16.0) // width, height, depth...
+srel!(28.0, 16.0, 8.0, 4.0),  // Down  | 1 0 1 | 0 0 0 OR 0 1 0 | 0 0 0
+srel!(20.0, 16.0, 8.0, 4.0),  // Up    | 0 0 1 | 0 0 0
+srel!(20.0, 20.0, 8.0, 12.0), // North | 0 0 1 | 0 0 1
+srel!(32.0, 20.0, 8.0, 12.0), // South | 0 1 1 | 0 0 1
+srel!(16.0, 20.0, 4.0, 12.0), // West  | 0 0 0 | 0 0 1
+srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
+    [1.0, 0.0, 0.0, 0.0],
+    [1.0, 0.0, 0.0, 0.0],
+    [1.0, 0.0, 0.0, 1.0],
+    [2.0, 0.0, 0.0, 1.0],
+    [2.0, 0.0, 0.0, 1.0],
+    [0.0, 0.0, 0.0, 1.0],
+*/
 
 pub fn add_systems(m: &mut ecs::Manager) {
     let sys = systems::UpdateLastPosition::new(m);
@@ -295,6 +334,7 @@ impl EntityType {
     pub fn init(manager: &mut Manager) {
         ENTITY_RENDERERS.insert(EntityType::Slime, Arc::new(SlimeRenderer::new(manager)));
         ENTITY_RENDERERS.insert(EntityType::Player, Arc::new(PlayerRenderer::new(manager)));
+        ENTITY_RENDERERS.insert(EntityType::Zombie, Arc::new(ZombieRenderer::new(manager)));
     }
 
     pub fn deinit() {
@@ -305,4 +345,27 @@ impl EntityType {
         ENTITY_RENDERERS.get(&self).map_or(NOOP_RENDERER.clone(), |x| x.value().clone())
     }
 
+}
+
+pub fn resolve_textures(texture: &Texture, width: f32, height: f32, depth: f32, offset_x: f32, offset_y: f32) -> [Option<Texture>; 6] {
+    [
+        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[0][0][0] + height * TEXTURE_MATRIX[0][0][1] + depth * TEXTURE_MATRIX[0][0][2]) / (texture.get_width() as f32),
+                              (offset_y + depth * TEXTURE_MATRIX[1][0][2]) / (texture.get_height() as f32),
+                              width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
+        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[0][1][0] + height * TEXTURE_MATRIX[0][1][1] + depth * TEXTURE_MATRIX[0][1][2]) / (texture.get_width() as f32),
+                              (offset_y + depth * TEXTURE_MATRIX[1][1][2]) / (texture.get_height() as f32),
+                              width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
+        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[0][2][0] + height * TEXTURE_MATRIX[0][2][1] + depth * TEXTURE_MATRIX[0][2][2]) / (texture.get_width() as f32),
+                              (offset_y + depth * TEXTURE_MATRIX[1][2][2]) / (texture.get_height() as f32),
+                              width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
+        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[0][3][0] + height * TEXTURE_MATRIX[0][3][1] + depth * TEXTURE_MATRIX[0][3][2]) / (texture.get_width() as f32),
+                              (offset_y + depth * TEXTURE_MATRIX[1][3][2]) / (texture.get_height() as f32),
+                              width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
+        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[0][4][0] + height * TEXTURE_MATRIX[0][4][1] + depth * TEXTURE_MATRIX[0][4][2]) / (texture.get_width() as f32),
+                              (offset_y + depth * TEXTURE_MATRIX[1][4][2]) / (texture.get_height() as f32),
+                              width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
+        Some(texture.relative((offset_x + width * TEXTURE_MATRIX[0][5][0] + height * TEXTURE_MATRIX[0][5][1] + depth * TEXTURE_MATRIX[0][5][2]) / (texture.get_width() as f32),
+                              (offset_y + depth * TEXTURE_MATRIX[1][5][2]) / (texture.get_height() as f32),
+                              width / (texture.get_width() as f32), height / (texture.get_height() as f32))),
+    ]
 }
