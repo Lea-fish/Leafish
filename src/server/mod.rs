@@ -52,6 +52,8 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::entity::EntityType;
+use crate::entity::slime::create_slime;
 
 pub mod plugin_messages;
 mod sun;
@@ -106,6 +108,7 @@ pub struct Server {
     gamemode: ecs::Key<GameMode>,
     pub rotation: ecs::Key<entity::Rotation>,
     target_rotation: ecs::Key<entity::TargetRotation>,
+    entity_type: ecs::Key<entity::EntityType>,
     block_break_info: Mutex<BlockBreakInfo>,
     //
     pub player: Arc<RwLock<Option<ecs::Entity>>>,
@@ -877,6 +880,7 @@ impl Server {
         )));
         hud_context.write().player_inventory =
             Some(inventory_context.read().player_inventory.clone());
+        EntityType::init(&mut entities);
 
         let version = resources.read().version();
         Server {
@@ -902,6 +906,7 @@ impl Server {
             gamemode: entities.get_key(),
             rotation: entities.get_key(),
             target_rotation: entities.get_key(),
+            entity_type: entities.get_key(),
             //
             entities: Arc::new(RwLock::new(entities)),
             player: Arc::new(RwLock::new(None)),
@@ -1100,6 +1105,7 @@ impl Server {
             sun_model.remove(renderer);
         }
         self.target_info.clone().write().clear(renderer);
+        EntityType::deinit();
     }
 
     fn update_time(&self, renderer: &mut render::Renderer, delta: f64) {
@@ -1631,6 +1637,7 @@ impl Server {
                 .unwrap();
             model.set_skin(info.skin_url.clone());
         }
+        let slime = create_slime(&mut self.entities.clone().write());
         self.hud_context.clone().write().update_game_mode(gamemode);
         *self
             .entities

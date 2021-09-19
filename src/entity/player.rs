@@ -15,11 +15,14 @@ use collision::{Aabb, Aabb3};
 use instant::Instant;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
+use crate::entity::{CustomEntityRenderer, EntityRenderer, EntityType};
+use crate::ecs::Entity;
+use crate::entity::slime::resolve_textures;
 
 pub fn add_systems(m: &mut ecs::Manager) {
     let sys = MovementHandler::new(m);
     m.add_system(sys);
-    let sys = PlayerRenderer::new(m);
+    let sys = EntityRenderer::new(m);
     m.add_render_system(sys);
 }
 
@@ -43,6 +46,7 @@ pub fn create_local(m: &mut ecs::Manager) -> ecs::Entity {
     );
     m.add_component_direct(entity, PlayerModel::new("", false, false, true));
     m.add_component_direct(entity, Light::new());
+    m.add_component_direct(entity, EntityType::Player);
     entity
 }
 
@@ -62,6 +66,7 @@ pub fn create_remote(m: &mut ecs::Manager, name: &str) -> ecs::Entity {
     );
     m.add_component_direct(entity, PlayerModel::new(name, true, true, false));
     m.add_component_direct(entity, Light::new());
+    m.add_component_direct(entity, EntityType::Player);
     entity
 }
 
@@ -108,8 +113,7 @@ impl PlayerModel {
     }
 }
 
-struct PlayerRenderer {
-    filter: ecs::Filter,
+pub struct PlayerRenderer {
     player_model: ecs::Key<PlayerModel>,
     position: ecs::Key<Position>,
     rotation: ecs::Key<Rotation>,
@@ -118,17 +122,12 @@ struct PlayerRenderer {
 }
 
 impl PlayerRenderer {
-    fn new(m: &mut ecs::Manager) -> PlayerRenderer {
+    pub fn new(m: &mut ecs::Manager) -> Self {
         let player_model = m.get_key();
         let position = m.get_key();
         let rotation = m.get_key();
         let light = m.get_key();
         PlayerRenderer {
-            filter: ecs::Filter::new()
-                .with(player_model)
-                .with(position)
-                .with(rotation)
-                .with(light),
             player_model,
             position,
             rotation,
@@ -146,22 +145,20 @@ enum PlayerModelPart {
     ArmLeft = 4,
     ArmRight = 5,
     NameTag = 6,
-    //Cape = 7, // TODO
+    // Cape = 7, // TODO
 }
 
 // TODO: Setup culling
-impl ecs::System for PlayerRenderer {
-    fn filter(&self) -> &ecs::Filter {
-        &self.filter
-    }
+impl CustomEntityRenderer for PlayerRenderer {
 
     fn update(
-        &mut self,
+        &self,
         m: &mut ecs::Manager,
         world: &world::World,
         renderer: &mut render::Renderer,
         _: bool,
         _: bool,
+        e: Entity
     ) {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
@@ -170,7 +167,6 @@ impl ecs::System for PlayerRenderer {
             .get_component_mut(world_entity, self.game_info)
             .unwrap()
             .delta;
-        for e in m.find(&self.filter) {
             let player_model = m.get_component_mut(e, self.player_model).unwrap();
             let position = m.get_component_mut(e, self.position).unwrap();
             let rotation = m.get_component_mut(e, self.rotation).unwrap();
@@ -319,11 +315,10 @@ impl ecs::System for PlayerRenderer {
                 player_model.time = time;
                 player_model.dir = dir;
             }
-        }
     }
 
     fn entity_added(
-        &mut self,
+        &self,
         m: &mut ecs::Manager,
         e: ecs::Entity,
         _: &world::World,
@@ -355,14 +350,15 @@ impl ecs::System for PlayerRenderer {
                 8.0 / 16.0,
                 8.0 / 16.0,
                 8.0 / 16.0,
-                [
+                /*[
                     srel!(16.0, 0.0, 8.0, 8.0), // Down
                     srel!(8.0, 0.0, 8.0, 8.0),  // Up
                     srel!(8.0, 8.0, 8.0, 8.0),  // North
                     srel!(24.0, 8.0, 8.0, 8.0), // South
                     srel!(16.0, 8.0, 8.0, 8.0), // West
                     srel!(0.0, 8.0, 8.0, 8.0),  // East
-                ],
+                ],*/
+                resolve_textures(&skin, 8.0, 8.0, 0.0, 0.0)
             );
             model::append_box(
                 &mut head_verts,
@@ -372,14 +368,15 @@ impl ecs::System for PlayerRenderer {
                 8.4 / 16.0,
                 8.4 / 16.0,
                 8.4 / 16.0,
-                [
+                /*[
                     srel!((16.0 + 32.0), 0.0, 8.0, 8.0), // Down
                     srel!((8.0 + 32.0), 0.0, 8.0, 8.0),  // Up
                     srel!((8.0 + 32.0), 8.0, 8.0, 8.0),  // North
                     srel!((24.0 + 32.0), 8.0, 8.0, 8.0), // South
                     srel!((16.0 + 32.0), 8.0, 8.0, 8.0), // West
                     srel!((0.0 + 32.0), 8.0, 8.0, 8.0),  // East
-                ],
+                ],*/
+                resolve_textures(&skin, 8.0, 8.0, 32.0, 0.0)
             );
         }
 
@@ -526,7 +523,7 @@ impl ecs::System for PlayerRenderer {
     }
 
     fn entity_removed(
-        &mut self,
+        &self,
         m: &mut ecs::Manager,
         e: ecs::Entity,
         _: &world::World,

@@ -4,8 +4,20 @@ pub mod player;
 use crate::ecs;
 use cgmath::Vector3;
 use collision::Aabb3;
+use crate::ecs::{Manager, System, Filter, Entity};
+use crate::render::Renderer;
+use crate::world::World;
+use lazy_static::lazy_static;
+use std::sync::Arc;
+use std::collections::HashMap;
+use dashmap::DashMap;
+use crate::entity::slime::SlimeRenderer;
+use parking_lot::Mutex;
+use std::borrow::BorrowMut;
+use crate::entity::player::PlayerRenderer;
 
 mod systems;
+pub mod slime;
 
 pub fn add_systems(m: &mut ecs::Manager) {
     let sys = systems::UpdateLastPosition::new(m);
@@ -160,4 +172,137 @@ impl Light {
     pub fn new() -> Light {
         Default::default()
     }
+}
+
+pub struct EntityRenderer {
+
+    filter: ecs::Filter,
+    position: ecs::Key<Position>,
+    rotation: ecs::Key<Rotation>,
+    entity_type: ecs::Key<EntityType>,
+
+}
+
+impl EntityRenderer {
+
+    pub fn new(manager: &mut Manager) -> Self {
+        let position = manager.get_key();
+        let rotation = manager.get_key();
+        let entity_type = manager.get_key();
+        EntityRenderer {
+            filter: ecs::Filter::new()
+                .with(position)
+                .with(rotation)
+                .with(entity_type),
+            position,
+            rotation,
+            entity_type,
+        }
+    }
+
+}
+
+impl System for EntityRenderer {
+    fn filter(&self) -> &Filter {
+        &self.filter
+    }
+
+    fn update(&mut self, m: &mut Manager, world: &World, renderer: &mut Renderer, focused: bool, dead: bool) {
+        for e in m.find(&self.filter) {
+            /*let position = m.get_component_mut(e, self.position).unwrap();
+            let rotation = m.get_component_mut(e, self.rotation).unwrap();*/
+            let entity_type = m.get_component(e, self.entity_type).unwrap();
+            let mut c_renderer = entity_type.get_renderer();
+            c_renderer.update(m, world, renderer, focused, dead, e);
+        }
+    }
+
+    fn entity_added(&mut self, m: &mut Manager, e: Entity, world: &World, renderer: &mut Renderer) {
+        let entity_type = m.get_component(e, self.entity_type).unwrap();
+        let mut c_renderer = entity_type.get_renderer();
+        c_renderer.entity_added(m, e, world, renderer);
+    }
+
+    fn entity_removed(&mut self, m: &mut Manager, e: Entity, world: &World, renderer: &mut Renderer) {
+        let entity_type = m.get_component(e, self.entity_type).unwrap();
+        let mut c_renderer = entity_type.get_renderer();
+        c_renderer.entity_removed(m, e, world, renderer);
+    }
+}
+
+pub trait CustomEntityRenderer {
+
+    fn update(&self,
+              manager: &mut Manager,
+              world: &World,
+              renderer: &mut Renderer,
+              focused: bool,
+              dead: bool,
+              entity: Entity);
+
+    fn entity_added(&self,
+                    manager: &mut ecs::Manager,
+                    entity: ecs::Entity,
+                    world: &World,
+                    renderer: &mut Renderer);
+
+    fn entity_removed(&self,
+                      manager: &mut Manager,
+                      entity: ecs::Entity,
+                      world: &World,
+                      renderer: &mut Renderer);
+
+}
+
+pub struct NOOPEntityRenderer {
+
+
+
+}
+
+impl CustomEntityRenderer for NOOPEntityRenderer {
+    fn update(&self, manager: &mut Manager, world: &World, renderer: &mut Renderer, focused: bool, dead: bool, entity: Entity) {
+
+    }
+
+    fn entity_added(&self, manager: &mut Manager, entity: Entity, world: &World, renderer: &mut Renderer) {
+
+    }
+
+    fn entity_removed(&self, manager: &mut Manager, entity: Entity, world: &World, renderer: &mut Renderer) {
+
+    }
+}
+
+#[derive(Eq, PartialEq, Hash)]
+pub enum EntityType {
+
+    Slime,
+    Player,
+    Bat,
+    Horse,
+    Zombie,
+
+}
+
+lazy_static! {
+    static ref ENTITY_RENDERERS: Arc<DashMap<EntityType, Arc<dyn CustomEntityRenderer + Send + Sync>>> = Arc::new(DashMap::new());
+    static ref NOOP_RENDERER: Arc<dyn CustomEntityRenderer + Send + Sync> = Arc::new(NOOPEntityRenderer {});
+}
+
+impl EntityType {
+
+    pub fn init(manager: &mut Manager) {
+        ENTITY_RENDERERS.insert(EntityType::Slime, Arc::new(SlimeRenderer::new(manager)));
+        ENTITY_RENDERERS.insert(EntityType::Player, Arc::new(PlayerRenderer::new(manager)));
+    }
+
+    pub fn deinit() {
+        ENTITY_RENDERERS.clear();
+    }
+
+    pub fn get_renderer(&self) -> Arc<dyn CustomEntityRenderer + Send + Sync> {
+        ENTITY_RENDERERS.get(&self).map_or(NOOP_RENDERER.clone(), |x| x.value().clone())
+    }
+
 }
