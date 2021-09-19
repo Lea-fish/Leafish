@@ -18,10 +18,11 @@ use std::hash::BuildHasherDefault;
 use crate::entity::{CustomEntityRenderer, EntityType, resolve_textures};
 use crate::render::{Renderer, Texture};
 use crate::ecs::Entity;
+use crate::entity::player_like::{compute_player_model_components, PlayerLikeModelPart};
 
 pub struct ZombieModel {
     model: Option<model::ModelKey>,
-    name: String,
+    name: Option<String>,
 
     dir: i32,
     time: f64,
@@ -30,10 +31,10 @@ pub struct ZombieModel {
 }
 
 impl ZombieModel {
-    pub fn new(name: &str) -> ZombieModel {
+    pub fn new(name: Option<String>) -> ZombieModel {
         ZombieModel {
             model: None,
-            name: name.to_owned(),
+            name,
             dir: 0,
             time: 0.0,
             still_time: 0.0,
@@ -56,7 +57,7 @@ pub fn create_zombie(m: &mut ecs::Manager) -> ecs::Entity {
     );
     m.add_component_direct(entity, Light::new());
     m.add_component_direct(entity, EntityType::Zombie);
-    m.add_component_direct(entity, ZombieModel::new("test"));
+    m.add_component_direct(entity, ZombieModel::new(Some(String::from("test"))));
     entity
 }
 
@@ -84,13 +85,6 @@ impl ZombieRenderer {
     }
 }
 
-enum ZombieModelPart {
-    Head = 0,
-    Body = 1,
-    RightArm = 2,
-    LeftArm = 3,
-}
-
 // TODO: Setup culling
 impl CustomEntityRenderer for ZombieRenderer {
     fn update(
@@ -109,17 +103,12 @@ impl CustomEntityRenderer for ZombieRenderer {
             .get_component_mut(world_entity, self.game_info)
             .unwrap()
             .delta;
-        let zombie_model = m.get_component_mut(e, self.zombie_model).unwrap();
+        let player_model = m.get_component_mut(e, self.zombie_model).unwrap();
         let position = m.get_component_mut(e, self.position).unwrap();
         let rotation = m.get_component_mut(e, self.rotation).unwrap();
         let light = m.get_component(e, self.light).unwrap();
 
-        /*if zombie_model.dirty {
-            self.entity_removed(m, e, world, renderer);
-            self.entity_added(m, e, world, renderer);
-        }*/
-
-        if let Some(pmodel) = zombie_model.model {
+        if let Some(pmodel) = player_model.model {
             let mdl = renderer.model.get_model(pmodel).unwrap();
 
             mdl.block_light = light.block_light;
@@ -136,22 +125,8 @@ impl CustomEntityRenderer for ZombieRenderer {
                 disp: offset,
             });
 
-            mdl.matrix[ZombieModelPart::Head as usize] = offset_matrix
-                * Matrix4::from(Decomposed {
-                scale: 1.0,
-                rot: Quaternion::from_angle_x(Rad(0.0)),
-                disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
-            });
-
-            mdl.matrix[ZombieModelPart::Body as usize] = offset_matrix
-                * Matrix4::from(Decomposed {
-                scale: 1.0,
-                rot: Quaternion::from_angle_x(Rad(0.0)),
-                disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-            });
-
             // TODO This sucks
-            /*if zombie_model.has_name_tag {
+           /* if player_model.has_name_tag {
                 let ang = (position.position.x - renderer.camera.pos.x)
                     .atan2(position.position.z - renderer.camera.pos.z)
                     as f32;
@@ -162,26 +137,98 @@ impl CustomEntityRenderer for ZombieRenderer {
                 });
             }*/
 
-            let mut i_time = zombie_model.idle_time;
+            mdl.matrix[PlayerLikeModelPart::Head as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                scale: 1.0,
+                rot: Quaternion::from_angle_x(Rad(-rotation.pitch as f32)),
+                disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
+            });
+            mdl.matrix[PlayerLikeModelPart::Body as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                scale: 1.0,
+                rot: Quaternion::from_angle_x(Rad(0.0)),
+                disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+            });
+
+            let mut time = player_model.time;
+            let mut dir = player_model.dir;
+            if dir == 0 {
+                dir = 1;
+                time = 15.0;
+            }
+            let ang = ((time / 15.0) - 1.0) * (PI64 / 4.0);
+
+            mdl.matrix[PlayerLikeModelPart::LegRight as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                scale: 1.0,
+                rot: Quaternion::from_angle_x(Rad(ang as f32)),
+                disp: Vector3::new(2.0 / 16.0, -12.0 / 16.0, 0.0),
+            });
+            mdl.matrix[PlayerLikeModelPart::LegLeft as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                scale: 1.0,
+                rot: Quaternion::from_angle_x(Rad(-ang as f32)),
+                disp: Vector3::new(-2.0 / 16.0, -12.0 / 16.0, 0.0),
+            });
+
+            let mut i_time = player_model.idle_time;
             i_time += delta * 0.02;
             if i_time > PI64 * 2.0 {
                 i_time -= PI64 * 2.0;
             }
-            zombie_model.idle_time = i_time;
+            player_model.idle_time = i_time;
 
-            mdl.matrix[ZombieModelPart::RightArm as usize] = offset_matrix
+            mdl.matrix[PlayerLikeModelPart::ArmRight as usize] = offset_matrix
                 * Matrix4::from_translation(Vector3::new(
                 6.0 / 16.0,
                 -12.0 / 16.0 - 12.0 / 16.0,
                 0.0,
-            ));
+            ))
+                * Matrix4::from(Quaternion::from_angle_x(Rad(-(ang * 0.75) as f32)))
+                * Matrix4::from(Quaternion::from_angle_z(Rad(
+                (i_time.cos() * 0.06 - 0.06) as f32
+            )))
+                * Matrix4::from(Quaternion::from_angle_x(Rad((i_time.sin() * 0.06
+                - ((7.5 - (0.5_f64 - 7.5).abs()) / 7.5))
+                as f32)));
 
-            mdl.matrix[ZombieModelPart::LeftArm as usize] = offset_matrix
+            mdl.matrix[PlayerLikeModelPart::ArmLeft as usize] = offset_matrix
                 * Matrix4::from_translation(Vector3::new(
                 -6.0 / 16.0,
                 -12.0 / 16.0 - 12.0 / 16.0,
                 0.0,
-            ));
+            ))
+                * Matrix4::from(Quaternion::from_angle_x(Rad((ang * 0.75) as f32)))
+                * Matrix4::from(Quaternion::from_angle_z(Rad(
+                -(i_time.cos() * 0.06 - 0.06) as f32
+            )))
+                * Matrix4::from(Quaternion::from_angle_x(Rad(-(i_time.sin() * 0.06) as f32)));
+
+            let mut update = true;
+            if position.moved {
+                player_model.still_time = 0.0;
+            } else if player_model.still_time > 2.0 {
+                if (time - 15.0).abs() <= 1.5 * delta {
+                    time = 15.0;
+                    update = false;
+                }
+                dir = (15.0 - time).signum() as i32;
+            } else {
+                player_model.still_time += delta;
+            }
+
+            if update {
+                time += delta * 1.5 * (dir as f64);
+                if time > 30.0 {
+                    time = 30.0;
+                    dir = -1;
+                } else if time < 0.0 {
+                    time = 0.0;
+                    dir = 1;
+                }
+            }
+            player_model.time = time;
+            player_model.dir = dir;
         }
     }
 
@@ -194,99 +241,11 @@ impl CustomEntityRenderer for ZombieRenderer {
     ) {
         let zombie_model = m.get_component_mut(e, self.zombie_model).unwrap();
         let tex = Renderer::get_texture(renderer.get_textures_ref(), "minecraft:entity/zombie/zombie");
-
-        // let mut name_verts = vec![];
-        /*if zombie_model.has_name_tag {
-            let mut state = FormatState {
-                width: 0.0,
-                offset: 0.0,
-                text: Vec::new(),
-                renderer,
-                y_scale: 0.16,
-                x_scale: 0.01,
-            };
-            let mut name = format::Component::Text(format::TextComponent::new(&zombie_model.name));
-            format::convert_legacy(&mut name);
-            state.build(&name, format::Color::Black);
-            // TODO: Remove black shadow and add dark, transparent box around name
-            let width = state.width;
-            // Center align text
-            for vert in &mut state.text {
-                vert.x += width * 0.5;
-                vert.r = 64;
-                vert.g = 64;
-                vert.b = 64;
-            }
-            name_verts.extend_from_slice(&state.text);
-            for vert in &mut state.text {
-                vert.x -= 0.01;
-                vert.y -= 0.01;
-                vert.z -= 0.05;
-                vert.r = 255;
-                vert.g = 255;
-                vert.b = 255;
-            }
-            name_verts.extend_from_slice(&state.text);
-        }*/
-
-        let mut head_verts = vec![];
-
-        model::append_box(
-                           &mut head_verts,
-                           -4.0 / 16.0,
-                           0.0,
-                           -4.0 / 16.0,
-                           8.0 / 16.0,
-                           8.0 / 16.0,
-                           8.0 / 16.0,
-                           resolve_textures(&tex, 8.0, 8.0, 8.0, 0.0, 0.0)
-        );
-
-        let mut body_verts = vec![];
-        model::append_box(
-            &mut body_verts,
-            -4.0 / 16.0,
-            -6.0 / 16.0,
-            -2.0 / 16.0,
-            8.0 / 16.0,
-            12.0 / 16.0,
-            4.0 / 16.0,
-            resolve_textures(&tex, 8.0, 12.0, 4.0, 16.0, 16.0)
-        );
-
-        let mut right_arm_verts = vec![];
-        model::append_box( // right arm
-            &mut right_arm_verts,
-            -3.0 / 16.0,
-            -2.0 / 16.0,
-            -2.0 / 16.0,
-            4.0 / 16.0,
-            12.0 / 16.0,
-            4.0 / 16.0,
-            resolve_textures(&tex, 4.0, 12.0, 4.0, 40.0, 16.0)
-        );
-
-        let mut left_arm_verts = vec![];
-        model::append_box( // left arm
-                           &mut left_arm_verts,
-                           -1.0 / 16.0,
-                           -2.0 / 16.0,
-                           -2.0 / 16.0,
-                           4.0 / 16.0,
-                           12.0 / 16.0,
-                           4.0 / 16.0,
-                           resolve_textures(&tex, 4.0, 12.0, 4.0, 40.0, 16.0)
-        );
+        let components = compute_player_model_components(&tex, &zombie_model.name, renderer);
 
         zombie_model.model = Some(renderer.model.create_model(
             model::DEFAULT,
-            vec![
-                head_verts,
-                body_verts,
-                right_arm_verts,
-                left_arm_verts,
-                // name_verts,
-            ],
+            components,
         ));
     }
 

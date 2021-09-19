@@ -20,16 +20,17 @@ use crate::entity::zombie::ZombieRenderer;
 mod systems;
 pub mod slime;
 pub mod zombie;
+pub mod player_like;
 
 // TODO: There may be wrong entries in this!
 static TEXTURE_MATRIX: [[[f32; 3]; 6]; 2] = [
     [
-        [0.0, 1.0, 0.0], // OR 0 1 0 [1.0, 0.0, 1.0], // OR 0 1 0
+        [0.0, 1.0, 0.0], // OR (although the current one seems correct) 1 0 1 [1.0, 0.0, 1.0], // OR 1 0 1
         [0.0, 0.0, 1.0],
         [0.0, 0.0, 1.0],
         [0.0, 1.0, 1.0],
         [0.0, 0.0, 0.0],
-        [1.0, 0.0, 1.0], // OR 1 0 1 [0.0, 1.0, 0.0], // OR 1 0 1
+        [1.0, 0.0, 1.0], // OR (although the current one seems correct) 0 1 0 [0.0, 1.0, 0.0], // OR 0 1 0
     ],
     [
         [0.0, 0.0, 0.0],
