@@ -1,31 +1,21 @@
-use super::{
-    Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity,
-};
+use super::{Bounds, GameInfo, Light, Position, Rotation, Velocity};
 use crate::ecs;
-use crate::format;
+use crate::ecs::Entity;
+use crate::entity::{resolve_textures, CustomEntityRenderer, EntityType};
 use crate::render;
-use crate::render::model::{self, FormatState};
-use crate::settings::Actionkey;
-use crate::shared::Position as BPosition;
-use crate::types::hash::FNVHash;
-use crate::types::GameMode;
+use crate::render::model;
+use crate::render::Renderer;
 use crate::world;
 use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
-use collision::{Aabb, Aabb3};
-use instant::Instant;
-use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
-use crate::entity::{CustomEntityRenderer, EntityType, resolve_textures};
-use crate::render::{Renderer, Texture};
-use crate::ecs::Entity;
+use collision::Aabb3;
 
 pub struct SlimeModel {
     model: Option<model::ModelKey>,
-    name: String,
+    _name: String,
 
-    dir: i32,
-    time: f64,
-    still_time: f64,
+    _dir: i32,
+    _time: f64,
+    _still_time: f64,
     idle_time: f64,
 }
 
@@ -33,11 +23,11 @@ impl SlimeModel {
     pub fn new(name: &str) -> SlimeModel {
         SlimeModel {
             model: None,
-            name: name.to_owned(),
+            _name: name.to_owned(),
 
-            dir: 0,
-            time: 0.0,
-            still_time: 0.0,
+            _dir: 0,
+            _time: 0.0,
+            _still_time: 0.0,
             idle_time: 0.0,
         }
     }
@@ -99,7 +89,7 @@ impl CustomEntityRenderer for SlimeRenderer {
         renderer: &mut render::Renderer,
         _: bool,
         _: bool,
-        e: Entity
+        e: Entity,
     ) {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
@@ -108,66 +98,66 @@ impl CustomEntityRenderer for SlimeRenderer {
             .get_component_mut(world_entity, self.game_info)
             .unwrap()
             .delta;
-            let slime_model = m.get_component_mut(e, self.slime_model).unwrap();
-            let position = m.get_component_mut(e, self.position).unwrap();
-            let rotation = m.get_component_mut(e, self.rotation).unwrap();
-            let light = m.get_component(e, self.light).unwrap();
+        let slime_model = m.get_component_mut(e, self.slime_model).unwrap();
+        let position = m.get_component_mut(e, self.position).unwrap();
+        let rotation = m.get_component_mut(e, self.rotation).unwrap();
+        let light = m.get_component(e, self.light).unwrap();
 
-            /*if slime_model.dirty {
-                self.entity_removed(m, e, world, renderer);
-                self.entity_added(m, e, world, renderer);
+        /*if slime_model.dirty {
+            self.entity_removed(m, e, world, renderer);
+            self.entity_added(m, e, world, renderer);
+        }*/
+
+        if let Some(pmodel) = slime_model.model {
+            let mdl = renderer.model.get_model(pmodel).unwrap();
+
+            mdl.block_light = light.block_light;
+            mdl.sky_light = light.sky_light;
+
+            let offset = Vector3::new(
+                position.position.x as f32,
+                -position.position.y as f32,
+                position.position.z as f32,
+            );
+            let offset_matrix = Matrix4::from(Decomposed {
+                scale: 1.0,
+                rot: Quaternion::from_angle_y(Rad(PI + rotation.yaw as f32)),
+                disp: offset,
+            });
+
+            mdl.matrix[SlimeModelPart::Body as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(0.0)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+                });
+
+            mdl.matrix[SlimeModelPart::Eyes as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(0.0)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+                });
+
+            // TODO This sucks
+            /*if slime_model.has_name_tag {
+                let ang = (position.position.x - renderer.camera.pos.x)
+                    .atan2(position.position.z - renderer.camera.pos.z)
+                    as f32;
+                mdl.matrix[SlimeModelPart::NameTag as usize] = Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_y(Rad(ang)),
+                    disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
+                });
             }*/
 
-            if let Some(pmodel) = slime_model.model {
-                let mdl = renderer.model.get_model(pmodel).unwrap();
-
-                mdl.block_light = light.block_light;
-                mdl.sky_light = light.sky_light;
-
-                let offset = Vector3::new(
-                    position.position.x as f32,
-                    -position.position.y as f32,
-                    position.position.z as f32,
-                );
-                let offset_matrix = Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_y(Rad(PI + rotation.yaw as f32)),
-                    disp: offset,
-                });
-
-                mdl.matrix[SlimeModelPart::Body as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(0.0)),
-                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-                });
-
-                mdl.matrix[SlimeModelPart::Eyes as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(0.0)),
-                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-                });
-
-                // TODO This sucks
-                /*if slime_model.has_name_tag {
-                    let ang = (position.position.x - renderer.camera.pos.x)
-                        .atan2(position.position.z - renderer.camera.pos.z)
-                        as f32;
-                    mdl.matrix[SlimeModelPart::NameTag as usize] = Matrix4::from(Decomposed {
-                        scale: 1.0,
-                        rot: Quaternion::from_angle_y(Rad(ang)),
-                        disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
-                    });
-                }*/
-
-                let mut i_time = slime_model.idle_time;
-                i_time += delta * 0.02;
-                if i_time > PI64 * 2.0 {
-                    i_time -= PI64 * 2.0;
-                }
-                slime_model.idle_time = i_time;
+            let mut i_time = slime_model.idle_time;
+            i_time += delta * 0.02;
+            if i_time > PI64 * 2.0 {
+                i_time -= PI64 * 2.0;
             }
+            slime_model.idle_time = i_time;
+        }
     }
 
     fn entity_added(
@@ -178,7 +168,8 @@ impl CustomEntityRenderer for SlimeRenderer {
         renderer: &mut render::Renderer,
     ) {
         let slime_model = m.get_component_mut(e, self.slime_model).unwrap();
-        let tex = Renderer::get_texture(renderer.get_textures_ref(), "minecraft:entity/slime/slime");
+        let tex =
+            Renderer::get_texture(renderer.get_textures_ref(), "minecraft:entity/slime/slime");
         let mut body_verts = vec![];
         model::append_box(
             &mut body_verts,
@@ -188,43 +179,45 @@ impl CustomEntityRenderer for SlimeRenderer {
             8.0 / 16.0,
             8.0 / 16.0,
             8.0 / 16.0,
-            resolve_textures(&tex, 8.0, 8.0, 8.0, 0.0, 0.0)
+            resolve_textures(&tex, 8.0, 8.0, 8.0, 0.0, 0.0),
         );
         model::append_box(
-                           &mut body_verts,
-                           -3.0 / 16.0,
-                           17.0 / 16.0,
-                           -3.0 / 16.0,
-                           6.0 / 16.0,
-                           6.0 / 16.0,
-                           6.0 / 16.0,
-                           resolve_textures(&tex, 6.0, 6.0, 6.0, 0.0, 0.0)
+            &mut body_verts,
+            -3.0 / 16.0,
+            17.0 / 16.0,
+            -3.0 / 16.0,
+            6.0 / 16.0,
+            6.0 / 16.0,
+            6.0 / 16.0,
+            resolve_textures(&tex, 6.0, 6.0, 6.0, 0.0, 0.0),
         );
 
         let mut eye_verts = vec![];
 
-        model::append_box( // right eye
-                           &mut eye_verts,
-                           -3.25 / 16.0,
-                           18.0 / 16.0,
-                           -3.5 / 16.0,
-                           2.0 / 16.0,
-                           2.0 / 16.0,
-                           2.0 / 16.0,
-                           resolve_textures(&tex, 2.0, 2.0, 2.0, 32.0, 0.0)
+        model::append_box(
+            // right eye
+            &mut eye_verts,
+            -3.25 / 16.0,
+            18.0 / 16.0,
+            -3.5 / 16.0,
+            2.0 / 16.0,
+            2.0 / 16.0,
+            2.0 / 16.0,
+            resolve_textures(&tex, 2.0, 2.0, 2.0, 32.0, 0.0),
         );
-        model::append_box( // left eye
-                           &mut eye_verts,
-                           1.25 / 16.0,
-                           18.0 / 16.0,
-                           -3.5 / 16.0,
-                           2.0 / 16.0,
-                           2.0 / 16.0,
-                           2.0 / 16.0,
-                           resolve_textures(&tex, 2.0, 2.0, 2.0, 32.0, 4.0)
+        model::append_box(
+            // left eye
+            &mut eye_verts,
+            1.25 / 16.0,
+            18.0 / 16.0,
+            -3.5 / 16.0,
+            2.0 / 16.0,
+            2.0 / 16.0,
+            2.0 / 16.0,
+            resolve_textures(&tex, 2.0, 2.0, 2.0, 32.0, 4.0),
         );
 
-       // let mut name_verts = vec![];
+        // let mut name_verts = vec![];
         /*if slime_model.has_name_tag {
             let mut state = FormatState {
                 width: 0.0,
@@ -261,8 +254,7 @@ impl CustomEntityRenderer for SlimeRenderer {
         slime_model.model = Some(renderer.model.create_model(
             model::DEFAULT,
             vec![
-                body_verts,
-                eye_verts,
+                body_verts, eye_verts,
                 // name_verts,
             ],
         ));

@@ -13,6 +13,9 @@
 // limitations under the License.
 
 use crate::entity;
+use crate::entity::player::create_local;
+use crate::entity::zombie::create_zombie;
+use crate::entity::EntityType;
 use crate::format;
 use crate::inventory::material::versions::to_material;
 use crate::inventory::{Inventory, InventoryContext, Item};
@@ -52,9 +55,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
-use crate::entity::EntityType;
-use crate::entity::player::create_local;
-use crate::entity::zombie::create_zombie;
 
 pub mod plugin_messages;
 mod sun;
@@ -109,7 +109,6 @@ pub struct Server {
     gamemode: ecs::Key<GameMode>,
     pub rotation: ecs::Key<entity::Rotation>,
     target_rotation: ecs::Key<entity::TargetRotation>,
-    entity_type: ecs::Key<entity::EntityType>,
     block_break_info: Mutex<BlockBreakInfo>,
     //
     pub player: Arc<RwLock<Option<ecs::Entity>>>,
@@ -907,7 +906,6 @@ impl Server {
             gamemode: entities.get_key(),
             rotation: entities.get_key(),
             target_rotation: entities.get_key(),
-            entity_type: entities.get_key(),
             //
             entities: Arc::new(RwLock::new(entities)),
             player: Arc::new(RwLock::new(None)),
@@ -1712,7 +1710,10 @@ impl Server {
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
-        self.entities.clone().write().remove_all_entities_gracefully();
+        self.entities
+            .clone()
+            .write()
+            .remove_all_entities_gracefully();
         *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
         let _ = create_zombie(&mut self.entities.clone().write());
         if *self.dead.read() {

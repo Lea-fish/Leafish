@@ -1,23 +1,7 @@
-use super::{
-    Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity,
-};
-use crate::ecs;
+use crate::entity::resolve_textures;
 use crate::format;
-use crate::render;
 use crate::render::model::{self, FormatState, Vertex};
-use crate::settings::Actionkey;
-use crate::shared::Position as BPosition;
-use crate::types::hash::FNVHash;
-use crate::types::GameMode;
-use crate::world;
-use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
-use collision::{Aabb, Aabb3};
-use instant::Instant;
-use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
-use crate::entity::{CustomEntityRenderer, EntityRenderer, EntityType, resolve_textures};
-use crate::ecs::Entity;
-use crate::render::{Texture, Renderer};
+use crate::render::{Renderer, Texture};
 
 pub enum PlayerLikeModelPart {
     Head = 0,
@@ -184,13 +168,22 @@ fn update(
         }
     }*/
 
-pub fn compute_player_model_components(tex: &Texture, name: &Option<String>, renderer: &mut Renderer) -> Vec<Vec<Vertex>> {
+pub fn compute_player_model_components(
+    tex: &Texture,
+    name: &Option<String>,
+    renderer: &mut Renderer,
+) -> Vec<Vec<Vertex>> {
     // TODO: Replace this shit entirely!
     macro_rules! srel {
-            ($x:expr, $y:expr, $w:expr, $h:expr) => {
-                Some(tex.relative(($x) / (tex.get_width() as f32), ($y) / (tex.get_height() as f32), ($w) / (tex.get_width() as f32), ($h) / (tex.get_height() as f32)))
-            };
-        }
+        ($x:expr, $y:expr, $w:expr, $h:expr) => {
+            Some(tex.relative(
+                ($x) / (tex.get_width() as f32),
+                ($y) / (tex.get_height() as f32),
+                ($w) / (tex.get_width() as f32),
+                ($h) / (tex.get_height() as f32),
+            ))
+        };
+    }
 
     let mut head_verts = vec![];
     model::append_box(
@@ -201,7 +194,7 @@ pub fn compute_player_model_components(tex: &Texture, name: &Option<String>, ren
         8.0 / 16.0,
         8.0 / 16.0,
         8.0 / 16.0,
-        resolve_textures(&tex, 8.0, 8.0, 8.0, 0.0, 0.0)
+        resolve_textures(&tex, 8.0, 8.0, 8.0, 0.0, 0.0),
     );
     model::append_box(
         &mut head_verts,
@@ -211,7 +204,7 @@ pub fn compute_player_model_components(tex: &Texture, name: &Option<String>, ren
         8.4 / 16.0,
         8.4 / 16.0,
         8.4 / 16.0,
-        resolve_textures(&tex, 8.0, 8.0, 8.0, 32.0, 0.0)
+        resolve_textures(&tex, 8.0, 8.0, 8.0, 32.0, 0.0),
     );
 
     let mut body_verts = vec![];
@@ -223,7 +216,7 @@ pub fn compute_player_model_components(tex: &Texture, name: &Option<String>, ren
         8.0 / 16.0,
         12.0 / 16.0,
         4.0 / 16.0,
-        resolve_textures(&tex, 8.0, 12.0, 4.0, 16.0, 16.0)
+        resolve_textures(&tex, 8.0, 12.0, 4.0, 16.0, 16.0),
     );
     model::append_box(
         &mut body_verts,
@@ -233,19 +226,19 @@ pub fn compute_player_model_components(tex: &Texture, name: &Option<String>, ren
         8.4 / 16.0,
         12.4 / 16.0,
         4.4 / 16.0,
-        resolve_textures(&tex, 8.0, 12.0, 4.0, 16.0, 16.0)
+        resolve_textures(&tex, 8.0, 12.0, 4.0, 16.0, 16.0),
     );
 
     let mut part_verts = vec![vec![]; 4];
 
     for (i, offsets) in [
-        [0.0, 16.0, 0.0, 32.0],  // Left leg
+        [0.0, 16.0, 0.0, 32.0],   // Left leg
         [0.0, 16.0, 0.0, 32.0],   // Right Leg
         [40.0, 16.0, 40.0, 32.0], // Left arm
         [40.0, 16.0, 40.0, 32.0], // Right arm
     ]
-        .iter()
-        .enumerate()
+    .iter()
+    .enumerate()
     {
         let (ox, oy) = (offsets[0], offsets[1]);
         model::append_box(
