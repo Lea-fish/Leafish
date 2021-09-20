@@ -236,6 +236,11 @@ impl super::Screen for Chat {
         None
     }
 
+    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        self.on_deactive(renderer, ui_container);
+        self.on_active(renderer, ui_container);
+    }
+
     fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
         if key == VirtualKeyCode::Escape && !down {
             game.screen_sys.clone().pop_screen();
