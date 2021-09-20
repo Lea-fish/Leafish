@@ -160,6 +160,7 @@ impl CustomEntityRenderer for SlimeRenderer {
         }
     }
 
+    #[allow(clippy::eq_op)]
     fn entity_added(
         &self,
         m: &mut ecs::Manager,
