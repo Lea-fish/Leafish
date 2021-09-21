@@ -17,8 +17,8 @@ use std::sync::Arc;
 pub mod player_like;
 pub mod slime;
 mod systems;
-pub mod zombie;
 pub mod versions;
+pub mod zombie;
 
 // TODO: There may be wrong entries in this!
 static TEXTURE_MATRIX: [[[f32; 3]; 6]; 2] = [
