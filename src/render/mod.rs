@@ -250,7 +250,6 @@ impl Renderer {
         self.textures.clone().write().reset();
     }
 
-    // TODO: Improve perf!
     pub fn update_camera(&mut self, width: u32, height: u32) {
         use std::f64::consts::PI as PI64;
         // Not a sane place to put this but it works
@@ -258,7 +257,6 @@ impl Renderer {
             let version = self.resources.read().version();
             if version != self.resource_version {
                 self.resource_version = version;
-                trace!("Updating textures to {}", self.resource_version);
                 self.textures.write().update_textures(self.resource_version);
 
                 self.model
@@ -304,8 +302,6 @@ impl Renderer {
             cgmath::Vector3::new(0.0, -1.0, 0.0),
         );
         self.camera_matrix = camera_matrix * cgmath::Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
-        /*self.frustum =
-        collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();*/
         self.frustum =
             collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();
     }
@@ -319,7 +315,6 @@ impl Renderer {
         physical_width: u32,
         physical_height: u32,
     ) {
-        // let now = Instant::now();
         self.update_textures(delta);
 
         if world.is_some() {

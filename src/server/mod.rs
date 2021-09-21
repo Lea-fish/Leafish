@@ -563,6 +563,24 @@ impl Server {
                         Packet::Respawn_WorldName(respawn) => {
                             server.on_respawn_worldname(respawn);
                         }
+                        Packet::SpawnMob_NoMeta(spawn) => {
+                            println!(
+                                "spawned mob {} {:?}", spawn.ty.0 as i16,
+                                entity::versions::to_entity_type(
+                                    spawn.ty.0 as i16,
+                                    server.mapped_protocol_version
+                                )
+                            );
+                        }
+                        Packet::SpawnObject_VarInt(spawn) => {
+                            println!(
+                                "spawned object {} {:?}", spawn.ty.0 as i16,
+                                entity::versions::to_entity_type(
+                                    spawn.ty.0 as i16,
+                                    server.mapped_protocol_version
+                                )
+                            );
+                        }
                         Packet::EntityTeleport_f64(entity_teleport) => {
                             server.on_entity_teleport_f64(entity_teleport);
                         }
