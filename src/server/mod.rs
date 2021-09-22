@@ -566,7 +566,7 @@ impl Server {
                         Packet::SpawnMob_NoMeta(spawn) => {
                             let entity_type = entity::versions::to_entity_type(spawn.ty.0 as i16, server.mapped_protocol_version);
                             if entity_type != EntityType::Unknown {
-                                let entity = entity_type.create_entity(&mut server.entities.clone().write());
+                                let entity = entity_type.create_entity(&mut server.entities.clone().write(), spawn.x, spawn.y, spawn.z);
                                 if entity.is_some() {
                                     println!("spawning {}", spawn.entity_id.0);
                                     server.entity_map.clone().write().insert(spawn.entity_id.0, entity.unwrap());
@@ -580,7 +580,7 @@ impl Server {
                         Packet::SpawnObject_VarInt(spawn) => {
                             let entity_type = entity::versions::to_entity_type(spawn.ty.0 as i16, server.mapped_protocol_version);
                             if entity_type != EntityType::Unknown {
-                                let entity = entity_type.create_entity(&mut server.entities.clone().write());
+                                let entity = entity_type.create_entity(&mut server.entities.clone().write(), spawn.x, spawn.y, spawn.z);
                                 if entity.is_some() {
                                     println!("spawning {}", spawn.entity_id.0);
                                     server.entity_map.clone().write().insert(spawn.entity_id.0, entity.unwrap());
@@ -1743,7 +1743,7 @@ impl Server {
             .write()
             .remove_all_entities_gracefully();
         *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
-        let _ = EntityType::Zombie.create_entity(&mut self.entities.clone().write())/*create_zombie(&mut self.entities.clone().write())*/;
+        let _ = EntityType::Zombie.create_entity(&mut self.entities.clone().write(), 1478.5, 47.0, -474.5)/*create_zombie(&mut self.entities.clone().write())*/;
         if *self.dead.read() {
             *self.close_death_screen.write() = true;
             *self.dead.write() = false;

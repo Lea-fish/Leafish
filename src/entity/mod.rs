@@ -457,28 +457,28 @@ impl EntityType {
             .map_or(NOOP_RENDERER.clone(), |x| x.value().clone())
     }
 
-    pub fn create_entity(&self, m: &mut ecs::Manager) -> Option<ecs::Entity> {
+    pub fn create_entity(&self, m: &mut ecs::Manager, x: f64, y: f64, z: f64) -> Option<ecs::Entity> {
         if self.supported() {
-            let ret = self.create_entity_internally(m);
+            let ret = self.create_entity_internally(m, x, y, z);
             self.create_model(m, ret);
             return Some(ret);
         }
         None
     }
 
-    pub fn create_entity_custom_model(&self, m: &mut ecs::Manager) -> Option<ecs::Entity> {
+    pub fn create_entity_custom_model(&self, m: &mut ecs::Manager, x: f64, y: f64, z: f64) -> Option<ecs::Entity> {
         if self.supported() {
-            return Some(self.create_entity_internally(m));
+            return Some(self.create_entity_internally(m, x, y, z));
         }
         None
     }
 
-    fn create_entity_internally(&self, m: &mut ecs::Manager) -> ecs::Entity {
+    fn create_entity_internally(&self, m: &mut ecs::Manager, x: f64, y: f64, z: f64) -> ecs::Entity {
         let entity = m.create_entity();
-        m.add_component_direct(entity, Position::new(1478.5, 47.0, -474.5));
+        m.add_component_direct(entity, Position::new(x, y, z));
         m.add_component_direct(entity, Rotation::new(0.0, 0.0));
         m.add_component_direct(entity, Velocity::new(0.0, 0.0, 0.0));
-        m.add_component_direct(entity, TargetPosition::new(0.0, 0.0, 0.0));
+        m.add_component_direct(entity, TargetPosition::new(x, y, z));
         m.add_component_direct(entity, TargetRotation::new(0.0, 0.0));
         m.add_component_direct(
             entity,
@@ -488,7 +488,7 @@ impl EntityType {
             )),
         );
         m.add_component_direct(entity, Light::new());
-        m.add_component_direct(entity, self.clone());
+        m.add_component_direct(entity, *self);
         entity
     }
 
