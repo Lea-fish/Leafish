@@ -563,33 +563,32 @@ impl Server {
                         Packet::Respawn_WorldName(respawn) => {
                             server.on_respawn_worldname(respawn);
                         }
-                        Packet::SpawnMob_NoMeta(spawn) => {
-                            let entity_type = entity::versions::to_entity_type(spawn.ty.0 as i16, server.mapped_protocol_version);
-                            if entity_type != EntityType::Unknown {
-                                let entity = entity_type.create_entity(&mut server.entities.clone().write(), spawn.x, spawn.y, spawn.z);
-                                if entity.is_some() {
-                                    println!("spawning {}", spawn.entity_id.0);
-                                    server.entity_map.clone().write().insert(spawn.entity_id.0, entity.unwrap());
-                                    println!(
-                                        "spawned mob {} {:?}", spawn.ty.0 as i16,
-                                        entity_type
-                                    );
-                                }
-                            }
+                        Packet::SpawnMob_u8(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
                         }
+                        /*Packet::SpawnMob_u8_i32(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }
+                        Packet::SpawnMob_u8_i32_NoUUID(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }*/
+                        Packet::SpawnMob_WithMeta(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }
+                        Packet::SpawnMob_NoMeta(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }
+                        Packet::SpawnObject(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }
+                        /*Packet::SpawnObject_i32(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }
+                        Packet::SpawnObject_i32_NoUUID(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }*/
                         Packet::SpawnObject_VarInt(spawn) => {
-                            let entity_type = entity::versions::to_entity_type(spawn.ty.0 as i16, server.mapped_protocol_version);
-                            if entity_type != EntityType::Unknown {
-                                let entity = entity_type.create_entity(&mut server.entities.clone().write(), spawn.x, spawn.y, spawn.z);
-                                if entity.is_some() {
-                                    println!("spawning {}", spawn.entity_id.0);
-                                    server.entity_map.clone().write().insert(spawn.entity_id.0, entity.unwrap());
-                                    println!(
-                                        "spawned object {} {:?}", spawn.ty.0 as i16,
-                                        entity_type
-                                    );
-                                }
-                            }
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
                         }
                         Packet::EntityTeleport_f64(entity_teleport) => {
                             server.on_entity_teleport_f64(entity_teleport);
@@ -1795,6 +1794,20 @@ impl Server {
                     .get_component_mut(player, self.player_movement)
                     .unwrap()
                     .flying = gamemode.can_fly();
+            }
+        }
+    }
+
+    fn on_entity_spawn(&self, ty: i16, entity_id: i32, x: f64, y: f64, z: f64) {
+        let entity_type = entity::versions::to_entity_type(ty, self.mapped_protocol_version);
+        if entity_type != EntityType::Unknown {
+            let entity = entity_type.create_entity(&mut self.entities.clone().write(), x, y, z);
+            if entity.is_some() {
+                self.entity_map.clone().write().insert(entity_id, entity.unwrap());
+                println!(
+                    "spawned {} {:?}", ty,
+                    entity_type
+                );
             }
         }
     }
