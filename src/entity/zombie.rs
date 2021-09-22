@@ -2,7 +2,7 @@ use super::{Bounds, GameInfo, Light, Position, Rotation, Velocity};
 use crate::ecs;
 use crate::ecs::Entity;
 use crate::entity::player_like::{compute_player_model_components, PlayerLikeModelPart};
-use crate::entity::{CustomEntityRenderer, EntityType};
+use crate::entity::{CustomEntityRenderer, EntityType, TargetPosition, TargetRotation};
 use crate::render;
 use crate::render::model;
 use crate::render::Renderer;
@@ -54,7 +54,7 @@ pub fn create_zombie(m: &mut ecs::Manager) -> ecs::Entity {
 pub struct ZombieRenderer {
     zombie_model: ecs::Key<ZombieModel>,
     position: ecs::Key<Position>,
-    rotation: ecs::Key<Rotation>,
+    rotation: ecs::Key<Rotation>, // TODO: Fix this, it is bugged somehow!
     game_info: ecs::Key<GameInfo>,
     light: ecs::Key<Light>,
 }

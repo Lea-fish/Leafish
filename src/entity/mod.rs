@@ -3,16 +3,17 @@ pub mod player;
 
 use crate::ecs;
 use crate::ecs::{Entity, Filter, Manager, System};
-use crate::entity::player::PlayerRenderer;
-use crate::entity::slime::SlimeRenderer;
-use crate::entity::zombie::ZombieRenderer;
+use crate::entity::player::{PlayerRenderer, PlayerModel};
+use crate::entity::slime::{SlimeRenderer, SlimeModel};
+use crate::entity::zombie::{ZombieRenderer, ZombieModel};
 use crate::render::{Renderer, Texture};
 use crate::world::World;
-use cgmath::Vector3;
+use cgmath::{Vector3, Point3};
 use collision::Aabb3;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use std::sync::Arc;
+use std::any::Any;
 
 pub mod player_like;
 pub mod slime;
@@ -314,7 +315,7 @@ impl CustomEntityRenderer for NOOPEntityRenderer {
     fn entity_removed(&self, _: &mut Manager, _: Entity, _: &World, _: &mut Renderer) {}
 }
 
-#[derive(Eq, PartialEq, Hash, Debug)]
+#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum EntityType {
     DroppedItem,
     ExperienceOrb,
@@ -454,6 +455,53 @@ impl EntityType {
         ENTITY_RENDERERS
             .get(&self)
             .map_or(NOOP_RENDERER.clone(), |x| x.value().clone())
+    }
+
+    pub fn create_entity(&self, m: &mut ecs::Manager) -> Option<ecs::Entity> {
+        if self.supported() {
+            let ret = self.create_entity_internally(m);
+            self.create_model(m, ret);
+            return Some(ret);
+        }
+        None
+    }
+
+    pub fn create_entity_custom_model(&self, m: &mut ecs::Manager) -> Option<ecs::Entity> {
+        if self.supported() {
+            return Some(self.create_entity_internally(m));
+        }
+        None
+    }
+
+    fn create_entity_internally(&self, m: &mut ecs::Manager) -> ecs::Entity {
+        let entity = m.create_entity();
+        m.add_component_direct(entity, Position::new(1478.5, 47.0, -474.5));
+        m.add_component_direct(entity, Rotation::new(0.0, 0.0));
+        m.add_component_direct(entity, Velocity::new(0.0, 0.0, 0.0));
+        m.add_component_direct(entity, TargetPosition::new(0.0, 0.0, 0.0));
+        m.add_component_direct(entity, TargetRotation::new(0.0, 0.0));
+        m.add_component_direct(
+            entity,
+            Bounds::new(Aabb3::new(
+                Point3::new(-0.3, 0.0, -0.3),
+                Point3::new(0.3, 1.8, 0.3),
+            )),
+        );
+        m.add_component_direct(entity, Light::new());
+        m.add_component_direct(entity, self.clone());
+        entity
+    }
+
+    fn create_model(&self, m: &mut ecs::Manager, entity: ecs::Entity) {
+        match self {
+            EntityType::Zombie => m.add_component_direct(entity, ZombieModel::new(Some(String::from("test")))),
+            EntityType::Slime => m.add_component_direct(entity, SlimeModel::new("test")),
+            _ => {},
+        };
+    }
+
+    fn supported(&self) -> bool {
+        matches!(self, EntityType::Zombie)
     }
 }
 

@@ -564,22 +564,32 @@ impl Server {
                             server.on_respawn_worldname(respawn);
                         }
                         Packet::SpawnMob_NoMeta(spawn) => {
-                            println!(
-                                "spawned mob {} {:?}", spawn.ty.0 as i16,
-                                entity::versions::to_entity_type(
-                                    spawn.ty.0 as i16,
-                                    server.mapped_protocol_version
-                                )
-                            );
+                            let entity_type = entity::versions::to_entity_type(spawn.ty.0 as i16, server.mapped_protocol_version);
+                            if entity_type != EntityType::Unknown {
+                                let entity = entity_type.create_entity(&mut server.entities.clone().write());
+                                if entity.is_some() {
+                                    println!("spawning {}", spawn.entity_id.0);
+                                    server.entity_map.clone().write().insert(spawn.entity_id.0, entity.unwrap());
+                                    println!(
+                                        "spawned mob {} {:?}", spawn.ty.0 as i16,
+                                        entity_type
+                                    );
+                                }
+                            }
                         }
                         Packet::SpawnObject_VarInt(spawn) => {
-                            println!(
-                                "spawned object {} {:?}", spawn.ty.0 as i16,
-                                entity::versions::to_entity_type(
-                                    spawn.ty.0 as i16,
-                                    server.mapped_protocol_version
-                                )
-                            );
+                            let entity_type = entity::versions::to_entity_type(spawn.ty.0 as i16, server.mapped_protocol_version);
+                            if entity_type != EntityType::Unknown {
+                                let entity = entity_type.create_entity(&mut server.entities.clone().write());
+                                if entity.is_some() {
+                                    println!("spawning {}", spawn.entity_id.0);
+                                    server.entity_map.clone().write().insert(spawn.entity_id.0, entity.unwrap());
+                                    println!(
+                                        "spawned object {} {:?}", spawn.ty.0 as i16,
+                                        entity_type
+                                    );
+                                }
+                            }
                         }
                         Packet::EntityTeleport_f64(entity_teleport) => {
                             server.on_entity_teleport_f64(entity_teleport);
@@ -1733,7 +1743,7 @@ impl Server {
             .write()
             .remove_all_entities_gracefully();
         *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
-        let _ = create_zombie(&mut self.entities.clone().write());
+        let _ = EntityType::Zombie.create_entity(&mut self.entities.clone().write())/*create_zombie(&mut self.entities.clone().write())*/;
         if *self.dead.read() {
             *self.close_death_screen.write() = true;
             *self.dead.write() = false;
@@ -2005,6 +2015,7 @@ impl Server {
     ) {
         use std::f64::consts::PI;
         if let Some(entity) = self.entity_map.clone().read().get(&entity_id) {
+            println!("updating position: {}", entity_id);
             let position = self
                 .entities
                 .clone()
