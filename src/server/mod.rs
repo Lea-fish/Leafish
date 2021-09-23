@@ -13,6 +13,8 @@
 // limitations under the License.
 
 use crate::entity;
+use crate::entity::player::create_local;
+use crate::entity::EntityType;
 use crate::format;
 use crate::inventory::material::versions::to_material;
 use crate::inventory::{Inventory, InventoryContext, Item};
@@ -515,6 +517,34 @@ impl Server {
                         Packet::EntityLook_VarInt(look) => {
                             server.on_entity_look_varint(look);
                         }
+                        Packet::EntityHeadLook(look) => {
+                            use std::f64::consts::PI;
+                            if let Some(entity) =
+                                server.entity_map.clone().read().get(&look.entity_id.0)
+                            {
+                                let rotation = server
+                                    .entities
+                                    .clone()
+                                    .write()
+                                    .get_component_mut(*entity, server.target_rotation)
+                                    .unwrap();
+                                rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
+                            }
+                        }
+                        Packet::EntityHeadLook_i32(look) => {
+                            use std::f64::consts::PI;
+                            if let Some(entity) =
+                                server.entity_map.clone().read().get(&look.entity_id)
+                            {
+                                let rotation = server
+                                    .entities
+                                    .clone()
+                                    .write()
+                                    .get_component_mut(*entity, server.target_rotation)
+                                    .unwrap();
+                                rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
+                            }
+                        }
                         Packet::EntityLook_i32_NoGround(look) => {
                             server.on_entity_look_i32_noground(look);
                         }
@@ -559,6 +589,78 @@ impl Server {
                         }
                         Packet::Respawn_WorldName(respawn) => {
                             server.on_respawn_worldname(respawn);
+                        }
+                        Packet::SpawnMob_u8(spawn) => {
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
+                        }
+                        /*Packet::SpawnMob_u8_i32(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }
+                        Packet::SpawnMob_u8_i32_NoUUID(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }*/
+                        Packet::SpawnMob_WithMeta(spawn) => {
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty.0 as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
+                        }
+                        Packet::SpawnMob_NoMeta(spawn) => {
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty.0 as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
+                        }
+                        Packet::SpawnObject(spawn) => {
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
+                        }
+                        /*Packet::SpawnObject_i32(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }
+                        Packet::SpawnObject_i32_NoUUID(spawn) => {
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                        }*/
+                        Packet::SpawnObject_VarInt(spawn) => {
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty.0 as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
                         }
                         Packet::EntityTeleport_f64(entity_teleport) => {
                             server.on_entity_teleport_f64(entity_teleport);
@@ -877,6 +979,7 @@ impl Server {
         )));
         hud_context.write().player_inventory =
             Some(inventory_context.read().player_inventory.clone());
+        EntityType::init(&mut entities);
 
         let version = resources.read().version();
         Server {
@@ -1003,7 +1106,7 @@ impl Server {
                 .clone()
                 .read()
                 .get_component(player, self.position)
-                .unwrap();
+                .unwrap(); // TODO: This panicked, check why!
             let rotation = self
                 .entities
                 .clone()
@@ -1100,6 +1203,7 @@ impl Server {
             sun_model.remove(renderer);
         }
         self.target_info.clone().write().clear(renderer);
+        EntityType::deinit();
     }
 
     fn update_time(&self, renderer: &mut render::Renderer, delta: f64) {
@@ -1705,6 +1809,12 @@ impl Server {
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
+        self.entities
+            .clone()
+            .write()
+            .remove_all_entities_gracefully();
+        *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
+        let _ = EntityType::Zombie.create_entity(&mut self.entities.clone().write(), 1478.5, 47.0, -474.5, 0.0, 0.0)/*create_zombie(&mut self.entities.clone().write())*/;
         if *self.dead.read() {
             *self.close_death_screen.write() = true;
             *self.dead.write() = false;
@@ -1756,6 +1866,27 @@ impl Server {
                     .get_component_mut(player, self.player_movement)
                     .unwrap()
                     .flying = gamemode.can_fly();
+            }
+        }
+    }
+
+    fn on_entity_spawn(
+        &self,
+        ty: i16,
+        entity_id: i32,
+        x: f64,
+        y: f64,
+        z: f64,
+        yaw: f64,
+        pitch: f64,
+    ) {
+        let entity_type = entity::versions::to_entity_type(ty, self.mapped_protocol_version);
+        if entity_type != EntityType::Unknown {
+            let entity =
+                entity_type.create_entity(&mut self.entities.clone().write(), x, y, z, yaw, pitch);
+            if let Some(entity) = entity {
+                self.entity_map.clone().write().insert(entity_id, entity);
+                println!("spawned {} {:?}", ty, entity_type);
             }
         }
     }

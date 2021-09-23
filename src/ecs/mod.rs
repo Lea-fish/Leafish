@@ -318,6 +318,11 @@ impl Manager {
 
     /// Deallocates all entities/components excluding the world entity
     pub fn remove_all_entities(&mut self, world: &world::World, renderer: &mut render::Renderer) {
+        self.remove_all_entities_gracefully();
+        self.process_entity_changes(world, renderer);
+    }
+
+    pub fn remove_all_entities_gracefully(&mut self) {
         for (id, e) in self.entities[1..].iter_mut().enumerate() {
             if let Some(set) = e.0.as_mut() {
                 set.components = BSet::new(self.components.len());
@@ -328,7 +333,6 @@ impl Manager {
                 });
             }
         }
-        self.process_entity_changes(world, renderer);
     }
 
     /// Returns whether an entity reference is valid.

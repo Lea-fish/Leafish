@@ -2,6 +2,8 @@ use super::{
     Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity,
 };
 use crate::ecs;
+use crate::ecs::Entity;
+use crate::entity::{resolve_textures, CustomEntityRenderer, EntityRenderer, EntityType};
 use crate::format;
 use crate::render;
 use crate::render::model::{self, FormatState};
@@ -19,7 +21,7 @@ use std::hash::BuildHasherDefault;
 pub fn add_systems(m: &mut ecs::Manager) {
     let sys = MovementHandler::new(m);
     m.add_system(sys);
-    let sys = PlayerRenderer::new(m);
+    let sys = EntityRenderer::new(m);
     m.add_render_system(sys);
 }
 
@@ -43,6 +45,7 @@ pub fn create_local(m: &mut ecs::Manager) -> ecs::Entity {
     );
     m.add_component_direct(entity, PlayerModel::new("", false, false, true));
     m.add_component_direct(entity, Light::new());
+    m.add_component_direct(entity, EntityType::Player);
     entity
 }
 
@@ -62,6 +65,7 @@ pub fn create_remote(m: &mut ecs::Manager, name: &str) -> ecs::Entity {
     );
     m.add_component_direct(entity, PlayerModel::new(name, true, true, false));
     m.add_component_direct(entity, Light::new());
+    m.add_component_direct(entity, EntityType::Player);
     entity
 }
 
@@ -108,8 +112,7 @@ impl PlayerModel {
     }
 }
 
-struct PlayerRenderer {
-    filter: ecs::Filter,
+pub struct PlayerRenderer {
     player_model: ecs::Key<PlayerModel>,
     position: ecs::Key<Position>,
     rotation: ecs::Key<Rotation>,
@@ -118,17 +121,12 @@ struct PlayerRenderer {
 }
 
 impl PlayerRenderer {
-    fn new(m: &mut ecs::Manager) -> PlayerRenderer {
+    pub fn new(m: &mut ecs::Manager) -> Self {
         let player_model = m.get_key();
         let position = m.get_key();
         let rotation = m.get_key();
         let light = m.get_key();
         PlayerRenderer {
-            filter: ecs::Filter::new()
-                .with(player_model)
-                .with(position)
-                .with(rotation)
-                .with(light),
             player_model,
             position,
             rotation,
@@ -146,22 +144,19 @@ enum PlayerModelPart {
     ArmLeft = 4,
     ArmRight = 5,
     NameTag = 6,
-    //Cape = 7, // TODO
+    // Cape = 7, // TODO
 }
 
 // TODO: Setup culling
-impl ecs::System for PlayerRenderer {
-    fn filter(&self) -> &ecs::Filter {
-        &self.filter
-    }
-
+impl CustomEntityRenderer for PlayerRenderer {
     fn update(
-        &mut self,
+        &self,
         m: &mut ecs::Manager,
         world: &world::World,
         renderer: &mut render::Renderer,
         _: bool,
         _: bool,
+        e: Entity,
     ) {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
@@ -170,160 +165,158 @@ impl ecs::System for PlayerRenderer {
             .get_component_mut(world_entity, self.game_info)
             .unwrap()
             .delta;
-        for e in m.find(&self.filter) {
-            let player_model = m.get_component_mut(e, self.player_model).unwrap();
-            let position = m.get_component_mut(e, self.position).unwrap();
-            let rotation = m.get_component_mut(e, self.rotation).unwrap();
-            let light = m.get_component(e, self.light).unwrap();
+        let player_model = m.get_component_mut(e, self.player_model).unwrap();
+        let position = m.get_component_mut(e, self.position).unwrap();
+        let rotation = m.get_component_mut(e, self.rotation).unwrap();
+        let light = m.get_component(e, self.light).unwrap();
 
-            if player_model.dirty {
-                self.entity_removed(m, e, world, renderer);
-                self.entity_added(m, e, world, renderer);
+        if player_model.dirty {
+            self.entity_removed(m, e, world, renderer);
+            self.entity_added(m, e, world, renderer);
+        }
+
+        if let Some(pmodel) = player_model.model {
+            let mdl = renderer.model.get_model(pmodel).unwrap();
+
+            mdl.block_light = light.block_light;
+            mdl.sky_light = light.sky_light;
+
+            let offset = if player_model.first_person {
+                let ox = (rotation.yaw - PI64 / 2.0).cos() * 0.25;
+                let oz = -(rotation.yaw - PI64 / 2.0).sin() * 0.25;
+                Vector3::new(
+                    position.position.x as f32 - ox as f32,
+                    -position.position.y as f32,
+                    position.position.z as f32 - oz as f32,
+                )
+            } else {
+                Vector3::new(
+                    position.position.x as f32,
+                    -position.position.y as f32,
+                    position.position.z as f32,
+                )
+            };
+            let offset_matrix = Matrix4::from(Decomposed {
+                scale: 1.0,
+                rot: Quaternion::from_angle_y(Rad(PI + rotation.yaw as f32)),
+                disp: offset,
+            });
+
+            // TODO This sucks
+            if player_model.has_name_tag {
+                let ang = (position.position.x - renderer.camera.pos.x)
+                    .atan2(position.position.z - renderer.camera.pos.z)
+                    as f32;
+                mdl.matrix[PlayerModelPart::NameTag as usize] = Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_y(Rad(ang)),
+                    disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
+                });
             }
 
-            if let Some(pmodel) = player_model.model {
-                let mdl = renderer.model.get_model(pmodel).unwrap();
-
-                mdl.block_light = light.block_light;
-                mdl.sky_light = light.sky_light;
-
-                let offset = if player_model.first_person {
-                    let ox = (rotation.yaw - PI64 / 2.0).cos() * 0.25;
-                    let oz = -(rotation.yaw - PI64 / 2.0).sin() * 0.25;
-                    Vector3::new(
-                        position.position.x as f32 - ox as f32,
-                        -position.position.y as f32,
-                        position.position.z as f32 - oz as f32,
-                    )
-                } else {
-                    Vector3::new(
-                        position.position.x as f32,
-                        -position.position.y as f32,
-                        position.position.z as f32,
-                    )
-                };
-                let offset_matrix = Matrix4::from(Decomposed {
+            mdl.matrix[PlayerModelPart::Head as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
                     scale: 1.0,
-                    rot: Quaternion::from_angle_y(Rad(PI + rotation.yaw as f32)),
-                    disp: offset,
+                    rot: Quaternion::from_angle_x(Rad(-rotation.pitch as f32)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
+                });
+            mdl.matrix[PlayerModelPart::Body as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(0.0)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
                 });
 
-                // TODO This sucks
-                if player_model.has_name_tag {
-                    let ang = (position.position.x - renderer.camera.pos.x)
-                        .atan2(position.position.z - renderer.camera.pos.z)
-                        as f32;
-                    mdl.matrix[PlayerModelPart::NameTag as usize] = Matrix4::from(Decomposed {
-                        scale: 1.0,
-                        rot: Quaternion::from_angle_y(Rad(ang)),
-                        disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
-                    });
-                }
-
-                mdl.matrix[PlayerModelPart::Head as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                        scale: 1.0,
-                        rot: Quaternion::from_angle_x(Rad(-rotation.pitch as f32)),
-                        disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
-                    });
-                mdl.matrix[PlayerModelPart::Body as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                        scale: 1.0,
-                        rot: Quaternion::from_angle_x(Rad(0.0)),
-                        disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-                    });
-
-                let mut time = player_model.time;
-                let mut dir = player_model.dir;
-                if dir == 0 {
-                    dir = 1;
-                    time = 15.0;
-                }
-                let ang = ((time / 15.0) - 1.0) * (PI64 / 4.0);
-
-                mdl.matrix[PlayerModelPart::LegRight as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                        scale: 1.0,
-                        rot: Quaternion::from_angle_x(Rad(ang as f32)),
-                        disp: Vector3::new(2.0 / 16.0, -12.0 / 16.0, 0.0),
-                    });
-                mdl.matrix[PlayerModelPart::LegLeft as usize] = offset_matrix
-                    * Matrix4::from(Decomposed {
-                        scale: 1.0,
-                        rot: Quaternion::from_angle_x(Rad(-ang as f32)),
-                        disp: Vector3::new(-2.0 / 16.0, -12.0 / 16.0, 0.0),
-                    });
-
-                let mut i_time = player_model.idle_time;
-                i_time += delta * 0.02;
-                if i_time > PI64 * 2.0 {
-                    i_time -= PI64 * 2.0;
-                }
-                player_model.idle_time = i_time;
-
-                if player_model.arm_time <= 0.0 {
-                    player_model.arm_time = 0.0;
-                } else {
-                    player_model.arm_time -= delta;
-                }
-
-                mdl.matrix[PlayerModelPart::ArmRight as usize] = offset_matrix
-                    * Matrix4::from_translation(Vector3::new(
-                        6.0 / 16.0,
-                        -12.0 / 16.0 - 12.0 / 16.0,
-                        0.0,
-                    ))
-                    * Matrix4::from(Quaternion::from_angle_x(Rad(-(ang * 0.75) as f32)))
-                    * Matrix4::from(Quaternion::from_angle_z(Rad(
-                        (i_time.cos() * 0.06 - 0.06) as f32
-                    )))
-                    * Matrix4::from(Quaternion::from_angle_x(Rad((i_time.sin() * 0.06
-                        - ((7.5 - (player_model.arm_time - 7.5).abs()) / 7.5))
-                        as f32)));
-
-                mdl.matrix[PlayerModelPart::ArmLeft as usize] = offset_matrix
-                    * Matrix4::from_translation(Vector3::new(
-                        -6.0 / 16.0,
-                        -12.0 / 16.0 - 12.0 / 16.0,
-                        0.0,
-                    ))
-                    * Matrix4::from(Quaternion::from_angle_x(Rad((ang * 0.75) as f32)))
-                    * Matrix4::from(Quaternion::from_angle_z(Rad(
-                        -(i_time.cos() * 0.06 - 0.06) as f32
-                    )))
-                    * Matrix4::from(Quaternion::from_angle_x(Rad(-(i_time.sin() * 0.06) as f32)));
-
-                let mut update = true;
-                if position.moved {
-                    player_model.still_time = 0.0;
-                } else if player_model.still_time > 2.0 {
-                    if (time - 15.0).abs() <= 1.5 * delta {
-                        time = 15.0;
-                        update = false;
-                    }
-                    dir = (15.0 - time).signum() as i32;
-                } else {
-                    player_model.still_time += delta;
-                }
-
-                if update {
-                    time += delta * 1.5 * (dir as f64);
-                    if time > 30.0 {
-                        time = 30.0;
-                        dir = -1;
-                    } else if time < 0.0 {
-                        time = 0.0;
-                        dir = 1;
-                    }
-                }
-                player_model.time = time;
-                player_model.dir = dir;
+            let mut time = player_model.time;
+            let mut dir = player_model.dir;
+            if dir == 0 {
+                dir = 1;
+                time = 15.0;
             }
+            let ang = ((time / 15.0) - 1.0) * (PI64 / 4.0);
+
+            mdl.matrix[PlayerModelPart::LegRight as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(ang as f32)),
+                    disp: Vector3::new(2.0 / 16.0, -12.0 / 16.0, 0.0),
+                });
+            mdl.matrix[PlayerModelPart::LegLeft as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(-ang as f32)),
+                    disp: Vector3::new(-2.0 / 16.0, -12.0 / 16.0, 0.0),
+                });
+
+            let mut i_time = player_model.idle_time;
+            i_time += delta * 0.02;
+            if i_time > PI64 * 2.0 {
+                i_time -= PI64 * 2.0;
+            }
+            player_model.idle_time = i_time;
+
+            if player_model.arm_time <= 0.0 {
+                player_model.arm_time = 0.0;
+            } else {
+                player_model.arm_time -= delta;
+            }
+
+            mdl.matrix[PlayerModelPart::ArmRight as usize] = offset_matrix
+                * Matrix4::from_translation(Vector3::new(
+                    6.0 / 16.0,
+                    -12.0 / 16.0 - 12.0 / 16.0,
+                    0.0,
+                ))
+                * Matrix4::from(Quaternion::from_angle_x(Rad(-(ang * 0.75) as f32)))
+                * Matrix4::from(Quaternion::from_angle_z(Rad(
+                    (i_time.cos() * 0.06 - 0.06) as f32
+                )))
+                * Matrix4::from(Quaternion::from_angle_x(Rad((i_time.sin() * 0.06
+                    - ((7.5 - (player_model.arm_time - 7.5).abs()) / 7.5))
+                    as f32)));
+
+            mdl.matrix[PlayerModelPart::ArmLeft as usize] = offset_matrix
+                * Matrix4::from_translation(Vector3::new(
+                    -6.0 / 16.0,
+                    -12.0 / 16.0 - 12.0 / 16.0,
+                    0.0,
+                ))
+                * Matrix4::from(Quaternion::from_angle_x(Rad((ang * 0.75) as f32)))
+                * Matrix4::from(Quaternion::from_angle_z(Rad(
+                    -(i_time.cos() * 0.06 - 0.06) as f32
+                )))
+                * Matrix4::from(Quaternion::from_angle_x(Rad(-(i_time.sin() * 0.06) as f32)));
+
+            let mut update = true;
+            if position.moved {
+                player_model.still_time = 0.0;
+            } else if player_model.still_time > 2.0 {
+                if (time - 15.0).abs() <= 1.5 * delta {
+                    time = 15.0;
+                    update = false;
+                }
+                dir = (15.0 - time).signum() as i32;
+            } else {
+                player_model.still_time += delta;
+            }
+
+            if update {
+                time += delta * 1.5 * (dir as f64);
+                if time > 30.0 {
+                    time = 30.0;
+                    dir = -1;
+                } else if time < 0.0 {
+                    time = 0.0;
+                    dir = 1;
+                }
+            }
+            player_model.time = time;
+            player_model.dir = dir;
         }
     }
 
     fn entity_added(
-        &mut self,
+        &self,
         m: &mut ecs::Manager,
         e: ecs::Entity,
         _: &world::World,
@@ -339,6 +332,7 @@ impl ecs::System for PlayerRenderer {
             render::Renderer::get_texture(renderer.get_textures_ref(), "entity/steve")
         };
 
+        // TODO: Replace this shit entirely!
         macro_rules! srel {
             ($x:expr, $y:expr, $w:expr, $h:expr) => {
                 Some(skin.relative(($x) / 64.0, ($y) / 64.0, ($w) / 64.0, ($h) / 64.0))
@@ -355,14 +349,7 @@ impl ecs::System for PlayerRenderer {
                 8.0 / 16.0,
                 8.0 / 16.0,
                 8.0 / 16.0,
-                [
-                    srel!(16.0, 0.0, 8.0, 8.0), // Down
-                    srel!(8.0, 0.0, 8.0, 8.0),  // Up
-                    srel!(8.0, 8.0, 8.0, 8.0),  // North
-                    srel!(24.0, 8.0, 8.0, 8.0), // South
-                    srel!(16.0, 8.0, 8.0, 8.0), // West
-                    srel!(0.0, 8.0, 8.0, 8.0),  // East
-                ],
+                resolve_textures(&skin, 8.0, 8.0, 8.0, 0.0, 0.0),
             );
             model::append_box(
                 &mut head_verts,
@@ -372,14 +359,7 @@ impl ecs::System for PlayerRenderer {
                 8.4 / 16.0,
                 8.4 / 16.0,
                 8.4 / 16.0,
-                [
-                    srel!((16.0 + 32.0), 0.0, 8.0, 8.0), // Down
-                    srel!((8.0 + 32.0), 0.0, 8.0, 8.0),  // Up
-                    srel!((8.0 + 32.0), 8.0, 8.0, 8.0),  // North
-                    srel!((24.0 + 32.0), 8.0, 8.0, 8.0), // South
-                    srel!((16.0 + 32.0), 8.0, 8.0, 8.0), // West
-                    srel!((0.0 + 32.0), 8.0, 8.0, 8.0),  // East
-                ],
+                resolve_textures(&skin, 8.0, 8.0, 8.0, 32.0, 0.0),
             );
         }
 
@@ -393,14 +373,7 @@ impl ecs::System for PlayerRenderer {
             8.0 / 16.0,
             12.0 / 16.0,
             4.0 / 16.0,
-            [
-                srel!(28.0, 16.0, 8.0, 4.0),  // Down
-                srel!(20.0, 16.0, 8.0, 4.0),  // Up
-                srel!(20.0, 20.0, 8.0, 12.0), // North
-                srel!(32.0, 20.0, 8.0, 12.0), // South
-                srel!(16.0, 20.0, 4.0, 12.0), // West
-                srel!(28.0, 20.0, 4.0, 12.0), // East
-            ],
+            resolve_textures(&skin, 8.0, 12.0, 4.0, 16.0, 16.0),
         );
         model::append_box(
             &mut body_verts,
@@ -410,14 +383,7 @@ impl ecs::System for PlayerRenderer {
             8.4 / 16.0,
             12.4 / 16.0,
             4.4 / 16.0,
-            [
-                srel!(28.0, 16.0 + 16.0, 8.0, 4.0),  // Down
-                srel!(20.0, 16.0 + 16.0, 8.0, 4.0),  // Up
-                srel!(20.0, 20.0 + 16.0, 8.0, 12.0), // North
-                srel!(32.0, 20.0 + 16.0, 8.0, 12.0), // South
-                srel!(16.0, 20.0 + 16.0, 4.0, 12.0), // West
-                srel!(28.0, 20.0 + 16.0, 4.0, 12.0), // East
-            ],
+            resolve_textures(&skin, 8.0, 12.0, 4.0, 16.0, 16.0),
         );
 
         let mut part_verts = vec![vec![]; 4];
@@ -526,7 +492,7 @@ impl ecs::System for PlayerRenderer {
     }
 
     fn entity_removed(
-        &mut self,
+        &self,
         m: &mut ecs::Manager,
         e: ecs::Entity,
         _: &world::World,

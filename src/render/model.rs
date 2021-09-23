@@ -270,7 +270,6 @@ impl Manager {
             for model in collection.models.values() {
                 if model.radius > 0.0
                     && frustum.contains(&Sphere {
-                        // TODO: Possibly move the frustum read
                         center: Point3::new(model.x, -model.y, model.z),
                         radius: model.radius,
                     }) == collision::Relation::Out
