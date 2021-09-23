@@ -194,7 +194,7 @@ pub fn compute_player_model_components(
         8.0 / 16.0,
         8.0 / 16.0,
         8.0 / 16.0,
-        resolve_textures(&tex, 8.0, 8.0, 8.0, 0.0, 0.0),
+        resolve_textures(tex, 8.0, 8.0, 8.0, 0.0, 0.0),
     );
     model::append_box(
         &mut head_verts,
@@ -204,7 +204,7 @@ pub fn compute_player_model_components(
         8.4 / 16.0,
         8.4 / 16.0,
         8.4 / 16.0,
-        resolve_textures(&tex, 8.0, 8.0, 8.0, 32.0, 0.0),
+        resolve_textures(tex, 8.0, 8.0, 8.0, 32.0, 0.0),
     );
 
     let mut body_verts = vec![];
@@ -216,7 +216,7 @@ pub fn compute_player_model_components(
         8.0 / 16.0,
         12.0 / 16.0,
         4.0 / 16.0,
-        resolve_textures(&tex, 8.0, 12.0, 4.0, 16.0, 16.0),
+        resolve_textures(tex, 8.0, 12.0, 4.0, 16.0, 16.0),
     );
     model::append_box(
         &mut body_verts,
@@ -226,7 +226,7 @@ pub fn compute_player_model_components(
         8.4 / 16.0,
         12.4 / 16.0,
         4.4 / 16.0,
-        resolve_textures(&tex, 8.0, 12.0, 4.0, 16.0, 16.0),
+        resolve_textures(tex, 8.0, 12.0, 4.0, 16.0, 16.0),
     );
 
     let mut part_verts = vec![vec![]; 4];

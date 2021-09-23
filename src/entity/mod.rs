@@ -452,7 +452,7 @@ impl EntityType {
 
     pub fn get_renderer(&self) -> Arc<dyn CustomEntityRenderer + Send + Sync> {
         ENTITY_RENDERERS
-            .get(&self)
+            .get(self)
             .map_or(NOOP_RENDERER.clone(), |x| x.value().clone())
     }
 
