@@ -14,7 +14,6 @@
 
 use crate::entity;
 use crate::entity::player::create_local;
-use crate::entity::zombie::create_zombie;
 use crate::entity::EntityType;
 use crate::format;
 use crate::inventory::material::versions::to_material;
@@ -55,7 +54,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::f64::consts::PI;
 
 pub mod plugin_messages;
 mod sun;
@@ -521,7 +519,9 @@ impl Server {
                         }
                         Packet::EntityHeadLook(look) => {
                             use std::f64::consts::PI;
-                            if let Some(entity) = server.entity_map.clone().read().get(&look.entity_id.0) {
+                            if let Some(entity) =
+                                server.entity_map.clone().read().get(&look.entity_id.0)
+                            {
                                 let rotation = server
                                     .entities
                                     .clone()
@@ -533,7 +533,9 @@ impl Server {
                         }
                         Packet::EntityHeadLook_i32(look) => {
                             use std::f64::consts::PI;
-                            if let Some(entity) = server.entity_map.clone().read().get(&look.entity_id) {
+                            if let Some(entity) =
+                                server.entity_map.clone().read().get(&look.entity_id)
+                            {
                                 let rotation = server
                                     .entities
                                     .clone()
@@ -589,8 +591,16 @@ impl Server {
                             server.on_respawn_worldname(respawn);
                         }
                         Packet::SpawnMob_u8(spawn) => {
-                            server.on_entity_spawn(spawn.ty as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
-                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
                         }
                         /*Packet::SpawnMob_u8_i32(spawn) => {
                             server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
@@ -599,16 +609,40 @@ impl Server {
                             server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
                         }*/
                         Packet::SpawnMob_WithMeta(spawn) => {
-                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
-                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty.0 as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
                         }
                         Packet::SpawnMob_NoMeta(spawn) => {
-                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
-                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty.0 as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
                         }
                         Packet::SpawnObject(spawn) => {
-                            server.on_entity_spawn(spawn.ty as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
-                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
                         }
                         /*Packet::SpawnObject_i32(spawn) => {
                             server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
@@ -617,8 +651,16 @@ impl Server {
                             server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
                         }*/
                         Packet::SpawnObject_VarInt(spawn) => {
-                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
-                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
+                            use std::f64::consts::PI;
+                            server.on_entity_spawn(
+                                spawn.ty.0 as i16,
+                                spawn.entity_id.0,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                -(spawn.yaw as f64 / 256.0) * PI * 2.0,
+                                -(spawn.pitch as f64 / 256.0) * PI * 2.0,
+                            );
                         }
                         Packet::EntityTeleport_f64(entity_teleport) => {
                             server.on_entity_teleport_f64(entity_teleport);
@@ -1828,16 +1870,26 @@ impl Server {
         }
     }
 
-    fn on_entity_spawn(&self, ty: i16, entity_id: i32, x: f64, y: f64, z: f64, yaw: f64, pitch: f64) {
+    fn on_entity_spawn(
+        &self,
+        ty: i16,
+        entity_id: i32,
+        x: f64,
+        y: f64,
+        z: f64,
+        yaw: f64,
+        pitch: f64,
+    ) {
         let entity_type = entity::versions::to_entity_type(ty, self.mapped_protocol_version);
         if entity_type != EntityType::Unknown {
-            let entity = entity_type.create_entity(&mut self.entities.clone().write(), x, y, z, yaw, pitch);
+            let entity =
+                entity_type.create_entity(&mut self.entities.clone().write(), x, y, z, yaw, pitch);
             if entity.is_some() {
-                self.entity_map.clone().write().insert(entity_id, entity.unwrap());
-                println!(
-                    "spawned {} {:?}", ty,
-                    entity_type
-                );
+                self.entity_map
+                    .clone()
+                    .write()
+                    .insert(entity_id, entity.unwrap());
+                println!("spawned {} {:?}", ty, entity_type);
             }
         }
     }

@@ -2,7 +2,7 @@ use super::{Bounds, GameInfo, Light, Position, Rotation, Velocity};
 use crate::ecs;
 use crate::ecs::Entity;
 use crate::entity::player_like::{compute_player_model_components, PlayerLikeModelPart};
-use crate::entity::{CustomEntityRenderer, EntityType, TargetPosition, TargetRotation};
+use crate::entity::{CustomEntityRenderer, EntityType};
 use crate::render;
 use crate::render::model;
 use crate::render::Renderer;

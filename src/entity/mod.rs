@@ -3,17 +3,16 @@ pub mod player;
 
 use crate::ecs;
 use crate::ecs::{Entity, Filter, Manager, System};
-use crate::entity::player::{PlayerRenderer, PlayerModel};
-use crate::entity::slime::{SlimeRenderer, SlimeModel};
-use crate::entity::zombie::{ZombieRenderer, ZombieModel};
+use crate::entity::player::PlayerRenderer;
+use crate::entity::slime::{SlimeModel, SlimeRenderer};
+use crate::entity::zombie::{ZombieModel, ZombieRenderer};
 use crate::render::{Renderer, Texture};
 use crate::world::World;
-use cgmath::{Vector3, Point3};
+use cgmath::{Point3, Vector3};
 use collision::Aabb3;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use std::sync::Arc;
-use std::any::Any;
 
 pub mod player_like;
 pub mod slime;
@@ -457,7 +456,15 @@ impl EntityType {
             .map_or(NOOP_RENDERER.clone(), |x| x.value().clone())
     }
 
-    pub fn create_entity(&self, m: &mut ecs::Manager, x: f64, y: f64, z: f64, yaw: f64, pitch: f64) -> Option<ecs::Entity> {
+    pub fn create_entity(
+        &self,
+        m: &mut ecs::Manager,
+        x: f64,
+        y: f64,
+        z: f64,
+        yaw: f64,
+        pitch: f64,
+    ) -> Option<ecs::Entity> {
         if self.supported() {
             let ret = self.create_entity_internally(m, x, y, z, yaw, pitch);
             self.create_model(m, ret);
@@ -466,14 +473,30 @@ impl EntityType {
         None
     }
 
-    pub fn create_entity_custom_model(&self, m: &mut ecs::Manager, x: f64, y: f64, z: f64, yaw: f64, pitch: f64) -> Option<ecs::Entity> {
+    pub fn create_entity_custom_model(
+        &self,
+        m: &mut ecs::Manager,
+        x: f64,
+        y: f64,
+        z: f64,
+        yaw: f64,
+        pitch: f64,
+    ) -> Option<ecs::Entity> {
         if self.supported() {
             return Some(self.create_entity_internally(m, x, y, z, yaw, pitch));
         }
         None
     }
 
-    fn create_entity_internally(&self, m: &mut ecs::Manager, x: f64, y: f64, z: f64, yaw: f64, pitch: f64) -> ecs::Entity {
+    fn create_entity_internally(
+        &self,
+        m: &mut ecs::Manager,
+        x: f64,
+        y: f64,
+        z: f64,
+        yaw: f64,
+        pitch: f64,
+    ) -> ecs::Entity {
         let entity = m.create_entity();
         m.add_component_direct(entity, Position::new(x, y, z));
         m.add_component_direct(entity, Rotation::new(yaw, pitch));
@@ -494,9 +517,11 @@ impl EntityType {
 
     fn create_model(&self, m: &mut ecs::Manager, entity: ecs::Entity) {
         match self {
-            EntityType::Zombie => m.add_component_direct(entity, ZombieModel::new(Some(String::from("test")))),
+            EntityType::Zombie => {
+                m.add_component_direct(entity, ZombieModel::new(Some(String::from("test"))))
+            }
             EntityType::Slime => m.add_component_direct(entity, SlimeModel::new("test")),
-            _ => {},
+            _ => {}
         };
     }
 

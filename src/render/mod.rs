@@ -28,7 +28,7 @@ use crate::resources;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::prelude::*;
 use image::{GenericImage, GenericImageView, RgbaImage};
-use log::{error, trace};
+use log::error;
 use std::collections::HashMap;
 use std::io::Write;
 use std::sync::Arc;
