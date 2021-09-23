@@ -1885,10 +1885,7 @@ impl Server {
             let entity =
                 entity_type.create_entity(&mut self.entities.clone().write(), x, y, z, yaw, pitch);
             if let Some(entity) = entity {
-                self.entity_map
-                    .clone()
-                    .write()
-                    .insert(entity_id, entity);
+                self.entity_map.clone().write().insert(entity_id, entity);
                 println!("spawned {} {:?}", ty, entity_type);
             }
         }
