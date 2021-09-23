@@ -1884,11 +1884,11 @@ impl Server {
         if entity_type != EntityType::Unknown {
             let entity =
                 entity_type.create_entity(&mut self.entities.clone().write(), x, y, z, yaw, pitch);
-            if entity.is_some() {
+            if let Some(entity) = entity {
                 self.entity_map
                     .clone()
                     .write()
-                    .insert(entity_id, entity.unwrap());
+                    .insert(entity_id, entity);
                 println!("spawned {} {:?}", ty, entity_type);
             }
         }
