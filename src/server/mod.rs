@@ -55,6 +55,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::f64::consts::PI;
 
 pub mod plugin_messages;
 mod sun;
@@ -518,6 +519,30 @@ impl Server {
                         Packet::EntityLook_VarInt(look) => {
                             server.on_entity_look_varint(look);
                         }
+                        Packet::EntityHeadLook(look) => {
+                            use std::f64::consts::PI;
+                            if let Some(entity) = server.entity_map.clone().read().get(&look.entity_id.0) {
+                                let rotation = server
+                                    .entities
+                                    .clone()
+                                    .write()
+                                    .get_component_mut(*entity, server.target_rotation)
+                                    .unwrap();
+                                rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
+                            }
+                        }
+                        Packet::EntityHeadLook_i32(look) => {
+                            use std::f64::consts::PI;
+                            if let Some(entity) = server.entity_map.clone().read().get(&look.entity_id) {
+                                let rotation = server
+                                    .entities
+                                    .clone()
+                                    .write()
+                                    .get_component_mut(*entity, server.target_rotation)
+                                    .unwrap();
+                                rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
+                            }
+                        }
                         Packet::EntityLook_i32_NoGround(look) => {
                             server.on_entity_look_i32_noground(look);
                         }
@@ -564,7 +589,8 @@ impl Server {
                             server.on_respawn_worldname(respawn);
                         }
                         Packet::SpawnMob_u8(spawn) => {
-                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                            server.on_entity_spawn(spawn.ty as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
+                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
                         }
                         /*Packet::SpawnMob_u8_i32(spawn) => {
                             server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
@@ -573,13 +599,16 @@ impl Server {
                             server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
                         }*/
                         Packet::SpawnMob_WithMeta(spawn) => {
-                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
+                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
                         }
                         Packet::SpawnMob_NoMeta(spawn) => {
-                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
+                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
                         }
                         Packet::SpawnObject(spawn) => {
-                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                            server.on_entity_spawn(spawn.ty as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
+                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
                         }
                         /*Packet::SpawnObject_i32(spawn) => {
                             server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
@@ -588,7 +617,8 @@ impl Server {
                             server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
                         }*/
                         Packet::SpawnObject_VarInt(spawn) => {
-                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z);
+                            server.on_entity_spawn(spawn.ty.0 as i16, spawn.entity_id.0, spawn.x, spawn.y, spawn.z,
+                                                   -(spawn.yaw as f64 / 256.0) * PI * 2.0, -(spawn.pitch as f64 / 256.0) * PI * 2.0);
                         }
                         Packet::EntityTeleport_f64(entity_teleport) => {
                             server.on_entity_teleport_f64(entity_teleport);
@@ -1034,7 +1064,7 @@ impl Server {
                 .clone()
                 .read()
                 .get_component(player, self.position)
-                .unwrap();
+                .unwrap(); // TODO: This panicked, check why!
             let rotation = self
                 .entities
                 .clone()
@@ -1742,7 +1772,7 @@ impl Server {
             .write()
             .remove_all_entities_gracefully();
         *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
-        let _ = EntityType::Zombie.create_entity(&mut self.entities.clone().write(), 1478.5, 47.0, -474.5)/*create_zombie(&mut self.entities.clone().write())*/;
+        let _ = EntityType::Zombie.create_entity(&mut self.entities.clone().write(), 1478.5, 47.0, -474.5, 0.0, 0.0)/*create_zombie(&mut self.entities.clone().write())*/;
         if *self.dead.read() {
             *self.close_death_screen.write() = true;
             *self.dead.write() = false;
@@ -1798,10 +1828,10 @@ impl Server {
         }
     }
 
-    fn on_entity_spawn(&self, ty: i16, entity_id: i32, x: f64, y: f64, z: f64) {
+    fn on_entity_spawn(&self, ty: i16, entity_id: i32, x: f64, y: f64, z: f64, yaw: f64, pitch: f64) {
         let entity_type = entity::versions::to_entity_type(ty, self.mapped_protocol_version);
         if entity_type != EntityType::Unknown {
-            let entity = entity_type.create_entity(&mut self.entities.clone().write(), x, y, z);
+            let entity = entity_type.create_entity(&mut self.entities.clone().write(), x, y, z, yaw, pitch);
             if entity.is_some() {
                 self.entity_map.clone().write().insert(entity_id, entity.unwrap());
                 println!(
@@ -2028,7 +2058,6 @@ impl Server {
     ) {
         use std::f64::consts::PI;
         if let Some(entity) = self.entity_map.clone().read().get(&entity_id) {
-            println!("updating position: {}", entity_id);
             let position = self
                 .entities
                 .clone()
