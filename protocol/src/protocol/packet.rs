@@ -1884,7 +1884,7 @@ state_packets!(
                 field name: String =,
                 field action: u8 =,
                 field object_name: String =,
-                field value: Option<i32 > = when(|p: &UpdateScore_i32| p.action != 1),
+                field value: Option<i32> = when(|p: &UpdateScore_i32| p.action != 1),
             }
             /// SpawnPosition is sent to change the player's current spawn point. Currently
             /// only used by the client for the compass.

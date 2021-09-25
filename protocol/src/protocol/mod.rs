@@ -274,6 +274,7 @@ macro_rules! protocol_packet_ids {
 
 pub mod packet;
 pub mod versions;
+pub mod mapped_packet;
 pub trait Serializable: Sized {
     fn read_from<R: io::Read>(buf: &mut R) -> Result<Self, Error>;
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error>;
