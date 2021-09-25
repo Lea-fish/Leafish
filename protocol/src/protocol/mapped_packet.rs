@@ -1,7 +1,8 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer};
-use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem};
-use crate::protocol::mapped_packet::login::clientbound::EncryptionRequest;
-use crate::protocol::mapped_packet::login::serverbound::EncryptionResponse;
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse};
+use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem};
+use crate::protocol::mapped_packet::login::clientbound::{EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID};
+use crate::protocol::mapped_packet::login::serverbound::{EncryptionResponse, LoginPluginResponse, LoginStart};
+use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
 macro_rules! state_mapped_packets {
      ($($state:ident $stateName:ident {
         $($dir:ident $dirName:ident {
@@ -2331,6 +2332,304 @@ impl MappablePacket for packet::Packet {
                    entity_feet_eyes: face_player.entity_feet_eyes.map(|x| x.0),
                })
            }
+           packet::Packet::GenerateStructure(generate_structure) => {
+               mapped_packet::MappedPacket::GenerateStructure(GenerateStructure {
+                   location: generate_structure.location,
+                   levels: generate_structure.levels.0,
+                   keep_jigsaws: generate_structure.keep_jigsaws,
+               })
+           }
+           packet::Packet::HeldItemChange(held_item) => {
+               mapped_packet::MappedPacket::HeldItemChange(HeldItemChange {
+                   slot: held_item.slot,
+               })
+           }
+           packet::Packet::Handshake(handshake) => {
+               mapped_packet::MappedPacket::Handshake(Handshake {
+                   protocol_version: handshake.protocol_version.0,
+                   host: handshake.host,
+                   port: handshake.port,
+                   next: handshake.next.0,
+               })
+           }
+           packet::Packet::JoinGame_i8(join_game) => {
+               mapped_packet::MappedPacket::JoinGame_i8(JoinGame_i8 {
+                   entity_id: join_game.entity_id,
+                   gamemode: join_game.gamemode,
+                   dimension: join_game.dimension,
+                   difficulty: join_game.difficulty,
+                   max_players: join_game.max_players,
+                   level_type: join_game.level_type,
+                   reduced_debug_info: join_game.reduced_debug_info,
+               })
+           }
+           packet::Packet::JoinGame_i8_NoDebug(join_game) => {
+               mapped_packet::MappedPacket::JoinGame_i8_NoDebug(JoinGame_i8_NoDebug {
+                   entity_id: join_game.entity_id,
+                   gamemode: join_game.gamemode,
+                   dimension: join_game.dimension,
+                   difficulty: join_game.difficulty,
+                   max_players: join_game.max_players,
+                   level_type: join_game.level_type,
+               })
+           }
+           packet::Packet::JoinGame_i32(join_game) => {
+               mapped_packet::MappedPacket::JoinGame_i32(JoinGame_i32 {
+                   entity_id: join_game.entity_id,
+                   gamemode: join_game.gamemode,
+                   dimension: join_game.dimension,
+                   difficulty: join_game.difficulty,
+                   max_players: join_game.max_players,
+                   level_type: join_game.level_type,
+                   reduced_debug_info: join_game.reduced_debug_info,
+               })
+           }
+           packet::Packet::JoinGame_i32_ViewDistance(join_game) => {
+               mapped_packet::MappedPacket::JoinGame_i32_ViewDistance(JoinGame_i32_ViewDistance {
+                   entity_id: join_game.entity_id,
+                   gamemode: join_game.gamemode,
+                   dimension: join_game.dimension,
+                   max_players: join_game.max_players,
+                   level_type: join_game.level_type,
+                   view_distance: join_game.view_distance.0,
+                   reduced_debug_info: join_game.reduced_debug_info,
+               })
+           }
+           packet::Packet::JoinGame_WorldNames(join_game) => {
+               mapped_packet::MappedPacket::JoinGame_WorldNames(JoinGame_WorldNames {
+                   entity_id: join_game.entity_id,
+                   gamemode: join_game.gamemode,
+                   previous_gamemode: join_game.previous_gamemode,
+                   world_names: join_game.world_names.data,
+                   dimension_codec: join_game.dimension_codec,
+                   dimension: join_game.dimension,
+                   world_name: join_game.world_name,
+                   hashed_seed: join_game.hashed_seed,
+                   max_players: join_game.max_players,
+                   view_distance: join_game.view_distance.0,
+                   reduced_debug_info: join_game.reduced_debug_info,
+                   enable_respawn_screen: join_game.enable_respawn_screen,
+                   is_debug: join_game.is_debug,
+                   is_flat: join_game.is_flat,
+               })
+           }
+           packet::Packet::JoinGame_WorldNames_IsHard(join_game) => {
+               mapped_packet::MappedPacket::JoinGame_WorldNames_IsHard(JoinGame_WorldNames_IsHard {
+                   entity_id: join_game.entity_id,
+                   is_hardcore: join_game.is_hardcore,
+                   gamemode: join_game.gamemode,
+                   previous_gamemode: join_game.previous_gamemode,
+                   world_names: join_game.world_names.data,
+                   dimension_codec: join_game.dimension_codec,
+                   dimension: join_game.dimension,
+                   world_name: join_game.world_name,
+                   hashed_seed: join_game.hashed_seed,
+                   max_players: join_game.max_players,
+                   view_distance: join_game.view_distance.0,
+                   reduced_debug_info: join_game.reduced_debug_info,
+                   enable_respawn_screen: join_game.enable_respawn_screen,
+                   is_debug: join_game.is_debug,
+                   is_flat: join_game.is_flat,
+               })
+           }
+           packet::Packet::KeepAliveClientbound_i32(keep_alive) => {
+               mapped_packet::MappedPacket::KeepAliveClientbound(KeepAliveClientbound {
+                   id: keep_alive.id as i64,
+               })
+           }
+           packet::Packet::KeepAliveClientbound_i64(keep_alive) => {
+               mapped_packet::MappedPacket::KeepAliveClientbound(KeepAliveClientbound {
+                   id: keep_alive.id,
+               })
+           }
+           packet::Packet::KeepAliveClientbound_VarInt(keep_alive) => {
+               mapped_packet::MappedPacket::KeepAliveClientbound(KeepAliveClientbound {
+                   id: keep_alive.id.0 as i64,
+               })
+           }
+           packet::Packet::KeepAliveServerbound_i32(keep_alive) => {
+               mapped_packet::MappedPacket::KeepAliveServerbound(KeepAliveServerbound {
+                   id: keep_alive.id as i64,
+               })
+           }
+           packet::Packet::KeepAliveServerbound_i64(keep_alive) => {
+               mapped_packet::MappedPacket::KeepAliveServerbound(KeepAliveServerbound {
+                   id: keep_alive.id,
+               })
+           }
+           packet::Packet::KeepAliveServerbound_VarInt(keep_alive) => {
+               mapped_packet::MappedPacket::KeepAliveServerbound(KeepAliveServerbound {
+                   id: keep_alive.id.0 as i64,
+               })
+           }
+           packet::Packet::LockDifficulty(lock_difficulty) => {
+               mapped_packet::MappedPacket::LockDifficulty(LockDifficulty {
+                   locked: lock_difficulty.locked,
+               })
+           }
+           packet::Packet::LoginDisconnect(login_disconnect) => {
+               mapped_packet::MappedPacket::LoginDisconnect(LoginDisconnect {
+                   reason: login_disconnect.reason,
+               })
+           }
+           packet::Packet::LoginPluginRequest(plugin_request) => {
+               mapped_packet::MappedPacket::LoginPluginRequest(LoginPluginRequest {
+                   message_id: plugin_request.message_id.0,
+                   channel: plugin_request.channel,
+                   data: plugin_request.data,
+               })
+           }
+           packet::Packet::LoginPluginResponse(plugin_response) => {
+               mapped_packet::MappedPacket::LoginPluginResponse(LoginPluginResponse {
+                   message_id: plugin_response.message_id.0,
+                   successful: plugin_response.successful,
+                   data: plugin_response.data,
+               })
+           }
+           packet::Packet::LoginStart(login_start) => {
+               mapped_packet::MappedPacket::LoginStart(LoginStart {
+                   username: login_start.username,
+               })
+           }
+           packet::Packet::LoginSuccess_String(login_success) => {
+               mapped_packet::MappedPacket::LoginSuccess_String(LoginSuccess_String {
+                   uuid: login_success.uuid,
+                   username: login_success.username,
+               })
+           }
+           packet::Packet::LoginSuccess_UUID(login_success) => {
+               mapped_packet::MappedPacket::LoginSuccess_UUID(LoginSuccess_UUID {
+                   uuid: login_success.uuid,
+                   username: login_success.username,
+               })
+           }
+           packet::Packet::Maps(maps) => {
+               mapped_packet::MappedPacket::Maps(Maps {
+                   item_damage: maps.item_damage.0,
+                   scale: Some(maps.scale),
+                   tracking_position: Some(maps.tracking_position),
+                   locked: Some(maps.locked),
+                   icons: Some(maps.icons.data),
+                   columns: Some(maps.columns),
+                   rows: maps.rows,
+                   x: maps.x,
+                   z: maps.z,
+                   data: maps.data.map(|x| x.data),
+               })
+           }
+           packet::Packet::Maps_NoLocked(maps) => {
+               mapped_packet::MappedPacket::Maps(Maps {
+                   item_damage: maps.item_damage.0,
+                   scale: Some(maps.scale),
+                   tracking_position: Some(maps.tracking_position),
+                   locked: None,
+                   icons: Some(maps.icons.data),
+                   columns: Some(maps.columns),
+                   rows: maps.rows,
+                   x: maps.x,
+                   z: maps.z,
+                   data: maps.data.map(|x| x.data),
+               })
+           }
+           packet::Packet::Maps_NoTracking(maps) => {
+               mapped_packet::MappedPacket::Maps(Maps {
+                   item_damage: maps.item_damage.0,
+                   scale: Some(maps.scale),
+                   tracking_position: None,
+                   locked: None,
+                   icons: Some(maps.icons.data),
+                   columns: Some(maps.columns),
+                   rows: maps.rows,
+                   x: maps.x,
+                   z: maps.z,
+                   data: maps.data.map(|x| x.data),
+               })
+           }
+           packet::Packet::Maps_NoTracking_Data(maps) => {
+               mapped_packet::MappedPacket::Maps(Maps {
+                   item_damage: maps.item_damage.0,
+                   scale: None,
+                   tracking_position: None,
+                   locked: None,
+                   icons: None,
+                   columns: None,
+                   rows: None,
+                   x: None,
+                   z: None,
+                   data: None,
+               })
+           }
+           packet::Packet::MultiBlockChange_Packed(block_change) => {
+               mapped_packet::MappedPacket::MultiBlockChange_Packed(MultiBlockChange_Packed {
+                   chunk_section_pos: block_change.chunk_section_pos,
+                   no_trust_edges: block_change.no_trust_edges,
+                   records: block_change.records.data,
+               })
+           }
+           packet::Packet::MultiBlockChange_u16(block_change) => {
+               mapped_packet::MappedPacket::MultiBlockChange_i32(MultiBlockChange_i32 {
+                   chunk_x: block_change.chunk_x,
+                   chunk_z: block_change.chunk_z,
+                   records: None,
+                   record_count: Some(block_change.record_count),
+                   data_size: Some(block_change.data_size),
+                   data: Some(block_change.data),
+               })
+           }
+           packet::Packet::MultiBlockChange_VarInt(block_change) => {
+               mapped_packet::MappedPacket::MultiBlockChange_i32(MultiBlockChange_i32 {
+                   chunk_x: block_change.chunk_x,
+                   chunk_z: block_change.chunk_z,
+                   records: Some(block_change.records.data),
+                   record_count: None,
+                   data_size: None,
+                   data: None,
+               })
+           }
+           packet::Packet::NamedSoundEffect(sound_effect) => {
+               mapped_packet::MappedPacket::NamedSoundEffect(NamedSoundEffect {
+                   name: sound_effect.name,
+                   category: Some(sound_effect.category.0),
+                   x: sound_effect.x,
+                   y: sound_effect.y,
+                   z: sound_effect.z,
+                   volume: sound_effect.volume,
+                   pitch: sound_effect.pitch,
+               })
+           }
+           packet::Packet::NamedSoundEffect_u8(sound_effect) => {
+               mapped_packet::MappedPacket::NamedSoundEffect(NamedSoundEffect {
+                   name: sound_effect.name,
+                   category: Some(sound_effect.category.0),
+                   x: sound_effect.x,
+                   y: sound_effect.y,
+                   z: sound_effect.z,
+                   volume: sound_effect.volume,
+                   pitch: sound_effect.pitch as f32, // TODO: Conversion?
+               })
+           }
+           packet::Packet::NamedSoundEffect_u8_NoCategory(sound_effect) => {
+               mapped_packet::MappedPacket::NamedSoundEffect(NamedSoundEffect {
+                   name: sound_effect.name,
+                   category: None,
+                   x: sound_effect.x,
+                   y: sound_effect.y,
+                   z: sound_effect.z,
+                   volume: sound_effect.volume,
+                   pitch: sound_effect.pitch as f32, // TODO: Conversion?
+               })
+           }
+           packet::Packet::NameItem(name_item) => {
+               mapped_packet::MappedPacket::NameItem(NameItem {
+                   item_name: name_item.item_name,
+               })
+           }
+           packet::Packet::NBTQueryResponse(nbt_query) => {
+               mapped_packet::MappedPacket::NBTQueryResponse(NBTQueryResponse {
+                   transaction_id: nbt_query.transaction_id.0,
+                   nbt: nbt_query.nbt,
+               })
+           }
 
        }
     }
@@ -2339,8 +2638,8 @@ impl MappablePacket for packet::Packet {
 
 
 /*
-           packet::Packet::Advancements(advancements) => {
-               mapped_packet::MappedPacket::Advancements(Advancements {
+           packet::Packet::Maps(maps) => {
+               mapped_packet::MappedPacket::Maps(Maps {
 
                })
            }
