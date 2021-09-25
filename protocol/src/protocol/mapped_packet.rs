@@ -1,5 +1,5 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent};
-use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest};
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport};
+use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction};
 macro_rules! state_mapped_packets {
      ($($state:ident $stateName:ident {
         $($dir:ident $dirName:ident {
@@ -1927,9 +1927,155 @@ impl MappablePacket for packet::Packet {
            }
            packet::Packet::CraftRecipeRequest(craft_recipe_request) => {
                mapped_packet::MappedPacket::CraftRecipeRequest(CraftRecipeRequest {
-
+                   window_id: craft_recipe_request.window_id,
+                   recipe: craft_recipe_request.recipe.0,
+                   make_all: craft_recipe_request.make_all,
                })
            }
+           packet::Packet::CraftRecipeResponse(craft_recipe_response) => {
+               mapped_packet::MappedPacket::CraftRecipeResponse(CraftRecipeResponse {
+                   window_id: craft_recipe_response.window_id,
+                   recipe: craft_recipe_response.recipe.0,
+               })
+           }
+           packet::Packet::CreativeInventoryAction(creative_inventory_action) => {
+               mapped_packet::MappedPacket::CreativeInventoryAction(CreativeInventoryAction {
+                   slot: creative_inventory_action.slot,
+                   clicked_item: creative_inventory_action.clicked_item,
+               })
+           }
+           packet::Packet::Disconnect(disconnect) => {
+               mapped_packet::MappedPacket::Disconnect(Disconnect {
+                   reason: disconnect.reason,
+               })
+           }
+           packet::Packet::DeclareCommands(declare_commands) => {
+               mapped_packet::MappedPacket::DeclareCommands(DeclareCommands {
+                   nodes: declare_commands.nodes.data,
+                   root_index: declare_commands.root_index.0,
+               })
+           }
+           packet::Packet::DeclareRecipes(declare_recipes) => {
+               mapped_packet::MappedPacket::DeclareRecipes(DeclareRecipes {
+                   recipes: declare_recipes.recipes.data,
+               })
+           }
+           packet::Packet::Entity(entity) => {
+               mapped_packet::MappedPacket::Entity(Entity {
+                   entity_id: entity.entity_id.0,
+               })
+           }
+           packet::Packet::EntityHeadLook(head_look) => {
+               mapped_packet::MappedPacket::EntityHeadLook(EntityHeadLook {
+                   entity_id: head_look.entity_id.0,
+                   head_yaw: head_look.head_yaw,
+               })
+           }
+           packet::Packet::EntityHeadLook_i32(head_look) => {
+               mapped_packet::MappedPacket::EntityHeadLook(EntityHeadLook {
+                   entity_id: head_look.entity_id,
+                   head_yaw: head_look.head_yaw,
+               })
+           }
+           packet::Packet::EntityVelocity(velocity) => {
+               mapped_packet::MappedPacket::EntityVelocity(EntityVelocity {
+                   entity_id: velocity.entity_id.0,
+                   velocity_x: velocity.velocity_x,
+                   velocity_y: velocity.velocity_y,
+                   velocity_z: velocity.velocity_z,
+               })
+           }
+           packet::Packet::EntityVelocity_i32(velocity) => {
+               mapped_packet::MappedPacket::EntityVelocity(EntityVelocity {
+                   entity_id: velocity.entity_id,
+                   velocity_x: velocity.velocity_x,
+                   velocity_y: velocity.velocity_y,
+                   velocity_z: velocity.velocity_z,
+               })
+           }
+           packet::Packet::EntityLookAndMove_i16(look_and_move) => {
+               mapped_packet::MappedPacket::EntityLookAndMove(EntityLookAndMove {
+                   entity_id: look_and_move.entity_id.0,
+                   delta_x: f64::from(look_and_move.delta_x),
+                   delta_y: f64::from(look_and_move.delta_y),
+                   delta_z: f64::from(look_and_move.delta_z),
+                   yaw: look_and_move.yaw,
+                   pitch: look_and_move.pitch,
+                   on_ground: Some(look_and_move.on_ground),
+               })
+           }
+           packet::Packet::EntityLookAndMove_i8(look_and_move) => {
+               mapped_packet::MappedPacket::EntityLookAndMove(EntityLookAndMove {
+                   entity_id: look_and_move.entity_id.0,
+                   delta_x: f64::from(look_and_move.delta_x),
+                   delta_y: f64::from(look_and_move.delta_y),
+                   delta_z: f64::from(look_and_move.delta_z),
+                   yaw: look_and_move.yaw,
+                   pitch: look_and_move.pitch,
+                   on_ground: Some(look_and_move.on_ground),
+               })
+           }
+           packet::Packet::EntityLookAndMove_i8_i32_NoGround(look_and_move) => {
+               mapped_packet::MappedPacket::EntityLookAndMove(EntityLookAndMove {
+                   entity_id: look_and_move.entity_id,
+                   delta_x: f64::from(look_and_move.delta_x),
+                   delta_y: f64::from(look_and_move.delta_y),
+                   delta_z: f64::from(look_and_move.delta_z),
+                   yaw: look_and_move.yaw,
+                   pitch: look_and_move.pitch,
+                   on_ground: None,
+               })
+           }
+           packet::Packet::EntityLook_i32_NoGround(look) => {
+               mapped_packet::MappedPacket::EntityLook(EntityLook {
+                   entity_id: look.entity_id,
+                   yaw: look.yaw,
+                   pitch: look.pitch,
+                   on_ground: None,
+               })
+           }
+           packet::Packet::EntityLook_VarInt(look) => {
+               mapped_packet::MappedPacket::EntityLook(EntityLook {
+                   entity_id: look.entity_id.0,
+                   yaw: look.yaw,
+                   pitch: look.pitch,
+                   on_ground: Some(look.on_ground),
+               })
+           }
+           packet::Packet::EntityTeleport_f64(teleport) => {
+               mapped_packet::MappedPacket::EntityTeleport(EntityTeleport {
+                   entity_id: teleport.entity_id.0,
+                   x: teleport.x,
+                   y: teleport.y,
+                   z: teleport.z,
+                   yaw: teleport.yaw,
+                   pitch: teleport.pitch,
+                   on_ground: Some(teleport.on_ground),
+               })
+           }
+           packet::Packet::EntityTeleport_i32(teleport) => {
+               mapped_packet::MappedPacket::EntityTeleport(EntityTeleport {
+                   entity_id: teleport.entity_id.0,
+                   x: f64::from(teleport.x),
+                   y: f64::from(teleport.y),
+                   z: f64::from(teleport.z),
+                   yaw: teleport.yaw,
+                   pitch: teleport.pitch,
+                   on_ground: Some(teleport.on_ground),
+               })
+           }
+           packet::Packet::EntityTeleport_i32_i32_NoGround(teleport) => {
+               mapped_packet::MappedPacket::EntityTeleport(EntityTeleport {
+                   entity_id: teleport.entity_id,
+                   x: f64::from(teleport.x),
+                   y: f64::from(teleport.y),
+                   z: f64::from(teleport.z),
+                   yaw: teleport.yaw,
+                   pitch: teleport.pitch,
+                   on_ground: None,
+               })
+           }
+
        }
     }
 
