@@ -1,5 +1,7 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport};
-use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction};
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer};
+use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem};
+use crate::protocol::mapped_packet::login::clientbound::EncryptionRequest;
+use crate::protocol::mapped_packet::login::serverbound::EncryptionResponse;
 macro_rules! state_mapped_packets {
      ($($state:ident $stateName:ident {
         $($dir:ident $dirName:ident {
@@ -1965,6 +1967,11 @@ impl MappablePacket for packet::Packet {
                    entity_id: entity.entity_id.0,
                })
            }
+           packet::Packet::Entity_i32(entity) => {
+               mapped_packet::MappedPacket::Entity(Entity {
+                   entity_id: entity.entity_id,
+               })
+           }
            packet::Packet::EntityHeadLook(head_look) => {
                mapped_packet::MappedPacket::EntityHeadLook(EntityHeadLook {
                    entity_id: head_look.entity_id.0,
@@ -2073,6 +2080,255 @@ impl MappablePacket for packet::Packet {
                    yaw: teleport.yaw,
                    pitch: teleport.pitch,
                    on_ground: None,
+               })
+           }
+           packet::Packet::EntityMove_i16(entity_move) => {
+               mapped_packet::MappedPacket::EntityMove(EntityMove {
+                   entity_id: entity_move.entity_id.0,
+                   delta_x: f64::from(entity_move.delta_x),
+                   delta_y: f64::from(entity_move.delta_y),
+                   delta_z: f64::from(entity_move.delta_z),
+                   on_ground: Some(entity_move.on_ground),
+               })
+           }
+           packet::Packet::EntityMove_i8(entity_move) => {
+               mapped_packet::MappedPacket::EntityMove(EntityMove {
+                   entity_id: entity_move.entity_id.0,
+                   delta_x: f64::from(entity_move.delta_x),
+                   delta_y: f64::from(entity_move.delta_y),
+                   delta_z: f64::from(entity_move.delta_z),
+                   on_ground: Some(entity_move.on_ground),
+               })
+           }
+           packet::Packet::EntityMove_i8_i32_NoGround(entity_move) => {
+               mapped_packet::MappedPacket::EntityMove(EntityMove {
+                   entity_id: entity_move.entity_id,
+                   delta_x: f64::from(entity_move.delta_x),
+                   delta_y: f64::from(entity_move.delta_y),
+                   delta_z: f64::from(entity_move.delta_z),
+                   on_ground: None,
+               })
+           }
+           packet::Packet::EntityDestroy(destroy) => {
+               mapped_packet::MappedPacket::EntityDestroy(EntityDestroy {
+                   entity_ids: destroy.entity_ids.data.iter().map(|x| x.0).collect(),
+               })
+           }
+           packet::Packet::EntityDestroy_u8(destroy) => {
+               mapped_packet::MappedPacket::EntityDestroy(EntityDestroy {
+                   entity_ids: destroy.entity_ids.data,
+               })
+           }
+           packet::Packet::EditBook(edit_book) => {
+               mapped_packet::MappedPacket::EditBook(EditBook {
+                   new_book: edit_book.new_book,
+                   is_signing: edit_book.is_signing,
+                   hand: edit_book.hand.0,
+               })
+           }
+           packet::Packet::Effect(effect) => {
+               mapped_packet::MappedPacket::Effect(Effect {
+                   effect_id: effect.effect_id,
+                   location: effect.location,
+                   data: effect.data,
+                   disable_relative: effect.disable_relative,
+               })
+           }
+           packet::Packet::Effect_u8y(effect) => {
+               mapped_packet::MappedPacket::Effect(Effect {
+                   effect_id: effect.effect_id,
+                   location: Position::new(effect.x, effect.y as i32, effect.z),
+                   data: effect.data,
+                   disable_relative: effect.disable_relative,
+               })
+           }
+           packet::Packet::EnchantItem(enchant_item) => {
+               mapped_packet::MappedPacket::EnchantItem(EnchantItem {
+                   id: enchant_item.id,
+                   enchantment: enchant_item.enchantment,
+               })
+           }
+           packet::Packet::EncryptionRequest(encryption_request) => {
+               mapped_packet::MappedPacket::EncryptionRequest(EncryptionRequest {
+                   server_id: encryption_request.server_id,
+                   public_key: encryption_request.public_key.data,
+                   verify_token: encryption_request.verify_token.data,
+               })
+           }
+           packet::Packet::EncryptionRequest_i16(encryption_request) => {
+               mapped_packet::MappedPacket::EncryptionRequest(EncryptionRequest {
+                   server_id: encryption_request.server_id,
+                   public_key: encryption_request.public_key.data,
+                   verify_token: encryption_request.verify_token.data,
+               })
+           }
+           packet::Packet::EncryptionResponse(encryption_response) => {
+               mapped_packet::MappedPacket::EncryptionResponse(EncryptionResponse {
+                   shared_secret: encryption_response.shared_secret.data,
+                   verify_token: encryption_response.verify_token.data,
+               })
+           }
+           packet::Packet::EncryptionResponse_i16(encryption_response) => {
+               mapped_packet::MappedPacket::EncryptionResponse(EncryptionResponse {
+                   shared_secret: encryption_response.shared_secret.data,
+                   verify_token: encryption_response.verify_token.data,
+               })
+           }
+           packet::Packet::EntityAction(action) => {
+               mapped_packet::MappedPacket::EntityAction(EntityAction {
+                   entity_id: action.entity_id,
+                   action_id: action.action_id,
+               })
+           }
+           packet::Packet::EntityAttach(attach) => {
+               mapped_packet::MappedPacket::EntityAttach(EntityAttach {
+                   entity_id: attach.entity_id,
+                   vehicle: attach.vehicle,
+                   leash: None,
+               })
+           }
+           packet::Packet::EntityAttach_leashed(attach) => {
+               mapped_packet::MappedPacket::EntityAttach(EntityAttach {
+                   entity_id: attach.entity_id,
+                   vehicle: attach.vehicle,
+                   leash: Some(attach.leash),
+               })
+           }
+           packet::Packet::EntityEffect(effect) => {
+               mapped_packet::MappedPacket::EntityEffect(EntityEffect {
+                   entity_id: effect.entity_id.0,
+                   effect_id: effect.effect_id,
+                   amplifier: effect.amplifier,
+                   duration: effect.duration.0,
+                   hide_particles: Some(effect.hide_particles),
+               })
+           }
+           packet::Packet::EntityEffect_i32(effect) => {
+               mapped_packet::MappedPacket::EntityEffect(EntityEffect {
+                   entity_id: effect.entity_id,
+                   effect_id: effect.effect_id,
+                   amplifier: effect.amplifier,
+                   duration: effect.duration as i32,
+                   hide_particles: None,
+               })
+           }
+           packet::Packet::EntityEquipment_Array(equipment) => {
+               mapped_packet::MappedPacket::EntityEquipment_Array(EntityEquipment_Array {
+                   entity_id: equipment.entity_id.0,
+                   equipments: equipment.equipments,
+               })
+           }
+           packet::Packet::EntityEquipment_u16(equipment) => {
+               mapped_packet::MappedPacket::EntityEquipment_Single(EntityEquipment_Single {
+                   entity_id: equipment.entity_id.0,
+                   slot: equipment.slot as i32,
+                   item: equipment.item,
+               })
+           }
+           packet::Packet::EntityEquipment_u16_i32(equipment) => {
+               mapped_packet::MappedPacket::EntityEquipment_Single(EntityEquipment_Single {
+                   entity_id: equipment.entity_id,
+                   slot: equipment.slot as i32,
+                   item: equipment.item,
+               })
+           }
+           packet::Packet::EntityEquipment_VarInt(equipment) => {
+               mapped_packet::MappedPacket::EntityEquipment_Single(EntityEquipment_Single {
+                   entity_id: equipment.entity_id.0,
+                   slot: equipment.slot.0,
+                   item: equipment.item,
+               })
+           }
+           packet::Packet::EntityMetadata(metadata) => {
+               mapped_packet::MappedPacket::EntityMetadata(EntityMetadata {
+                   entity_id: metadata.entity_id.0,
+                   metadata: metadata.metadata,
+               })
+           }
+           packet::Packet::EntityMetadata_i32(metadata) => {
+               mapped_packet::MappedPacket::EntityMetadata(EntityMetadata {
+                   entity_id: metadata.entity_id,
+                   metadata: metadata.metadata,
+               })
+           }
+           packet::Packet::EntityProperties(properties) => {
+               mapped_packet::MappedPacket::EntityProperties(EntityProperties {
+                   entity_id: properties.entity_id.0,
+                   properties: properties.entity_id.0,
+               })
+           }
+           packet::Packet::EntityProperties_i32(properties) => {
+               mapped_packet::MappedPacket::EntityProperties(EntityProperties {
+                   entity_id: properties.entity_id,
+                   properties: properties.entity_id,
+               })
+           }
+           packet::Packet::EntityRemoveEffect(remove_effect) => {
+               mapped_packet::MappedPacket::EntityRemoveEffect(EntityRemoveEffect {
+                   entity_id: remove_effect.entity_id.0,
+                   effect_id: remove_effect.effect_id,
+               })
+           }
+           packet::Packet::EntityRemoveEffect_i32(remove_effect) => {
+               mapped_packet::MappedPacket::EntityRemoveEffect(EntityRemoveEffect {
+                   entity_id: remove_effect.entity_id,
+                   effect_id: remove_effect.effect_id,
+               })
+           }
+           packet::Packet::EntitySoundEffect(sound_effect) => {
+               mapped_packet::MappedPacket::EntitySoundEffect(EntitySoundEffect {
+                   sound_id: sound_effect.sound_id.0,
+                   sound_category: sound_effect.sound_category.0,
+                   entity_id: sound_effect.entity_id.0,
+                   volume: sound_effect.volume,
+                   pitch: sound_effect.pitch,
+               })
+           }
+           packet::Packet::EntityStatus(status) => {
+               mapped_packet::MappedPacket::EntityStatus(EntityStatus {
+                   entity_id: status.entity_id,
+                   entity_status: status.entity_status,
+               })
+           }
+           packet::Packet::EntityUpdateNBT(update_nbt) => {
+               mapped_packet::MappedPacket::EntityUpdateNBT(EntityUpdateNBT {
+                   entity_id: update_nbt.entity_id.0,
+                   nbt: update_nbt.nbt,
+               })
+           }
+           packet::Packet::EntityUsedBed(used_bed) => {
+               mapped_packet::MappedPacket::EntityUsedBed(EntityUsedBed {
+                   entity_id: used_bed.entity_id.0,
+                   location: used_bed.location,
+               })
+           }
+           packet::Packet::EntityUsedBed_i32(used_bed) => {
+               mapped_packet::MappedPacket::EntityUsedBed(EntityUsedBed {
+                   entity_id: used_bed.entity_id,
+                   location: Position::new(used_bed.x, used_bed.y as i32, used_bed.z),
+               })
+           }
+           packet::Packet::Explosion(explosion) => {
+               mapped_packet::MappedPacket::Explosion(Explosion {
+                   x: explosion.x,
+                   y: explosion.y,
+                   z: explosion.z,
+                   radius: explosion.radius,
+                   records: explosion.records.data,
+                   velocity_x: explosion.velocity_x,
+                   velocity_y: explosion.velocity_y,
+                   velocity_z: explosion.velocity_z,
+               })
+           }
+           packet::Packet::FacePlayer(face_player) => {
+               mapped_packet::MappedPacket::FacePlayer(FacePlayer {
+                   feet_eyes: face_player.feet_eyes.0,
+                   target_x: face_player.target_x,
+                   target_y: face_player.target_y,
+                   target_z: face_player.target_z,
+                   is_entity: face_player.is_entity,
+                   entity_id: face_player.entity_id.map(|x| x.0),
+                   entity_feet_eyes: face_player.entity_feet_eyes.map(|x| x.0),
                })
            }
 
