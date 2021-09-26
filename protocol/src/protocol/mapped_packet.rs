@@ -1,9 +1,11 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen};
-use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign};
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound};
+use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign, SpectateTeleport, SteerBoat, SteerVehicle};
 use crate::protocol::mapped_packet::login::clientbound::{EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID, SetInitialCompression};
 use crate::protocol::mapped_packet::login::serverbound::{EncryptionResponse, LoginPluginResponse, LoginStart};
 use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
 use crate::protocol::packet::play::serverbound::PlayerLook;
+use crate::protocol::mapped_packet::status::serverbound::{StatusPing, StatusRequest};
+use crate::protocol::mapped_packet::status::clientbound::{StatusPong, StatusResponse};
 macro_rules! state_mapped_packets {
      ($($state:ident $stateName:ident {
         $($dir:ident $dirName:ident {
@@ -3437,6 +3439,175 @@ impl MappablePacket for packet::Packet {
            packet::Packet::SignEditorOpen_i32(sign_editor) => {
                mapped_packet::MappedPacket::SignEditorOpen(SignEditorOpen {
                    location: Position::new(sign_editor.x, sign_editor.y, sign_editor.z),
+               })
+           }
+           packet::Packet::SoundEffect(sound) => {
+               mapped_packet::MappedPacket::SoundEffect(SoundEffect {
+                   name: sound.name.0,
+                   category: sound.category.0,
+                   x: sound.x,
+                   y: sound.y,
+                   z: sound.z,
+                   volume: sound.volume,
+                   pitch: sound.pitch,
+               })
+           }
+           packet::Packet::SoundEffect_u8(sound) => {
+               mapped_packet::MappedPacket::SoundEffect(SoundEffect {
+                   name: sound.name.0,
+                   category: sound.category.0,
+                   x: sound.x,
+                   y: sound.y,
+                   z: sound.z,
+                   volume: sound.volume,
+                   pitch: sound.pitch as f32, // TODO: Convert this somehow?
+               })
+           }
+           packet::Packet::SpawnExperienceOrb(exp_orb) => {
+               mapped_packet::MappedPacket::SpawnExperienceOrb(SpawnExperienceOrb {
+                   entity_id: exp_orb.entity_id.0,
+                   x: exp_orb.x,
+                   y: exp_orb.y,
+                   z: exp_orb.z,
+                   count: exp_orb.count,
+               })
+           }
+           packet::Packet::SpawnExperienceOrb_i32(exp_orb) => {
+               mapped_packet::MappedPacket::SpawnExperienceOrb(SpawnExperienceOrb {
+                   entity_id: exp_orb.entity_id.0,
+                   x: f64::from(exp_orb.x),
+                   y: f64::from(exp_orb.y),
+                   z: f64::from(exp_orb.z),
+                   count: exp_orb.count,
+               })
+           }
+           packet::Packet::SpawnGlobalEntity(global) => {
+               mapped_packet::MappedPacket::SpawnGlobalEntity(SpawnGlobalEntity {
+                   entity_id: global.entity_id.0,
+                   ty: global.ty,
+                   x: global.x,
+                   y: global.y,
+                   z: global.z,
+               })
+           }
+           packet::Packet::SpawnGlobalEntity_i32(global) => {
+               mapped_packet::MappedPacket::SpawnGlobalEntity(SpawnGlobalEntity {
+                   entity_id: global.entity_id.0,
+                   ty: global.ty,
+                   x: f64::from(global.x),
+                   y: f64::from(global.y),
+                   z: f64::from(global.z),
+               })
+           }
+           packet::Packet::SpawnPainting_NoUUID(painting) => {
+               mapped_packet::MappedPacket::SpawnPainting(SpawnPainting {
+                   entity_id: painting.entity_id.0,
+                   uuid: None,
+                   motive: None,
+                   title: Some(painting.title),
+                   location: painting.location,
+                   direction: painting.direction,
+               })
+           }
+           packet::Packet::SpawnPainting_NoUUID_i32(painting) => {
+               mapped_packet::MappedPacket::SpawnPainting(SpawnPainting {
+                   entity_id: painting.entity_id.0,
+                   uuid: None,
+                   motive: None,
+                   title: Some(painting.title),
+                   location: Position::from(painting.x, painting.y, painting.z),
+                   direction: painting.direction,
+               })
+           }
+           packet::Packet::SpawnPainting_String(painting) => {
+               mapped_packet::MappedPacket::SpawnPainting(SpawnPainting {
+                   entity_id: painting.entity_id.0,
+                   uuid: Some(painting.uuid),
+                   motive: None,
+                   title: Some(painting.title),
+                   location: painting.location,
+                   direction: painting.direction,
+               })
+           }
+           packet::Packet::SpawnPainting_VarInt(painting) => {
+               mapped_packet::MappedPacket::SpawnPainting(SpawnPainting {
+                   entity_id: painting.entity_id.0,
+                   uuid: Some(painting.uuid),
+                   motive: Some(painting.motive.0),
+                   title: None,
+                   location: painting.location,
+                   direction: painting.direction,
+               })
+           }
+           packet::Packet::SpawnPosition(position) => {
+               mapped_packet::MappedPacket::SpawnPosition(SpawnPosition {
+                   location: position.location,
+               })
+           }
+           packet::Packet::SpawnPosition_i32(position) => {
+               mapped_packet::MappedPacket::SpawnPosition(SpawnPosition {
+                   location: Position::new(position.x, position.y, position.z),
+               })
+           }
+           packet::Packet::SpectateTeleport(teleport) => {
+               mapped_packet::MappedPacket::SpectateTeleport(SpectateTeleport {
+                   target: teleport.target,
+               })
+           }
+           packet::Packet::Statistics(statistics) => {
+               mapped_packet::MappedPacket::Statistics(Statistics {
+                   statistices: statistics.statistices.data,
+               })
+           }
+           packet::Packet::StatusPing(ping) => {
+               mapped_packet::MappedPacket::StatusPing(StatusPing {
+                   ping: ping.ping,
+               })
+           }
+           packet::Packet::StatusPong(pong) => {
+               mapped_packet::MappedPacket::StatusPong(StatusPong {
+                   ping: pong.ping,
+               })
+           }
+           packet::Packet::StatusRequest(request) => {
+               mapped_packet::MappedPacket::StatusRequest(StatusRequest {
+                   empty: (),
+               })
+           }
+           packet::Packet::StatusResponse(response) => {
+               mapped_packet::MappedPacket::StatusResponse(StatusResponse {
+                   status: response.status,
+               })
+           }
+           packet::Packet::SteerBoat(steer_boat) => {
+               mapped_packet::MappedPacket::SteerBoat(SteerBoat {
+                   left_paddle_turning: steer_boat.left_paddle_turning,
+                   right_paddle_turning: steer_boat.right_paddle_turning,
+               })
+           }
+           packet::Packet::SteerVehicle(steer_vehicle) => {
+               mapped_packet::MappedPacket::SteerVehicle(SteerVehicle {
+                   sideways: steer_vehicle.sideways,
+                   forward: steer_vehicle.forward,
+                   flags: Some(steer_vehicle.flags),
+                   jump: None,
+                   unmount: None,
+               })
+           }
+           packet::Packet::SteerVehicle_jump_unmount(steer_vehicle) => {
+               mapped_packet::MappedPacket::SteerVehicle(SteerVehicle {
+                   sideways: steer_vehicle.sideways,
+                   forward: steer_vehicle.forward,
+                   flags: None,
+                   jump: Some(steer_vehicle.jump),
+                   unmount: Some(steer_vehicle.unmount),
+               })
+           }
+           packet::Packet::StopSound(stop_sound) => {
+               mapped_packet::MappedPacket::StopSound(StopSound {
+                   flags: stop_sound.flags,
+                   source: stop_sound.source.map(|x| x.0),
+                   sound: stop_sound.sound,
                })
            }
 
