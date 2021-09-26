@@ -18,7 +18,7 @@ use crate::entity::EntityType;
 use crate::format;
 use crate::inventory::material::versions::to_material;
 use crate::inventory::{Inventory, InventoryContext, Item};
-use crate::protocol::{self, forge, mojang, packet, mapped_packet};
+use crate::protocol::{self, forge, mapped_packet, mojang, packet};
 use crate::render;
 use crate::render::hud::HudContext;
 use crate::render::Renderer;
@@ -38,6 +38,8 @@ use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use instant::{Duration, Instant};
 use leafish_protocol::format::{Component, TextComponent};
+use leafish_protocol::protocol::mapped_packet::MappablePacket;
+use leafish_protocol::protocol::mapped_packet::MappedPacket;
 use leafish_protocol::protocol::packet::{DigType, Hand, Packet};
 use leafish_protocol::protocol::{Conn, Version};
 use leafish_shared::direction::Direction as BlockDirection;
@@ -54,8 +56,6 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
-use leafish_protocol::protocol::mapped_packet::MappablePacket;
-use leafish_protocol::protocol::mapped_packet::MappedPacket;
 
 pub mod plugin_messages;
 mod sun;
@@ -432,7 +432,11 @@ impl Server {
                             server.on_keep_alive_i32(keep_alive);
                         }*/
                         MappedPacket::KeepAliveClientbound(keep_alive) => {
-                            packet::send_keep_alive(server.conn.clone().write().as_mut().unwrap(), server.mapped_protocol_version, keep_alive.id);
+                            packet::send_keep_alive(
+                                server.conn.clone().write().as_mut().unwrap(),
+                                server.mapped_protocol_version,
+                                keep_alive.id,
+                            );
                         }
                         MappedPacket::ChunkData_NoEntities(chunk_data) => {
                             server.on_chunk_data_no_entities(chunk_data);
@@ -500,7 +504,11 @@ impl Server {
                             server.on_entity_move(m);
                         }
                         MappedPacket::EntityLook(look) => {
-                            server.on_entity_look(look.entity_id, look.yaw as f64, look.pitch as f64);
+                            server.on_entity_look(
+                                look.entity_id,
+                                look.yaw as f64,
+                                look.pitch as f64,
+                            );
                         }
                         MappedPacket::EntityHeadLook(look) => {
                             use std::f64::consts::PI;
@@ -579,13 +587,23 @@ impl Server {
                             );
                         }
                         MappedPacket::EntityLookAndMove(lookmove) => {
-                            server.on_entity_look_and_move(lookmove.entity_id, lookmove.delta_x, lookmove.delta_y, lookmove.delta_z, lookmove.yaw as f64, lookmove.pitch as f64);
+                            server.on_entity_look_and_move(
+                                lookmove.entity_id,
+                                lookmove.delta_x,
+                                lookmove.delta_y,
+                                lookmove.delta_z,
+                                lookmove.yaw as f64,
+                                lookmove.pitch as f64,
+                            );
                         }
                         MappedPacket::SpawnPlayer(spawn) => {
                             if spawn.uuid_str.is_some() {
                                 // 1.7.10: populate the player list here, since we only now know the UUID
-                                let uuid = protocol::UUID::from_str(spawn.uuid_str.as_ref().unwrap()).unwrap();
-                                server.players
+                                let uuid =
+                                    protocol::UUID::from_str(spawn.uuid_str.as_ref().unwrap())
+                                        .unwrap();
+                                server
+                                    .players
                                     .clone()
                                     .write()
                                     .entry(uuid.clone())
@@ -603,7 +621,15 @@ impl Server {
                             } else {
                                 spawn.uuid.unwrap()
                             };
-                            server.on_player_spawn(spawn.entity_id, uuid, spawn.x, spawn.y, spawn.z, spawn.pitch as f64, spawn.yaw as f64);
+                            server.on_player_spawn(
+                                spawn.entity_id,
+                                uuid,
+                                spawn.x,
+                                spawn.y,
+                                spawn.z,
+                                spawn.pitch as f64,
+                                spawn.yaw as f64,
+                            );
                         }
                         MappedPacket::PlayerInfo(player_info) => {
                             server.on_player_info(player_info);
@@ -1407,7 +1433,10 @@ impl Server {
         });
     }
 
-    fn on_plugin_message_clientbound(&self, msg: mapped_packet::play::clientbound::PluginMessageClientbound) {
+    fn on_plugin_message_clientbound(
+        &self,
+        msg: mapped_packet::play::clientbound::PluginMessageClientbound,
+    ) {
         if protocol::is_network_debug() {
             debug!(
                 "Received plugin message: channel={}, data={:?}",
@@ -1419,8 +1448,9 @@ impl Server {
             "REGISTER" => {}   // TODO
             "UNREGISTER" => {} // TODO
             "FML|HS" => {
-                let msg = crate::protocol::Serializable::read_from(&mut std::io::Cursor::new(msg.data))
-                    .unwrap();
+                let msg =
+                    crate::protocol::Serializable::read_from(&mut std::io::Cursor::new(msg.data))
+                        .unwrap();
                 // debug!("FML|HS msg={:?}", msg);
 
                 use forge::FmlHs::*;
@@ -1996,10 +2026,7 @@ impl Server {
         self.entity_map.clone().write().insert(entity_id, entity);
     }
 
-    fn on_teleport_player(
-        &self,
-        teleport: mapped_packet::play::clientbound::TeleportPlayer
-    ) {
+    fn on_teleport_player(&self, teleport: mapped_packet::play::clientbound::TeleportPlayer) {
         use std::f64::consts::PI;
         if let Some(player) = *self.player.clone().write() {
             let position = self
@@ -2022,12 +2049,24 @@ impl Server {
                 .unwrap();
 
             let flags = teleport.flags.unwrap_or(0);
-            position.position.x =
-                calculate_relative_teleport(TeleportFlag::RelX, flags, position.position.x, teleport.x);
-            position.position.y =
-                calculate_relative_teleport(TeleportFlag::RelY, flags, position.position.y, teleport.y);
-            position.position.z =
-                calculate_relative_teleport(TeleportFlag::RelZ, flags, position.position.z, teleport.z);
+            position.position.x = calculate_relative_teleport(
+                TeleportFlag::RelX,
+                flags,
+                position.position.x,
+                teleport.x,
+            );
+            position.position.y = calculate_relative_teleport(
+                TeleportFlag::RelY,
+                flags,
+                position.position.y,
+                teleport.y,
+            );
+            position.position.z = calculate_relative_teleport(
+                TeleportFlag::RelZ,
+                flags,
+                position.position.z,
+                teleport.z,
+            );
             rotation.yaw = calculate_relative_teleport(
                 TeleportFlag::RelYaw,
                 flags,
@@ -2054,12 +2093,17 @@ impl Server {
             }
 
             if let Some(teleport_id) = teleport.teleport_id {
-                self.write_packet(packet::play::serverbound::TeleportConfirm { teleport_id: protocol::VarInt(teleport_id) });
+                self.write_packet(packet::play::serverbound::TeleportConfirm {
+                    teleport_id: protocol::VarInt(teleport_id),
+                });
             }
         }
     }
 
-    fn on_block_entity_update(&self, block_update: mapped_packet::play::clientbound::UpdateBlockEntity) {
+    fn on_block_entity_update(
+        &self,
+        block_update: mapped_packet::play::clientbound::UpdateBlockEntity,
+    ) {
         match block_update.nbt {
             None => {
                 // NBT is null, so we need to remove the block entity
@@ -2139,7 +2183,10 @@ impl Server {
             ))));
     }
 
-    fn on_player_info_string(&self, _player_info: mapped_packet::play::clientbound::PlayerInfo_String) {
+    fn on_player_info_string(
+        &self,
+        _player_info: mapped_packet::play::clientbound::PlayerInfo_String,
+    ) {
         // TODO: track online players, for 1.7.10 - this is for the <tab> online player list
         // self.players in 1.7.10 will be only spawned players (within client range)
         /*
@@ -2259,10 +2306,7 @@ impl Server {
         }
     }
 
-    fn on_servermessage(
-        &self,
-        message: mapped_packet::play::clientbound::ServerMessage,
-    ) {
+    fn on_servermessage(&self, message: mapped_packet::play::clientbound::ServerMessage) {
         debug!("Received chat message: {}", message.message);
         self.hud_context
             .clone()
@@ -2339,7 +2383,10 @@ impl Server {
         self.load_block_entities(chunk_data.block_entities);
     }
 
-    fn on_chunk_data_biomes3d(&self, chunk_data: mapped_packet::play::clientbound::ChunkData_Biomes3D) {
+    fn on_chunk_data_biomes3d(
+        &self,
+        chunk_data: mapped_packet::play::clientbound::ChunkData_Biomes3D,
+    ) {
         self.world
             .clone()
             .load_chunk115(
@@ -2367,7 +2414,10 @@ impl Server {
         self.load_block_entities(chunk_data.block_entities);
     }
 
-    fn on_chunk_data_heightmap(&self, chunk_data: mapped_packet::play::clientbound::ChunkData_HeightMap) {
+    fn on_chunk_data_heightmap(
+        &self,
+        chunk_data: mapped_packet::play::clientbound::ChunkData_HeightMap,
+    ) {
         self.world
             .clone()
             .load_chunk19(

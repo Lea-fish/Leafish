@@ -1,5 +1,4 @@
 use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
-use crate::protocol::packet::{Hand};
 use crate::protocol::mapped_packet::login::clientbound::{
     EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID,
     SetInitialCompression,
@@ -17,9 +16,9 @@ use crate::protocol::mapped_packet::play::clientbound::{
     EntityDestroy, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityHeadLook,
     EntityLook, EntityLookAndMove, EntityMetadata, EntityMove, EntityProperties,
     EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityTeleport, EntityUpdateNBT,
-    EntityUsedBed, EntityVelocity, Explosion, FacePlayer, JoinGame_WorldNames,
-    JoinGame_WorldNames_IsHard, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_i8,
-    JoinGame_i8_NoDebug, JoinGame_HashedSeed_Respawn, KeepAliveClientbound, Maps, MultiBlockChange,
+    EntityUsedBed, EntityVelocity, Explosion, FacePlayer, JoinGame_HashedSeed_Respawn,
+    JoinGame_WorldNames, JoinGame_WorldNames_IsHard, JoinGame_i32, JoinGame_i32_ViewDistance,
+    JoinGame_i8, JoinGame_i8_NoDebug, KeepAliveClientbound, Maps, MultiBlockChange,
     NBTQueryResponse, NamedSoundEffect, OpenBook, Particle, PlayerAbilities, PlayerInfo,
     PlayerInfo_String, PlayerListHeaderFooter, PluginMessageClientbound, ResourcePackSend, Respawn,
     ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, ServerMessage,
@@ -45,6 +44,7 @@ use crate::protocol::mapped_packet::play::serverbound::{
 };
 use crate::protocol::mapped_packet::status::clientbound::{StatusPong, StatusResponse};
 use crate::protocol::mapped_packet::status::serverbound::{StatusPing, StatusRequest};
+use crate::protocol::packet::Hand;
 use crate::protocol::packet::PropertyModifier;
 use std::io::Cursor;
 
@@ -2433,17 +2433,19 @@ impl MappablePacket for packet::Packet {
                 )
             }
             packet::Packet::JoinGame_HashedSeed_Respawn(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_HashedSeed_Respawn(JoinGame_HashedSeed_Respawn {
-                    entity_id: join_game.entity_id,
-                    gamemode: join_game.gamemode,
-                    dimension: join_game.dimension,
-                    hashed_seed: join_game.hashed_seed,
-                    max_players: join_game.max_players,
-                    view_distance: join_game.view_distance.0,
-                    reduced_debug_info: join_game.reduced_debug_info,
-                    enable_respawn_screen: join_game.enable_respawn_screen,
-                    level_type: join_game.level_type,
-                })
+                mapped_packet::MappedPacket::JoinGame_HashedSeed_Respawn(
+                    JoinGame_HashedSeed_Respawn {
+                        entity_id: join_game.entity_id,
+                        gamemode: join_game.gamemode,
+                        dimension: join_game.dimension,
+                        hashed_seed: join_game.hashed_seed,
+                        max_players: join_game.max_players,
+                        view_distance: join_game.view_distance.0,
+                        reduced_debug_info: join_game.reduced_debug_info,
+                        enable_respawn_screen: join_game.enable_respawn_screen,
+                        level_type: join_game.level_type,
+                    },
+                )
             }
             packet::Packet::KeepAliveClientbound_i32(keep_alive) => {
                 mapped_packet::MappedPacket::KeepAliveClientbound(KeepAliveClientbound {
@@ -2573,26 +2575,29 @@ impl MappablePacket for packet::Packet {
                     chunk_y: Some(sy),
                     chunk_z: sz,
                     no_trust_edges: Some(block_change.no_trust_edges),
-                    records: block_change.records.data.iter().map(|record| {
-                        let block_id = record.0 >> 12;
-                        let z = (record.0 & 0xf) as u8;
-                        let y = ((record.0 >> 4) & 0xf) as u8;
-                        let x = ((record.0 >> 8) & 0xf) as u8;
-                        let xz = (z & 0xF) | (x << 4);
-                        BlockChangeRecord {
-                            xz,
-                            y,
-                            block_id: block_id as i32,
-                        }
-                    }).collect(),
+                    records: block_change
+                        .records
+                        .data
+                        .iter()
+                        .map(|record| {
+                            let block_id = record.0 >> 12;
+                            let z = (record.0 & 0xf) as u8;
+                            let y = ((record.0 >> 4) & 0xf) as u8;
+                            let x = ((record.0 >> 8) & 0xf) as u8;
+                            let xz = (z & 0xF) | (x << 4);
+                            BlockChangeRecord {
+                                xz,
+                                y,
+                                block_id: block_id as i32,
+                            }
+                        })
+                        .collect(),
                 })
             }
             packet::Packet::MultiBlockChange_u16(block_change) => {
                 let mut cursor = Cursor::new(block_change.data);
                 let mut records = vec![];
                 for _ in 0..block_change.record_count {
-                    use byteorder::BigEndian;
-
                     let record = cursor.read_u32::<BigEndian>().unwrap();
 
                     let id = record & 0x0000_ffff;
@@ -2620,11 +2625,16 @@ impl MappablePacket for packet::Packet {
                     chunk_y: None,
                     chunk_z: block_change.chunk_z,
                     no_trust_edges: None,
-                    records: block_change.records.data.iter().map(|record| BlockChangeRecord {
-                        xz: record.xz,
-                        y: record.y,
-                        block_id: record.block_id.0,
-                    }).collect(),
+                    records: block_change
+                        .records
+                        .data
+                        .iter()
+                        .map(|record| BlockChangeRecord {
+                            xz: record.xz,
+                            y: record.y,
+                            block_id: record.block_id.0,
+                        })
+                        .collect(),
                 })
             }
             packet::Packet::NamedSoundEffect(sound_effect) => {
