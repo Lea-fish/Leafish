@@ -1,5 +1,5 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound};
-use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign, SpectateTeleport, SteerBoat, SteerVehicle};
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound, TimeUpdate, TeleportPlayer, TabCompleteReply, Tags, Teams, Title, TradeList};
+use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign, SpectateTeleport, SteerBoat, SteerVehicle, TeleportConfirm, TabComplete};
 use crate::protocol::mapped_packet::login::clientbound::{EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID, SetInitialCompression};
 use crate::protocol::mapped_packet::login::serverbound::{EncryptionResponse, LoginPluginResponse, LoginStart};
 use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
@@ -1067,8 +1067,8 @@ state_mapped_packets!(
             packet TeleportPlayer {
                 field x: f64,
                 field y: Option<f64>,
-                field eyes_y: Option<f64>,
                 field z: f64,
+                field eyes_y: Option<f64>,
                 field yaw: f32,
                 field pitch: f32,
                 field flags: Option<u8>,
@@ -3610,7 +3610,212 @@ impl MappablePacket for packet::Packet {
                    sound: stop_sound.sound,
                })
            }
-
+           packet::Packet::TimeUpdate(time_update) => {
+               mapped_packet::MappedPacket::TimeUpdate(TimeUpdate {
+                   world_age: time_update.world_age,
+                   time_of_day: time_update.time_of_day,
+               })
+           }
+           packet::Packet::TeleportConfirm(teleport_confirm) => {
+               mapped_packet::MappedPacket::TeleportConfirm(TeleportConfirm {
+                   teleport_id: teleport_confirm.teleport_id.0,
+               })
+           }
+           packet::Packet::TeleportPlayer_OnGround(tp_player) => {
+               mapped_packet::MappedPacket::TeleportPlayer(TeleportPlayer {
+                   x: tp_player.x,
+                   y: None,
+                   z: tp_player.z,
+                   eyes_y: Some(tp_player.eyes_y),
+                   yaw: tp_player.yaw,
+                   pitch: tp_player.pitch,
+                   flags: None,
+                   teleport_id: None,
+                   on_ground: Some(tp_player.on_ground),
+               })
+           }
+           packet::Packet::TeleportPlayer_NoConfirm(tp_player) => {
+               mapped_packet::MappedPacket::TeleportPlayer(TeleportPlayer {
+                   x: tp_player.x,
+                   y: Some(tp_player.y),
+                   z: tp_player.z,
+                   eyes_y: None,
+                   yaw: tp_player.yaw,
+                   pitch: tp_player.pitch,
+                   flags: Some(tp_player.flags),
+                   teleport_id: None,
+                   on_ground: None,
+               })
+           }
+           packet::Packet::TeleportPlayer_WithConfirm(tp_player) => {
+               mapped_packet::MappedPacket::TeleportPlayer(TeleportPlayer {
+                   x: tp_player.x,
+                   y: Some(tp_player.y),
+                   z: tp_player.z,
+                   eyes_y: None,
+                   yaw: tp_player.yaw,
+                   pitch: tp_player.pitch,
+                   flags: Some(tp_player.flags),
+                   teleport_id: Some(tp_player.teleport_id.0),
+                   on_ground: None,
+               })
+           }
+           packet::Packet::TabComplete(tab_complete) => {
+               mapped_packet::MappedPacket::TabComplete(TabComplete {
+                   text: tab_complete.text,
+                   assume_command: Some(tab_complete.assume_command),
+                   has_target: Some(tab_complete.has_target),
+                   target: tab_complete.target,
+               })
+           }
+           packet::Packet::TabComplete_NoAssume(tab_complete) => {
+               mapped_packet::MappedPacket::TabComplete(TabComplete {
+                   text: tab_complete.text,
+                   assume_command: None,
+                   has_target: Some(tab_complete.has_target),
+                   target: tab_complete.target,
+               })
+           }
+           packet::Packet::TabComplete_NoAssume_NoTarget(tab_complete) => {
+               mapped_packet::MappedPacket::TabComplete(TabComplete {
+                   text: tab_complete.text,
+                   assume_command: None,
+                   has_target: None,
+                   target: None,
+               })
+           }
+           packet::Packet::TabCompleteReply(reply) => {
+               mapped_packet::MappedPacket::TabCompleteReply(TabCompleteReply {
+                   matches: reply.matches.data,
+               })
+           }
+           packet::Packet::Tags(tags) => {
+               mapped_packet::MappedPacket::Tags(Tags {
+                   block_tags: tags.block_tags.data,
+                   item_tags: tags.item_tags.data,
+                   fluid_tags: tags.fluid_tags.data,
+                   entity_tags: None,
+               })
+           }
+           packet::Packet::TagsWithEntities(tags) => {
+               mapped_packet::MappedPacket::Tags(Tags {
+                   block_tags: tags.block_tags.data,
+                   item_tags: tags.item_tags.data,
+                   fluid_tags: tags.fluid_tags.data,
+                   entity_tags: Some(tags.entity_tags.data),
+               })
+           }
+           packet::Packet::Teams_u8(teams) => {
+               mapped_packet::MappedPacket::Teams(Teams {
+                   name: teams.name,
+                   mode: teams.mode,
+                   display_name: teams.display_name,
+                   flags: teams.flags,
+                   name_tag_visibility: teams.name_tag_visibility,
+                   collision_rule: teams.collision_rule,
+                   formatting: None,
+                   prefix: teams.prefix,
+                   suffix: teams.suffix,
+                   players: teams.players.map(|x| x.data),
+                   color: teams.color,
+                   data: Some(teams.data),
+               })
+           }
+           packet::Packet::Teams_NoVisColor(teams) => {
+               mapped_packet::MappedPacket::Teams(Teams {
+                   name: teams.name,
+                   mode: teams.mode,
+                   display_name: teams.display_name,
+                   flags: teams.flags,
+                   name_tag_visibility: None,
+                   collision_rule: None,
+                   formatting: None,
+                   prefix: teams.prefix,
+                   suffix: teams.suffix,
+                   players: teams.players.map(|x| x.data),
+                   color: None,
+                   data: None,
+               })
+           }
+           packet::Packet::Teams_VarInt(teams) => {
+               mapped_packet::MappedPacket::Teams(Teams {
+                   name: teams.name,
+                   mode: teams.mode,
+                   display_name: teams.display_name,
+                   flags: teams.flags,
+                   name_tag_visibility: teams.name_tag_visibility,
+                   collision_rule: teams.collision_rule,
+                   formatting: teams.formatting.map(|x| x.0),
+                   prefix: teams.prefix,
+                   suffix: teams.suffix,
+                   players: teams.players.map(|x| x.data),
+                   color: None,
+                   data: None,
+               })
+           }
+           packet::Packet::Title(title) => {
+               mapped_packet::MappedPacket::Title(Title {
+                   action: title.action.0,
+                   title: title.title,
+                   sub_title: title.sub_title,
+                   action_bar_text: title.action_bar_text,
+                   fade_in: title.fade_in,
+                   fade_stay: title.fade_stay,
+                   fade_out: title.fade_out,
+                   fade_in_comp: None,
+                   fade_stay_comp: None,
+                   fade_out_comp: None,
+               })
+           }
+           packet::Packet::Title_notext(title) => {
+               mapped_packet::MappedPacket::Title(Title {
+                   action: title.action.0,
+                   title: title.title,
+                   sub_title: title.sub_title,
+                   action_bar_text: None,
+                   fade_in: title.fade_in,
+                   fade_stay: title.fade_stay,
+                   fade_out: title.fade_out,
+                   fade_in_comp: None,
+                   fade_stay_comp: None,
+                   fade_out_comp: None,
+               })
+           }
+           packet::Packet::Title_notext_component(title) => {
+               mapped_packet::MappedPacket::Title(Title {
+                   action: title.action.0,
+                   title: title.title,
+                   sub_title: title.sub_title,
+                   action_bar_text: None,
+                   fade_in: None,
+                   fade_stay: None,
+                   fade_out: None,
+                   fade_in_comp: title.fade_in,
+                   fade_stay_comp: title.fade_stay,
+                   fade_out_comp: title.fade_out,
+               })
+           }
+           packet::Packet::TradeList_WithoutRestock(trade_list) => {
+               mapped_packet::MappedPacket::TradeList(TradeList {
+                   id: trade_list.id.0,
+                   trades: trade_list.trades.data,
+                   villager_level: trade_list.villager_level.0,
+                   experience: trade_list.experience.0,
+                   is_regular_villager: trade_list.is_regular_villager,
+                   can_restock: None,
+               })
+           }
+           packet::Packet::TradeList_WithRestock(trade_list) => {
+               mapped_packet::MappedPacket::TradeList(TradeList {
+                   id: trade_list.id.0,
+                   trades: trade_list.trades.data,
+                   villager_level: trade_list.villager_level.0,
+                   experience: trade_list.experience.0,
+                   is_regular_villager: trade_list.is_regular_villager,
+                   can_restock: Some(trade_list.can_restock),
+               })
+           }
+           
        }
     }
 
