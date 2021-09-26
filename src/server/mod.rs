@@ -40,7 +40,7 @@ use instant::{Duration, Instant};
 use leafish_protocol::format::{Component, TextComponent};
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
-use leafish_protocol::protocol::packet::{DigType, Hand, Packet};
+use leafish_protocol::protocol::packet::{DigType, Hand};
 use leafish_protocol::protocol::{Conn, Version};
 use leafish_shared::direction::Direction as BlockDirection;
 use log::{debug, error, info, warn};
