@@ -3311,10 +3311,11 @@ pub enum DigType {
     DropAllItems,
     DropItem,
     ReleaseUseItem,
+    Invalid(i32),
 }
 
 impl DigType {
-    pub fn ordinal(&self) -> u8 {
+    pub fn ordinal(&self) -> i32 {
         match self {
             DigType::StartDestroyBlock => 0,
             DigType::AbortDestroyBlock => 1,
@@ -3322,20 +3323,54 @@ impl DigType {
             DigType::DropAllItems => 3,
             DigType::DropItem => 4,
             DigType::ReleaseUseItem => 5,
+            DigType::Invalid(id) => *id,
         }
     }
 }
 
+impl From<i32> for DigType {
+    fn from(src: i32) -> Self {
+        match src {
+            0 => DigType::StartDestroyBlock,
+            1 => DigType::AbortDestroyBlock,
+            2 => DigType::StopDestroyBlock,
+            3 => DigType::DropAllItems,
+            4 => DigType::DropItem,
+            5 => DigType::ReleaseUseItem,
+            _ => DigType::Invalid(src),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum Hand {
     MainHand,
     OffHand,
+    Invalid(i32),
+}
+
+impl Default for Hand {
+    fn default() -> Self {
+        Hand::MainHand
+    }
 }
 
 impl Hand {
-    pub fn ordinal(&self) -> u8 {
+    pub fn ordinal(&self) -> i32 {
         match self {
             Hand::MainHand => 0,
             Hand::OffHand => 1,
+            Hand::Invalid(id) => *id,
+        }
+    }
+}
+
+impl From<i32> for Hand {
+    fn from(src: i32) -> Self {
+        match src {
+            0 => Hand::MainHand,
+            1 => Hand::OffHand,
+            _ => Hand::Invalid(src),
         }
     }
 }
@@ -3398,7 +3433,7 @@ pub fn send_digging(
 ) -> Result<(), Error> {
     if version < Version::V1_8 {
         conn.write_packet(packet::play::serverbound::PlayerDigging_u8_u8y {
-            status: status.ordinal(),
+            status: status.ordinal() as u8,
             x: pos.x,
             y: pos.y as u8,
             z: pos.z,
@@ -3406,13 +3441,13 @@ pub fn send_digging(
         })
     } else if version < Version::V1_9 {
         conn.write_packet(packet::play::serverbound::PlayerDigging_u8 {
-            status: status.ordinal(),
+            status: status.ordinal() as u8,
             location: pos,
             face: face_index,
         })
     } else {
         conn.write_packet(packet::play::serverbound::PlayerDigging {
-            status: VarInt(status.ordinal() as i32),
+            status: VarInt(status.ordinal()),
             location: pos,
             face: face_index,
         })

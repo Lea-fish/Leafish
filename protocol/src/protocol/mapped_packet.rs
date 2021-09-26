@@ -1,4 +1,5 @@
 use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
+use crate::protocol::packet::Hand;
 use crate::protocol::mapped_packet::login::clientbound::{
     EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID,
     SetInitialCompression,
@@ -18,7 +19,7 @@ use crate::protocol::mapped_packet::play::clientbound::{
     EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityTeleport, EntityUpdateNBT,
     EntityUsedBed, EntityVelocity, Explosion, FacePlayer, JoinGame_WorldNames,
     JoinGame_WorldNames_IsHard, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_i8,
-    JoinGame_i8_NoDebug, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32,
+    JoinGame_i8_NoDebug, JoinGame_HashedSeed_Respawn, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32,
     NBTQueryResponse, NamedSoundEffect, OpenBook, Particle, PlayerAbilities, PlayerInfo,
     PlayerInfo_String, PlayerListHeaderFooter, PluginMessageClientbound, ResourcePackSend, Respawn,
     ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, ServerMessage,
@@ -82,6 +83,7 @@ macro_rules! state_mapped_packets {
                 use crate::types;
                 use crate::item;
                 use crate::shared::Position;
+                use crate::protocol::packet::Hand;
 
 
                 $(
@@ -168,7 +170,7 @@ state_mapped_packets!(
                 field chat_colors: bool,
                 field difficulty: Option<u8>,
                 field displayed_skin_parts: u8,
-                field main_hand: Option<i32>,
+                field main_hand: Option<Hand>,
             }
             /// ConfirmTransactionServerbound is a reply to ConfirmTransaction.
             packet ConfirmTransactionServerbound {
@@ -209,7 +211,7 @@ state_mapped_packets!(
             packet EditBook {
                 field new_book: Option<item::Stack>,
                 field is_signing: bool,
-                field hand: i32,
+                field hand: Hand,
             }
             packet QueryEntityNBT {
                 field transaction_id: i32,
@@ -426,7 +428,7 @@ state_mapped_packets!(
             /// ArmSwing is sent by the client when the player left clicks (to swing their
             /// arm).
             packet ArmSwing {
-                field hand: Option<i32>,
+                field hand: Option<Hand>,
                 field entity_id: Option<i32>,
                 field animation: Option<u8>,
             }
@@ -610,7 +612,7 @@ state_mapped_packets!(
             packet MultiBlockChange_Packed {
                 field chunk_section_pos: u64,
                 field no_trust_edges: bool,
-                field records: Vec<VarLong>,
+                field records: Vec<i64>,
             }
             packet MultiBlockChange_i32 {
                 field chunk_x: i32,
@@ -742,7 +744,7 @@ state_mapped_packets!(
                 field new: bool,
                 field bitmask: i32,
                 field heightmaps: Option<nbt::NamedTag>,
-                field biomes: Vec<VarInt>,
+                field biomes: Vec<i32>,
                 field data: Vec<u8>,
                 field block_entities: Vec<Option<nbt::NamedTag>>,
             }
@@ -1052,7 +1054,7 @@ state_mapped_packets!(
             }
             /// Opens the book GUI.
             packet OpenBook {
-                field hand: i32,
+                field hand: Hand,
             }
             /// SignEditorOpen causes the client to open the editor for a sign so that
             /// it can write to it. Only sent in vanilla when the player places a sign.
@@ -1612,7 +1614,7 @@ impl MappablePacket for packet::Packet {
             }
             packet::Packet::ArmSwing(arm_swing) => {
                 mapped_packet::MappedPacket::ArmSwing(ArmSwing {
-                    hand: Some(arm_swing.hand.0),
+                    hand: Some(Hand::from(arm_swing.hand.0)),
                     entity_id: None,
                     animation: None,
                 })
@@ -1717,7 +1719,7 @@ impl MappablePacket for packet::Packet {
                     chat_colors: client_settings.chat_colors,
                     difficulty: None,
                     displayed_skin_parts: client_settings.displayed_skin_parts,
-                    main_hand: Some(client_settings.main_hand.0),
+                    main_hand: Some(Hand::from(client_settings.main_hand.0)),
                 })
             }
             packet::Packet::ClientSettings_u8(client_settings) => {
@@ -1728,7 +1730,7 @@ impl MappablePacket for packet::Packet {
                     chat_colors: client_settings.chat_colors,
                     difficulty: None,
                     displayed_skin_parts: client_settings.displayed_skin_parts,
-                    main_hand: Some(client_settings.main_hand.0),
+                    main_hand: Some(Hand::from(client_settings.main_hand.0)),
                 })
             }
             packet::Packet::ClientSettings_u8_Handsfree(client_settings) => {
@@ -1803,7 +1805,7 @@ impl MappablePacket for packet::Packet {
                     new: chunk_data.new,
                     bitmask: chunk_data.bitmask.0,
                     heightmaps: chunk_data.heightmaps,
-                    biomes: chunk_data.biomes.data,
+                    biomes: chunk_data.biomes.data.iter().map(|x| x.0).collect(),
                     data: chunk_data.data.data,
                     block_entities: chunk_data.block_entities.data,
                 })
@@ -2159,7 +2161,7 @@ impl MappablePacket for packet::Packet {
                 mapped_packet::MappedPacket::EditBook(EditBook {
                     new_book: edit_book.new_book,
                     is_signing: edit_book.is_signing,
-                    hand: edit_book.hand.0,
+                    hand: Hand::from(edit_book.hand.0),
                 })
             }
             packet::Packet::Effect(effect) => mapped_packet::MappedPacket::Effect(Effect {
@@ -2483,26 +2485,19 @@ impl MappablePacket for packet::Packet {
                     },
                 )
             }
-            /*
             packet::Packet::JoinGame_HashedSeed_Respawn(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_WorldNames_IsHard(JoinGame_WorldNames_IsHard {
+                mapped_packet::MappedPacket::JoinGame_HashedSeed_Respawn(JoinGame_HashedSeed_Respawn {
                     entity_id: join_game.entity_id,
-                    is_hardcore: join_game.is_hardcore,
                     gamemode: join_game.gamemode,
-                    previous_gamemode: join_game.previous_gamemode,
-                    world_names: join_game.world_names.data,
-                    dimension_codec: join_game.dimension_codec,
                     dimension: join_game.dimension,
-                    world_name: join_game.world_name,
                     hashed_seed: join_game.hashed_seed,
-                    max_players: join_game.max_players.0,
+                    max_players: join_game.max_players,
                     view_distance: join_game.view_distance.0,
                     reduced_debug_info: join_game.reduced_debug_info,
                     enable_respawn_screen: join_game.enable_respawn_screen,
-                    is_debug: join_game.is_debug,
-                    is_flat: join_game.is_flat,
+                    level_type: join_game.level_type,
                 })
-            }*/
+            }
             packet::Packet::KeepAliveClientbound_i32(keep_alive) => {
                 mapped_packet::MappedPacket::KeepAliveClientbound(KeepAliveClientbound {
                     id: keep_alive.id as i64,
@@ -2626,7 +2621,7 @@ impl MappablePacket for packet::Packet {
                 mapped_packet::MappedPacket::MultiBlockChange_Packed(MultiBlockChange_Packed {
                     chunk_section_pos: block_change.chunk_section_pos,
                     no_trust_edges: block_change.no_trust_edges,
-                    records: block_change.records.data,
+                    records: block_change.records.data.iter().map(|x| x.0).collect(),
                 })
             }
             packet::Packet::MultiBlockChange_u16(block_change) => {
@@ -2695,7 +2690,7 @@ impl MappablePacket for packet::Packet {
             }
             packet::Packet::OpenBook(open_book) => {
                 mapped_packet::MappedPacket::OpenBook(OpenBook {
-                    hand: open_book.hand.0,
+                    hand: Hand::from(open_book.hand.0),
                 })
             }
             packet::Packet::Player(player) => mapped_packet::MappedPacket::Player(Player {
@@ -4195,14 +4190,6 @@ impl MappablePacket for packet::Packet {
                     portal_boundary: border.portal_boundary.map(|x| x.0),
                     warning_time: border.warning_time.map(|x| x.0),
                     warning_blocks: border.warning_blocks.map(|x| x.0),
-                })
-            }
-            _ => {
-                mapped_packet::MappedPacket::ArmSwing(ArmSwing {
-                    // TODO: Fix this!
-                    hand: None,
-                    entity_id: None,
-                    animation: None,
                 })
             }
         }
