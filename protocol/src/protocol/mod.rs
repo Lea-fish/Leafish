@@ -272,6 +272,7 @@ macro_rules! protocol_packet_ids {
     }
 }
 
+pub mod mapped_packet;
 pub mod packet;
 pub mod versions;
 pub trait Serializable: Sized {
