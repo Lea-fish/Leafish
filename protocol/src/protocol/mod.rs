@@ -229,6 +229,60 @@ macro_rules! state_packets {
 }
 
 #[macro_export]
+macro_rules! state_mapped_packets {
+     ($($state:ident $stateName:ident {
+        $($dir:ident $dirName:ident {
+            $(
+                $(#[$attr:meta])*
+                packet $name:ident {
+                    $($(#[$fattr:meta])*field $field:ident: $field_type:ty, )+
+                }
+            )*
+        })+
+    })+) => {
+        use crate::protocol::*;
+
+        #[derive(Debug)]
+        pub enum MappedPacket {
+        $(
+            $(
+                $(
+        $name($state::$dir::$name),
+                )*
+            )+
+        )+
+        }
+
+        $(
+        pub mod $state {
+
+            $(
+            pub mod $dir {
+                #![allow(unused_imports)]
+                use crate::protocol::*;
+                use std::io;
+                use crate::format;
+                use crate::nbt;
+                use crate::types;
+                use crate::item;
+                use crate::shared::Position;
+                use crate::protocol::packet::Hand;
+
+
+                $(
+                    #[derive(Default, Debug)]
+                    $(#[$attr])* pub struct $name {
+                        $($(#[$fattr])* pub $field: $field_type),+,
+                    }
+                )*
+            }
+            )+
+        }
+        )+
+    }
+}
+
+#[macro_export]
 macro_rules! protocol_packet_ids {
     ($($state:ident $stateName:ident {
        $($dir:ident $dirName:ident {

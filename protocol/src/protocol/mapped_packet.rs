@@ -1,5 +1,5 @@
 use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
-use crate::protocol::packet::Hand;
+use crate::protocol::packet::{Hand};
 use crate::protocol::mapped_packet::login::clientbound::{
     EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID,
     SetInitialCompression,
@@ -19,7 +19,7 @@ use crate::protocol::mapped_packet::play::clientbound::{
     EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityTeleport, EntityUpdateNBT,
     EntityUsedBed, EntityVelocity, Explosion, FacePlayer, JoinGame_WorldNames,
     JoinGame_WorldNames_IsHard, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_i8,
-    JoinGame_i8_NoDebug, JoinGame_HashedSeed_Respawn, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32,
+    JoinGame_i8_NoDebug, JoinGame_HashedSeed_Respawn, KeepAliveClientbound, Maps, MultiBlockChange,
     NBTQueryResponse, NamedSoundEffect, OpenBook, Particle, PlayerAbilities, PlayerInfo,
     PlayerInfo_String, PlayerListHeaderFooter, PluginMessageClientbound, ResourcePackSend, Respawn,
     ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, ServerMessage,
@@ -46,58 +46,7 @@ use crate::protocol::mapped_packet::play::serverbound::{
 use crate::protocol::mapped_packet::status::clientbound::{StatusPong, StatusResponse};
 use crate::protocol::mapped_packet::status::serverbound::{StatusPing, StatusRequest};
 use crate::protocol::packet::PropertyModifier;
-macro_rules! state_mapped_packets {
-     ($($state:ident $stateName:ident {
-        $($dir:ident $dirName:ident {
-            $(
-                $(#[$attr:meta])*
-                packet $name:ident {
-                    $($(#[$fattr:meta])*field $field:ident: $field_type:ty, )+
-                }
-            )*
-        })+
-    })+) => {
-        use crate::protocol::*;
-
-        #[derive(Debug)]
-        pub enum MappedPacket {
-        $(
-            $(
-                $(
-        $name($state::$dir::$name),
-                )*
-            )+
-        )+
-        }
-
-        $(
-        pub mod $state {
-
-            $(
-            pub mod $dir {
-                #![allow(unused_imports)]
-                use crate::protocol::*;
-                use std::io;
-                use crate::format;
-                use crate::nbt;
-                use crate::types;
-                use crate::item;
-                use crate::shared::Position;
-                use crate::protocol::packet::Hand;
-
-
-                $(
-                    #[derive(Default, Debug)]
-                    $(#[$attr])* pub struct $name {
-                        $($(#[$fattr])* pub $field: $field_type),+,
-                    }
-                )*
-            }
-            )+
-        }
-        )+
-    }
-}
+use std::io::Cursor;
 
 state_mapped_packets!(
     handshake Handshaking {
@@ -566,10 +515,11 @@ state_mapped_packets!(
                 field block_type: i32,
             }
             /// BlockChange is used to update a single block on the client.
+            /// The block id is the actual block id combined with its metadata
+            /// which is stored in the first 4 bits of this i32.
             packet BlockChange {
                 field location: Position,
                 field block_id: i32,
-                field block_metadata: Option<u8>,
             }
             /// BossBar displays and/or changes a boss bar that is displayed on the
             /// top of the client's screen. This is normally used for bosses such as
@@ -609,18 +559,12 @@ state_mapped_packets!(
                 field sender: Option<UUID>,
             }
             /// MultiBlockChange is used to update a batch of blocks in a single packet.
-            packet MultiBlockChange_Packed {
-                field chunk_section_pos: u64,
-                field no_trust_edges: bool,
-                field records: Vec<i64>,
-            }
-            packet MultiBlockChange_i32 {
+            packet MultiBlockChange {
                 field chunk_x: i32,
+                field chunk_y: Option<i32>,
                 field chunk_z: i32,
-                field records: Option<Vec<packet::BlockChangeRecord>>,
-                field record_count: Option<u16>,
-                field data_size: Option<i32>,
-                field data: Option<Vec<u8>>,
+                field no_trust_edges: Option<bool>,
+                field records: Vec<mapped_packet::BlockChangeRecord>,
             }
             /// ConfirmTransaction notifies the client whether a transaction was successful
             /// or failed (e.g. due to lag).
@@ -1106,9 +1050,8 @@ state_mapped_packets!(
             /// otherwise will reject future packets.
             packet TeleportPlayer {
                 field x: f64,
-                field y: Option<f64>,
+                field y: f64,
                 field z: f64,
-                field eyes_y: Option<f64>,
                 field yaw: f32,
                 field pitch: f32,
                 field flags: Option<u8>,
@@ -1573,6 +1516,12 @@ state_mapped_packets!(
     }
 );
 
+impl Default for MappedPacket {
+    fn default() -> Self {
+        panic!("This function is not meant to be used, it is only used to make `MappedPacket` visible to the outside world.")
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct EntityProperty {
     pub key: String,
@@ -1670,15 +1619,13 @@ impl MappablePacket for packet::Packet {
             packet::Packet::BlockChange_u8(block_change) => {
                 mapped_packet::MappedPacket::BlockChange(BlockChange {
                     location: Position::new(block_change.x, block_change.y as i32, block_change.z),
-                    block_id: block_change.block_id.0,
-                    block_metadata: Some(block_change.block_metadata),
+                    block_id: (block_change.block_id.0 << 4) | (block_change.block_metadata as i32),
                 })
             }
             packet::Packet::BlockChange_VarInt(block_change) => {
                 mapped_packet::MappedPacket::BlockChange(BlockChange {
                     location: block_change.location,
                     block_id: block_change.block_id.0,
-                    block_metadata: None,
                 })
             }
             packet::Packet::BossBar(boss_bar) => mapped_packet::MappedPacket::BossBar(BossBar {
@@ -2618,30 +2565,66 @@ impl MappablePacket for packet::Packet {
                 data: None,
             }),
             packet::Packet::MultiBlockChange_Packed(block_change) => {
-                mapped_packet::MappedPacket::MultiBlockChange_Packed(MultiBlockChange_Packed {
-                    chunk_section_pos: block_change.chunk_section_pos,
-                    no_trust_edges: block_change.no_trust_edges,
-                    records: block_change.records.data.iter().map(|x| x.0).collect(),
+                let sx = (block_change.chunk_section_pos >> 42) as i32;
+                let sy = ((block_change.chunk_section_pos << 44) >> 44) as i32;
+                let sz = ((block_change.chunk_section_pos << 22) >> 42) as i32;
+                mapped_packet::MappedPacket::MultiBlockChange(MultiBlockChange {
+                    chunk_x: sx,
+                    chunk_y: Some(sy),
+                    chunk_z: sz,
+                    no_trust_edges: Some(block_change.no_trust_edges),
+                    records: block_change.records.data.iter().map(|record| {
+                        let block_id = record.0 >> 12;
+                        let z = (record.0 & 0xf) as u8;
+                        let y = ((record.0 >> 4) & 0xf) as u8;
+                        let x = ((record.0 >> 8) & 0xf) as u8;
+                        let xz = (z & 0xF) | (x << 4);
+                        BlockChangeRecord {
+                            xz,
+                            y,
+                            block_id: block_id as i32,
+                        }
+                    }).collect(),
                 })
             }
             packet::Packet::MultiBlockChange_u16(block_change) => {
-                mapped_packet::MappedPacket::MultiBlockChange_i32(MultiBlockChange_i32 {
+                let mut cursor = Cursor::new(block_change.data);
+                let mut records = vec![];
+                for _ in 0..block_change.record_count {
+                    use byteorder::BigEndian;
+
+                    let record = cursor.read_u32::<BigEndian>().unwrap();
+
+                    let id = record & 0x0000_ffff;
+                    let y = ((record & 0x00ff_0000) >> 16) as u8;
+                    let z = ((record & 0x0f00_0000) >> 24) as u8;
+                    let x = ((record & 0xf000_0000) >> 28) as u8;
+                    let xz = (z & 0xF) | (x << 4);
+                    records.push(BlockChangeRecord {
+                        xz,
+                        y,
+                        block_id: id as i32,
+                    });
+                }
+                mapped_packet::MappedPacket::MultiBlockChange(MultiBlockChange {
                     chunk_x: block_change.chunk_x,
+                    chunk_y: None,
                     chunk_z: block_change.chunk_z,
-                    records: None,
-                    record_count: Some(block_change.record_count),
-                    data_size: Some(block_change.data_size),
-                    data: Some(block_change.data),
+                    no_trust_edges: None,
+                    records,
                 })
             }
             packet::Packet::MultiBlockChange_VarInt(block_change) => {
-                mapped_packet::MappedPacket::MultiBlockChange_i32(MultiBlockChange_i32 {
+                mapped_packet::MappedPacket::MultiBlockChange(MultiBlockChange {
                     chunk_x: block_change.chunk_x,
+                    chunk_y: None,
                     chunk_z: block_change.chunk_z,
-                    records: Some(block_change.records.data),
-                    record_count: None,
-                    data_size: None,
-                    data: None,
+                    no_trust_edges: None,
+                    records: block_change.records.data.iter().map(|record| BlockChangeRecord {
+                        xz: record.xz,
+                        y: record.y,
+                        block_id: record.block_id.0,
+                    }).collect(),
                 })
             }
             packet::Packet::NamedSoundEffect(sound_effect) => {
@@ -3669,9 +3652,8 @@ impl MappablePacket for packet::Packet {
             packet::Packet::TeleportPlayer_OnGround(tp_player) => {
                 mapped_packet::MappedPacket::TeleportPlayer(TeleportPlayer {
                     x: tp_player.x,
-                    y: None,
+                    y: tp_player.eyes_y - 1.62,
                     z: tp_player.z,
-                    eyes_y: Some(tp_player.eyes_y),
                     yaw: tp_player.yaw,
                     pitch: tp_player.pitch,
                     flags: None,
@@ -3682,9 +3664,8 @@ impl MappablePacket for packet::Packet {
             packet::Packet::TeleportPlayer_NoConfirm(tp_player) => {
                 mapped_packet::MappedPacket::TeleportPlayer(TeleportPlayer {
                     x: tp_player.x,
-                    y: Some(tp_player.y),
+                    y: tp_player.y,
                     z: tp_player.z,
-                    eyes_y: None,
                     yaw: tp_player.yaw,
                     pitch: tp_player.pitch,
                     flags: Some(tp_player.flags),
@@ -3695,9 +3676,8 @@ impl MappablePacket for packet::Packet {
             packet::Packet::TeleportPlayer_WithConfirm(tp_player) => {
                 mapped_packet::MappedPacket::TeleportPlayer(TeleportPlayer {
                     x: tp_player.x,
-                    y: Some(tp_player.y),
+                    y: tp_player.y,
                     z: tp_player.z,
-                    eyes_y: None,
                     yaw: tp_player.yaw,
                     pitch: tp_player.pitch,
                     flags: Some(tp_player.flags),
@@ -4194,4 +4174,11 @@ impl MappablePacket for packet::Packet {
             }
         }
     }
+}
+
+#[derive(Debug, Default)]
+pub struct BlockChangeRecord {
+    pub xz: u8,
+    pub y: u8,
+    pub block_id: i32,
 }
