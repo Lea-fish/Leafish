@@ -1,11 +1,11 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound, TimeUpdate, TeleportPlayer, TabCompleteReply, Tags, Teams, Title, TradeList, UpdateHealth, UpdateLight, UpdateViewPosition, UpdateBlockEntity, UpdateSign, UnlockRecipes, UpdateScore, UpdateViewDistance, VehicleTeleport, WindowItems, WindowClose, WindowOpen, WindowOpenHorse, WindowProperty, WindowSetSlot, WorldBorder};
-use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign, SpectateTeleport, SteerBoat, SteerVehicle, TeleportConfirm, TabComplete, UpdateCommandBlock, UpdateCommandBlockMinecart, UpdateJigsawBlock_Joint, UpdateJigsawBlock_Type, UpdateStructureBlock, UseEntity, UseItem, VehicleMove};
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound, TimeUpdate, TeleportPlayer, TabCompleteReply, Tags, Teams, Title, TradeList, UpdateHealth, UpdateLight, UpdateViewPosition, UpdateBlockEntity, UpdateSign, UnlockRecipes, UpdateScore, UpdateViewDistance, VehicleTeleport, WindowItems, WindowClose, WindowOpen, WindowOpenHorse, WindowProperty, WindowSetSlot, WorldBorder};
+use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign, SpectateTeleport, SteerBoat, SteerVehicle, TeleportConfirm, TabComplete, UpdateCommandBlock, UpdateCommandBlockMinecart, UpdateJigsawBlock_Joint, UpdateJigsawBlock_Type, UpdateStructureBlock, UseEntity, UseItem, VehicleMove, PlayerLook};
 use crate::protocol::mapped_packet::login::clientbound::{EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID, SetInitialCompression};
 use crate::protocol::mapped_packet::login::serverbound::{EncryptionResponse, LoginPluginResponse, LoginStart};
 use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
-use crate::protocol::packet::play::serverbound::PlayerLook;
 use crate::protocol::mapped_packet::status::serverbound::{StatusPing, StatusRequest};
 use crate::protocol::mapped_packet::status::clientbound::{StatusPong, StatusResponse};
+use crate::protocol::packet::PropertyModifier;
 macro_rules! state_mapped_packets {
      ($($state:ident $stateName:ident {
         $($dir:ident $dirName:ident {
@@ -18,7 +18,6 @@ macro_rules! state_mapped_packets {
         })+
     })+) => {
         use crate::protocol::*;
-        use std::io;
 
         #[derive(Debug)]
         pub enum MappedPacket {
@@ -1542,7 +1541,7 @@ pub struct EntityProperty {
 
 pub trait MappablePacket {
 
-    fn map(&self) -> MappedPacket;
+    fn map(self) -> MappedPacket;
 
 }
 
@@ -1688,7 +1687,7 @@ impl MappablePacket for packet::Packet {
                mapped_packet::MappedPacket::ClientSettings(ClientSettings {
                    locale: client_settings.locale,
                    view_distance: client_settings.view_distance,
-                   chat_mode: client_settings.chat_mode.0,
+                   chat_mode: client_settings.chat_mode as i32,
                    chat_colors: client_settings.chat_colors,
                    difficulty: None,
                    displayed_skin_parts: client_settings.displayed_skin_parts,
@@ -1699,7 +1698,7 @@ impl MappablePacket for packet::Packet {
                mapped_packet::MappedPacket::ClientSettings(ClientSettings {
                    locale: client_settings.locale,
                    view_distance: client_settings.view_distance,
-                   chat_mode: client_settings.chat_mode.0,
+                   chat_mode: client_settings.chat_mode as i32,
                    chat_colors: client_settings.chat_colors,
                    difficulty: None,
                    displayed_skin_parts: client_settings.displayed_skin_parts,
@@ -1710,7 +1709,7 @@ impl MappablePacket for packet::Packet {
                mapped_packet::MappedPacket::ClientSettings(ClientSettings {
                    locale: client_settings.locale,
                    view_distance: client_settings.view_distance,
-                   chat_mode: client_settings.chat_mode.0,
+                   chat_mode: client_settings.chat_mode as i32,
                    chat_colors: client_settings.chat_colors,
                    difficulty: Some(client_settings.difficulty),
                    displayed_skin_parts: client_settings.displayed_skin_parts,
@@ -1777,7 +1776,7 @@ impl MappablePacket for packet::Packet {
                    new: chunk_data.new,
                    bitmask: chunk_data.bitmask.0,
                    heightmaps: chunk_data.heightmaps,
-                   biomes: chunk_data.biomes.data,
+                   biomes: chunk_data.biomes,
                    data: chunk_data.data.data,
                    block_entities: chunk_data.block_entities.data,
                })
@@ -1790,13 +1789,13 @@ impl MappablePacket for packet::Packet {
                    ignore_old_data: chunk_data.ignore_old_data,
                    bitmask: chunk_data.bitmask.0,
                    heightmaps: chunk_data.heightmaps,
-                   biomes: chunk_data.biomes.data,
+                   biomes: chunk_data.biomes,
                    data: chunk_data.data.data,
                    block_entities: chunk_data.block_entities.data,
                })
            }
            packet::Packet::ChunkData_17(chunk_data) => {
-               mapped_packet::MappedPacket::ChunkData_Biomes3D_i32(ChunkData_17 {
+               mapped_packet::MappedPacket::ChunkData_17(ChunkData_17 {
                    chunk_x: chunk_data.chunk_x,
                    chunk_z: chunk_data.chunk_z,
                    new: chunk_data.new,
@@ -1834,7 +1833,7 @@ impl MappablePacket for packet::Packet {
            packet::Packet::ChunkDataBulk(chunk_data) => {
                mapped_packet::MappedPacket::ChunkDataBulk(ChunkDataBulk {
                    skylight: chunk_data.skylight,
-                   chunk_meta: chunk_data.chunk_meta,
+                   chunk_meta: chunk_data.chunk_meta.data,
                    chunk_data: chunk_data.chunk_data,
                })
            }
@@ -1859,7 +1858,7 @@ impl MappablePacket for packet::Packet {
                    slot: click_window.slot,
                    button: click_window.button,
                    action_number: click_window.action_number,
-                   mode: click_window.mode,
+                   mode: click_window.mode as i32,
                    clicked_item: click_window.clicked_item,
                })
            }
@@ -2258,13 +2257,21 @@ impl MappablePacket for packet::Packet {
            packet::Packet::EntityProperties(properties) => {
                mapped_packet::MappedPacket::EntityProperties(EntityProperties {
                    entity_id: properties.entity_id.0,
-                   properties: properties.entity_id.0,
+                   properties: properties.properties.data.iter().map(|x| EntityProperty {
+                       key: x.key,
+                       value: x.value,
+                       modifiers: x.modifiers.data,
+                   }).collect(),
                })
            }
            packet::Packet::EntityProperties_i32(properties) => {
                mapped_packet::MappedPacket::EntityProperties(EntityProperties {
                    entity_id: properties.entity_id,
-                   properties: properties.entity_id,
+                   properties: properties.properties.data.iter().map(|x| EntityProperty {
+                       key: x.key,
+                       value: x.value,
+                       modifiers: x.modifiers.data,
+                   }).collect(),
                })
            }
            packet::Packet::EntityRemoveEffect(remove_effect) => {
@@ -2427,7 +2434,7 @@ impl MappablePacket for packet::Packet {
                    dimension: join_game.dimension,
                    world_name: join_game.world_name,
                    hashed_seed: join_game.hashed_seed,
-                   max_players: join_game.max_players,
+                   max_players: join_game.max_players.0,
                    view_distance: join_game.view_distance.0,
                    reduced_debug_info: join_game.reduced_debug_info,
                    enable_respawn_screen: join_game.enable_respawn_screen,
@@ -2770,8 +2777,8 @@ impl MappablePacket for packet::Packet {
            }
            packet::Packet::Particle_VarIntArray(particle) => {
                mapped_packet::MappedPacket::Particle(Particle {
-                   particle_id: None,
-                   particle_name: Some(particle.particle_id),
+                   particle_id: Some(particle.particle_id),
+                   particle_name: None,
                    long_distance: Some(particle.long_distance),
                    x: particle.x as f64,
                    y: particle.y as f64,
@@ -2988,7 +2995,7 @@ impl MappablePacket for packet::Packet {
            }
            packet::Packet::Respawn_NBT(respawn) => {
                mapped_packet::MappedPacket::Respawn(Respawn {
-                   dimension_tag: Some(respawn.dimension),
+                   dimension_tag: respawn.dimension,
                    dimension_name: None,
                    world_name: Some(respawn.world_name),
                    dimension: None,
@@ -3506,7 +3513,7 @@ impl MappablePacket for packet::Packet {
                    motive: None,
                    title: Some(painting.title),
                    location: painting.location,
-                   direction: painting.direction,
+                   direction: painting.direction as i32,
                })
            }
            packet::Packet::SpawnPainting_NoUUID_i32(painting) => {
@@ -3515,7 +3522,7 @@ impl MappablePacket for packet::Packet {
                    uuid: None,
                    motive: None,
                    title: Some(painting.title),
-                   location: Position::from(painting.x, painting.y, painting.z),
+                   location: Position::new(painting.x, painting.y, painting.z),
                    direction: painting.direction,
                })
            }
@@ -3526,7 +3533,7 @@ impl MappablePacket for packet::Packet {
                    motive: None,
                    title: Some(painting.title),
                    location: painting.location,
-                   direction: painting.direction,
+                   direction: painting.direction as i32,
                })
            }
            packet::Packet::SpawnPainting_VarInt(painting) => {
@@ -3536,7 +3543,7 @@ impl MappablePacket for packet::Packet {
                    motive: Some(painting.motive.0),
                    title: None,
                    location: painting.location,
-                   direction: painting.direction,
+                   direction: painting.direction as i32,
                })
            }
            packet::Packet::SpawnPosition(position) => {
