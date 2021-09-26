@@ -431,13 +431,11 @@ impl Server {
                         MappedPacket::KeepAliveClientbound_i32(keep_alive) => {
                             server.on_keep_alive_i32(keep_alive);
                         }*/
-                        MappedPacket::KeepAliveClientbound(keep_alive) => {
-                            packet::send_keep_alive(
-                                server.conn.clone().write().as_mut().unwrap(),
-                                server.mapped_protocol_version,
-                                keep_alive.id,
-                            )
-                        }
+                        MappedPacket::KeepAliveClientbound(keep_alive) => packet::send_keep_alive(
+                            server.conn.clone().write().as_mut().unwrap(),
+                            server.mapped_protocol_version,
+                            keep_alive.id,
+                        ),
                         MappedPacket::ChunkData_NoEntities(chunk_data) => {
                             server.on_chunk_data_no_entities(chunk_data);
                         }
