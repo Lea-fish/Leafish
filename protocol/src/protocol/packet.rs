@@ -3550,3 +3550,23 @@ pub fn send_client_settings(
         })
     }
 }
+
+pub fn send_keep_alive(
+    conn: &mut Conn,
+    version: Version,
+    id: i64,
+) -> Result<(), Error> {
+    if version < Version::V1_8 {
+        conn.write_packet(packet::play::serverbound::KeepAliveServerbound_i32 {
+            id: id as i32,
+        })
+    } else if version < Version::V1_12 {
+        conn.write_packet(packet::play::serverbound::KeepAliveServerbound_VarInt {
+            id: VarInt(id as i32),
+        })
+    } else {
+        conn.write_packet(packet::play::serverbound::KeepAliveServerbound_i64 {
+            id,
+        })
+    }
+}

@@ -431,6 +431,9 @@ impl Server {
                         MappedPacket::KeepAliveClientbound_i32(keep_alive) => {
                             server.on_keep_alive_i32(keep_alive);
                         }*/
+                        MappedPacket::KeepAliveClientbound(keep_alive) => {
+                            packet::send_keep_alive(server.conn.clone().write().as_mut().unwrap(), server.mapped_protocol_version, keep_alive.id);
+                        }
                         MappedPacket::ChunkData_NoEntities(chunk_data) => {
                             server.on_chunk_data_no_entities(chunk_data);
                         }
@@ -575,29 +578,32 @@ impl Server {
                                 entity_teleport.on_ground.unwrap_or(true), // TODO: how is this default supposed to be set? (for 1.7)
                             );
                         }
-                        MappedPacket::EntityLookAndMove_i8_i32_NoGround(lookmove) => {
-                            server.on_entity_look_and_move_i8_i32_noground(lookmove);
+                        MappedPacket::EntityLookAndMove(lookmove) => {
+                            server.on_entity_look_and_move(lookmove.entity_id, lookmove.delta_x, lookmove.delta_y, lookmove.delta_z, lookmove.yaw as f64, lookmove.pitch as f64);
                         }
-                        MappedPacket::EntityLookAndMove_i8(lookmove) => {
-                            server.on_entity_look_and_move_i8(lookmove);
-                        }
-                        MappedPacket::EntityLookAndMove_i16(lookmove) => {
-                            server.on_entity_look_and_move_i16(lookmove);
-                        }
-                        MappedPacket::SpawnPlayer_i32_HeldItem_String(spawn) => {
-                            server.on_player_spawn_i32_helditem_string(spawn);
-                        }
-                        MappedPacket::SpawnPlayer_i32_HeldItem(spawn) => {
-                            server.on_player_spawn_i32_helditem(spawn);
-                        }
-                        MappedPacket::SpawnPlayer_i32(spawn) => {
-                            server.on_player_spawn_i32(spawn);
-                        }
-                        MappedPacket::SpawnPlayer_f64(spawn) => {
-                            server.on_player_spawn_f64(spawn);
-                        }
-                        MappedPacket::SpawnPlayer_f64_NoMeta(spawn) => {
-                            server.on_player_spawn_f64_nometa(spawn);
+                        MappedPacket::SpawnPlayer(spawn) => {
+                            if spawn.uuid_str.is_some() {
+                                // 1.7.10: populate the player list here, since we only now know the UUID
+                                let uuid = protocol::UUID::from_str(spawn.uuid_str.as_ref().unwrap()).unwrap();
+                                server.players
+                                    .clone()
+                                    .write()
+                                    .entry(uuid.clone())
+                                    .or_insert(PlayerInfo {
+                                        name: spawn.name.unwrap().clone(),
+                                        uuid,
+                                        skin_url: None,
+                                        display_name: None,
+                                        ping: 0, // TODO: don't overwrite from PlayerInfo_String
+                                        gamemode: GameMode::from_int(0),
+                                    });
+                            }
+                            let uuid = if spawn.uuid_str.is_some() {
+                                protocol::UUID::from_str(spawn.uuid_str.as_ref().unwrap()).unwrap()
+                            } else {
+                                spawn.uuid.unwrap()
+                            };
+                            server.on_player_spawn(spawn.entity_id, uuid, spawn.x, spawn.y, spawn.z, spawn.pitch as f64, spawn.yaw as f64);
                         }
                         MappedPacket::PlayerInfo(player_info) => {
                             server.on_player_info(player_info);
@@ -1807,48 +1813,6 @@ impl Server {
         look: packet::play::clientbound::EntityLook_i32_NoGround,
     ) {
         self.on_entity_look(look.entity_id, look.yaw as f64, look.pitch as f64)
-    }
-
-    fn on_entity_look_and_move_i16(
-        &self,
-        lookmove: packet::play::clientbound::EntityLookAndMove_i16,
-    ) {
-        self.on_entity_look_and_move(
-            lookmove.entity_id.0,
-            f64::from(lookmove.delta_x),
-            f64::from(lookmove.delta_y),
-            f64::from(lookmove.delta_z),
-            lookmove.yaw as f64,
-            lookmove.pitch as f64,
-        )
-    }
-
-    fn on_entity_look_and_move_i8(
-        &self,
-        lookmove: packet::play::clientbound::EntityLookAndMove_i8,
-    ) {
-        self.on_entity_look_and_move(
-            lookmove.entity_id.0,
-            f64::from(lookmove.delta_x),
-            f64::from(lookmove.delta_y),
-            f64::from(lookmove.delta_z),
-            lookmove.yaw as f64,
-            lookmove.pitch as f64,
-        )
-    }
-
-    fn on_entity_look_and_move_i8_i32_noground(
-        &self,
-        lookmove: packet::play::clientbound::EntityLookAndMove_i8_i32_NoGround,
-    ) {
-        self.on_entity_look_and_move(
-            lookmove.entity_id,
-            f64::from(lookmove.delta_x),
-            f64::from(lookmove.delta_y),
-            f64::from(lookmove.delta_z),
-            lookmove.yaw as f64,
-            lookmove.pitch as f64,
-        )
     }
 
     fn on_entity_look_and_move(
