@@ -1,6 +1,6 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend};
-use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus};
-use crate::protocol::mapped_packet::login::clientbound::{EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID};
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen};
+use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign};
+use crate::protocol::mapped_packet::login::clientbound::{EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID, SetInitialCompression};
 use crate::protocol::mapped_packet::login::serverbound::{EncryptionResponse, LoginPluginResponse, LoginStart};
 use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
 use crate::protocol::packet::play::serverbound::PlayerLook;
@@ -3048,6 +3048,395 @@ impl MappablePacket for packet::Packet {
                mapped_packet::MappedPacket::ResourcePackStatus(ResourcePackStatus {
                    hash: Some(resource_pack.hash),
                    result: resource_pack.result.0,
+               })
+           }
+           packet::Packet::SpawnMob_WithMeta(spawn_mob) => {
+               mapped_packet::MappedPacket::SpawnMob(SpawnMob {
+                   entity_id: spawn_mob.entity_id.0,
+                   uuid: Some(spawn_mob.uuid),
+                   ty: spawn_mob.ty.0,
+                   x: spawn_mob.x,
+                   y: spawn_mob.y,
+                   z: spawn_mob.z,
+                   yaw: spawn_mob.yaw,
+                   pitch: spawn_mob.pitch,
+                   head_pitch: spawn_mob.head_pitch,
+                   velocity_x: spawn_mob.velocity_x,
+                   velocity_y: spawn_mob.velocity_y,
+                   velocity_z: spawn_mob.velocity_z,
+                   metadata: Some(spawn_mob.metadata),
+               })
+           }
+           packet::Packet::SpawnMob_NoMeta(spawn_mob) => {
+               mapped_packet::MappedPacket::SpawnMob(SpawnMob {
+                   entity_id: spawn_mob.entity_id.0,
+                   uuid: Some(spawn_mob.uuid),
+                   ty: spawn_mob.ty.0,
+                   x: spawn_mob.x,
+                   y: spawn_mob.y,
+                   z: spawn_mob.z,
+                   yaw: spawn_mob.yaw,
+                   pitch: spawn_mob.pitch,
+                   head_pitch: spawn_mob.head_pitch,
+                   velocity_x: spawn_mob.velocity_x,
+                   velocity_y: spawn_mob.velocity_y,
+                   velocity_z: spawn_mob.velocity_z,
+                   metadata: None,
+               })
+           }
+           packet::Packet::SpawnMob_u8(spawn_mob) => {
+               mapped_packet::MappedPacket::SpawnMob(SpawnMob {
+                   entity_id: spawn_mob.entity_id.0,
+                   uuid: Some(spawn_mob.uuid),
+                   ty: spawn_mob.ty as i32,
+                   x: spawn_mob.x,
+                   y: spawn_mob.y,
+                   z: spawn_mob.z,
+                   yaw: spawn_mob.yaw,
+                   pitch: spawn_mob.pitch,
+                   head_pitch: spawn_mob.head_pitch,
+                   velocity_x: spawn_mob.velocity_x,
+                   velocity_y: spawn_mob.velocity_y,
+                   velocity_z: spawn_mob.velocity_z,
+                   metadata: Some(spawn_mob.metadata),
+               })
+           }
+           packet::Packet::SpawnMob_u8_i32(spawn_mob) => {
+               mapped_packet::MappedPacket::SpawnMob(SpawnMob {
+                   entity_id: spawn_mob.entity_id.0,
+                   uuid: Some(spawn_mob.uuid),
+                   ty: spawn_mob.ty as i32,
+                   x: f64::from(spawn_mob.x),
+                   y: f64::from(spawn_mob.y),
+                   z: f64::from(spawn_mob.z),
+                   yaw: spawn_mob.yaw,
+                   pitch: spawn_mob.pitch,
+                   head_pitch: spawn_mob.head_pitch,
+                   velocity_x: spawn_mob.velocity_x,
+                   velocity_y: spawn_mob.velocity_y,
+                   velocity_z: spawn_mob.velocity_z,
+                   metadata: Some(spawn_mob.metadata),
+               })
+           }
+           packet::Packet::SpawnMob_u8_i32_NoUUID(spawn_mob) => {
+               mapped_packet::MappedPacket::SpawnMob(SpawnMob {
+                   entity_id: spawn_mob.entity_id.0,
+                   uuid: None,
+                   ty: spawn_mob.ty as i32,
+                   x: f64::from(spawn_mob.x),
+                   y: f64::from(spawn_mob.y),
+                   z: f64::from(spawn_mob.z),
+                   yaw: spawn_mob.yaw,
+                   pitch: spawn_mob.pitch,
+                   head_pitch: spawn_mob.head_pitch,
+                   velocity_x: spawn_mob.velocity_x,
+                   velocity_y: spawn_mob.velocity_y,
+                   velocity_z: spawn_mob.velocity_z,
+                   metadata: Some(spawn_mob.metadata),
+               })
+           }
+           packet::Packet::SpawnObject(spawn_object) => {
+               mapped_packet::MappedPacket::SpawnObject(SpawnObject {
+                   entity_id: spawn_object.entity_id.0,
+                   uuid: Some(spawn_object.uuid),
+                   ty: spawn_object.ty as i32,
+                   x: spawn_object.x,
+                   y: spawn_object.y,
+                   z: spawn_object.z,
+                   pitch: spawn_object.pitch,
+                   yaw: spawn_object.yaw,
+                   data: spawn_object.data,
+                   velocity_x: spawn_object.velocity_x,
+                   velocity_y: spawn_object.velocity_y,
+                   velocity_z: spawn_object.velocity_z,
+               })
+           }
+           packet::Packet::SpawnObject_VarInt(spawn_object) => {
+               mapped_packet::MappedPacket::SpawnObject(SpawnObject {
+                   entity_id: spawn_object.entity_id.0,
+                   uuid: Some(spawn_object.uuid),
+                   ty: spawn_object.ty.0,
+                   x: spawn_object.x,
+                   y: spawn_object.y,
+                   z: spawn_object.z,
+                   pitch: spawn_object.pitch,
+                   yaw: spawn_object.yaw,
+                   data: spawn_object.data,
+                   velocity_x: spawn_object.velocity_x,
+                   velocity_y: spawn_object.velocity_y,
+                   velocity_z: spawn_object.velocity_z,
+               })
+           }
+           packet::Packet::SpawnObject_i32(spawn_object) => {
+               mapped_packet::MappedPacket::SpawnObject(SpawnObject {
+                   entity_id: spawn_object.entity_id.0,
+                   uuid: Some(spawn_object.uuid),
+                   ty: spawn_object.ty as i32,
+                   x: f64::from(spawn_object.x),
+                   y: f64::from(spawn_object.y),
+                   z: f64::from(spawn_object.z),
+                   pitch: spawn_object.pitch,
+                   yaw: spawn_object.yaw,
+                   data: spawn_object.data,
+                   velocity_x: spawn_object.velocity_x,
+                   velocity_y: spawn_object.velocity_y,
+                   velocity_z: spawn_object.velocity_z,
+               })
+           }
+           packet::Packet::SpawnObject_i32_NoUUID(spawn_object) => {
+               mapped_packet::MappedPacket::SpawnObject(SpawnObject {
+                   entity_id: spawn_object.entity_id.0,
+                   uuid: None,
+                   ty: spawn_object.ty as i32,
+                   x: f64::from(spawn_object.x),
+                   y: f64::from(spawn_object.y),
+                   z: f64::from(spawn_object.z),
+                   pitch: spawn_object.pitch,
+                   yaw: spawn_object.yaw,
+                   data: spawn_object.data,
+                   velocity_x: spawn_object.velocity_x,
+                   velocity_y: spawn_object.velocity_y,
+                   velocity_z: spawn_object.velocity_z,
+               })
+           }
+           packet::Packet::SetCurrentHotbarSlot(set_slot) => {
+               mapped_packet::MappedPacket::SetCurrentHotbarSlot(SetCurrentHotbarSlot {
+                   slot: set_slot.slot,
+               })
+           }
+           packet::Packet::ServerMessage_Sender(server_msg) => {
+               mapped_packet::MappedPacket::ServerMessage(ServerMessage {
+                   message: server_msg.message,
+                   position: Some(server_msg.position),
+                   sender: Some(server_msg.sender),
+               })
+           }
+           packet::Packet::ServerMessage_Position(server_msg) => {
+               mapped_packet::MappedPacket::ServerMessage(ServerMessage {
+                   message: server_msg.message,
+                   position: Some(server_msg.position),
+                   sender: None,
+               })
+           }
+           packet::Packet::ServerMessage_NoPosition(server_msg) => {
+               mapped_packet::MappedPacket::ServerMessage(ServerMessage {
+                   message: server_msg.message,
+                   position: None,
+                   sender: None,
+               })
+           }
+           packet::Packet::SpawnPlayer_f64(spawn_player) => {
+               mapped_packet::MappedPacket::SpawnPlayer(SpawnPlayer {
+                   entity_id: spawn_player.entity_id.0,
+                   uuid: Some(spawn_player.uuid),
+                   uuid_str: None,
+                   name: None,
+                   properties: None,
+                   x: spawn_player.x,
+                   y: spawn_player.y,
+                   z: spawn_player.z,
+                   yaw: spawn_player.yaw,
+                   pitch: spawn_player.pitch,
+                   current_item: None,
+                   metadata: Some(spawn_player.metadata),
+               })
+           }
+           packet::Packet::SpawnPlayer_f64_NoMeta(spawn_player) => {
+               mapped_packet::MappedPacket::SpawnPlayer(SpawnPlayer {
+                   entity_id: spawn_player.entity_id.0,
+                   uuid: Some(spawn_player.uuid),
+                   uuid_str: None,
+                   name: None,
+                   properties: None,
+                   x: spawn_player.x,
+                   y: spawn_player.y,
+                   z: spawn_player.z,
+                   yaw: spawn_player.yaw,
+                   pitch: spawn_player.pitch,
+                   current_item: None,
+                   metadata: None,
+               })
+           }
+           packet::Packet::SpawnPlayer_i32(spawn_player) => {
+               mapped_packet::MappedPacket::SpawnPlayer(SpawnPlayer {
+                   entity_id: spawn_player.entity_id.0,
+                   uuid: Some(spawn_player.uuid),
+                   uuid_str: None,
+                   name: None,
+                   properties: None,
+                   x: f64::from(spawn_player.x),
+                   y: f64::from(spawn_player.y),
+                   z: f64::from(spawn_player.z),
+                   yaw: spawn_player.yaw,
+                   pitch: spawn_player.pitch,
+                   current_item: None,
+                   metadata: Some(spawn_player.metadata),
+               })
+           }
+           packet::Packet::SpawnPlayer_i32_HeldItem(spawn_player) => {
+               mapped_packet::MappedPacket::SpawnPlayer(SpawnPlayer {
+                   entity_id: spawn_player.entity_id.0,
+                   uuid: Some(spawn_player.uuid),
+                   uuid_str: None,
+                   name: None,
+                   properties: None,
+                   x: f64::from(spawn_player.x),
+                   y: f64::from(spawn_player.y),
+                   z: f64::from(spawn_player.z),
+                   yaw: spawn_player.yaw,
+                   pitch: spawn_player.pitch,
+                   current_item: Some(spawn_player.current_item),
+                   metadata: Some(spawn_player.metadata),
+               })
+           }
+           packet::Packet::SpawnPlayer_i32_HeldItem_String(spawn_player) => {
+               mapped_packet::MappedPacket::SpawnPlayer(SpawnPlayer {
+                   entity_id: spawn_player.entity_id.0,
+                   uuid: None,
+                   uuid_str: Some(spawn_player.uuid),
+                   name: Some(spawn_player.name),
+                   properties: Some(spawn_player.properties.data),
+                   x: f64::from(spawn_player.x),
+                   y: f64::from(spawn_player.y),
+                   z: f64::from(spawn_player.z),
+                   yaw: spawn_player.yaw,
+                   pitch: spawn_player.pitch,
+                   current_item: Some(spawn_player.current_item),
+                   metadata: Some(spawn_player.metadata),
+               })
+           }
+           packet::Packet::ScoreboardDisplay(display) => {
+               mapped_packet::MappedPacket::ScoreboardDisplay(ScoreboardDisplay {
+                   position: display.position,
+                   name: display.name,
+               })
+           }
+           packet::Packet::ScoreboardObjective(objective) => {
+               mapped_packet::MappedPacket::ScoreboardObjective(ScoreboardObjective {
+                   name: objective.name,
+                   mode: Some(objective.mode),
+                   value: objective.value,
+                   ty_str: Some(objective.ty),
+                   ty: None,
+               })
+           }
+           packet::Packet::ScoreboardObjective_NoMode(objective) => {
+               mapped_packet::MappedPacket::ScoreboardObjective(ScoreboardObjective {
+                   name: objective.name,
+                   mode: None,
+                   value: objective.value,
+                   ty_str: None,
+                   ty: Some(objective.ty),
+               })
+           }
+           packet::Packet::SelectAdvancementTab(advancements_tab) => {
+               mapped_packet::MappedPacket::SelectAdvancementTab(SelectAdvancementTab {
+                   has_id: advancements_tab.has_id,
+                   tab_id: advancements_tab.tab_id,
+               })
+           }
+           packet::Packet::SelectTrade(trade) => {
+               mapped_packet::MappedPacket::SelectTrade(SelectTrade {
+                   selected_slot: trade.selected_slot.0,
+               })
+           }
+           packet::Packet::ServerDifficulty(difficulty) => {
+               mapped_packet::MappedPacket::ServerDifficulty(ServerDifficulty {
+                   difficulty: difficulty.difficulty,
+                   locked: None,
+               })
+           }
+           packet::Packet::ServerDifficulty_Locked(difficulty) => {
+               mapped_packet::MappedPacket::ServerDifficulty(ServerDifficulty {
+                   difficulty: difficulty.difficulty,
+                   locked: Some(difficulty.locked),
+               })
+           }
+           packet::Packet::SetBeaconEffect(beacon) => {
+               mapped_packet::MappedPacket::SetBeaconEffect(SetBeaconEffect {
+                   primary_effect: beacon.primary_effect.0,
+                   secondary_effect: beacon.secondary_effect.0,
+               })
+           }
+           packet::Packet::SetCompression(compression) => {
+               mapped_packet::MappedPacket::SetCompression(SetCompression {
+                   threshold: compression.threshold.0,
+               })
+           }
+           packet::Packet::SetCooldown(cooldown) => {
+               mapped_packet::MappedPacket::SetCooldown(SetCooldown {
+                   item_id: cooldown.item_id.0,
+                   ticks: cooldown.ticks.0,
+               })
+           }
+           packet::Packet::SetDifficulty(difficulty) => {
+               mapped_packet::MappedPacket::SetDifficulty(SetDifficulty {
+                   new_difficulty: difficulty.new_difficulty,
+               })
+           }
+           packet::Packet::SetDisplayedRecipe(displayed_recipe) => {
+               mapped_packet::MappedPacket::SetDisplayedRecipe(SetDisplayedRecipe {
+                   recipe_id: displayed_recipe.recipe_id,
+               })
+           }
+           packet::Packet::SetExperience(set_exp) => {
+               mapped_packet::MappedPacket::SetExperience(SetExperience {
+                   experience_bar: set_exp.experience_bar,
+                   level: set_exp.level.0,
+                   total_experience: set_exp.total_experience.0,
+               })
+           }
+           packet::Packet::SetExperience_i16(set_exp) => {
+               mapped_packet::MappedPacket::SetExperience(SetExperience {
+                   experience_bar: set_exp.experience_bar,
+                   level: set_exp.level as i32,
+                   total_experience: set_exp.total_experience as i32,
+               })
+           }
+           packet::Packet::SetInitialCompression(init_comp) => {
+               mapped_packet::MappedPacket::SetInitialCompression(SetInitialCompression {
+                   threshold: init_comp.threshold.0,
+               })
+           }
+           packet::Packet::SetPassengers(passengers) => {
+               mapped_packet::MappedPacket::SetPassengers(SetPassengers {
+                   entity_id: passengers.entity_id.0,
+                   passengers: passengers.passengers.data.iter().map(|x| x.0).collect(),
+               })
+           }
+           packet::Packet::SetRecipeBookState(recipe_book) => {
+               mapped_packet::MappedPacket::SetRecipeBookState(SetRecipeBookState {
+                   book_id: recipe_book.book_id.0,
+                   book_open: recipe_book.book_open,
+                   filter_active: recipe_book.filter_active,
+               })
+           }
+           packet::Packet::SetSign(set_sign) => {
+               mapped_packet::MappedPacket::SetSign(SetSign {
+                   location: set_sign.location,
+                   line1: set_sign.line1,
+                   line2: set_sign.line2,
+                   line3: set_sign.line3,
+                   line4: set_sign.line4,
+               })
+           }
+           packet::Packet::SetSign_i16y(set_sign) => {
+               mapped_packet::MappedPacket::SetSign(SetSign {
+                   location: Position::new(set_sign.x, set_sign.y as i32, set_sign.z),
+                   line1: set_sign.line1,
+                   line2: set_sign.line2,
+                   line3: set_sign.line3,
+                   line4: set_sign.line4,
+               })
+           }
+           packet::Packet::SignEditorOpen(sign_editor) => {
+               mapped_packet::MappedPacket::SignEditorOpen(SignEditorOpen {
+                   location: sign_editor.location,
+               })
+           }
+           packet::Packet::SignEditorOpen_i32(sign_editor) => {
+               mapped_packet::MappedPacket::SignEditorOpen(SignEditorOpen {
+                   location: Position::new(sign_editor.x, sign_editor.y, sign_editor.z),
                })
            }
 
