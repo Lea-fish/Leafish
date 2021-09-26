@@ -1410,27 +1410,6 @@ impl Server {
         })));
     }
 
-    fn on_keep_alive_i64(&self, keep_alive: packet::play::clientbound::KeepAliveClientbound_i64) {
-        self.write_packet(packet::play::serverbound::KeepAliveServerbound_i64 {
-            id: keep_alive.id,
-        });
-    }
-
-    fn on_keep_alive_varint(
-        &self,
-        keep_alive: packet::play::clientbound::KeepAliveClientbound_VarInt,
-    ) {
-        self.write_packet(packet::play::serverbound::KeepAliveServerbound_VarInt {
-            id: keep_alive.id,
-        });
-    }
-
-    fn on_keep_alive_i32(&self, keep_alive: packet::play::clientbound::KeepAliveClientbound_i32) {
-        self.write_packet(packet::play::serverbound::KeepAliveServerbound_i32 {
-            id: keep_alive.id,
-        });
-    }
-
     fn on_plugin_message_clientbound(
         &self,
         msg: mapped_packet::play::clientbound::PluginMessageClientbound,
@@ -1759,21 +1738,6 @@ impl Server {
                 self.entities.clone().write().remove_entity(entity);
             }
         }
-    }
-
-    fn on_entity_teleport_f64(
-        &self,
-        entity_teleport: mapped_packet::play::clientbound::EntityTeleport,
-    ) {
-        self.on_entity_teleport(
-            entity_teleport.entity_id,
-            entity_teleport.x,
-            entity_teleport.y,
-            entity_teleport.z,
-            entity_teleport.yaw as f64,
-            entity_teleport.pitch as f64,
-            entity_teleport.on_ground.unwrap_or(true), // TODO: how is this default supposed to be set? (for 1.7)
-        );
     }
 
     fn on_entity_teleport(
