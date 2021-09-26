@@ -436,7 +436,7 @@ impl Server {
                                 server.conn.clone().write().as_mut().unwrap(),
                                 server.mapped_protocol_version,
                                 keep_alive.id,
-                            );
+                            )
                         }
                         MappedPacket::ChunkData_NoEntities(chunk_data) => {
                             server.on_chunk_data_no_entities(chunk_data);
@@ -1838,13 +1838,6 @@ impl Server {
         }
     }
 
-    fn on_entity_look_i32_noground(
-        &self,
-        look: packet::play::clientbound::EntityLook_i32_NoGround,
-    ) {
-        self.on_entity_look(look.entity_id, look.yaw as f64, look.pitch as f64)
-    }
-
     fn on_entity_look_and_move(
         &self,
         entity_id: i32,
@@ -1874,88 +1867,6 @@ impl Server {
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
             rotation.pitch = -(pitch / 256.0) * PI * 2.0;
         }
-    }
-
-    fn on_player_spawn_f64_nometa(&self, spawn: packet::play::clientbound::SpawnPlayer_f64_NoMeta) {
-        self.on_player_spawn(
-            spawn.entity_id.0,
-            spawn.uuid,
-            spawn.x,
-            spawn.y,
-            spawn.z,
-            spawn.yaw as f64,
-            spawn.pitch as f64,
-        )
-    }
-
-    fn on_player_spawn_f64(&self, spawn: packet::play::clientbound::SpawnPlayer_f64) {
-        self.on_player_spawn(
-            spawn.entity_id.0,
-            spawn.uuid,
-            spawn.x,
-            spawn.y,
-            spawn.z,
-            spawn.yaw as f64,
-            spawn.pitch as f64,
-        )
-    }
-
-    fn on_player_spawn_i32(&self, spawn: packet::play::clientbound::SpawnPlayer_i32) {
-        self.on_player_spawn(
-            spawn.entity_id.0,
-            spawn.uuid,
-            f64::from(spawn.x),
-            f64::from(spawn.y),
-            f64::from(spawn.z),
-            spawn.yaw as f64,
-            spawn.pitch as f64,
-        )
-    }
-
-    fn on_player_spawn_i32_helditem(
-        &self,
-        spawn: packet::play::clientbound::SpawnPlayer_i32_HeldItem,
-    ) {
-        self.on_player_spawn(
-            spawn.entity_id.0,
-            spawn.uuid,
-            f64::from(spawn.x),
-            f64::from(spawn.y),
-            f64::from(spawn.z),
-            spawn.yaw as f64,
-            spawn.pitch as f64,
-        )
-    }
-
-    fn on_player_spawn_i32_helditem_string(
-        &self,
-        spawn: packet::play::clientbound::SpawnPlayer_i32_HeldItem_String,
-    ) {
-        // 1.7.10: populate the player list here, since we only now know the UUID
-        let uuid = protocol::UUID::from_str(&spawn.uuid).unwrap();
-        self.players
-            .clone()
-            .write()
-            .entry(uuid.clone())
-            .or_insert(PlayerInfo {
-                name: spawn.name.clone(),
-                uuid,
-                skin_url: None,
-
-                display_name: None,
-                ping: 0, // TODO: don't overwrite from PlayerInfo_String
-                gamemode: GameMode::from_int(0),
-            });
-
-        self.on_player_spawn(
-            spawn.entity_id.0,
-            protocol::UUID::from_str(&spawn.uuid).unwrap(),
-            f64::from(spawn.x),
-            f64::from(spawn.y),
-            f64::from(spawn.z),
-            spawn.yaw as f64,
-            spawn.pitch as f64,
-        )
     }
 
     fn on_player_spawn(
@@ -2311,7 +2222,7 @@ impl Server {
         self.hud_context
             .clone()
             .write()
-            .display_message_in_chat(message.message.clone());
+            .display_message_in_chat(message.message);
         self.received_chat_at
             .clone()
             .write()
