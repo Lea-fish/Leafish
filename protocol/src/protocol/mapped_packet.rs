@@ -1,5 +1,5 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound, TimeUpdate, TeleportPlayer, TabCompleteReply, Tags, Teams, Title, TradeList};
-use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign, SpectateTeleport, SteerBoat, SteerVehicle, TeleportConfirm, TabComplete};
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound, TimeUpdate, TeleportPlayer, TabCompleteReply, Tags, Teams, Title, TradeList, UpdateHealth, UpdateLight, UpdateViewPosition, UpdateBlockEntity, UpdateSign, UnlockRecipes, UpdateScore, UpdateViewDistance, VehicleTeleport};
+use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign, SpectateTeleport, SteerBoat, SteerVehicle, TeleportConfirm, TabComplete, UpdateCommandBlock, UpdateCommandBlockMinecart, UpdateJigsawBlock_Joint, UpdateJigsawBlock_Type, UpdateStructureBlock, UseEntity, UseItem, VehicleMove};
 use crate::protocol::mapped_packet::login::clientbound::{EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID, SetInitialCompression};
 use crate::protocol::mapped_packet::login::serverbound::{EncryptionResponse, LoginPluginResponse, LoginStart};
 use crate::protocol::mapped_packet::handshake::serverbound::Handshake;
@@ -179,7 +179,7 @@ state_mapped_packets!(
             }
             /// UseEntity is sent when the user interacts (right clicks) or attacks
             /// (left clicks) an entity.
-            packet UseEntity_Sneakflag {
+            packet UseEntity {
                 field target_id: i32,
                 field ty: i32,
                 field target_x: Option<f32>,
@@ -374,7 +374,7 @@ state_mapped_packets!(
                 field rotation: i32,
                 field metadata: String,
                 field integrity: f32,
-                field seed: VarLong,
+                field seed: i64,
                 field flags: i8,
             }
             /// SetSign sets the text on a sign after placing it.
@@ -1090,10 +1090,10 @@ state_mapped_packets!(
                 field filtering_blast_furnace: Option<bool>,
                 field smoker_open: Option<bool>,
                 field filtering_smoker: Option<bool>,
-                field recipe_ids: Vec<i32>,
-                field recipe_ids2: Vec<i32>,
-                field recipe_ids_str: Vec<String>,
-                field recipe_ids_str2: Vec<String>,
+                field recipe_ids: Option<Vec<i32>>,
+                field recipe_ids2: Option<Vec<i32>>,
+                field recipe_ids_str: Option<Vec<String>>,
+                field recipe_ids_str2: Option<Vec<String>>,
             }
             /// EntityDestroy destroys the entities with the ids in the provided slice.
             packet EntityDestroy {
@@ -3815,7 +3815,277 @@ impl MappablePacket for packet::Packet {
                    can_restock: Some(trade_list.can_restock),
                })
            }
-           
+           packet::Packet::UpdateHealth(health) => {
+               mapped_packet::MappedPacket::UpdateHealth(UpdateHealth {
+                   health: health.health,
+                   food: health.food.0,
+                   food_saturation: health.food_saturation,
+               })
+           }
+           packet::Packet::UpdateHealth_u16(health) => {
+               mapped_packet::MappedPacket::UpdateHealth(UpdateHealth {
+                   health: health.health,
+                   food: health.food as i32,
+                   food_saturation: health.food_saturation,
+               })
+           }
+           packet::Packet::UpdateLight_WithTrust(light) => {
+               mapped_packet::MappedPacket::UpdateLight(UpdateLight {
+                   chunk_x: light.chunk_x.0,
+                   chunk_z: light.chunk_z.0,
+                   trust_edges: Some(light.trust_edges),
+                   sky_light_mask: light.sky_light_mask.0,
+                   block_light_mask: light.block_light_mask.0,
+                   empty_sky_light_mask: light.empty_sky_light_mask.0,
+                   light_arrays: light.light_arrays,
+               })
+           }
+           packet::Packet::UpdateLight_NoTrust(light) => {
+               mapped_packet::MappedPacket::UpdateLight(UpdateLight {
+                   chunk_x: light.chunk_x.0,
+                   chunk_z: light.chunk_z.0,
+                   trust_edges: None,
+                   sky_light_mask: light.sky_light_mask.0,
+                   block_light_mask: light.block_light_mask.0,
+                   empty_sky_light_mask: light.empty_sky_light_mask.0,
+                   light_arrays: light.light_arrays,
+               })
+           }
+           packet::Packet::UpdateViewPosition(view_position) => {
+               mapped_packet::MappedPacket::UpdateViewPosition(UpdateViewPosition {
+                   chunk_x: view_position.chunk_x.0,
+                   chunk_z: view_position.chunk_z.0,
+               })
+           }
+           packet::Packet::UpdateBlockEntity(block_entity) => {
+               mapped_packet::MappedPacket::UpdateBlockEntity(UpdateBlockEntity {
+                   location: block_entity.location,
+                   action: block_entity.action,
+                   nbt: block_entity.nbt,
+                   data_length: None,
+                   gzipped_nbt: None,
+               })
+           }
+           packet::Packet::UpdateBlockEntity_Data(block_entity) => {
+               mapped_packet::MappedPacket::UpdateBlockEntity(UpdateBlockEntity {
+                   location: Position::new(block_entity.x, block_entity.y as i32, block_entity.z),
+                   action: block_entity.action,
+                   nbt: None,
+                   data_length: Some(block_entity.data_length),
+                   gzipped_nbt: Some(block_entity.gzipped_nbt),
+               })
+           }
+           packet::Packet::UpdateSign(sign) => {
+               mapped_packet::MappedPacket::UpdateSign(UpdateSign {
+                   location: sign.location,
+                   line1: sign.line1,
+                   line2: sign.line2,
+                   line3: sign.line3,
+                   line4: sign.line4,
+               })
+           }
+           packet::Packet::UpdateSign_u16(sign) => {
+               mapped_packet::MappedPacket::UpdateSign(UpdateSign {
+                   location: Position::new(sign.x, sign.y as i32, sign.z),
+                   line1: sign.line1,
+                   line2: sign.line2,
+                   line3: sign.line3,
+                   line4: sign.line4,
+               })
+           }
+           packet::Packet::UnlockRecipes_NoSmelting(recipes) => {
+               mapped_packet::MappedPacket::UnlockRecipes(UnlockRecipes {
+                   action: recipes.action.0,
+                   crafting_book_open: recipes.crafting_book_open,
+                   filtering_craftable: recipes.filtering_craftable,
+                   smelting_book_open: None,
+                   filtering_smeltable: None,
+                   blast_furnace_open: None,
+                   filtering_blast_furnace: None,
+                   smoker_open: None,
+                   filtering_smoker: None,
+                   recipe_ids: Some(recipes.recipe_ids.data.iter().map(|x| x.0).collect()),
+                   recipe_ids2: Some(recipes.recipe_ids2.data.iter().map(|x| x.0).collect()),
+                   recipe_ids_str: None,
+                   recipe_ids_str2: None,
+               })
+           }
+           packet::Packet::UnlockRecipes_WithSmelting(recipes) => {
+               mapped_packet::MappedPacket::UnlockRecipes(UnlockRecipes {
+                   action: recipes.action.0,
+                   crafting_book_open: recipes.crafting_book_open,
+                   filtering_craftable: recipes.filtering_craftable,
+                   smelting_book_open: Some(recipes.smelting_book_open),
+                   filtering_smeltable: Some(recipes.filtering_smeltable),
+                   blast_furnace_open: None,
+                   filtering_blast_furnace: None,
+                   smoker_open: None,
+                   filtering_smoker: None,
+                   recipe_ids: None,
+                   recipe_ids2: None,
+                   recipe_ids_str: Some(recipes.recipe_ids.data),
+                   recipe_ids_str2: Some(recipes.recipe_ids2.data),
+               })
+           }
+           packet::Packet::UnlockRecipes_WithBlastSmoker(recipes) => {
+               mapped_packet::MappedPacket::UnlockRecipes(UnlockRecipes {
+                   action: recipes.action.0,
+                   crafting_book_open: recipes.crafting_book_open,
+                   filtering_craftable: recipes.filtering_craftable,
+                   smelting_book_open: Some(recipes.smelting_book_open),
+                   filtering_smeltable: Some(recipes.filtering_smeltable),
+                   blast_furnace_open: Some(recipes.blast_furnace_open),
+                   filtering_blast_furnace: Some(recipes.filtering_blast_furnace),
+                   smoker_open: Some(recipes.smoker_open),
+                   filtering_smoker: Some(recipes.filtering_smoker),
+                   recipe_ids: None,
+                   recipe_ids2: None,
+                   recipe_ids_str: Some(recipes.recipe_ids.data),
+                   recipe_ids_str2: Some(recipes.recipe_ids2.data),
+               })
+           }
+           packet::Packet::UpdateCommandBlock(command) => {
+               mapped_packet::MappedPacket::UpdateCommandBlock(UpdateCommandBlock {
+                   location: command.location,
+                   command: command.command,
+                   mode: command.mode.0,
+                   flags: command.flags,
+               })
+           }
+           packet::Packet::UpdateCommandBlockMinecart(command_minecart) => {
+               mapped_packet::MappedPacket::UpdateCommandBlockMinecart(UpdateCommandBlockMinecart {
+                   entity_id: command_minecart.entity_id.0,
+                   command: command_minecart.command,
+                   track_output: command_minecart.track_output,
+               })
+           }
+           packet::Packet::UpdateJigsawBlock_Joint(jigsaw) => {
+               mapped_packet::MappedPacket::UpdateJigsawBlock_Joint(UpdateJigsawBlock_Joint {
+                   location: jigsaw.location,
+                   name: jigsaw.name,
+                   target: jigsaw.target,
+                   pool: jigsaw.pool,
+                   final_state: jigsaw.final_state,
+                   joint_type: jigsaw.joint_type,
+               })
+           }
+           packet::Packet::UpdateJigsawBlock_Type(jigsaw) => {
+               mapped_packet::MappedPacket::UpdateJigsawBlock_Type(UpdateJigsawBlock_Type {
+                   location: jigsaw.location,
+                   attachment_type: jigsaw.attachment_type,
+                   target_pool: jigsaw.target_pool,
+                   final_state: jigsaw.final_state,
+               })
+           }
+           packet::Packet::UpdateScore(score) => {
+               mapped_packet::MappedPacket::UpdateScore(UpdateScore {
+                   name: score.name,
+                   action: score.action,
+                   object_name: score.object_name,
+                   value: score.value.map(|x| x.0),
+               })
+           }
+           packet::Packet::UpdateScore_i32(score) => {
+               mapped_packet::MappedPacket::UpdateScore(UpdateScore {
+                   name: score.name,
+                   action: score.action,
+                   object_name: score.object_name,
+                   value: score.value,
+               })
+           }
+           packet::Packet::UpdateStructureBlock(structure_block) => {
+               mapped_packet::MappedPacket::UpdateStructureBlock(UpdateStructureBlock {
+                   location: structure_block.location,
+                   action: structure_block.action.0,
+                   mode: structure_block.mode.0,
+                   name: structure_block.name,
+                   offset_x: structure_block.offset_x,
+                   offset_y: structure_block.offset_y,
+                   offset_z: structure_block.offset_z,
+                   size_x: structure_block.size_x,
+                   size_y: structure_block.size_y,
+                   size_z: structure_block.size_z,
+                   mirror: structure_block.mirror.0,
+                   rotation: structure_block.rotation.0,
+                   metadata: structure_block.metadata,
+                   integrity: structure_block.integrity,
+                   seed: structure_block.seed.0,
+                   flags: structure_block.flags,
+               })
+           }
+           packet::Packet::UpdateViewDistance(view_distance) => {
+               mapped_packet::MappedPacket::UpdateViewDistance(UpdateViewDistance {
+                   view_distance: view_distance.view_distance.0,
+               })
+           }
+           packet::Packet::UseEntity_Hand(use_entity) => {
+               mapped_packet::MappedPacket::UseEntity(UseEntity {
+                   target_id: use_entity.target_id.0,
+                   ty: use_entity.ty.0,
+                   target_x: Some(use_entity.target_x),
+                   target_y: Some(use_entity.target_y),
+                   target_z: Some(use_entity.target_z),
+                   hand: Some(use_entity.hand.0),
+                   sneaking: None,
+               })
+           }
+           packet::Packet::UseEntity_Handsfree(use_entity) => {
+               mapped_packet::MappedPacket::UseEntity(UseEntity {
+                   target_id: use_entity.target_id.0,
+                   ty: use_entity.ty.0,
+                   target_x: Some(use_entity.target_x),
+                   target_y: Some(use_entity.target_y),
+                   target_z: Some(use_entity.target_z),
+                   hand: None,
+                   sneaking: None,
+               })
+           }
+           packet::Packet::UseEntity_Handsfree_i32(use_entity) => {
+               mapped_packet::MappedPacket::UseEntity(UseEntity {
+                   target_id: use_entity.target_id,
+                   ty: use_entity.ty as i32,
+                   target_x: None,
+                   target_y: None,
+                   target_z: None,
+                   hand: None,
+                   sneaking: None,
+               })
+           }
+           packet::Packet::UseEntity_Sneakflag(use_entity) => {
+               mapped_packet::MappedPacket::UseEntity(UseEntity {
+                   target_id: use_entity.target_id.0,
+                   ty: use_entity.ty.0,
+                   target_x: Some(use_entity.target_x),
+                   target_y: Some(use_entity.target_y),
+                   target_z: Some(use_entity.target_z),
+                   hand: Some(use_entity.hand.0),
+                   sneaking: Some(use_entity.sneaking),
+               })
+           }
+           packet::Packet::UseItem(use_item) => {
+               mapped_packet::MappedPacket::UseItem(UseItem {
+                   hand: use_item.hand.0,
+               })
+           }
+           packet::Packet::VehicleMove(vehicle_move) => {
+               mapped_packet::MappedPacket::VehicleMove(VehicleMove {
+                   x: vehicle_move.x,
+                   y: vehicle_move.y,
+                   z: vehicle_move.z,
+                   yaw: vehicle_move.yaw,
+                   pitch: vehicle_move.pitch,
+               })
+           }
+           packet::Packet::VehicleTeleport(teleport) => {
+               mapped_packet::MappedPacket::VehicleTeleport(VehicleTeleport {
+                   x: teleport.x,
+                   y: teleport.y,
+                   z: teleport.z,
+                   yaw: teleport.yaw,
+                   pitch: teleport.pitch,
+               })
+           }
+
        }
     }
 
