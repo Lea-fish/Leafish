@@ -1,4 +1,4 @@
-use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound, TimeUpdate, TeleportPlayer, TabCompleteReply, Tags, Teams, Title, TradeList, UpdateHealth, UpdateLight, UpdateViewPosition, UpdateBlockEntity, UpdateSign, UnlockRecipes, UpdateScore, UpdateViewDistance, VehicleTeleport};
+use crate::protocol::mapped_packet::play::clientbound::{Advancements, AcknowledgePlayerDigging, Animation, BlockAction, BlockBreakAnimation, BlockChange, BossBar, ChangeGameState, ConfirmTransaction, ChunkUnload, ChunkData, ChunkData_HeightMap, ChunkData_Biomes3D_i32, ChunkData_Biomes3D, ChunkData_Biomes3D_bool, ChunkData_NoEntities_u16, ChunkData_NoEntities, ChunkData_17, ChunkDataBulk_17, ChunkDataBulk, Camera, CoFHLib_SendUUID, CollectItem, CombatEvent, CraftRecipeResponse, Disconnect, DeclareCommands, DeclareRecipes, Entity, EntityHeadLook, EntityVelocity, EntityLookAndMove, EntityLook, EntityTeleport, EntityMove, EntityDestroy, Effect, EntityAction, EntityAttach, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityMetadata, EntityProperties, EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityUpdateNBT, EntityUsedBed, Explosion, FacePlayer, JoinGame_i8, JoinGame_i8_NoDebug, JoinGame_i32, JoinGame_i32_ViewDistance, JoinGame_WorldNames, JoinGame_WorldNames_IsHard, KeepAliveClientbound, Maps, MultiBlockChange_Packed, MultiBlockChange_i32, NamedSoundEffect, NBTQueryResponse, OpenBook, PlayerInfo_String, PlayerInfo, Particle, PlayerAbilities, PlayerListHeaderFooter, PluginMessageClientbound, Respawn_Gamemode, Respawn, ResourcePackSend, SpawnMob, SpawnObject, SetCurrentHotbarSlot, ServerMessage, SpawnPlayer, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, SetCompression, SetCooldown, SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnPainting, SpawnPosition, Statistics, StopSound, TimeUpdate, TeleportPlayer, TabCompleteReply, Tags, Teams, Title, TradeList, UpdateHealth, UpdateLight, UpdateViewPosition, UpdateBlockEntity, UpdateSign, UnlockRecipes, UpdateScore, UpdateViewDistance, VehicleTeleport, WindowItems, WindowClose, WindowOpen, WindowOpenHorse, WindowProperty, WindowSetSlot, WorldBorder};
 use crate::protocol::mapped_packet::play::serverbound::{AdvancementTab, ChatMessage, ArmSwing, ClientStatus, ClientSettings, ConfirmTransactionServerbound, ClickWindow, ClickWindowButton, ClientAbilities, CloseWindow, CraftingBookData, CraftRecipeRequest, CreativeInventoryAction, EditBook, EnchantItem, GenerateStructure, HeldItemChange, KeepAliveServerbound, LockDifficulty, NameItem, Player, PlayerDigging, PickItem, PlayerAction, PlayerBlockPlacement, PlayerPosition, PlayerPositionLook, PluginMessageServerbound, QueryBlockNBT, QueryEntityNBT, ResourcePackStatus, SelectTrade, SetBeaconEffect, SetDifficulty, SetDisplayedRecipe, SetRecipeBookState, SetSign, SpectateTeleport, SteerBoat, SteerVehicle, TeleportConfirm, TabComplete, UpdateCommandBlock, UpdateCommandBlockMinecart, UpdateJigsawBlock_Joint, UpdateJigsawBlock_Type, UpdateStructureBlock, UseEntity, UseItem, VehicleMove};
 use crate::protocol::mapped_packet::login::clientbound::{EncryptionRequest, LoginDisconnect, LoginPluginRequest, LoginSuccess_String, LoginSuccess_UUID, SetInitialCompression};
 use crate::protocol::mapped_packet::login::serverbound::{EncryptionResponse, LoginPluginResponse, LoginStart};
@@ -1149,7 +1149,7 @@ state_mapped_packets!(
                 field action: i32,
                 field old_radius: Option<f64>,
                 field new_radius: Option<f64>,
-                field speed: Option<VarLong>,
+                field speed: Option<i64>,
                 field x: Option<f64>,
                 field z: Option<f64>,
                 field portal_boundary: Option<i32>,
@@ -4085,17 +4085,85 @@ impl MappablePacket for packet::Packet {
                    pitch: teleport.pitch,
                })
            }
-
+           packet::Packet::WindowItems(items) => {
+               mapped_packet::MappedPacket::WindowItems(WindowItems {
+                   id: items.id,
+                   items: items.items.data,
+               })
+           }
+           packet::Packet::WindowClose(close) => {
+               mapped_packet::MappedPacket::WindowClose(WindowClose {
+                   id: close.id,
+               })
+           }
+           packet::Packet::WindowOpen(open) => {
+               mapped_packet::MappedPacket::WindowOpen(WindowOpen {
+                   id: open.id as i32,
+                   ty: None,
+                   ty_name: Some(open.ty),
+                   title: open.title,
+                   slot_count: Some(open.slot_count),
+                   use_provided_window_title: None,
+                   entity_id: Some(open.entity_id),
+               })
+           }
+           packet::Packet::WindowOpen_u8(open) => {
+               mapped_packet::MappedPacket::WindowOpen(WindowOpen {
+                   id: open.id as i32,
+                   ty: Some(open.ty as i32),
+                   ty_name: None,
+                   title: open.title,
+                   slot_count: Some(open.slot_count),
+                   use_provided_window_title: Some(open.use_provided_window_title),
+                   entity_id: Some(open.entity_id),
+               })
+           }
+           packet::Packet::WindowOpen_VarInt(open) => {
+               mapped_packet::MappedPacket::WindowOpen(WindowOpen {
+                   id: open.id.0,
+                   ty: Some(open.ty.0),
+                   ty_name: None,
+                   title: open.title,
+                   slot_count: None,
+                   use_provided_window_title: None,
+                   entity_id: None,
+               })
+           }
+           packet::Packet::WindowOpenHorse(open) => {
+               mapped_packet::MappedPacket::WindowOpenHorse(WindowOpenHorse {
+                   window_id: open.window_id,
+                   number_of_slots: open.number_of_slots.0,
+                   entity_id: open.entity_id,
+               })
+           }
+           packet::Packet::WindowProperty(property) => {
+               mapped_packet::MappedPacket::WindowProperty(WindowProperty {
+                   id: property.id,
+                   property: property.property,
+                   value: property.value,
+               })
+           }
+           packet::Packet::WindowSetSlot(set_slot) => {
+               mapped_packet::MappedPacket::WindowSetSlot(WindowSetSlot {
+                   id: set_slot.id,
+                   slot: set_slot.slot,
+                   item: set_slot.item,
+               })
+           }
+           packet::Packet::WorldBorder(border) => {
+               mapped_packet::MappedPacket::WorldBorder(WorldBorder {
+                   action: border.action.0,
+                   old_radius: border.old_radius,
+                   new_radius: border.new_radius,
+                   speed: border.speed.map(|x| x.0),
+                   x: border.x,
+                   z: border.z,
+                   portal_boundary: border.portal_boundary.map(|x| x.0),
+                   warning_time: border.warning_time.map(|x| x.0),
+                   warning_blocks: border.warning_blocks.map(|x| x.0),
+               })
+           }
        }
     }
 
 }
-
-
-/*
-           packet::Packet::Maps(maps) => {
-               mapped_packet::MappedPacket::Maps(Maps {
-
-               })
-           }
-*/
