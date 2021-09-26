@@ -435,7 +435,8 @@ impl Server {
                             server.conn.clone().write().as_mut().unwrap(),
                             server.mapped_protocol_version,
                             keep_alive.id,
-                        ).unwrap(),
+                        )
+                        .unwrap(),
                         MappedPacket::ChunkData_NoEntities(chunk_data) => {
                             server.on_chunk_data_no_entities(chunk_data);
                         }
