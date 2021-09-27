@@ -523,26 +523,8 @@ impl Server {
                                 rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
                             }
                         }
-                        MappedPacket::JoinGame_HashedSeed_Respawn(join) => {
-                            server.on_game_join_hashedseed_respawn(join);
-                        }
-                        MappedPacket::JoinGame_i8(join) => {
-                            server.on_game_join_i8(join);
-                        }
-                        MappedPacket::JoinGame_i8_NoDebug(join) => {
-                            server.on_game_join_i8_nodebug(join);
-                        }
-                        MappedPacket::JoinGame_i32(join) => {
-                            server.on_game_join_i32(join);
-                        }
-                        MappedPacket::JoinGame_i32_ViewDistance(join) => {
-                            server.on_game_join_i32_viewdistance(join);
-                        }
-                        MappedPacket::JoinGame_WorldNames(join) => {
-                            server.on_game_join_worldnames(join);
-                        }
-                        MappedPacket::JoinGame_WorldNames_IsHard(join) => {
-                            server.on_game_join_worldnames_ishard(join);
+                        MappedPacket::JoinGame(join) => {
+                            server.on_game_join(join.gamemode, join.entity_id);
                         }
                         MappedPacket::TeleportPlayer(teleport) => {
                             server.on_teleport_player(teleport);
@@ -1542,43 +1524,6 @@ impl Server {
             .as_mut()
             .unwrap()
             .write_plugin_message(channel, data); // TODO handle errors
-    }
-
-    fn on_game_join_worldnames_ishard(
-        &self,
-        join: mapped_packet::play::clientbound::JoinGame_WorldNames_IsHard,
-    ) {
-        self.on_game_join(join.gamemode, join.entity_id)
-    }
-
-    fn on_game_join_worldnames(&self, join: mapped_packet::play::clientbound::JoinGame_WorldNames) {
-        self.on_game_join(join.gamemode, join.entity_id)
-    }
-
-    fn on_game_join_hashedseed_respawn(
-        &self,
-        join: mapped_packet::play::clientbound::JoinGame_HashedSeed_Respawn,
-    ) {
-        self.on_game_join(join.gamemode, join.entity_id)
-    }
-
-    fn on_game_join_i32_viewdistance(
-        &self,
-        join: mapped_packet::play::clientbound::JoinGame_i32_ViewDistance,
-    ) {
-        self.on_game_join(join.gamemode, join.entity_id)
-    }
-
-    fn on_game_join_i32(&self, join: mapped_packet::play::clientbound::JoinGame_i32) {
-        self.on_game_join(join.gamemode, join.entity_id)
-    }
-
-    fn on_game_join_i8(&self, join: mapped_packet::play::clientbound::JoinGame_i8) {
-        self.on_game_join(join.gamemode, join.entity_id)
-    }
-
-    fn on_game_join_i8_nodebug(&self, join: mapped_packet::play::clientbound::JoinGame_i8_NoDebug) {
-        self.on_game_join(join.gamemode, join.entity_id)
     }
 
     fn on_game_join(&self, gamemode: u8, entity_id: i32) {
