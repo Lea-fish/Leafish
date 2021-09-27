@@ -16,19 +16,17 @@ use crate::protocol::mapped_packet::play::clientbound::{
     EntityDestroy, EntityEffect, EntityEquipment_Array, EntityEquipment_Single, EntityHeadLook,
     EntityLook, EntityLookAndMove, EntityMetadata, EntityMove, EntityProperties,
     EntityRemoveEffect, EntitySoundEffect, EntityStatus, EntityTeleport, EntityUpdateNBT,
-    EntityUsedBed, EntityVelocity, Explosion, FacePlayer, JoinGame_HashedSeed_Respawn,
-    JoinGame_WorldNames, JoinGame_WorldNames_IsHard, JoinGame_i32, JoinGame_i32_ViewDistance,
-    JoinGame_i8, JoinGame_i8_NoDebug, KeepAliveClientbound, Maps, MultiBlockChange,
-    NBTQueryResponse, NamedSoundEffect, OpenBook, Particle, PlayerAbilities, PlayerInfo,
-    PlayerInfo_String, PlayerListHeaderFooter, PluginMessageClientbound, ResourcePackSend, Respawn,
-    ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab, ServerDifficulty, ServerMessage,
-    SetCompression, SetCooldown, SetCurrentHotbarSlot, SetExperience, SetPassengers,
-    SignEditorOpen, SoundEffect, SpawnExperienceOrb, SpawnGlobalEntity, SpawnMob, SpawnObject,
-    SpawnPainting, SpawnPlayer, SpawnPosition, Statistics, StopSound, TabCompleteReply, Tags,
-    Teams, TeleportPlayer, TimeUpdate, Title, TradeList, UnlockRecipes, UpdateBlockEntity,
-    UpdateHealth, UpdateLight, UpdateScore, UpdateSign, UpdateViewDistance, UpdateViewPosition,
-    VehicleTeleport, WindowClose, WindowItems, WindowOpen, WindowOpenHorse, WindowProperty,
-    WindowSetSlot, WorldBorder,
+    EntityUsedBed, EntityVelocity, Explosion, FacePlayer, JoinGame, KeepAliveClientbound, Maps,
+    MultiBlockChange, NBTQueryResponse, NamedSoundEffect, OpenBook, Particle, PlayerAbilities,
+    PlayerInfo, PlayerInfo_String, PlayerListHeaderFooter, PluginMessageClientbound,
+    ResourcePackSend, Respawn, ScoreboardDisplay, ScoreboardObjective, SelectAdvancementTab,
+    ServerDifficulty, ServerMessage, SetCompression, SetCooldown, SetCurrentHotbarSlot,
+    SetExperience, SetPassengers, SignEditorOpen, SoundEffect, SpawnExperienceOrb,
+    SpawnGlobalEntity, SpawnMob, SpawnObject, SpawnPainting, SpawnPlayer, SpawnPosition,
+    Statistics, StopSound, TabCompleteReply, Tags, Teams, TeleportPlayer, TimeUpdate, Title,
+    TradeList, UnlockRecipes, UpdateBlockEntity, UpdateHealth, UpdateLight, UpdateScore,
+    UpdateSign, UpdateViewDistance, UpdateViewPosition, VehicleTeleport, WindowClose, WindowItems,
+    WindowOpen, WindowOpenHorse, WindowProperty, WindowSetSlot, WorldBorder,
 };
 use crate::protocol::mapped_packet::play::serverbound::{
     AdvancementTab, ArmSwing, ChatMessage, ClickWindow, ClickWindowButton, ClientAbilities,
@@ -342,7 +340,7 @@ state_mapped_packets!(
                 field final_state: String,
                 field joint_type: String,
             }
-            packet UpdateJigsawBlock_Type {
+            packet UpdateJigsawBlock_Type { // TODO: Check if this can be merged!
                 field location: Position,
                 field attachment_type: String,
                 field target_pool: String,
@@ -797,149 +795,44 @@ state_mapped_packets!(
             }
             /// JoinGame is sent after completing the login process. This
             /// sets the initial state for the client.
-            packet JoinGame_WorldNames_IsHard {
+            packet JoinGame {
                 /// The entity id the client will be referenced by
                 field entity_id: i32,
                 /// Whether hardcore mode is enabled
-                field is_hardcore: bool,
+                field is_hardcore: Option<bool>,
                 /// The starting gamemode of the client
                 field gamemode: u8,
                 /// The previous gamemode of the client
-                field previous_gamemode: u8,
+                field previous_gamemode: Option<u8>,
                 /// Identifiers for all worlds on the server
-                field world_names: Vec<String>,
+                field world_names: Option<Vec<String>>,
                 /// Represents a dimension registry
                 field dimension_codec: Option<nbt::NamedTag>,
                 /// The dimension the client is starting in
                 field dimension: Option<nbt::NamedTag>,
+                field dimension_name: Option<String>,
+                field dimension_id: Option<i32>, // an alternative to dimension
+                /// The difficuilty setting for the server
+                field difficulty: Option<u8>,
+                /// The level type of the server
+                field level_type: Option<String>,
                 /// The world being spawned into
-                field world_name: String,
+                field world_name: Option<String>,
                 /// Truncated SHA-256 hash of world's seed
-                field hashed_seed: i64,
+                field hashed_seed: Option<i64>,
                 /// The max number of players on the server
                 field max_players: i32,
                 /// The render distance (2-32)
-                field view_distance: i32,
+                field view_distance: Option<i32>,
                 /// Whether the client should reduce the amount of debug
                 /// information it displays in F3 mode
-                field reduced_debug_info: bool,
+                field reduced_debug_info: Option<bool>,
                 /// Whether to prompt or immediately respawn
-                field enable_respawn_screen: bool,
+                field enable_respawn_screen: Option<bool>,
                 /// Whether the world is in debug mode
-                field is_debug: bool,
+                field is_debug: Option<bool>,
                 /// Whether the world is a superflat world
-                field is_flat: bool,
-            }
-            packet JoinGame_WorldNames {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The previous gamemode of the client
-                field previous_gamemode: u8,
-                /// Identifiers for all worlds on the server
-                field world_names: Vec<String>,
-                /// Represents a dimension registry
-                field dimension_codec: Option<nbt::NamedTag>,
-                /// The dimension the client is starting in
-                field dimension: String,
-                /// The world being spawned into
-                field world_name: String,
-                /// Truncated SHA-256 hash of world's seed
-                field hashed_seed: i64,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The render distance (2-32)
-                field view_distance: i32,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-                /// Whether to prompt or immediately respawn
-                field enable_respawn_screen: bool,
-                /// Whether the world is in debug mode
-                field is_debug: bool,
-                /// Whether the world is a superflat world
-                field is_flat: bool,
-            }
-            packet JoinGame_HashedSeed_Respawn {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The dimension the client is starting in
-                field dimension: i32,
-                /// Truncated SHA-256 hash of world's seed
-                field hashed_seed: i64,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The level type of the server
-                field level_type: String,
-                /// The render distance (2-32)
-                field view_distance: i32,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-                /// Whether to prompt or immediately respawn
-                field enable_respawn_screen: bool,
-            }
-            packet JoinGame_i32_ViewDistance {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The dimension the client is starting in
-                field dimension: i32,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The level type of the server
-                field level_type: String,
-                /// The render distance (2-32)
-                field view_distance: i32,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-            }
-            packet JoinGame_i32 {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The dimension the client is starting in
-                field dimension: i32,
-                /// The difficuilty setting for the server
-                field difficulty: u8,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The level type of the server
-                field level_type: String,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-            }
-            packet JoinGame_i8 {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The dimension the client is starting in
-                field dimension: i8,
-                /// The difficuilty setting for the server
-                field difficulty: u8,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The level type of the server
-                field level_type: String,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-            }
-            packet JoinGame_i8_NoDebug {
-                field entity_id: i32,
-                field gamemode: u8,
-                field dimension: i8,
-                field difficulty: u8,
-                field max_players: u8,
-                field level_type: String,
+                field is_flat: Option<bool>,
             }
             /// Maps updates a single map's contents
             packet Maps {
@@ -2351,101 +2244,165 @@ impl MappablePacket for packet::Packet {
                 })
             }
             packet::Packet::JoinGame_i8(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_i8(JoinGame_i8 {
+                mapped_packet::MappedPacket::JoinGame(JoinGame {
                     entity_id: join_game.entity_id,
+                    is_hardcore: None,
                     gamemode: join_game.gamemode,
-                    dimension: join_game.dimension,
-                    difficulty: join_game.difficulty,
-                    max_players: join_game.max_players,
-                    level_type: join_game.level_type,
-                    reduced_debug_info: join_game.reduced_debug_info,
+                    previous_gamemode: None,
+                    world_names: None,
+                    dimension_codec: None,
+                    dimension: None,
+                    dimension_name: None,
+                    dimension_id: Some(join_game.dimension as i32),
+                    difficulty: Some(join_game.difficulty),
+                    max_players: join_game.max_players as i32,
+                    level_type: Some(join_game.level_type),
+                    world_name: None,
+                    reduced_debug_info: Some(join_game.reduced_debug_info),
+                    enable_respawn_screen: None,
+                    is_debug: None,
+                    hashed_seed: None,
+                    view_distance: None,
+                    is_flat: None,
                 })
             }
             packet::Packet::JoinGame_i8_NoDebug(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_i8_NoDebug(JoinGame_i8_NoDebug {
+                mapped_packet::MappedPacket::JoinGame(JoinGame {
                     entity_id: join_game.entity_id,
+                    is_hardcore: None,
                     gamemode: join_game.gamemode,
-                    dimension: join_game.dimension,
-                    difficulty: join_game.difficulty,
-                    max_players: join_game.max_players,
-                    level_type: join_game.level_type,
+                    previous_gamemode: None,
+                    world_names: None,
+                    dimension_codec: None,
+                    dimension: None,
+                    dimension_name: None,
+                    dimension_id: Some(join_game.dimension as i32),
+                    difficulty: Some(join_game.difficulty),
+                    max_players: join_game.max_players as i32,
+                    level_type: Some(join_game.level_type),
+                    world_name: None,
+                    reduced_debug_info: None,
+                    enable_respawn_screen: None,
+                    is_debug: None,
+                    hashed_seed: None,
+                    view_distance: None,
+                    is_flat: None,
                 })
             }
             packet::Packet::JoinGame_i32(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_i32(JoinGame_i32 {
+                mapped_packet::MappedPacket::JoinGame(JoinGame {
                     entity_id: join_game.entity_id,
+                    is_hardcore: None,
                     gamemode: join_game.gamemode,
-                    dimension: join_game.dimension,
-                    difficulty: join_game.difficulty,
-                    max_players: join_game.max_players,
-                    level_type: join_game.level_type,
-                    reduced_debug_info: join_game.reduced_debug_info,
+                    previous_gamemode: None,
+                    world_names: None,
+                    dimension_codec: None,
+                    dimension: None,
+                    dimension_name: None,
+                    dimension_id: Some(join_game.dimension),
+                    difficulty: Some(join_game.difficulty),
+                    max_players: join_game.max_players as i32,
+                    level_type: Some(join_game.level_type),
+                    world_name: None,
+                    reduced_debug_info: Some(join_game.reduced_debug_info),
+                    enable_respawn_screen: None,
+                    is_debug: None,
+                    hashed_seed: None,
+                    view_distance: None,
+                    is_flat: None,
                 })
             }
             packet::Packet::JoinGame_i32_ViewDistance(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_i32_ViewDistance(JoinGame_i32_ViewDistance {
+                mapped_packet::MappedPacket::JoinGame(JoinGame {
                     entity_id: join_game.entity_id,
+                    is_hardcore: None,
                     gamemode: join_game.gamemode,
-                    dimension: join_game.dimension,
-                    max_players: join_game.max_players,
-                    level_type: join_game.level_type,
-                    view_distance: join_game.view_distance.0,
-                    reduced_debug_info: join_game.reduced_debug_info,
+                    previous_gamemode: None,
+                    world_names: None,
+                    dimension_codec: None,
+                    dimension: None,
+                    dimension_name: None,
+                    dimension_id: Some(join_game.dimension),
+                    max_players: join_game.max_players as i32,
+                    level_type: Some(join_game.level_type),
+                    world_name: None,
+                    view_distance: Some(join_game.view_distance.0),
+                    reduced_debug_info: Some(join_game.reduced_debug_info),
+                    enable_respawn_screen: None,
+                    is_debug: None,
+                    difficulty: None,
+                    hashed_seed: None,
+                    is_flat: None,
                 })
             }
             packet::Packet::JoinGame_WorldNames(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_WorldNames(JoinGame_WorldNames {
+                mapped_packet::MappedPacket::JoinGame(JoinGame {
                     entity_id: join_game.entity_id,
+                    is_hardcore: None,
                     gamemode: join_game.gamemode,
-                    previous_gamemode: join_game.previous_gamemode,
-                    world_names: join_game.world_names.data,
+                    previous_gamemode: Some(join_game.previous_gamemode),
+                    world_names: Some(join_game.world_names.data),
                     dimension_codec: join_game.dimension_codec,
-                    dimension: join_game.dimension,
-                    world_name: join_game.world_name,
-                    hashed_seed: join_game.hashed_seed,
-                    max_players: join_game.max_players,
-                    view_distance: join_game.view_distance.0,
-                    reduced_debug_info: join_game.reduced_debug_info,
-                    enable_respawn_screen: join_game.enable_respawn_screen,
-                    is_debug: join_game.is_debug,
-                    is_flat: join_game.is_flat,
+                    dimension: None,
+                    dimension_name: Some(join_game.dimension),
+                    dimension_id: None,
+                    difficulty: None,
+                    level_type: None,
+                    world_name: Some(join_game.world_name),
+                    hashed_seed: Some(join_game.hashed_seed),
+                    max_players: join_game.max_players as i32,
+                    view_distance: Some(join_game.view_distance.0),
+                    reduced_debug_info: Some(join_game.reduced_debug_info),
+                    enable_respawn_screen: Some(join_game.enable_respawn_screen),
+                    is_debug: Some(join_game.is_debug),
+                    is_flat: Some(join_game.is_flat),
                 })
             }
             packet::Packet::JoinGame_WorldNames_IsHard(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_WorldNames_IsHard(
-                    JoinGame_WorldNames_IsHard {
-                        entity_id: join_game.entity_id,
-                        is_hardcore: join_game.is_hardcore,
-                        gamemode: join_game.gamemode,
-                        previous_gamemode: join_game.previous_gamemode,
-                        world_names: join_game.world_names.data,
-                        dimension_codec: join_game.dimension_codec,
-                        dimension: join_game.dimension,
-                        world_name: join_game.world_name,
-                        hashed_seed: join_game.hashed_seed,
-                        max_players: join_game.max_players.0,
-                        view_distance: join_game.view_distance.0,
-                        reduced_debug_info: join_game.reduced_debug_info,
-                        enable_respawn_screen: join_game.enable_respawn_screen,
-                        is_debug: join_game.is_debug,
-                        is_flat: join_game.is_flat,
-                    },
-                )
+                mapped_packet::MappedPacket::JoinGame(JoinGame {
+                    entity_id: join_game.entity_id,
+                    is_hardcore: Some(join_game.is_hardcore),
+                    gamemode: join_game.gamemode,
+                    previous_gamemode: Some(join_game.previous_gamemode),
+                    world_names: Some(join_game.world_names.data),
+                    dimension_codec: join_game.dimension_codec,
+                    dimension: join_game.dimension,
+                    dimension_name: None,
+                    dimension_id: None,
+                    difficulty: None,
+                    level_type: None,
+                    world_name: Some(join_game.world_name),
+                    hashed_seed: Some(join_game.hashed_seed),
+                    max_players: join_game.max_players.0,
+                    view_distance: Some(join_game.view_distance.0),
+                    reduced_debug_info: Some(join_game.reduced_debug_info),
+                    enable_respawn_screen: Some(join_game.enable_respawn_screen),
+                    is_debug: Some(join_game.is_debug),
+                    is_flat: Some(join_game.is_flat),
+                })
             }
             packet::Packet::JoinGame_HashedSeed_Respawn(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_HashedSeed_Respawn(
-                    JoinGame_HashedSeed_Respawn {
-                        entity_id: join_game.entity_id,
-                        gamemode: join_game.gamemode,
-                        dimension: join_game.dimension,
-                        hashed_seed: join_game.hashed_seed,
-                        max_players: join_game.max_players,
-                        view_distance: join_game.view_distance.0,
-                        reduced_debug_info: join_game.reduced_debug_info,
-                        enable_respawn_screen: join_game.enable_respawn_screen,
-                        level_type: join_game.level_type,
-                    },
-                )
+                mapped_packet::MappedPacket::JoinGame(JoinGame {
+                    entity_id: join_game.entity_id,
+                    is_hardcore: None,
+                    gamemode: join_game.gamemode,
+                    previous_gamemode: None,
+                    world_names: None,
+                    dimension_codec: None,
+                    dimension: None,
+                    dimension_name: None,
+                    dimension_id: Some(join_game.dimension),
+                    difficulty: None,
+                    level_type: Some(join_game.level_type),
+                    world_name: None,
+                    hashed_seed: Some(join_game.hashed_seed),
+                    max_players: join_game.max_players as i32,
+                    view_distance: Some(join_game.view_distance.0),
+                    reduced_debug_info: Some(join_game.reduced_debug_info),
+                    enable_respawn_screen: Some(join_game.enable_respawn_screen),
+                    is_debug: None,
+                    is_flat: None,
+                })
             }
             packet::Packet::KeepAliveClientbound_i32(keep_alive) => {
                 mapped_packet::MappedPacket::KeepAliveClientbound(KeepAliveClientbound {

@@ -21,14 +21,15 @@ pub mod versions;
 pub mod zombie;
 
 // TODO: There may be wrong entries in this!
+// 1.0, 1.0, 0.0 | 0.0, 0.0, 0.0
 static TEXTURE_MATRIX: [[[f32; 3]; 6]; 2] = [
     [
         [0.0, 1.0, 0.0], // OR (although the current one seems correct) 1 0 1 [1.0, 0.0, 1.0], // OR 1 0 1
         [0.0, 0.0, 1.0],
         [0.0, 0.0, 1.0],
-        [0.0, 1.0, 1.0],
-        [0.0, 0.0, 0.0],
-        [1.0, 0.0, 1.0], // OR (although the current one seems correct) 0 1 0 [0.0, 1.0, 0.0], // OR 0 1 0
+        [0.0, 1.0, 1.0], // south(back) - 0, 1, 1 | 1, 0, 1 - 0, 0, 1 displays the left half of the back (body) and the left side of the head
+        [1.0, 0.0, 1.0], // left(west)
+        [0.0, 0.0, 0.0], // right(east)
     ],
     [
         [0.0, 0.0, 0.0],
