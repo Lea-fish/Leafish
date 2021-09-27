@@ -2327,17 +2327,26 @@ impl MappablePacket for packet::Packet {
                 )
             }
             packet::Packet::JoinGame_HashedSeed_Respawn(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_HashedSeed_Respawn(
-                    JoinGame_HashedSeed_Respawn {
+                mapped_packet::MappedPacket::JoinGame(
+                    JoinGame {
                         entity_id: join_game.entity_id,
+                        is_hardcore: None,
                         gamemode: join_game.gamemode,
-                        dimension: join_game.dimension,
-                        hashed_seed: join_game.hashed_seed,
-                        max_players: join_game.max_players,
+                        previous_gamemode: None,
+                        world_names: None,
+                        dimension_codec: None,
+                        dimension: Some(join_game.dimension),
+                        dimension_id: None,
+                        difficulty: None,
+                        level_type: Some(join_game.level_type),
+                        world_name: None,
+                        hashed_seed: Some(join_game.hashed_seed),
+                        max_players: join_game.max_players as i32,
                         view_distance: join_game.view_distance.0,
-                        reduced_debug_info: join_game.reduced_debug_info,
-                        enable_respawn_screen: join_game.enable_respawn_screen,
-                        level_type: join_game.level_type,
+                        reduced_debug_info: Some(join_game.reduced_debug_info),
+                        enable_respawn_screen: Some(join_game.enable_respawn_screen),
+                        is_debug: None,
+                        is_flat: None,
                     },
                 )
             }
