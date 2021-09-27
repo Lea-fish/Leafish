@@ -797,7 +797,7 @@ state_mapped_packets!(
             }
             /// JoinGame is sent after completing the login process. This
             /// sets the initial state for the client.
-            packet JoinGame_WorldNames_IsHard {
+            packet JoinGame {
                 /// The entity id the client will be referenced by
                 field entity_id: i32,
                 /// Whether hardcore mode is enabled
