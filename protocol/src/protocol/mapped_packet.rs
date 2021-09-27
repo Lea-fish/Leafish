@@ -2306,23 +2306,26 @@ impl MappablePacket for packet::Packet {
                 })
             }
             packet::Packet::JoinGame_WorldNames_IsHard(join_game) => {
-                mapped_packet::MappedPacket::JoinGame_WorldNames_IsHard(
-                    JoinGame_WorldNames_IsHard {
+                mapped_packet::MappedPacket::JoinGame(
+                    JoinGame {
                         entity_id: join_game.entity_id,
-                        is_hardcore: join_game.is_hardcore,
+                        is_hardcore: Some(join_game.is_hardcore),
                         gamemode: join_game.gamemode,
-                        previous_gamemode: join_game.previous_gamemode,
-                        world_names: join_game.world_names.data,
-                        dimension_codec: join_game.dimension_codec,
-                        dimension: join_game.dimension,
-                        world_name: join_game.world_name,
-                        hashed_seed: join_game.hashed_seed,
+                        previous_gamemode: Some(join_game.previous_gamemode),
+                        world_names: Some(join_game.world_names.data),
+                        dimension_codec: Some(join_game.dimension_codec),
+                        dimension: Some(join_game.dimension),
+                        dimension_id: None,
+                        difficulty: None,
+                        level_type: None,
+                        world_name: Some(join_game.world_name),
+                        hashed_seed: Some(join_game.hashed_seed),
                         max_players: join_game.max_players.0,
                         view_distance: join_game.view_distance.0,
-                        reduced_debug_info: join_game.reduced_debug_info,
-                        enable_respawn_screen: join_game.enable_respawn_screen,
-                        is_debug: join_game.is_debug,
-                        is_flat: join_game.is_flat,
+                        reduced_debug_info: Some(join_game.reduced_debug_info),
+                        enable_respawn_screen: Some(join_game.enable_respawn_screen),
+                        is_debug: Some(join_game.is_debug),
+                        is_flat: Some(join_game.is_flat),
                     },
                 )
             }
