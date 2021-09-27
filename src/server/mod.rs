@@ -1559,12 +1559,8 @@ impl Server {
         let brand = plugin_messages::Brand {
             brand: "leafish".into(),
         };
-        // TODO: refactor with write_plugin_message
-        if self.protocol_version >= 47 {
-            self.write_packet(brand.into_message());
-        } else {
-            self.write_packet(brand.into_message17());
-        }
+        brand.write_to(self.conn.clone().write().as_mut().unwrap());
+
         packet::send_client_settings(
             self.conn.clone().write().as_mut().unwrap(),
             self.mapped_protocol_version,
