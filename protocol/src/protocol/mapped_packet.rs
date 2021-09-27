@@ -342,7 +342,7 @@ state_mapped_packets!(
                 field final_state: String,
                 field joint_type: String,
             }
-            packet UpdateJigsawBlock_Type {
+            packet UpdateJigsawBlock_Type { // TODO: Check if this can be merged!
                 field location: Position,
                 field attachment_type: String,
                 field target_pool: String,
@@ -801,145 +801,39 @@ state_mapped_packets!(
                 /// The entity id the client will be referenced by
                 field entity_id: i32,
                 /// Whether hardcore mode is enabled
-                field is_hardcore: bool,
+                field is_hardcore: Option<bool>,
                 /// The starting gamemode of the client
                 field gamemode: u8,
                 /// The previous gamemode of the client
-                field previous_gamemode: u8,
+                field previous_gamemode: Option<u8>,
                 /// Identifiers for all worlds on the server
-                field world_names: Vec<String>,
+                field world_names: Option<Vec<String>>,
                 /// Represents a dimension registry
                 field dimension_codec: Option<nbt::NamedTag>,
                 /// The dimension the client is starting in
                 field dimension: Option<nbt::NamedTag>,
+                field dimension_id: Option<i32>, // an alternative to dimension
+                /// The difficuilty setting for the server
+                field difficulty: Option<u8>,
+                /// The level type of the server
+                field level_type: Option<String>,
                 /// The world being spawned into
-                field world_name: String,
+                field world_name: Option<String>,
                 /// Truncated SHA-256 hash of world's seed
-                field hashed_seed: i64,
+                field hashed_seed: Option<i64>,
                 /// The max number of players on the server
                 field max_players: i32,
                 /// The render distance (2-32)
                 field view_distance: i32,
                 /// Whether the client should reduce the amount of debug
                 /// information it displays in F3 mode
-                field reduced_debug_info: bool,
+                field reduced_debug_info: Option<bool>,
                 /// Whether to prompt or immediately respawn
-                field enable_respawn_screen: bool,
+                field enable_respawn_screen: Option<bool>,
                 /// Whether the world is in debug mode
-                field is_debug: bool,
+                field is_debug: Option<bool>,
                 /// Whether the world is a superflat world
-                field is_flat: bool,
-            }
-            packet JoinGame_WorldNames {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The previous gamemode of the client
-                field previous_gamemode: u8,
-                /// Identifiers for all worlds on the server
-                field world_names: Vec<String>,
-                /// Represents a dimension registry
-                field dimension_codec: Option<nbt::NamedTag>,
-                /// The dimension the client is starting in
-                field dimension: String,
-                /// The world being spawned into
-                field world_name: String,
-                /// Truncated SHA-256 hash of world's seed
-                field hashed_seed: i64,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The render distance (2-32)
-                field view_distance: i32,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-                /// Whether to prompt or immediately respawn
-                field enable_respawn_screen: bool,
-                /// Whether the world is in debug mode
-                field is_debug: bool,
-                /// Whether the world is a superflat world
-                field is_flat: bool,
-            }
-            packet JoinGame_HashedSeed_Respawn {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The dimension the client is starting in
-                field dimension: i32,
-                /// Truncated SHA-256 hash of world's seed
-                field hashed_seed: i64,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The level type of the server
-                field level_type: String,
-                /// The render distance (2-32)
-                field view_distance: i32,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-                /// Whether to prompt or immediately respawn
-                field enable_respawn_screen: bool,
-            }
-            packet JoinGame_i32_ViewDistance {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The dimension the client is starting in
-                field dimension: i32,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The level type of the server
-                field level_type: String,
-                /// The render distance (2-32)
-                field view_distance: i32,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-            }
-            packet JoinGame_i32 {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The dimension the client is starting in
-                field dimension: i32,
-                /// The difficuilty setting for the server
-                field difficulty: u8,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The level type of the server
-                field level_type: String,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-            }
-            packet JoinGame_i8 {
-                /// The entity id the client will be referenced by
-                field entity_id: i32,
-                /// The starting gamemode of the client
-                field gamemode: u8,
-                /// The dimension the client is starting in
-                field dimension: i8,
-                /// The difficuilty setting for the server
-                field difficulty: u8,
-                /// The max number of players on the server
-                field max_players: u8,
-                /// The level type of the server
-                field level_type: String,
-                /// Whether the client should reduce the amount of debug
-                /// information it displays in F3 mode
-                field reduced_debug_info: bool,
-            }
-            packet JoinGame_i8_NoDebug {
-                field entity_id: i32,
-                field gamemode: u8,
-                field dimension: i8,
-                field difficulty: u8,
-                field max_players: u8,
-                field level_type: String,
+                field is_flat: Option<bool>,
             }
             /// Maps updates a single map's contents
             packet Maps {
