@@ -100,6 +100,10 @@ struct ScreenInfo {
     last_height: i32,
 }
 
+// TODO: Add safety comment!
+unsafe impl Send for ScreenSystem {}
+unsafe impl Sync for ScreenSystem {}
+
 #[derive(Default)]
 pub struct ScreenSystem {
     screens: Arc<RwLock<Vec<ScreenInfo>>>,
@@ -180,7 +184,7 @@ impl ScreenSystem {
         }
     }
 
-    pub fn press_key(&self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+    pub fn press_key(&self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if self.screens.clone().read().last().is_some() {
             self.screens
                 .clone()
@@ -192,15 +196,7 @@ impl ScreenSystem {
                 .clone()
                 .lock()
                 .on_key_press(key, down, game);
-            let len = self.pre_computed_screens.clone().read().len();
-            return len == 0
-                || !self.pre_computed_screens.clone().read()[len - 1]
-                    .screen
-                    .clone()
-                    .lock()
-                    .is_in_game();
         }
-        false
     }
 
     #[allow(unused_must_use)]
@@ -210,7 +206,7 @@ impl ScreenSystem {
         renderer: Arc<RwLock<render::Renderer>>,
         ui_container: &mut ui::Container,
         window: &Window,
-    ) {
+    ) -> bool {
         let renderer = &mut renderer.write();
         for screen in self.remove_queue.clone().write().drain(..) {
             if screen.active {
@@ -262,7 +258,7 @@ impl ScreenSystem {
         }
 
         if self.screens.clone().read().is_empty() {
-            return;
+            return true;
         }
         // Update state for screens
         let len = self.screens.clone().read().len();
@@ -337,6 +333,13 @@ impl ScreenSystem {
         if let Some(swap) = swap {
             self.replace_screen(swap);
         }
+        let len = self.screens.clone().read().len();
+        return len == 0
+            || !self.screens.clone().read()[len - 1]
+            .screen
+            .clone()
+            .lock()
+            .is_in_game();
     }
 
     pub fn on_scroll(&self, x: f64, y: f64) {

@@ -144,6 +144,7 @@ impl Game {
             access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
         };
         let renderer = self.renderer.clone();
+        let screen_sys = self.screen_sys.clone();
         let result = thread::spawn(move || {
             server::Server::connect(
                 resources,
@@ -154,6 +155,7 @@ impl Game {
                 fml_network_version,
                 renderer,
                 hud_context.clone(),
+                screen_sys,
             )
         })
         .join();
@@ -446,7 +448,6 @@ fn tick_all(
                 );
             game.server = None;
             game.renderer.clone().write().reset();
-            game.focused = false;
         }
     } else {
         game.chunk_builder.reset();
@@ -513,9 +514,19 @@ fn tick_all(
         gl::viewport(0, 0, physical_width as i32, physical_height as i32);
     }
 
-    game.screen_sys
+    if game.screen_sys
         .clone()
-        .tick(delta, game.renderer.clone(), &mut ui_container, window);
+        .tick(delta, game.renderer.clone(), &mut ui_container, window) {
+        window.set_cursor_grab(false).unwrap();
+        window.set_cursor_visible(true);
+        game.focused = false;
+        println!("not focused");
+    } else {
+        window.set_cursor_grab(true).unwrap();
+        window.set_cursor_visible(false);
+        game.focused = true;
+        println!("focused");
+    }
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {
         if Instant::now().duration_since(received_chat_at).as_secs() < 5 {
@@ -655,18 +666,10 @@ fn handle_window_event<T>(
                         let (width, height) =
                             physical_size.to_logical::<f64>(game.dpi_factor).into();
 
-                        if game.server.is_some()
+                        if !(game.server.is_some()
                             && game.server.as_ref().unwrap().is_connected()
-                            && !game.focused
-                            && !game.screen_sys.clone().is_current_closable()
-                        {
-                            game.focused = true;
-                            window.set_cursor_grab(true).unwrap();
-                            window.set_cursor_visible(false);
-                        } else if !game.focused {
+                            && !game.screen_sys.clone().is_current_closable()) && !game.focused {
                             // TODO: after Pointer Lock https://github.com/rust-windowing/winit/issues/1674
-                            window.set_cursor_grab(false).unwrap();
-                            window.set_cursor_visible(true);
                             ui_container.click_at(
                                 game,
                                 game.last_mouse_x,
@@ -744,30 +747,14 @@ fn handle_window_event<T>(
                                 let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
                                 ui_container.key_press(game, key, true, ctrl_pressed);
                             }
-                            if game.screen_sys.clone().press_key(key, true, game) {
-                                window.set_cursor_grab(false).unwrap();
-                                window.set_cursor_visible(true);
-                                game.focused = false;
-                            } else {
-                                window.set_cursor_grab(true).unwrap();
-                                window.set_cursor_visible(false);
-                                game.focused = true;
-                            }
+                            game.screen_sys.clone().press_key(key, true, game);
                         }
                         (ElementState::Released, Some(key)) => {
                             if !game.focused {
                                 let ctrl_pressed = game.is_ctrl_pressed;
                                 ui_container.key_press(game, key, false, ctrl_pressed);
                             }
-                            if game.screen_sys.clone().press_key(key, false, game) {
-                                window.set_cursor_grab(false).unwrap();
-                                window.set_cursor_visible(true);
-                                game.focused = false;
-                            } else {
-                                window.set_cursor_grab(true).unwrap();
-                                window.set_cursor_visible(false);
-                                game.focused = true;
-                            }
+                            game.screen_sys.clone().press_key(key, false, game);
                         }
                         (_, None) => (),
                     }
