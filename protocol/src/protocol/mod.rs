@@ -40,6 +40,7 @@ use num_traits::cast::{cast, NumCast};
 use trust_dns_resolver::config::ResolverConfig;
 use trust_dns_resolver::config::ResolverOpts;
 use trust_dns_resolver::Resolver;
+use serde::{Serialize, Deserialize};
 
 use crate::format;
 use crate::nbt;
@@ -529,7 +530,7 @@ impl Serializable for f64 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct UUID(u64, u64);
 
 #[derive(Debug)]

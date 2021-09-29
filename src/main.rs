@@ -289,7 +289,7 @@ fn main() {
 
     let screen_sys = screen::ScreenSystem::new();
     if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(vars.get(settings::BACKGROUND_IMAGE).clone())));
+        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(vars.get(settings::BACKGROUND_IMAGE).clone(), vec![])));
         // screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
     }
 

@@ -35,40 +35,71 @@ use crossbeam_channel::{Receiver, TryRecvError};
 use instant::Duration;
 use parking_lot::RwLock;
 use rand::Rng;
+use leafish_protocol::protocol::UUID;
+use serde::{Serialize, Deserialize};
 
 /// SAFETY: We don't alter components which, which aren't thread safe on other threads than the main one.
 unsafe impl Send for Launcher {}
 unsafe impl Sync for Launcher {}
 
 pub struct Launcher {
-    displayed_accounts: Vec<DisplayedAccount>,
+    rendered_accounts: Vec<RenderAccount>,
     options: Option<ui::ButtonRef>,
     background: Option<ui::ImageRef>,
     background_image: String,
     disclaimer: Option<ui::TextRef>,
+    accounts: Vec<Account>,
 }
 
 impl Clone for Launcher {
     fn clone(&self) -> Self {
-        Launcher::new(self.background_image.clone())
+        Launcher::new(self.background_image.clone(), self.accounts.to_vec())
     }
 }
 
-struct DisplayedAccount {
+struct RenderAccount {
 
     head_picture: Option<ui::ImageRef>,
+    account_name: Option<ui::TextRef>,
 
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct Account {
+    name: String,
+    uuid: Option<UUID>,
+    verification_tokens: Vec<String>, // this represents the verification tokens used to verify the account, such as hashed passwords, actual tokens, etc
+}
+
+impl Clone for Account {
+    fn clone(&self) -> Self {
+        Account {
+            name: self.name.clone(),
+            uuid: self.uuid.clone(),
+            verification_tokens: self.verification_tokens.to_vec(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub enum AccountType {
+
+    Mojang,
+    Microsoft,
+    Custom(String), // Not implemented yet, this will enable us to support other auth services without implementing every single one specifically
+    None, // aka. unverified or "offline account" (for offline mode servers)
 
 }
 
 impl Launcher {
-    pub fn new(background_image: String) -> Self {
+    pub fn new(background_image: String, accounts: Vec<Account>) -> Self {
         Launcher {
-            displayed_accounts: vec![],
+            rendered_accounts: vec![],
             options: None,
             background: None,
             background_image,
-            disclaimer: None
+            disclaimer: None,
+            accounts,
         }
     }
 
@@ -268,6 +299,12 @@ impl super::Screen for Launcher {
             .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
             .create(ui_container);
         self.disclaimer.replace(disclaimer);
+        for account in self.accounts.iter() {
+            self.rendered_accounts.push(RenderAccount {
+                head_picture: None,
+                account_name: None,
+            });
+        }
     }
 
     fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
@@ -275,7 +312,7 @@ impl super::Screen for Launcher {
         self.background.take();
         self.options.take();
         self.disclaimer.take();
-        self.displayed_accounts.clear();
+        self.rendered_accounts.clear();
     }
 
     fn tick(
