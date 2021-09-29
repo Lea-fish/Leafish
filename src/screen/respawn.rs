@@ -106,7 +106,14 @@ impl super::Screen for Respawn {
                 .attach(&mut *main_menu_button);
             main_menu_button.add_text(txt);
             main_menu_button.add_click_func(|_, _game| {
-                // TODO: Disconnect!
+                    game.server.as_ref().unwrap().disconnect(None);
+                    game.screen_sys.clone().pop_screen();
+                    game.screen_sys
+                        .clone()
+                        .replace_screen(Box::new(super::ServerList::new(
+                            None,
+                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                        )));
                 true
             });
         }
