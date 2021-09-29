@@ -24,6 +24,7 @@ pub mod edit_server;
 pub mod chat;
 pub mod respawn;
 pub mod settings_menu;
+pub mod launcher;
 
 pub use self::settings_menu::{AudioSettingsMenu, SettingsMenu, VideoSettingsMenu};
 

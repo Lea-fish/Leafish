@@ -543,6 +543,11 @@ impl super::Screen for ServerList {
                     back.y = s.y;
                 }
             }
+            if s.y < elements._add_btn.borrow().y {
+                // TODO: Make button invisible!
+            } else {
+                // TODO: Make button visible.
+            }
 
             // Keep checking to see if the server has finished being
             // pinged
