@@ -389,7 +389,7 @@ impl Server {
         resources: Arc<RwLock<resources::Manager>>,
         renderer: Arc<RwLock<Renderer>>,
         hud_context: Arc<RwLock<HudContext>>,
-        screen_sys: Arc<ScreenSystem>
+        screen_sys: Arc<ScreenSystem>,
     ) -> Arc<Server> {
         let server_callback = Arc::new(Mutex::new(None));
         let inner_server = server_callback.clone();
@@ -840,7 +840,7 @@ impl Server {
         render_list_computer_notify: Receiver<bool>,
         hud_context: Arc<RwLock<HudContext>>,
         renderer: &Renderer,
-        screen_sys: Arc<ScreenSystem>
+        screen_sys: Arc<ScreenSystem>,
     ) -> Server {
         let mut entities = ecs::Manager::new();
         entity::add_systems(&mut entities);
@@ -918,7 +918,7 @@ impl Server {
             last_chat_open: AtomicBool::new(false),
             chat_open: AtomicBool::new(false),
             chat_ctx: Arc::new(ChatContext::new()),
-            screen_sys
+            screen_sys,
         }
     }
 

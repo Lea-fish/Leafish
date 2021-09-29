@@ -344,10 +344,10 @@ impl ScreenSystem {
         let len = self.screens.clone().read().len();
         return len == 0
             || !self.screens.clone().read()[len - 1]
-            .screen
-            .clone()
-            .lock()
-            .is_in_game();
+                .screen
+                .clone()
+                .lock()
+                .is_in_game();
     }
 
     pub fn on_scroll(&self, x: f64, y: f64) {

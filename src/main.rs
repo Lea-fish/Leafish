@@ -514,9 +514,11 @@ fn tick_all(
         gl::viewport(0, 0, physical_width as i32, physical_height as i32);
     }
 
-    if game.screen_sys
+    if game
+        .screen_sys
         .clone()
-        .tick(delta, game.renderer.clone(), &mut ui_container, window) {
+        .tick(delta, game.renderer.clone(), &mut ui_container, window)
+    {
         window.set_cursor_grab(false).unwrap();
         window.set_cursor_visible(true);
         game.focused = false;
