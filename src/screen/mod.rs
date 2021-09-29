@@ -169,6 +169,14 @@ impl ScreenSystem {
         }
     }
 
+    pub fn is_current_ingame(&self) -> bool {
+        if let Some(last) = self.pre_computed_screens.clone().read().last() {
+            last.screen.clone().lock().is_in_game()
+        } else {
+            true
+        }
+    }
+
     pub fn receive_char(&self, received: char, game: &mut Game) {
         if self.screens.clone().read().last().is_some() {
             self.screens

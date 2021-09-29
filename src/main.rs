@@ -520,12 +520,10 @@ fn tick_all(
         window.set_cursor_grab(false).unwrap();
         window.set_cursor_visible(true);
         game.focused = false;
-        println!("not focused");
     } else {
         window.set_cursor_grab(true).unwrap();
         window.set_cursor_visible(false);
         game.focused = true;
-        println!("focused");
     }
     /* TODO: open console for chat messages
     if let Some(received_chat_at) = game.server.received_chat_at {
@@ -665,10 +663,7 @@ fn handle_window_event<T>(
                         let physical_size = window.inner_size();
                         let (width, height) =
                             physical_size.to_logical::<f64>(game.dpi_factor).into();
-
-                        if !(game.server.is_some()
-                            && game.server.as_ref().unwrap().is_connected()
-                            && !game.screen_sys.clone().is_current_closable()) && !game.focused {
+                        if !game.screen_sys.clone().is_current_ingame() && !game.focused {
                             // TODO: after Pointer Lock https://github.com/rust-windowing/winit/issues/1674
                             ui_container.click_at(
                                 game,

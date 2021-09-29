@@ -133,6 +133,11 @@ impl super::Screen for Respawn {
         None
     }
 
+    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        self.on_deactive(renderer, ui_container);
+        self.on_active(renderer, ui_container);
+    }
+
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
     }
