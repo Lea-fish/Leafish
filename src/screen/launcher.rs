@@ -60,6 +60,7 @@ impl Clone for Launcher {
 struct RenderAccount {
 
     head_picture: Option<ui::ImageRef>,
+    entry_back: Option<ui::ImageRef>,
     account_name: Option<ui::TextRef>,
 
 }
@@ -69,6 +70,7 @@ pub struct Account {
     name: String,
     uuid: Option<UUID>,
     verification_tokens: Vec<String>, // this represents the verification tokens used to verify the account, such as hashed passwords, actual tokens, etc
+    head_img_data: Option<Vec<u8>>,
 }
 
 impl Clone for Account {
@@ -77,6 +79,7 @@ impl Clone for Account {
             name: self.name.clone(),
             uuid: self.uuid.clone(),
             verification_tokens: self.verification_tokens.to_vec(),
+            head_img_data: self.head_img_data.as_ref().map(|x| x.to_vec()),
         }
     }
 }
@@ -249,6 +252,12 @@ impl Launcher {
 impl super::Screen for Launcher {
 
     fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+        self.accounts.push(Account {
+            name: "terrarier2111".to_string(),
+            uuid: None,
+            verification_tokens: vec![],
+            head_img_data: None,
+        });
         let background = if Renderer::get_texture_optional(
             renderer.get_textures_ref(),
             &*format!("#{}", self.background_image),
@@ -299,11 +308,29 @@ impl super::Screen for Launcher {
             .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
             .create(ui_container);
         self.disclaimer.replace(disclaimer);
+        let mut offset = 0.0;
         for account in self.accounts.iter() {
+            // Everything is attached to this
+            let mut back = ui::ImageBuilder::new()
+                .texture("leafish:solid")
+                .position(0.0, offset * 100.0)
+                .size(700.0, 100.0)
+                .colour((0, 0, 0, 100))
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .create(ui_container);
+            let account_name = ui::TextBuilder::new()
+                .text(account.name.clone())
+                .position(0.0, -32.5)
+                .colour((200, 200, 200, 255))
+                .draw_index(1)
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .attach(&mut *back.borrow_mut());
             self.rendered_accounts.push(RenderAccount {
                 head_picture: None,
-                account_name: None,
+                entry_back: Some(back),
+                account_name: Some(account_name),
             });
+            offset += 1.0;
         }
     }
 
