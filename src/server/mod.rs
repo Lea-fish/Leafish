@@ -130,10 +130,10 @@ pub struct Server {
     fps_start: RwLock<u128>,
     pub dead: RwLock<bool>,
     just_died: RwLock<bool>,
-    close_death_screen: RwLock<bool>,
     last_chat_open: AtomicBool,
     pub chat_open: AtomicBool,
     pub chat_ctx: Arc<ChatContext>,
+    screen_sys: Arc<ScreenSystem>,
 }
 
 #[derive(Debug)]
@@ -167,6 +167,7 @@ impl Server {
         fml_network_version: Option<i64>,
         renderer: Arc<RwLock<Renderer>>,
         hud_context: Arc<RwLock<HudContext>>,
+        screen_sys: Arc<ScreenSystem>,
     ) -> Result<Arc<Server>, protocol::Error> {
         let mut conn = protocol::Conn::new(address, protocol_version)?;
 
@@ -222,6 +223,7 @@ impl Server {
                         resources,
                         renderer,
                         hud_context,
+                        screen_sys,
                     );
                     return Ok(server);
                 }
@@ -237,6 +239,7 @@ impl Server {
                         resources,
                         renderer,
                         hud_context,
+                        screen_sys,
                     );
 
                     return Ok(server);
@@ -372,6 +375,7 @@ impl Server {
             resources,
             renderer,
             hud_context,
+            screen_sys,
         );
 
         Ok(server)
@@ -385,6 +389,7 @@ impl Server {
         resources: Arc<RwLock<resources::Manager>>,
         renderer: Arc<RwLock<Renderer>>,
         hud_context: Arc<RwLock<HudContext>>,
+        screen_sys: Arc<ScreenSystem>,
     ) -> Arc<Server> {
         let server_callback = Arc::new(Mutex::new(None));
         let inner_server = server_callback.clone();
@@ -405,6 +410,7 @@ impl Server {
             render_list_computer.1,
             hud_context,
             &renderer.read(),
+            screen_sys,
         ));
         server.hud_context.clone().write().server = Some(server.clone());
 
@@ -834,6 +840,7 @@ impl Server {
         render_list_computer_notify: Receiver<bool>,
         hud_context: Arc<RwLock<HudContext>>,
         renderer: &Renderer,
+        screen_sys: Arc<ScreenSystem>,
     ) -> Server {
         let mut entities = ecs::Manager::new();
         entity::add_systems(&mut entities);
@@ -900,7 +907,6 @@ impl Server {
             fps_start: RwLock::new(0),
             dead: RwLock::new(false),
             just_died: RwLock::new(false),
-            close_death_screen: RwLock::new(false),
             block_break_info: Mutex::new(BlockBreakInfo {
                 break_position: Default::default(),
                 break_face: BlockDirection::Invalid,
@@ -912,6 +918,7 @@ impl Server {
             last_chat_open: AtomicBool::new(false),
             chat_open: AtomicBool::new(false),
             chat_ctx: Arc::new(ChatContext::new()),
+            screen_sys,
         }
     }
 
@@ -941,11 +948,6 @@ impl Server {
         } else {
             *self.fps.write() += 1;
         }
-        if *self.close_death_screen.read() {
-            *self.close_death_screen.write() = false;
-            game.screen_sys.clone().pop_screen();
-            game.focused = true;
-        }
         let chat_open = self.chat_open.load(Ordering::Acquire);
         if chat_open != self.last_chat_open.load(Ordering::Acquire) {
             self.last_chat_open.store(chat_open, Ordering::Release);
@@ -953,10 +955,8 @@ impl Server {
                 game.screen_sys
                     .clone()
                     .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
-                game.focused = false;
             } else {
                 game.screen_sys.clone().pop_screen();
-                game.focused = true;
             }
         }
         let version = self.resources.read().version();
@@ -1015,7 +1015,6 @@ impl Server {
                 game.screen_sys
                     .clone()
                     .add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
-                game.focused = false;
             }
             let world = self.world.clone();
             if let Some((pos, bl, _, _)) = target::trace_ray(
@@ -1599,7 +1598,6 @@ impl Server {
         *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
         let _ = EntityType::Zombie.create_entity(&mut self.entities.clone().write(), 1478.5, 47.0, -474.5, 0.0, 0.0)/*create_zombie(&mut self.entities.clone().write())*/;
         if *self.dead.read() {
-            *self.close_death_screen.write() = true;
             *self.dead.write() = false;
             *self.just_died.write() = false;
             self.hud_context
@@ -1611,6 +1609,7 @@ impl Server {
             self.hud_context.clone().write().update_absorbtion(0.0);
             self.hud_context.clone().write().update_armor(0);
             // self.hud_context.clone().write().update_breath(-1); // TODO: Fix this!
+            self.screen_sys.pop_screen();
         }
     }
 
@@ -2373,7 +2372,10 @@ impl Server {
             .update_health_and_food(health, food, saturation);
         if health <= 0.0 && !*self.dead.read() {
             *self.dead.write() = true;
-            *self.just_died.write() = true;
+            self.screen_sys.close_closable_screens();
+            self.screen_sys
+                .clone()
+                .add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
         }
     }
 }

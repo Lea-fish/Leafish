@@ -181,7 +181,6 @@ impl ServerList {
                         game.screen_sys
                             .clone()
                             .add_screen(Box::new(Hud::new(hud_context)));
-                        game.focused = true;
                     }
                     true
                 });

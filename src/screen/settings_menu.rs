@@ -157,9 +157,6 @@ impl super::Screen for SettingsMenu {
             done_button.add_text(txt);
             done_button.add_click_func(|_, game| {
                 game.screen_sys.clone().pop_screen();
-                if game.server.is_some() {
-                    game.focused = true;
-                }
                 true
             });
         }

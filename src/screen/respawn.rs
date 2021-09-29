@@ -1,8 +1,8 @@
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::Screen;
-use crate::ui;
 use crate::ui::{Container, ImageRef};
+use crate::{settings, ui};
 use leafish_protocol::protocol::packet::play::serverbound::ClientStatus;
 use leafish_protocol::protocol::{VarInt, Version};
 
@@ -105,8 +105,15 @@ impl super::Screen for Respawn {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *main_menu_button);
             main_menu_button.add_text(txt);
-            main_menu_button.add_click_func(|_, _game| {
-                // TODO: Disconnect!
+            main_menu_button.add_click_func(|_, game| {
+                game.server.as_ref().unwrap().disconnect(None);
+                game.screen_sys.clone().pop_screen();
+                game.screen_sys
+                    .clone()
+                    .replace_screen(Box::new(super::ServerList::new(
+                        None,
+                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                    )));
                 true
             });
         }
@@ -131,6 +138,11 @@ impl super::Screen for Respawn {
     ) -> Option<Box<dyn Screen>> {
         // TODO
         None
+    }
+
+    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        self.on_deactive(renderer, ui_container);
+        self.on_active(renderer, ui_container);
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {
