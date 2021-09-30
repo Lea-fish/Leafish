@@ -49,6 +49,7 @@ pub struct Launcher {
     background_image: String,
     disclaimer: Option<ui::TextRef>,
     accounts: Vec<Account>,
+    add: Option<ui::ButtonRef>,
 }
 
 impl Clone for Launcher {
@@ -103,6 +104,7 @@ impl Launcher {
             background_image,
             disclaimer: None,
             accounts,
+            add: None,
         }
     }
 
@@ -308,13 +310,37 @@ impl super::Screen for Launcher {
             .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
             .create(ui_container);
         self.disclaimer.replace(disclaimer);
+
+        // Add a new server to the list
+        let add = ui::ButtonBuilder::new()
+            .position(200.0, -50.0 - 15.0)
+            .size(100.0, 30.0)
+            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+            .draw_index(2)
+            .create(ui_container);
+        {
+            let mut add = add.borrow_mut();
+            let txt = ui::TextBuilder::new()
+                .text("Add")
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .attach(&mut *add);
+            add.add_text(txt);
+            add.add_click_func(move |_, game| {
+                /*game.screen_sys
+                    .clone()
+                    .replace_screen(Box::new(super::edit_server::EditServerEntry::new(None)));*/
+                true
+            })
+        }
+        self.add.replace(add);
+
         let mut offset = 0.0;
         for account in self.accounts.iter() {
             // Everything is attached to this
             let mut back = ui::ImageBuilder::new()
                 .texture("leafish:solid")
-                .position(0.0, offset * 100.0)
-                .size(700.0, 100.0)
+                .position(0.0, offset * 105.0)
+                .size(500.0, 100.0)
                 .colour((0, 0, 0, 100))
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container);
@@ -325,8 +351,15 @@ impl super::Screen for Launcher {
                 .draw_index(1)
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *back.borrow_mut());
+            let head = ui::ImageBuilder::new()
+                .texture("none")
+                .position(-200.0, offset * 105.0)
+                .size(85.0, 85.0)
+                .colour((0, 0, 0, 255))
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .create(ui_container);
             self.rendered_accounts.push(RenderAccount {
-                head_picture: None,
+                head_picture: Some(head),
                 entry_back: Some(back),
                 account_name: Some(account_name),
             });

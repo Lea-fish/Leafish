@@ -14,7 +14,7 @@
 
 use std::cell::Cell;
 use std::rc::Rc;
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc};
 use std::thread;
 
 use rand::{self, Rng};
@@ -27,17 +27,18 @@ use crate::render;
 use crate::screen::Screen;
 use crate::settings;
 use crate::ui;
+use crate::screen::launcher::Account;
 
 pub struct Login {
     elements: Option<UIElements>,
-    vars: Rc<console::Vars>,
+    callback: Arc<dyn Fn(Option<Account>)>,
 }
 
 impl Clone for Login {
     fn clone(&self) -> Self {
         Login {
             elements: None,
-            vars: self.vars.clone(),
+            callback: self.callback.clone(),
         }
     }
 }
@@ -59,10 +60,10 @@ struct UIElements {
 }
 
 impl Login {
-    pub fn new(vars: Rc<console::Vars>) -> Self {
+    pub fn new(callback: Arc<dyn Fn(Option<Account>)>) -> Self {
         Login {
             elements: None,
-            vars,
+            callback,
         }
     }
 }
