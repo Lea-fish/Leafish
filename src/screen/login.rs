@@ -27,7 +27,10 @@ use crate::render;
 use crate::screen::Screen;
 use crate::settings;
 use crate::ui;
-use crate::screen::launcher::Account;
+use leafish_protocol::protocol::{UUID, Error};
+use std::str::FromStr;
+use std::ops::Deref;
+use leafish_protocol::protocol::login::{Account, AccountType};
 
 pub struct Login {
     elements: Option<UIElements>,
@@ -54,9 +57,7 @@ struct UIElements {
     _disclaimer: ui::TextRef,
     try_login: Rc<Cell<bool>>,
     refresh: bool,
-    login_res: Option<mpsc::Receiver<Result<mojang::Profile, protocol::Error>>>,
-
-    profile: mojang::Profile,
+    login_res: Option<mpsc::Receiver<Result<Account, protocol::Error>>>,
 }
 
 impl Login {
@@ -140,17 +141,11 @@ impl super::Screen for Login {
             .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
             .create(ui_container);
 
-        let profile = mojang::Profile {
-            username: self.vars.get(auth::CL_USERNAME).clone(),
-            id: self.vars.get(auth::CL_UUID).clone(),
-            access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
-        };
-        let refresh = profile.is_complete();
+        let refresh = false; // TODO: Detect this!
         try_login.set(refresh);
 
         self.elements = Some(UIElements {
             logo,
-            profile,
             login_btn,
             login_btn_text,
             login_error,
@@ -183,26 +178,12 @@ impl super::Screen for Login {
             elements.login_res = Some(rx);
             elements.login_btn.borrow_mut().disabled = true;
             elements.login_btn_text.borrow_mut().text = "Logging in...".into();
-            let mut client_token = self.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
-            if client_token.is_empty() {
-                client_token = std::iter::repeat(())
-                    .map(|()| rand::thread_rng().sample(&rand::distributions::Alphanumeric) as char)
-                    .take(20)
-                    .collect();
-                self.vars.set(auth::AUTH_CLIENT_TOKEN, client_token);
-            }
-            let client_token = self.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+            let client_token = String::new();
             let username = elements.username_txt.borrow().input.clone();
             let password = elements.password_txt.borrow().input.clone();
             let refresh = elements.refresh;
-            let profile = elements.profile.clone();
             thread::spawn(move || {
-                if refresh && (username.is_empty() || password.is_empty()) {
-                    tx.send(profile.refresh(&client_token)).unwrap();
-                } else {
-                    tx.send(mojang::Profile::login(&username, &password, &client_token))
-                        .unwrap();
-                }
+                tx.send(try_login(refresh, username.clone(), client_token, password, AccountType::Mojang));
             });
         }
         let mut done = false;
@@ -212,15 +193,9 @@ impl super::Screen for Login {
                 elements.login_btn.borrow_mut().disabled = false;
                 elements.login_btn_text.borrow_mut().text = "Login".into();
                 match res {
-                    Ok(val) => {
-                        self.vars.set(auth::CL_USERNAME, val.username.clone());
-                        self.vars.set(auth::CL_UUID, val.id.clone());
-                        self.vars.set(auth::AUTH_TOKEN, val.access_token.clone());
-                        elements.profile = val;
-                        return Some(Box::new(super::ServerList::new(
-                            None,
-                            self.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                        )));
+                    Ok(account) => {
+                        self.callback.clone().deref()(Some(account));
+                        return None;
                     }
                     Err(err) => {
                         elements.login_error.borrow_mut().text = format!("{}", err);
@@ -238,5 +213,32 @@ impl super::Screen for Login {
 
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
+    }
+}
+
+fn try_login(refresh: bool, name: String, token: String, password: String, account_type: AccountType) -> Result<Account, Error> {
+    try_login_account(refresh, Account {
+        name,
+        uuid: None,
+        verification_tokens: vec![password, token],
+        head_img_data: None,
+        account_type,
+    })
+}
+
+static DEFAULT_PW: String = String::new();
+
+fn try_login_account(refresh: bool, account: Account) -> Result<Account, Error> {
+    let password = if !account.verification_tokens.is_empty() {
+        account.verification_tokens.get(0).unwrap()
+    } else {
+        &DEFAULT_PW
+    };
+    if refresh && (account.name.is_empty() || password.is_empty()) { // password is at idx 0 in the verification tokens
+        let client_token = account.verification_tokens.get(1).unwrap().clone();
+        account.refresh(&*client_token)
+    } else {
+        let client_token = account.verification_tokens.get(1).unwrap();
+        Account::login(&account.name, password, client_token, AccountType::Mojang)
     }
 }

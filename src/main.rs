@@ -287,9 +287,9 @@ fn main() {
 
     let mut last_frame = Instant::now();
 
-    let screen_sys = screen::ScreenSystem::new();
+    let screen_sys = Arc::new(screen::ScreenSystem::new());
     if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(vars.get(settings::BACKGROUND_IMAGE).clone(), vec![])));
+        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(vars.get(settings::BACKGROUND_IMAGE).clone(), Arc::new(Mutex::new(vec![])), screen_sys.clone())));
         // screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
     }
 
@@ -322,7 +322,7 @@ fn main() {
         server: None,
         focused: false,
         renderer: Arc::new(RwLock::new(renderer)),
-        screen_sys: Arc::new(screen_sys),
+        screen_sys,
         resource_manager: resource_manager.clone(),
         console: con,
         vars,

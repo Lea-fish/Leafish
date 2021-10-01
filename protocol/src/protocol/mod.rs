@@ -48,10 +48,11 @@ use crate::shared::Position;
 
 pub mod forge;
 pub mod mojang;
+pub mod login;
 
-pub const SUPPORTED_PROTOCOLS: [i32; 24] = [
-    754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 452, 451, 404, 340, 316, 315, 210,
-    109, 107, 74, 47, 5,
+pub const SUPPORTED_PROTOCOLS: [i32; 21] = [
+    754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 404, 340, 316, 315, 210,
+    109, 107, 47, 5,
 ];
 
 static CURRENT_PROTOCOL_VERSION: AtomicI32 = AtomicI32::new(SUPPORTED_PROTOCOLS[0]);

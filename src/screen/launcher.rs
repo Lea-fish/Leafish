@@ -28,15 +28,16 @@ use crate::ui;
 
 use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui::Container;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, TryRecvError};
 use instant::Duration;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use rand::Rng;
 use leafish_protocol::protocol::UUID;
 use serde::{Serialize, Deserialize};
+use leafish_protocol::protocol::login::{Account, AccountType};
 
 /// SAFETY: We don't alter components which, which aren't thread safe on other threads than the main one.
 unsafe impl Send for Launcher {}
@@ -48,13 +49,14 @@ pub struct Launcher {
     background: Option<ui::ImageRef>,
     background_image: String,
     disclaimer: Option<ui::TextRef>,
-    accounts: Vec<Account>,
+    accounts: Arc<Mutex<Vec<Account>>>,
     add: Option<ui::ButtonRef>,
+    screen_sys: Arc<ScreenSystem>,
 }
 
 impl Clone for Launcher {
     fn clone(&self) -> Self {
-        Launcher::new(self.background_image.clone(), self.accounts.to_vec())
+        Launcher::new(self.background_image.clone(), self.accounts.clone(), self.screen_sys.clone())
     }
 }
 
@@ -66,37 +68,8 @@ struct RenderAccount {
 
 }
 
-#[derive(Serialize, Deserialize)]
-pub struct Account {
-    name: String,
-    uuid: Option<UUID>,
-    verification_tokens: Vec<String>, // this represents the verification tokens used to verify the account, such as hashed passwords, actual tokens, etc
-    head_img_data: Option<Vec<u8>>,
-}
-
-impl Clone for Account {
-    fn clone(&self) -> Self {
-        Account {
-            name: self.name.clone(),
-            uuid: self.uuid.clone(),
-            verification_tokens: self.verification_tokens.to_vec(),
-            head_img_data: self.head_img_data.as_ref().map(|x| x.to_vec()),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum AccountType {
-
-    Mojang,
-    Microsoft,
-    Custom(String), // Not implemented yet, this will enable us to support other auth services without implementing every single one specifically
-    None, // aka. unverified or "offline account" (for offline mode servers)
-
-}
-
 impl Launcher {
-    pub fn new(background_image: String, accounts: Vec<Account>) -> Self {
+    pub fn new(background_image: String, accounts: Arc<Mutex<Vec<Account>>>, screen_sys: Arc<ScreenSystem>) -> Self {
         Launcher {
             rendered_accounts: vec![],
             options: None,
@@ -105,6 +78,7 @@ impl Launcher {
             disclaimer: None,
             accounts,
             add: None,
+            screen_sys,
         }
     }
 
@@ -254,11 +228,12 @@ impl Launcher {
 impl super::Screen for Launcher {
 
     fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        self.accounts.push(Account {
+        self.accounts.clone().lock().push(Account {
             name: "terrarier2111".to_string(),
             uuid: None,
             verification_tokens: vec![],
             head_img_data: None,
+            account_type: AccountType::Mojang,
         });
         let background = if Renderer::get_texture_optional(
             renderer.get_textures_ref(),
@@ -325,17 +300,28 @@ impl super::Screen for Launcher {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *add);
             add.add_text(txt);
+            let accounts = self.accounts.clone();
+            let screen_sys = self.screen_sys.clone();
             add.add_click_func(move |_, game| {
-                /*game.screen_sys
+                let accounts = accounts.clone();
+                let screen_sys = screen_sys.clone();
+                game.screen_sys
                     .clone()
-                    .replace_screen(Box::new(super::edit_server::EditServerEntry::new(None)));*/
+                    .add_screen(Box::new(super::login::Login::new(Arc::new(move |account| {
+                        let accounts = accounts.clone();
+                        let screen_sys = screen_sys.clone();
+                        if account.is_some() {
+                            accounts.clone().lock().push(account.unwrap());
+                        }
+                        screen_sys.clone().pop_screen();
+                    }))));
                 true
             })
         }
         self.add.replace(add);
 
         let mut offset = 0.0;
-        for account in self.accounts.iter() {
+        for account in self.accounts.clone().lock().iter() {
             // Everything is attached to this
             let mut back = ui::ImageBuilder::new()
                 .texture("leafish:solid")

@@ -14,21 +14,20 @@
 
 use serde_json::json;
 use sha1::{self, Digest};
-
-#[derive(Clone, Debug)]
-pub struct Profile {
-    pub username: String,
-    pub id: String,
-    pub access_token: String,
-}
+use crate::protocol::login::{AccountImpl, Account, AccountType};
+use crate::protocol::UUID;
 
 const JOIN_URL: &str = "https://sessionserver.mojang.com/session/minecraft/join";
 const LOGIN_URL: &str = "https://authserver.mojang.com/authenticate";
 const REFRESH_URL: &str = "https://authserver.mojang.com/refresh";
 const VALIDATE_URL: &str = "https://authserver.mojang.com/validate";
 
-impl Profile {
-    pub fn login(username: &str, password: &str, token: &str) -> Result<Profile, super::Error> {
+pub struct MojangAccount {
+
+}
+
+impl AccountImpl for MojangAccount {
+    fn login(&self, username: &str, password: &str, token: &str) -> Result<Account, super::Error> {
         let req_msg = json!({
         "username": username,
         "password": password,
@@ -67,22 +66,23 @@ impl Profile {
                 )))
             }
         };
-        Ok(Profile {
-            username: username.to_string(),
-            id: ret
+        Ok(Account {
+            name: username.to_string(),
+            uuid: UUID::from_str(ret
                 .pointer("/selectedProfile/id")
                 .and_then(|v| v.as_str())
-                .unwrap()
-                .to_owned(),
-            access_token: ret
+                .unwrap()),
+            verification_tokens: vec!["".to_string(), ret
                 .get("accessToken")
                 .and_then(|v| v.as_str())
                 .unwrap()
-                .to_owned(),
+                .to_owned()],
+            head_img_data: None,
+            account_type: AccountType::Mojang
         })
     }
 
-    pub fn refresh(self, token: &str) -> Result<Profile, super::Error> {
+    fn refresh(&self, account: Account, token: &str) -> Result<Account, super::Error> {
         let req_msg = json!({
         "accessToken": self.access_token,
         "clientToken": token
@@ -113,29 +113,40 @@ impl Profile {
                     ret.get("errorMessage").and_then(|v| v.as_str()).unwrap()
                 )));
             }
-            return Ok(Profile {
-                username: ret
+            return Ok(Account {
+                name: ret
                     .pointer("/selectedProfile/name")
                     .and_then(|v| v.as_str())
                     .unwrap()
                     .to_owned(),
-                id: ret
+                uuid: Some(UUID::from_str(ret
                     .pointer("/selectedProfile/id")
                     .and_then(|v| v.as_str())
-                    .unwrap()
-                    .to_owned(),
-                access_token: ret
-                    .get("accessToken")
-                    .and_then(|v| v.as_str())
-                    .unwrap()
-                    .to_owned(),
+                    .unwrap())),
+                verification_tokens: if account.verification_tokens.is_empty() {
+                    account.verification_tokens.insert(1, ret
+                        .get("accessToken")
+                        .and_then(|v| v.as_str())
+                        .unwrap());
+                    account.verification_tokens
+                } else {
+                    account.verification_tokens.push("");
+                    account.verification_tokens.push(ret
+                        .get("accessToken")
+                        .and_then(|v| v.as_str())
+                        .unwrap());
+                    account.verification_tokens
+                },
+                head_img_data: None,
+                account_type: AccountType::Mojang
             });
         }
         Ok(self)
     }
 
-    pub fn join_server(
+    fn join_server(
         &self,
+        account: &Account,
         server_id: &str,
         shared_key: &[u8],
         public_key: &[u8],
@@ -183,10 +194,6 @@ impl Profile {
         } else {
             Err(super::Error::Err("Failed to auth with server".to_owned()))
         }
-    }
-
-    pub fn is_complete(&self) -> bool {
-        !self.username.is_empty() && !self.id.is_empty() && !self.access_token.is_empty()
     }
 }
 

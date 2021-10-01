@@ -22,6 +22,8 @@ lazy_static = "1.4.0"
 trust-dns-resolver = "0.20.3"
 # srv-rs = { version = "0.2.0", features = ["libresolv"] }
 
+dashmap = "4.0.2"
+
 reqwest = { version = "0.11.3", features = [ "blocking" ]}
 
 [dependencies.leafish_shared]
