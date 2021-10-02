@@ -62,6 +62,8 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
+use leafish_protocol::protocol::login::{Account, AccountType};
+use leafish_protocol::protocol::mojang::MojangAccount;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -99,6 +101,7 @@ pub struct Game {
     is_logo_pressed: bool,
     is_fullscreen: bool,
     default_protocol_version: i32,
+    current_account: Arc<Mutex<Option<Account>>>,
 }
 
 impl Game {
@@ -138,17 +141,13 @@ impl Game {
         }
         let address = address.to_owned();
         let resources = self.resource_manager.clone();
-        let profile = mojang::Profile {
-            username: self.vars.get(auth::CL_USERNAME).clone(),
-            id: self.vars.get(auth::CL_UUID).clone(),
-            access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
-        };
         let renderer = self.renderer.clone();
         let screen_sys = self.screen_sys.clone();
+        let account = self.current_account.clone();
         let result = thread::spawn(move || {
             server::Server::connect(
                 resources,
-                profile,
+                account.clone().lock().as_ref().unwrap(),
                 &address,
                 protocol_version,
                 forge_mods,
@@ -220,6 +219,7 @@ fn main() {
     log::set_max_level(log::LevelFilter::Trace);
 
     info!("Starting Leafish...");
+    protocol::login::ACCOUNT_IMPLS.clone().insert(AccountType::Mojang, Arc::new(MojangAccount {}));
 
     let (vars, mut vsync) = {
         let mut vars = console::Vars::new();
@@ -339,6 +339,7 @@ fn main() {
         is_fullscreen: false,
         default_protocol_version,
         clipboard_provider: Arc::new(RwLock::new(clipboard)),
+        current_account: Arc::new(Default::default()),
     };
     game.renderer.write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {

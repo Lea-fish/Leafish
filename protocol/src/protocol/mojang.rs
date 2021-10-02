@@ -16,6 +16,7 @@ use serde_json::json;
 use sha1::{self, Digest};
 use crate::protocol::login::{AccountImpl, Account, AccountType};
 use crate::protocol::UUID;
+use std::str::FromStr;
 
 const JOIN_URL: &str = "https://sessionserver.mojang.com/session/minecraft/join";
 const LOGIN_URL: &str = "https://authserver.mojang.com/authenticate";
@@ -68,10 +69,10 @@ impl AccountImpl for MojangAccount {
         };
         Ok(Account {
             name: username.to_string(),
-            uuid: UUID::from_str(ret
+            uuid: FromStr::from_str(ret
                 .pointer("/selectedProfile/id")
                 .and_then(|v| v.as_str())
-                .unwrap()),
+                .unwrap()).ok(),
             verification_tokens: vec!["".to_string(), ret
                 .get("accessToken")
                 .and_then(|v| v.as_str())
@@ -84,7 +85,7 @@ impl AccountImpl for MojangAccount {
 
     fn refresh(&self, account: Account, token: &str) -> Result<Account, super::Error> {
         let req_msg = json!({
-        "accessToken": self.access_token,
+        "accessToken": account.verification_tokens.get(1).unwrap(),
         "clientToken": token
         });
         let req = serde_json::to_string(&req_msg)?;
@@ -119,29 +120,32 @@ impl AccountImpl for MojangAccount {
                     .and_then(|v| v.as_str())
                     .unwrap()
                     .to_owned(),
-                uuid: Some(UUID::from_str(ret
+                uuid: FromStr::from_str(ret
                     .pointer("/selectedProfile/id")
                     .and_then(|v| v.as_str())
-                    .unwrap())),
+                    .unwrap()).ok(),
                 verification_tokens: if account.verification_tokens.is_empty() {
-                    account.verification_tokens.insert(1, ret
-                        .get("accessToken")
-                        .and_then(|v| v.as_str())
-                        .unwrap());
-                    account.verification_tokens
+                    vec![String::new(),
+                         ret
+                             .get("accessToken")
+                             .and_then(|v| v.as_str())
+                             .unwrap().to_string()]
                 } else {
-                    account.verification_tokens.push("");
-                    account.verification_tokens.push(ret
+                    let mut new_tokens = account.verification_tokens.to_vec();
+                    if new_tokens.len() >= 2 {
+                        new_tokens.drain(1..);
+                    }
+                    new_tokens.push(ret
                         .get("accessToken")
                         .and_then(|v| v.as_str())
-                        .unwrap());
-                    account.verification_tokens
+                        .unwrap().to_string());
+                    new_tokens
                 },
                 head_img_data: None,
                 account_type: AccountType::Mojang
             });
         }
-        Ok(self)
+        Ok(account)
     }
 
     fn join_server(
@@ -176,8 +180,8 @@ impl AccountImpl for MojangAccount {
         };
 
         let join_msg = json!({
-            "accessToken": &self.access_token,
-            "selectedProfile": &self.id,
+            "accessToken": account.verification_tokens.get(1).unwrap(),
+            "selectedProfile": account.uuid.as_ref().unwrap(),
             "serverId": hash_str
         });
         let join = serde_json::to_string(&join_msg).unwrap();
@@ -194,6 +198,10 @@ impl AccountImpl for MojangAccount {
         } else {
             Err(super::Error::Err("Failed to auth with server".to_owned()))
         }
+    }
+
+    fn append_head_img_data(&self, account: &mut Account) -> Result<(), super::Error> {
+        Ok(())
     }
 }
 

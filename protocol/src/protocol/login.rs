@@ -83,7 +83,7 @@ impl Clone for Account {
 }
 
 lazy_static! {
-    static ref ACCOUNT_IMPLS: Arc<DashMap<AccountType, Arc<dyn AccountImpl + Send + Sync>>> = Arc::new(DashMap::new());
+    pub static ref ACCOUNT_IMPLS: Arc<DashMap<AccountType, Arc<dyn AccountImpl + Send + Sync>>> = Arc::new(DashMap::new());
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]

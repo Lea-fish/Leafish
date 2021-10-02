@@ -359,6 +359,7 @@ impl super::Screen for Launcher {
         self.options.take();
         self.disclaimer.take();
         self.rendered_accounts.clear();
+        self.add.take();
     }
 
     fn tick(

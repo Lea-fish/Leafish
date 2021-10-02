@@ -56,6 +56,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
+use leafish_protocol::protocol::login::Account;
 
 pub mod plugin_messages;
 mod sun;
@@ -160,7 +161,7 @@ pub struct PlayerInfo {
 impl Server {
     pub fn connect(
         resources: Arc<RwLock<resources::Manager>>,
-        profile: mojang::Profile,
+        account: &Account,
         address: &str,
         protocol_version: i32,
         forge_mods: Vec<forge::ForgeMod>,
@@ -188,7 +189,7 @@ impl Server {
         })?;
         conn.state = protocol::State::Login;
         conn.write_packet(protocol::packet::login::serverbound::LoginStart {
-            username: profile.username.clone(),
+            username: account.name.clone(),
         })?;
 
         use std::rc::Rc;
@@ -257,7 +258,7 @@ impl Server {
         let shared_e = rsa_public_encrypt_pkcs1::encrypt(&public_key, &shared).unwrap();
         let token_e = rsa_public_encrypt_pkcs1::encrypt(&public_key, &verify_token).unwrap();
 
-        profile.join_server(&server_id, &shared, &public_key)?;
+        account.join_server(&server_id, &shared, &public_key)?;
 
         if protocol_version >= 47 {
             conn.write_packet(protocol::packet::login::serverbound::EncryptionResponse {
