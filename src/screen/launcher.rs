@@ -38,6 +38,8 @@ use rand::Rng;
 use leafish_protocol::protocol::UUID;
 use serde::{Serialize, Deserialize};
 use leafish_protocol::protocol::login::{Account, AccountType};
+use std::fs::File;
+use std::io::{Read, Write};
 
 /// SAFETY: We don't alter components which, which aren't thread safe on other threads than the main one.
 unsafe impl Send for Launcher {}
@@ -52,11 +54,12 @@ pub struct Launcher {
     accounts: Arc<Mutex<Vec<Account>>>,
     add: Option<ui::ButtonRef>,
     screen_sys: Arc<ScreenSystem>,
+    active_account: Arc<Mutex<Option<Account>>>,
 }
 
 impl Clone for Launcher {
     fn clone(&self) -> Self {
-        Launcher::new(self.background_image.clone(), self.accounts.clone(), self.screen_sys.clone())
+        Launcher::new(self.background_image.clone(), self.accounts.clone(), self.screen_sys.clone(), self.active_account.clone())
     }
 }
 
@@ -69,7 +72,7 @@ struct RenderAccount {
 }
 
 impl Launcher {
-    pub fn new(background_image: String, accounts: Arc<Mutex<Vec<Account>>>, screen_sys: Arc<ScreenSystem>) -> Self {
+    pub fn new(background_image: String, accounts: Arc<Mutex<Vec<Account>>>, screen_sys: Arc<ScreenSystem>, active_account: Arc<Mutex<Option<Account>>>) -> Self {
         Launcher {
             rendered_accounts: vec![],
             options: None,
@@ -79,6 +82,7 @@ impl Launcher {
             accounts,
             add: None,
             screen_sys,
+            active_account,
         }
     }
 
@@ -228,13 +232,13 @@ impl Launcher {
 impl super::Screen for Launcher {
 
     fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        self.accounts.clone().lock().push(Account {
+        /*self.accounts.clone().lock().push(Account {
             name: "terrarier2111".to_string(),
             uuid: None,
             verification_tokens: vec![],
             head_img_data: None,
             account_type: AccountType::Mojang,
-        });
+        });*/
         let background = if Renderer::get_texture_optional(
             renderer.get_textures_ref(),
             &*format!("#{}", self.background_image),
@@ -314,6 +318,7 @@ impl super::Screen for Launcher {
                             accounts.clone().lock().push(account.unwrap());
                         }
                         screen_sys.clone().pop_screen();
+                        save_accounts(&*accounts.clone().lock());
                     }))));
                 true
             })
@@ -338,7 +343,7 @@ impl super::Screen for Launcher {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *back.borrow_mut());
             let head = ui::ImageBuilder::new()
-                .texture("none")
+                .texture("none") // TODO: Load the actual head image!
                 .position(-200.0, offset * 105.0)
                 .size(85.0, 85.0)
                 .colour((0, 0, 0, 255))
@@ -403,4 +408,20 @@ impl super::Screen for Launcher {
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
     }
+}
+
+fn save_accounts(accounts: &Vec<Account>) {
+    let mut file = File::create(paths::get_config_dir().join("accounts.cfg")).unwrap();
+    let json = serde_json::to_string(accounts).unwrap();
+    file.write_all(json.as_bytes());
+}
+
+pub fn load_accounts() -> Option<Vec<Account>> {
+    if let Ok(mut file) = fs::File::open(paths::get_config_dir().join("accounts.cfg")) {
+        let mut content = String::new();
+        file.read_to_string(&mut content).unwrap();
+        let accounts: Option<Vec<Account>> = serde_json::from_str(&*content).ok();
+        return accounts;
+    }
+    None
 }

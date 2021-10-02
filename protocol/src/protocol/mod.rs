@@ -547,14 +547,22 @@ impl fmt::Display for UUIDParseError {
 impl std::str::FromStr for UUID {
     type Err = UUIDParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 36 {
-            return Err(UUIDParseError {});
-        }
         let mut parts = hex::decode(&s[..8]).unwrap();
-        parts.extend_from_slice(&hex::decode(&s[9..13]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[14..18]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[19..23]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[24..36]).unwrap());
+        if s.len() != 36 {
+            if s.len() != 32 {
+                return Err(UUIDParseError {});
+            }
+            // TODO: Verify that this parses uuids correctly (although it should).
+            parts.extend_from_slice(&hex::decode(&s[8..12]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[12..16]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[16..20]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[20..32]).unwrap());
+        } else {
+            parts.extend_from_slice(&hex::decode(&s[9..13]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[14..18]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[19..23]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[24..36]).unwrap());
+        }
         let mut high = 0u64;
         let mut low = 0u64;
         for i in 0..8 {

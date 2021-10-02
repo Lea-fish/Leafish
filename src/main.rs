@@ -288,8 +288,10 @@ fn main() {
     let mut last_frame = Instant::now();
 
     let screen_sys = Arc::new(screen::ScreenSystem::new());
+    let active_account = Arc::new(Mutex::new(None));
     if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(vars.get(settings::BACKGROUND_IMAGE).clone(), Arc::new(Mutex::new(vec![])), screen_sys.clone())));
+        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(vars.get(settings::BACKGROUND_IMAGE).clone(),
+                                                                       Arc::new(Mutex::new(screen::launcher::load_accounts().unwrap_or(vec![]))), screen_sys.clone(), active_account.clone())));
         // screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
     }
 
@@ -339,7 +341,7 @@ fn main() {
         is_fullscreen: false,
         default_protocol_version,
         clipboard_provider: Arc::new(RwLock::new(clipboard)),
-        current_account: Arc::new(Default::default()),
+        current_account: active_account.clone(),
     };
     game.renderer.write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {
