@@ -37,22 +37,22 @@ use instant::{Duration, Instant};
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use num_traits::cast::{cast, NumCast};
+use serde::{Deserialize, Serialize};
 use trust_dns_resolver::config::ResolverConfig;
 use trust_dns_resolver::config::ResolverOpts;
 use trust_dns_resolver::Resolver;
-use serde::{Serialize, Deserialize};
 
 use crate::format;
 use crate::nbt;
 use crate::shared::Position;
 
 pub mod forge;
-pub mod mojang;
 pub mod login;
+pub mod mojang;
 
 pub const SUPPORTED_PROTOCOLS: [i32; 21] = [
-    754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 404, 340, 316, 315, 210,
-    109, 107, 47, 5,
+    754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 404, 340, 316, 315, 210, 109, 107,
+    47, 5,
 ];
 
 static CURRENT_PROTOCOL_VERSION: AtomicI32 = AtomicI32::new(SUPPORTED_PROTOCOLS[0]);

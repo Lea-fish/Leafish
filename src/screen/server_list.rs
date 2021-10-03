@@ -169,9 +169,11 @@ impl ServerList {
                     let result = game.connect_to(&address, hud_context.clone());
                     game.screen_sys.clone().pop_screen();
                     if let Err(error) = result {
-                        game.screen_sys.clone().add_screen(Box::new(ServerList::new(
-                            Some(Component::Text(TextComponent::new(&*error.to_string()))),
-                        )));
+                        game.screen_sys
+                            .clone()
+                            .add_screen(Box::new(ServerList::new(Some(Component::Text(
+                                TextComponent::new(&*error.to_string()),
+                            )))));
                     } else {
                         game.screen_sys
                             .clone()

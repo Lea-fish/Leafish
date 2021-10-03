@@ -12,32 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::cell::RefCell;
 use std::fs;
-use std::rc::Rc;
 use std::sync::Arc;
-use std::thread;
 
-use crate::{format, auth};
-use crate::format::{Component, TextComponent};
+use crate::auth;
 use crate::paths;
 use crate::protocol;
 use crate::render;
-use crate::settings;
 use crate::ui;
 
-use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem, ServerList};
 use crate::ui::Container;
-use crossbeam_channel::unbounded;
-use crossbeam_channel::{Receiver, TryRecvError};
-use instant::Duration;
-use parking_lot::{RwLock, Mutex};
+use leafish_protocol::protocol::login::Account;
+use parking_lot::Mutex;
 use rand::Rng;
-use leafish_protocol::protocol::UUID;
-use serde::{Serialize, Deserialize};
-use leafish_protocol::protocol::login::{Account, AccountType};
 use std::fs::File;
 use std::io::{Read, Write};
 
@@ -58,20 +47,26 @@ pub struct Launcher {
 
 impl Clone for Launcher {
     fn clone(&self) -> Self {
-        Launcher::new(self.accounts.clone(), self.screen_sys.clone(), self.active_account.clone())
+        Launcher::new(
+            self.accounts.clone(),
+            self.screen_sys.clone(),
+            self.active_account.clone(),
+        )
     }
 }
 
 struct RenderAccount {
-
-    head_picture: Option<ui::ImageRef>,
-    entry_back: Option<ui::ButtonRef>,
-    account_name: Option<ui::TextRef>,
-
+    _head_picture: Option<ui::ImageRef>,
+    _entry_back: Option<ui::ButtonRef>,
+    _account_name: Option<ui::TextRef>,
 }
 
 impl Launcher {
-    pub fn new(accounts: Arc<Mutex<Vec<Account>>>, screen_sys: Arc<ScreenSystem>, active_account: Arc<Mutex<Option<Account>>>) -> Self {
+    pub fn new(
+        accounts: Arc<Mutex<Vec<Account>>>,
+        screen_sys: Arc<ScreenSystem>,
+        active_account: Arc<Mutex<Option<Account>>>,
+    ) -> Self {
         Launcher {
             rendered_accounts: vec![],
             options: None,
@@ -86,15 +81,7 @@ impl Launcher {
 }
 
 impl super::Screen for Launcher {
-
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        /*self.accounts.clone().lock().push(Account {
-            name: "terrarier2111".to_string(),
-            uuid: None,
-            verification_tokens: vec![],
-            head_img_data: None,
-            account_type: AccountType::Mojang,
-        });*/
+    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         // Options menu
         let options = ui::ButtonBuilder::new()
             .position(5.0, 25.0)
@@ -130,7 +117,7 @@ impl super::Screen for Launcher {
         self.disclaimer.replace(disclaimer);
 
         // Add a new server to the list
-        let mut add = ui::ButtonBuilder::new()
+        let add = ui::ButtonBuilder::new()
             .position(200.0, -50.0 - 15.0)
             .size(100.0, 30.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
@@ -150,20 +137,23 @@ impl super::Screen for Launcher {
                 let screen_sys = screen_sys.clone();
                 game.screen_sys
                     .clone()
-                    .add_screen(Box::new(super::login::Login::new(Arc::new(move |account| {
-                        let accounts = accounts.clone();
-                        let screen_sys = screen_sys.clone();
-                        if account.is_some() {
-                            accounts.clone().lock().push(account.unwrap());
-                        }
-                        screen_sys.clone().pop_screen();
-                        save_accounts(&*accounts.clone().lock());
-                    }), game.vars.clone())));
+                    .add_screen(Box::new(super::login::Login::new(
+                        Arc::new(move |account| {
+                            let accounts = accounts.clone();
+                            let screen_sys = screen_sys.clone();
+                            if account.is_some() {
+                                accounts.clone().lock().push(account.unwrap());
+                            }
+                            screen_sys.clone().pop_screen();
+                            save_accounts(&*accounts.clone().lock());
+                        }),
+                        game.vars.clone(),
+                    )));
                 true
             })
         }
         self.add.replace(add);
-        let mut background_selection = ui::ButtonBuilder::new()
+        let background_selection = ui::ButtonBuilder::new()
             .position(10.0, 25.0)
             .size(200.0, 30.0)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Left)
@@ -176,12 +166,8 @@ impl super::Screen for Launcher {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *background_selection);
             background_selection.add_text(txt);
-            let accounts = self.accounts.clone();
-            let screen_sys = self.screen_sys.clone();
-            background_selection.add_click_func(move |_, game| {
-                let accounts = accounts.clone();
-                let screen_sys = screen_sys.clone();
-
+            background_selection.add_click_func(move |_, _game| {
+                // TODO: Support this via the NFD2 lib or via the RFD lib
                 true
             })
         }
@@ -193,7 +179,7 @@ impl super::Screen for Launcher {
         for account in iter {
             let account_name = account.name.clone();
             // Everything is attached to this
-            let mut back = ui::ButtonBuilder::new()
+            let back = ui::ButtonBuilder::new()
                 .position(0.0, offset * 105.0)
                 .size(500.0, 100.0)
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
@@ -212,22 +198,39 @@ impl super::Screen for Launcher {
                     let mut client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
                     if client_token.is_empty() {
                         client_token = std::iter::repeat(())
-                            .map(|()| rand::thread_rng().sample(&rand::distributions::Alphanumeric) as char)
+                            .map(|()| {
+                                rand::thread_rng().sample(&rand::distributions::Alphanumeric)
+                                    as char
+                            })
                             .take(20)
                             .collect();
                         game.vars.set(auth::AUTH_CLIENT_TOKEN, client_token);
                     }
                     let client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
-                    let result = protocol::login::ACCOUNT_IMPLS.get(&account.account_type).unwrap().value().refresh(account.clone(),
-                                                                                                                    &*client_token/*account.verification_tokens.get(1).unwrap()*/);
+                    let result = protocol::login::ACCOUNT_IMPLS
+                        .get(&account.account_type)
+                        .unwrap()
+                        .value()
+                        .refresh(
+                            account.clone(),
+                            &*client_token, /*account.verification_tokens.get(1).unwrap()*/
+                        );
                     if result.is_ok() {
                         active_account.clone().lock().replace(result.ok().unwrap());
                         game.screen_sys
                             .clone()
                             .add_screen(Box::new(ServerList::new(None)));
                     } else {
-                        println!("password: {} client token: {} auth token: {}", account.verification_tokens.get(0).unwrap(), account.verification_tokens.get(1).unwrap(), &*client_token);
-                        println!("An error occoured while attempting to login {}", result.err().unwrap())
+                        println!(
+                            "password: {} client token: {} auth token: {}",
+                            account.verification_tokens.get(0).unwrap(),
+                            account.verification_tokens.get(1).unwrap(),
+                            &*client_token
+                        );
+                        println!(
+                            "An error occoured while attempting to login {}",
+                            result.err().unwrap()
+                        )
                     }
                     true
                 });
@@ -247,9 +250,9 @@ impl super::Screen for Launcher {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container);
             self.rendered_accounts.push(RenderAccount {
-                head_picture: Some(head),
-                entry_back: Some(back),
-                account_name: Some(account_name),
+                _head_picture: Some(head),
+                _entry_back: Some(back),
+                _account_name: Some(account_name),
             });
             offset += 1.0;
         }
@@ -310,7 +313,7 @@ impl super::Screen for Launcher {
 fn save_accounts(accounts: &Vec<Account>) {
     let mut file = File::create(paths::get_config_dir().join("accounts.cfg")).unwrap();
     let json = serde_json::to_string(accounts).unwrap();
-    file.write_all(json.as_bytes());
+    file.write_all(json.as_bytes()).unwrap();
 }
 
 pub fn load_accounts() -> Option<Vec<Account>> {

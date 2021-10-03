@@ -21,11 +21,11 @@ pub mod connecting;
 pub mod delete_server;
 pub mod edit_server;
 
+pub mod background;
 pub mod chat;
+pub mod launcher;
 pub mod respawn;
 pub mod settings_menu;
-pub mod launcher;
-pub mod background;
 
 pub use self::settings_menu::{AudioSettingsMenu, SettingsMenu, VideoSettingsMenu};
 
@@ -268,13 +268,12 @@ impl ScreenSystem {
                 let idx = self.screens.read().len() - 1;
                 self.screens.write().push(screen.clone());
                 let mut screens = self.screens.write();
-                let mut last = screens.get_mut(idx);
+                let last = screens.get_mut(idx);
                 if last.is_some() {
                     let mut last = last.unwrap();
                     if last.active {
                         last.active = false;
-                        last
-                            .screen
+                        last.screen
                             .clone()
                             .lock()
                             .on_deactive(renderer, ui_container);

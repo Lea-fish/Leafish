@@ -52,8 +52,9 @@ pub mod settings;
 pub mod ui;
 pub mod world;
 
-use crate::protocol::mojang;
 use crate::render::hud::HudContext;
+use leafish_protocol::protocol::login::{Account, AccountType};
+use leafish_protocol::protocol::mojang::MojangAccount;
 use leafish_protocol::protocol::{Error, Version};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -62,8 +63,6 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
-use leafish_protocol::protocol::login::{Account, AccountType};
-use leafish_protocol::protocol::mojang::MojangAccount;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -219,7 +218,9 @@ fn main() {
     log::set_max_level(log::LevelFilter::Trace);
 
     info!("Starting Leafish...");
-    protocol::login::ACCOUNT_IMPLS.clone().insert(AccountType::Mojang, Arc::new(MojangAccount {}));
+    protocol::login::ACCOUNT_IMPLS
+        .clone()
+        .insert(AccountType::Mojang, Arc::new(MojangAccount {}));
 
     let (vars, mut vsync) = {
         let mut vars = console::Vars::new();
@@ -290,9 +291,17 @@ fn main() {
     let screen_sys = Arc::new(screen::ScreenSystem::new());
     let active_account = Arc::new(Mutex::new(None));
     if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::background::Background::new(vars.clone(), screen_sys.clone())));
+        screen_sys.add_screen(Box::new(screen::background::Background::new(
+            vars.clone(),
+            screen_sys.clone(),
+        )));
         screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(
-                                                                       Arc::new(Mutex::new(screen::launcher::load_accounts().unwrap_or(vec![]))), screen_sys.clone(), active_account.clone())));
+            Arc::new(Mutex::new(
+                screen::launcher::load_accounts().unwrap_or(vec![]),
+            )),
+            screen_sys.clone(),
+            active_account.clone(),
+        )));
         // screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
     }
 
@@ -436,9 +445,7 @@ fn tick_all(
             game.screen_sys.close_closable_screens();
             game.screen_sys
                 .clone()
-                .replace_screen(Box::new(screen::ServerList::new(
-                    disconnect_reason,
-                )));
+                .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
             game.server
                 .as_ref()
                 .unwrap()

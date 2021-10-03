@@ -17,7 +17,6 @@ use std::fs;
 
 use crate::paths;
 use crate::render;
-use crate::settings;
 use crate::ui;
 
 use crate::screen::Screen;
@@ -127,9 +126,7 @@ impl super::Screen for DeleteServerEntry {
                 Self::delete_server(index);
                 game.screen_sys
                     .clone()
-                    .replace_screen(Box::new(super::ServerList::new(
-                        None,
-                    )));
+                    .replace_screen(Box::new(super::ServerList::new(None)));
                 true
             });
         }
@@ -150,9 +147,7 @@ impl super::Screen for DeleteServerEntry {
             cancel.add_click_func(|_, game| {
                 game.screen_sys
                     .clone()
-                    .replace_screen(Box::new(super::ServerList::new(
-                        None,
-                    )));
+                    .replace_screen(Box::new(super::ServerList::new(None)));
                 true
             });
         }

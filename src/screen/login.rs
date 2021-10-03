@@ -21,17 +21,14 @@ use rand::{self, Rng};
 
 use crate::auth;
 use crate::console;
+use crate::console::Vars;
 use crate::protocol;
-use crate::protocol::mojang;
 use crate::render;
 use crate::screen::Screen;
-use crate::settings;
 use crate::ui;
-use leafish_protocol::protocol::{UUID, Error};
-use std::str::FromStr;
-use std::ops::Deref;
 use leafish_protocol::protocol::login::{Account, AccountType};
-use crate::console::Vars;
+use leafish_protocol::protocol::Error;
+use std::ops::Deref;
 
 pub struct Login {
     vars: Rc<console::Vars>,
@@ -195,7 +192,15 @@ impl super::Screen for Login {
             let password = elements.password_txt.borrow().input.clone();
             let refresh = elements.refresh;
             thread::spawn(move || {
-                tx.send(try_login(refresh, username.clone(), None, password, AccountType::Mojang, client_token));
+                tx.send(try_login(
+                    refresh,
+                    username.clone(),
+                    None,
+                    password,
+                    AccountType::Mojang,
+                    client_token,
+                ))
+                .unwrap();
             });
         }
         let mut done = false;
@@ -228,25 +233,41 @@ impl super::Screen for Login {
     }
 }
 
-fn try_login(refresh: bool, name: String, token: Option<String>, password: String, account_type: AccountType, client_token: String) -> Result<Account, Error> {
-    try_login_account(refresh, Account {
-        name,
-        uuid: None,
-        verification_tokens: vec![password, token.unwrap_or(String::new())],
-        head_img_data: None,
-        account_type,
-    }, client_token)
+fn try_login(
+    refresh: bool,
+    name: String,
+    token: Option<String>,
+    password: String,
+    account_type: AccountType,
+    client_token: String,
+) -> Result<Account, Error> {
+    try_login_account(
+        refresh,
+        Account {
+            name,
+            uuid: None,
+            verification_tokens: vec![password, token.unwrap_or(String::new())],
+            head_img_data: None,
+            account_type,
+        },
+        client_token,
+    )
 }
 
 static DEFAULT_PW: String = String::new();
 
-fn try_login_account(refresh: bool, account: Account, client_token: String) -> Result<Account, Error> {
+fn try_login_account(
+    refresh: bool,
+    account: Account,
+    client_token: String,
+) -> Result<Account, Error> {
     let password = if !account.verification_tokens.is_empty() {
         account.verification_tokens.get(0).unwrap()
     } else {
         &DEFAULT_PW
     };
-    if refresh && (account.name.is_empty() || password.is_empty()) { // password is at idx 0 in the verification tokens
+    if refresh && (account.name.is_empty() || password.is_empty()) {
+        // password is at idx 0 in the verification tokens
         account.refresh(&*client_token)
     } else {
         Account::login(&account.name, password, &*client_token, AccountType::Mojang)

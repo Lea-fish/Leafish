@@ -1,19 +1,16 @@
-use crate::{ui, console, Game};
-use std::rc::Rc;
-use crate::screen::{Screen, ScreenSystem};
 use crate::render::Renderer;
-use crate::ui::Container;
+use crate::screen::{Screen, ScreenSystem};
 use crate::settings::BACKGROUND_IMAGE;
+use crate::ui::Container;
+use crate::{console, ui};
+use std::rc::Rc;
 use std::sync::Arc;
-use glutin::event::VirtualKeyCode;
 
 pub struct Background {
-
     background: Option<ui::ImageRef>,
     vars: Rc<console::Vars>,
     screen_sys: Arc<ScreenSystem>,
     active: bool,
-
 }
 
 impl Clone for Background {
@@ -23,7 +20,6 @@ impl Clone for Background {
 }
 
 impl Background {
-
     pub fn new(vars: Rc<console::Vars>, screen_sys: Arc<ScreenSystem>) -> Self {
         Self {
             background: None,
@@ -32,7 +28,6 @@ impl Background {
             active: false,
         }
     }
-
 }
 
 impl Screen for Background {
@@ -41,7 +36,7 @@ impl Screen for Background {
             renderer.get_textures_ref(),
             &*format!("#{}", self.vars.get(BACKGROUND_IMAGE)),
         )
-            .is_some()
+        .is_some()
         {
             Some(
                 ui::ImageBuilder::new()
@@ -65,7 +60,12 @@ impl Screen for Background {
 
     fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
-    fn tick(&mut self, _: f64, renderer: &mut Renderer, ui_container: &mut Container) -> Option<Box<dyn Screen>> {
+    fn tick(
+        &mut self,
+        _: f64,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) -> Option<Box<dyn Screen>> {
         let hide = self.screen_sys.is_any_ingame();
         if self.active {
             if hide {

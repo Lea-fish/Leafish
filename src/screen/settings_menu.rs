@@ -180,9 +180,7 @@ impl super::Screen for SettingsMenu {
                     game.screen_sys.clone().pop_screen();
                     game.screen_sys
                         .clone()
-                        .replace_screen(Box::new(super::ServerList::new(
-                            None,
-                        )));
+                        .replace_screen(Box::new(super::ServerList::new(None)));
                     true
                 });
             }

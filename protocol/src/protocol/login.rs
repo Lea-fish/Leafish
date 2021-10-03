@@ -1,11 +1,10 @@
-use lazy_static::lazy_static;
-use dashmap::DashMap;
-use std::sync::Arc;
-use serde::{Serialize, Deserialize};
 use crate::protocol::UUID;
+use dashmap::DashMap;
+use lazy_static::lazy_static;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 pub trait AccountImpl {
-
     fn login(&self, username: &str, password: &str, token: &str) -> Result<Account, super::Error>;
 
     fn join_server(
@@ -19,7 +18,6 @@ pub trait AccountImpl {
     fn refresh(&self, account: Account, token: &str) -> Result<Account, super::Error>;
 
     fn append_head_img_data(&self, account: &mut Account) -> Result<(), super::Error>;
-
 }
 
 #[derive(Serialize, Deserialize)]
@@ -32,7 +30,6 @@ pub struct Account {
 }
 
 impl Account {
-
     pub fn new(name: String, uuid: Option<UUID>, account_type: AccountType) -> Self {
         Account {
             name,
@@ -54,19 +51,44 @@ impl Account {
         shared_key: &[u8],
         public_key: &[u8],
     ) -> Result<(), super::Error> {
-        ACCOUNT_IMPLS.clone().get(&self.account_type).unwrap().clone().join_server(&self, server_id, shared_key, public_key)
+        ACCOUNT_IMPLS
+            .clone()
+            .get(&self.account_type)
+            .unwrap()
+            .clone()
+            .join_server(&self, server_id, shared_key, public_key)
     }
 
     pub fn refresh(self, token: &str) -> Result<Account, super::Error> {
-        ACCOUNT_IMPLS.clone().get(&self.account_type).unwrap().clone().refresh(self, token)
+        ACCOUNT_IMPLS
+            .clone()
+            .get(&self.account_type)
+            .unwrap()
+            .clone()
+            .refresh(self, token)
     }
 
     pub fn append_head_img_data(&mut self) -> Result<(), super::Error> {
-        ACCOUNT_IMPLS.clone().get(&self.account_type).unwrap().clone().append_head_img_data(self)
+        ACCOUNT_IMPLS
+            .clone()
+            .get(&self.account_type)
+            .unwrap()
+            .clone()
+            .append_head_img_data(self)
     }
 
-    pub fn login(username: &str, password: &str, token: &str, account_type: AccountType) -> Result<Account, super::Error> {
-        ACCOUNT_IMPLS.clone().get(&account_type).unwrap().clone().login(username, password, token)
+    pub fn login(
+        username: &str,
+        password: &str,
+        token: &str,
+        account_type: AccountType,
+    ) -> Result<Account, super::Error> {
+        ACCOUNT_IMPLS
+            .clone()
+            .get(&account_type)
+            .unwrap()
+            .clone()
+            .login(username, password, token)
     }
 }
 
@@ -83,15 +105,14 @@ impl Clone for Account {
 }
 
 lazy_static! {
-    pub static ref ACCOUNT_IMPLS: Arc<DashMap<AccountType, Arc<dyn AccountImpl + Send + Sync>>> = Arc::new(DashMap::new());
+    pub static ref ACCOUNT_IMPLS: Arc<DashMap<AccountType, Arc<dyn AccountImpl + Send + Sync>>> =
+        Arc::new(DashMap::new());
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum AccountType {
-
     Mojang,
     Microsoft,
     Custom(String), // Not implemented yet, this will enable us to support other auth services without implementing every single one specifically
-    None, // aka. unverified or "offline account" (for offline mode servers)
-
+    None,           // aka. unverified or "offline account" (for offline mode servers)
 }

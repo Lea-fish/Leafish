@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::protocol::login::{Account, AccountImpl, AccountType};
 use serde_json::json;
 use sha1::{self, Digest};
-use crate::protocol::login::{AccountImpl, Account, AccountType};
-use crate::protocol::UUID;
 use std::str::FromStr;
 
 const JOIN_URL: &str = "https://sessionserver.mojang.com/session/minecraft/join";
@@ -23,9 +22,7 @@ const LOGIN_URL: &str = "https://authserver.mojang.com/authenticate";
 const REFRESH_URL: &str = "https://authserver.mojang.com/refresh";
 const VALIDATE_URL: &str = "https://authserver.mojang.com/validate";
 
-pub struct MojangAccount {
-
-}
+pub struct MojangAccount {}
 
 impl AccountImpl for MojangAccount {
     fn login(&self, username: &str, password: &str, token: &str) -> Result<Account, super::Error> {
@@ -69,17 +66,21 @@ impl AccountImpl for MojangAccount {
         };
         Ok(Account {
             name: username.to_string(),
-            uuid: FromStr::from_str(ret
-                .pointer("/selectedProfile/id")
-                .and_then(|v| v.as_str())
-                .unwrap()).ok(),
-            verification_tokens: vec!["".to_string(), ret
-                .get("accessToken")
-                .and_then(|v| v.as_str())
-                .unwrap()
-                .to_owned()],
+            uuid: FromStr::from_str(
+                ret.pointer("/selectedProfile/id")
+                    .and_then(|v| v.as_str())
+                    .unwrap(),
+            )
+            .ok(),
+            verification_tokens: vec![
+                "".to_string(),
+                ret.get("accessToken")
+                    .and_then(|v| v.as_str())
+                    .unwrap()
+                    .to_owned(),
+            ],
             head_img_data: None,
-            account_type: AccountType::Mojang
+            account_type: AccountType::Mojang,
         })
     }
 
@@ -120,29 +121,35 @@ impl AccountImpl for MojangAccount {
                     .and_then(|v| v.as_str())
                     .unwrap()
                     .to_owned(),
-                uuid: FromStr::from_str(ret
-                    .pointer("/selectedProfile/id")
-                    .and_then(|v| v.as_str())
-                    .unwrap()).ok(),
+                uuid: FromStr::from_str(
+                    ret.pointer("/selectedProfile/id")
+                        .and_then(|v| v.as_str())
+                        .unwrap(),
+                )
+                .ok(),
                 verification_tokens: if account.verification_tokens.is_empty() {
-                    vec![String::new(),
-                         ret
-                             .get("accessToken")
-                             .and_then(|v| v.as_str())
-                             .unwrap().to_string()]
+                    vec![
+                        String::new(),
+                        ret.get("accessToken")
+                            .and_then(|v| v.as_str())
+                            .unwrap()
+                            .to_string(),
+                    ]
                 } else {
                     let mut new_tokens = account.verification_tokens.to_vec();
                     if new_tokens.len() >= 2 {
                         new_tokens.drain(1..);
                     }
-                    new_tokens.push(ret
-                        .get("accessToken")
-                        .and_then(|v| v.as_str())
-                        .unwrap().to_string());
+                    new_tokens.push(
+                        ret.get("accessToken")
+                            .and_then(|v| v.as_str())
+                            .unwrap()
+                            .to_string(),
+                    );
                     new_tokens
                 },
                 head_img_data: None,
-                account_type: AccountType::Mojang
+                account_type: AccountType::Mojang,
             });
         }
         Ok(account)
@@ -200,7 +207,7 @@ impl AccountImpl for MojangAccount {
         }
     }
 
-    fn append_head_img_data(&self, account: &mut Account) -> Result<(), super::Error> {
+    fn append_head_img_data(&self, _account: &mut Account) -> Result<(), super::Error> {
         Ok(())
     }
 }
