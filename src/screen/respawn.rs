@@ -1,8 +1,8 @@
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::Screen;
+use crate::ui;
 use crate::ui::{Container, ImageRef};
-use crate::{settings, ui};
 use leafish_protocol::protocol::packet::play::serverbound::ClientStatus;
 use leafish_protocol::protocol::{VarInt, Version};
 
@@ -110,10 +110,7 @@ impl super::Screen for Respawn {
                 game.screen_sys.clone().pop_screen();
                 game.screen_sys
                     .clone()
-                    .replace_screen(Box::new(super::ServerList::new(
-                        None,
-                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                    )));
+                    .replace_screen(Box::new(super::ServerList::new(None)));
                 true
             });
         }

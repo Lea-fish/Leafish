@@ -180,10 +180,7 @@ impl super::Screen for SettingsMenu {
                     game.screen_sys.clone().pop_screen();
                     game.screen_sys
                         .clone()
-                        .replace_screen(Box::new(super::ServerList::new(
-                            None,
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                        )));
+                        .replace_screen(Box::new(super::ServerList::new(None)));
                     true
                 });
             }

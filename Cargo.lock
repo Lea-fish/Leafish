@@ -1205,6 +1205,7 @@ dependencies = [
  "byteorder",
  "cfb8",
  "cgmath",
+ "dashmap",
  "flate2",
  "hex",
  "instant",

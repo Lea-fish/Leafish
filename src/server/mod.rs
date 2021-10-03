@@ -18,7 +18,7 @@ use crate::entity::EntityType;
 use crate::format;
 use crate::inventory::material::versions::to_material;
 use crate::inventory::{Inventory, InventoryContext, Item};
-use crate::protocol::{self, forge, mapped_packet, mojang, packet};
+use crate::protocol::{self, forge, mapped_packet, packet};
 use crate::render;
 use crate::render::hud::HudContext;
 use crate::render::Renderer;
@@ -38,6 +38,7 @@ use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use instant::{Duration, Instant};
 use leafish_protocol::format::{Component, TextComponent};
+use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
 use leafish_protocol::protocol::packet::{DigType, Hand};
@@ -160,7 +161,7 @@ pub struct PlayerInfo {
 impl Server {
     pub fn connect(
         resources: Arc<RwLock<resources::Manager>>,
-        profile: mojang::Profile,
+        account: &Account,
         address: &str,
         protocol_version: i32,
         forge_mods: Vec<forge::ForgeMod>,
@@ -188,7 +189,7 @@ impl Server {
         })?;
         conn.state = protocol::State::Login;
         conn.write_packet(protocol::packet::login::serverbound::LoginStart {
-            username: profile.username.clone(),
+            username: account.name.clone(),
         })?;
 
         use std::rc::Rc;
@@ -257,7 +258,7 @@ impl Server {
         let shared_e = rsa_public_encrypt_pkcs1::encrypt(&public_key, &shared).unwrap();
         let token_e = rsa_public_encrypt_pkcs1::encrypt(&public_key, &verify_token).unwrap();
 
-        profile.join_server(&server_id, &shared, &public_key)?;
+        account.join_server(&server_id, &shared, &public_key)?;
 
         if protocol_version >= 47 {
             conn.write_packet(protocol::packet::login::serverbound::EncryptionResponse {

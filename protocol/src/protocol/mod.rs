@@ -37,6 +37,7 @@ use instant::{Duration, Instant};
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use num_traits::cast::{cast, NumCast};
+use serde::{Deserialize, Serialize};
 use trust_dns_resolver::config::ResolverConfig;
 use trust_dns_resolver::config::ResolverOpts;
 use trust_dns_resolver::Resolver;
@@ -46,11 +47,12 @@ use crate::nbt;
 use crate::shared::Position;
 
 pub mod forge;
+pub mod login;
 pub mod mojang;
 
-pub const SUPPORTED_PROTOCOLS: [i32; 24] = [
-    754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 452, 451, 404, 340, 316, 315, 210,
-    109, 107, 74, 47, 5,
+pub const SUPPORTED_PROTOCOLS: [i32; 21] = [
+    754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 404, 340, 316, 315, 210, 109, 107,
+    47, 5,
 ];
 
 static CURRENT_PROTOCOL_VERSION: AtomicI32 = AtomicI32::new(SUPPORTED_PROTOCOLS[0]);
@@ -529,7 +531,7 @@ impl Serializable for f64 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct UUID(u64, u64);
 
 #[derive(Debug)]
@@ -545,14 +547,22 @@ impl fmt::Display for UUIDParseError {
 impl std::str::FromStr for UUID {
     type Err = UUIDParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 36 {
-            return Err(UUIDParseError {});
-        }
         let mut parts = hex::decode(&s[..8]).unwrap();
-        parts.extend_from_slice(&hex::decode(&s[9..13]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[14..18]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[19..23]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[24..36]).unwrap());
+        if s.len() != 36 {
+            if s.len() != 32 {
+                return Err(UUIDParseError {});
+            }
+            // TODO: Verify that this parses uuids correctly (although it should).
+            parts.extend_from_slice(&hex::decode(&s[8..12]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[12..16]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[16..20]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[20..32]).unwrap());
+        } else {
+            parts.extend_from_slice(&hex::decode(&s[9..13]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[14..18]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[19..23]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[24..36]).unwrap());
+        }
         let mut high = 0u64;
         let mut low = 0u64;
         for i in 0..8 {

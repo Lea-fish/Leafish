@@ -12,23 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::protocol::login::{Account, AccountImpl, AccountType};
 use serde_json::json;
 use sha1::{self, Digest};
-
-#[derive(Clone, Debug)]
-pub struct Profile {
-    pub username: String,
-    pub id: String,
-    pub access_token: String,
-}
+use std::str::FromStr;
 
 const JOIN_URL: &str = "https://sessionserver.mojang.com/session/minecraft/join";
 const LOGIN_URL: &str = "https://authserver.mojang.com/authenticate";
 const REFRESH_URL: &str = "https://authserver.mojang.com/refresh";
 const VALIDATE_URL: &str = "https://authserver.mojang.com/validate";
 
-impl Profile {
-    pub fn login(username: &str, password: &str, token: &str) -> Result<Profile, super::Error> {
+pub struct MojangAccount {}
+
+impl AccountImpl for MojangAccount {
+    fn login(&self, username: &str, password: &str, token: &str) -> Result<Account, super::Error> {
         let req_msg = json!({
         "username": username,
         "password": password,
@@ -67,24 +64,29 @@ impl Profile {
                 )))
             }
         };
-        Ok(Profile {
-            username: username.to_string(),
-            id: ret
-                .pointer("/selectedProfile/id")
-                .and_then(|v| v.as_str())
-                .unwrap()
-                .to_owned(),
-            access_token: ret
-                .get("accessToken")
-                .and_then(|v| v.as_str())
-                .unwrap()
-                .to_owned(),
+        Ok(Account {
+            name: username.to_string(),
+            uuid: FromStr::from_str(
+                ret.pointer("/selectedProfile/id")
+                    .and_then(|v| v.as_str())
+                    .unwrap(),
+            )
+            .ok(),
+            verification_tokens: vec![
+                "".to_string(),
+                ret.get("accessToken")
+                    .and_then(|v| v.as_str())
+                    .unwrap()
+                    .to_owned(),
+            ],
+            head_img_data: None,
+            account_type: AccountType::Mojang,
         })
     }
 
-    pub fn refresh(self, token: &str) -> Result<Profile, super::Error> {
+    fn refresh(&self, account: Account, token: &str) -> Result<Account, super::Error> {
         let req_msg = json!({
-        "accessToken": self.access_token,
+        "accessToken": account.verification_tokens.get(1).unwrap(),
         "clientToken": token
         });
         let req = serde_json::to_string(&req_msg)?;
@@ -113,29 +115,49 @@ impl Profile {
                     ret.get("errorMessage").and_then(|v| v.as_str()).unwrap()
                 )));
             }
-            return Ok(Profile {
-                username: ret
+            return Ok(Account {
+                name: ret
                     .pointer("/selectedProfile/name")
                     .and_then(|v| v.as_str())
                     .unwrap()
                     .to_owned(),
-                id: ret
-                    .pointer("/selectedProfile/id")
-                    .and_then(|v| v.as_str())
-                    .unwrap()
-                    .to_owned(),
-                access_token: ret
-                    .get("accessToken")
-                    .and_then(|v| v.as_str())
-                    .unwrap()
-                    .to_owned(),
+                uuid: FromStr::from_str(
+                    ret.pointer("/selectedProfile/id")
+                        .and_then(|v| v.as_str())
+                        .unwrap(),
+                )
+                .ok(),
+                verification_tokens: if account.verification_tokens.is_empty() {
+                    vec![
+                        String::new(),
+                        ret.get("accessToken")
+                            .and_then(|v| v.as_str())
+                            .unwrap()
+                            .to_string(),
+                    ]
+                } else {
+                    let mut new_tokens = account.verification_tokens.to_vec();
+                    if new_tokens.len() >= 2 {
+                        new_tokens.drain(1..);
+                    }
+                    new_tokens.push(
+                        ret.get("accessToken")
+                            .and_then(|v| v.as_str())
+                            .unwrap()
+                            .to_string(),
+                    );
+                    new_tokens
+                },
+                head_img_data: None,
+                account_type: AccountType::Mojang,
             });
         }
-        Ok(self)
+        Ok(account)
     }
 
-    pub fn join_server(
+    fn join_server(
         &self,
+        account: &Account,
         server_id: &str,
         shared_key: &[u8],
         public_key: &[u8],
@@ -165,8 +187,8 @@ impl Profile {
         };
 
         let join_msg = json!({
-            "accessToken": &self.access_token,
-            "selectedProfile": &self.id,
+            "accessToken": account.verification_tokens.get(1).unwrap(),
+            "selectedProfile": account.uuid.as_ref().unwrap(),
             "serverId": hash_str
         });
         let join = serde_json::to_string(&join_msg).unwrap();
@@ -185,8 +207,8 @@ impl Profile {
         }
     }
 
-    pub fn is_complete(&self) -> bool {
-        !self.username.is_empty() && !self.id.is_empty() && !self.access_token.is_empty()
+    fn append_head_img_data(&self, _account: &mut Account) -> Result<(), super::Error> {
+        Ok(())
     }
 }
 

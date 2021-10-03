@@ -5,7 +5,7 @@ authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>", "iceiix <ice_ix@protonma
 edition = "2018"
 
 [dependencies]
-serde = "1.0.127"
+serde = { version = "1.0.127", features = ["derive"] }
 serde_json = "1.0.64"
 hex = "0.4.3"
 sha-1 = "0.9.7"
@@ -21,6 +21,8 @@ cgmath = "0.17.0"
 lazy_static = "1.4.0"
 trust-dns-resolver = "0.20.3"
 # srv-rs = { version = "0.2.0", features = ["libresolv"] }
+
+dashmap = "4.0.2"
 
 reqwest = { version = "0.11.3", features = [ "blocking" ]}
 

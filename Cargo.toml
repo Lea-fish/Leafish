@@ -26,7 +26,7 @@ opt-level = 1
 winit = "0.25.0"
 glow = "0.10.0"
 byteorder = "1.4.3"
-serde = "1.0.127"
+serde = { version = "1.0.127", features = ["derive"] }
 serde_json = "1.0.66"
 flate2 = { version = "1.0.20", features = ["rust_backend"], default-features = false }
 zip = { version = "0.5.13", features = ["deflate"], default-features = false }
@@ -52,6 +52,7 @@ crossbeam-channel = "0.5.1" # check if flume would be better in terms of perform
 # flume = "0.10.8" # replaced by crossbeam channel
 # tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
 rayon = "1.5.1"
+# nfd2 = "0.3.0" # used to open native file dialogs - sadly i don't think we can use this what about rfd?
 
 reqwest = { version = "0.11.4", features = [ "blocking" ]}
 glutin = "0.27.0"
