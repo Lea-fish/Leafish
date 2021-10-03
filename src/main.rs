@@ -290,7 +290,8 @@ fn main() {
     let screen_sys = Arc::new(screen::ScreenSystem::new());
     let active_account = Arc::new(Mutex::new(None));
     if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(vars.get(settings::BACKGROUND_IMAGE).clone(),
+        screen_sys.add_screen(Box::new(screen::background::Background::new(vars.clone(), screen_sys.clone())));
+        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(
                                                                        Arc::new(Mutex::new(screen::launcher::load_accounts().unwrap_or(vec![]))), screen_sys.clone(), active_account.clone())));
         // screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
     }
@@ -437,7 +438,6 @@ fn tick_all(
                 .clone()
                 .replace_screen(Box::new(screen::ServerList::new(
                     disconnect_reason,
-                    game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                 )));
             game.server
                 .as_ref()

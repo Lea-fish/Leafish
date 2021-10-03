@@ -25,6 +25,7 @@ pub mod chat;
 pub mod respawn;
 pub mod settings_menu;
 pub mod launcher;
+pub mod background;
 
 pub use self::settings_menu::{AudioSettingsMenu, SettingsMenu, VideoSettingsMenu};
 
@@ -166,7 +167,7 @@ impl ScreenSystem {
         if let Some(last) = self.pre_computed_screens.clone().read().last() {
             last.screen.clone().lock().is_closable()
         } else {
-            true
+            false
         }
     }
 
@@ -174,8 +175,17 @@ impl ScreenSystem {
         if let Some(last) = self.pre_computed_screens.clone().read().last() {
             last.screen.clone().lock().is_in_game()
         } else {
-            true
+            false
         }
+    }
+
+    pub fn is_any_ingame(&self) -> bool {
+        for screen in self.pre_computed_screens.clone().read().iter().rev() {
+            if !screen.screen.clone().is_locked() && screen.screen.clone().lock().is_in_game() {
+                return true;
+            }
+        }
+        false
     }
 
     pub fn receive_char(&self, received: char, game: &mut Game) {
@@ -255,7 +265,30 @@ impl ScreenSystem {
                 .iter()
                 .skip(lowest as usize)
             {
+                let idx = self.screens.read().len() - 1;
                 self.screens.write().push(screen.clone());
+                let mut screens = self.screens.write();
+                let mut last = screens.get_mut(idx);
+                if last.is_some() {
+                    let mut last = last.unwrap();
+                    if last.active {
+                        last.active = false;
+                        last
+                            .screen
+                            .clone()
+                            .lock()
+                            .on_deactive(renderer, ui_container);
+                    }
+                }
+                let mut current = screens.last_mut().unwrap();
+                current.init = true;
+                current.screen.clone().lock().init(renderer, ui_container);
+                current.active = true;
+                current
+                    .screen
+                    .clone()
+                    .lock()
+                    .on_active(renderer, ui_container);
             }
             self.lowest_offset.store(-1, Ordering::Release);
             if !was_closable {
@@ -271,24 +304,10 @@ impl ScreenSystem {
         }
         // Update state for screens
         let len = self.screens.clone().read().len();
-        for screen in &mut self.screens.clone().write()[..len - 1] {
-            if screen.active {
-                screen.active = false;
-                screen
-                    .screen
-                    .clone()
-                    .lock()
-                    .on_deactive(renderer, ui_container);
-            }
-        }
         let swap = {
             let tmp = self.screens.clone();
             let mut tmp = tmp.write();
             let current = tmp.last_mut().unwrap();
-            if !current.init {
-                current.init = true;
-                current.screen.clone().lock().init(renderer, ui_container);
-            }
             if !current.active {
                 current.active = true;
                 current

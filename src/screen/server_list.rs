@@ -41,7 +41,6 @@ pub struct ServerList {
     disconnect_reason: Option<Component>,
 
     needs_reload: Rc<RefCell<bool>>,
-    background_image: String,
 }
 
 impl Clone for ServerList {
@@ -50,7 +49,6 @@ impl Clone for ServerList {
             elements: None,
             disconnect_reason: self.disconnect_reason.clone(),
             needs_reload: Rc::new(RefCell::new(false)),
-            background_image: self.background_image.clone(),
         }
     }
 }
@@ -65,7 +63,6 @@ struct UIElements {
     _disclaimer: ui::TextRef,
 
     _disconnected: Option<ui::ImageRef>,
-    _background: Option<ui::ImageRef>,
 }
 
 struct Server {
@@ -108,12 +105,11 @@ impl Server {
 }
 
 impl ServerList {
-    pub fn new(disconnect_reason: Option<Component>, background_image: String) -> ServerList {
+    pub fn new(disconnect_reason: Option<Component>) -> ServerList {
         ServerList {
             elements: None,
             disconnect_reason,
             needs_reload: Rc::new(RefCell::new(false)),
-            background_image,
         }
     }
 
@@ -175,7 +171,6 @@ impl ServerList {
                     if let Err(error) = result {
                         game.screen_sys.clone().add_screen(Box::new(ServerList::new(
                             Some(Component::Text(TextComponent::new(&*error.to_string()))),
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                         )));
                     } else {
                         game.screen_sys
@@ -466,23 +461,6 @@ impl ServerList {
             None
         };
 
-        let background = if Renderer::get_texture_optional(
-            renderer.get_textures_ref(),
-            &*format!("#{}", self.background_image),
-        )
-        .is_some()
-        {
-            Some(
-                ui::ImageBuilder::new()
-                    .texture(&*format!("#{}", self.background_image))
-                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
-                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                    .create(ui_container),
-            )
-        } else {
-            None
-        };
-
         self.elements = Some(UIElements {
             logo,
             servers: vec![],
@@ -493,7 +471,6 @@ impl ServerList {
             _disclaimer: disclaimer,
 
             _disconnected: disconnected,
-            _background: background,
         });
     }
 }

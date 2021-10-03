@@ -48,18 +48,17 @@ unsafe impl Sync for Launcher {}
 pub struct Launcher {
     rendered_accounts: Vec<RenderAccount>,
     options: Option<ui::ButtonRef>,
-    background: Option<ui::ImageRef>,
-    background_image: String,
     disclaimer: Option<ui::TextRef>,
     accounts: Arc<Mutex<Vec<Account>>>,
     add: Option<ui::ButtonRef>,
+    background_selection: Option<ui::ButtonRef>,
     screen_sys: Arc<ScreenSystem>,
     active_account: Arc<Mutex<Option<Account>>>,
 }
 
 impl Clone for Launcher {
     fn clone(&self) -> Self {
-        Launcher::new(self.background_image.clone(), self.accounts.clone(), self.screen_sys.clone(), self.active_account.clone())
+        Launcher::new(self.accounts.clone(), self.screen_sys.clone(), self.active_account.clone())
     }
 }
 
@@ -72,161 +71,18 @@ struct RenderAccount {
 }
 
 impl Launcher {
-    pub fn new(background_image: String, accounts: Arc<Mutex<Vec<Account>>>, screen_sys: Arc<ScreenSystem>, active_account: Arc<Mutex<Option<Account>>>) -> Self {
+    pub fn new(accounts: Arc<Mutex<Vec<Account>>>, screen_sys: Arc<ScreenSystem>, active_account: Arc<Mutex<Option<Account>>>) -> Self {
         Launcher {
             rendered_accounts: vec![],
             options: None,
-            background: None,
-            background_image,
             disclaimer: None,
             accounts,
             add: None,
+            background_selection: None,
             screen_sys,
             active_account,
         }
     }
-
-    /*
-    fn init_list(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
-
-        // Refresh the server list
-        let refresh = ui::ButtonBuilder::new()
-            .position(300.0, -50.0 - 15.0)
-            .size(100.0, 30.0)
-            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-            .draw_index(2)
-            .create(ui_container);
-        {
-            let mut refresh = refresh.borrow_mut();
-            let txt = ui::TextBuilder::new()
-                .text("Refresh")
-                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                .attach(&mut *refresh);
-            refresh.add_text(txt);
-            let nr = self.needs_reload.clone();
-            refresh.add_click_func(move |_, _| {
-                *nr.borrow_mut() = true;
-                true
-            })
-        }
-
-        // Add a new server to the list
-        let add = ui::ButtonBuilder::new()
-            .position(200.0, -50.0 - 15.0)
-            .size(100.0, 30.0)
-            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-            .draw_index(2)
-            .create(ui_container);
-        {
-            let mut add = add.borrow_mut();
-            let txt = ui::TextBuilder::new()
-                .text("Add")
-                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                .attach(&mut *add);
-            add.add_text(txt);
-            add.add_click_func(move |_, game| {
-                game.screen_sys
-                    .clone()
-                    .replace_screen(Box::new(super::edit_server::EditServerEntry::new(None)));
-                true
-            })
-        }
-
-        // Options menu
-        let options = ui::ButtonBuilder::new()
-            .position(5.0, 25.0)
-            .size(40.0, 40.0)
-            .draw_index(1)
-            .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
-            .create(ui_container);
-        {
-            let mut options = options.borrow_mut();
-            ui::ImageBuilder::new()
-                .texture("leafish:gui/cog")
-                .position(0.0, 0.0)
-                .size(40.0, 40.0)
-                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                .attach(&mut *options);
-            options.add_click_func(|_, game| {
-                game.screen_sys
-                    .clone()
-                    .add_screen(Box::new(super::SettingsMenu::new(game.vars.clone(), false)));
-                true
-            });
-        }
-
-        // Disclaimer
-        let disclaimer = ui::TextBuilder::new()
-            .text("Not affiliated with Mojang/Minecraft")
-            .position(5.0, 5.0)
-            .colour((255, 200, 200, 255))
-            .draw_index(1)
-            .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
-            .create(ui_container);
-
-        // If we are kicked from a server display the reason
-        let disconnected = if let Some(ref disconnect_reason) = self.disconnect_reason {
-            let (width, height) =
-                ui::Formatted::compute_size(renderer, disconnect_reason, 600.0, 1.0);
-            let background = ui::ImageBuilder::new()
-                .texture("leafish:solid")
-                .position(0.0, 3.0)
-                .size(
-                    width.max(renderer.ui.size_of_string("Disconnected")) + 4.0,
-                    height + 4.0 + 16.0,
-                )
-                .colour((0, 0, 0, 100))
-                .alignment(ui::VAttach::Top, ui::HAttach::Center)
-                .draw_index(10)
-                .create(ui_container);
-            ui::TextBuilder::new()
-                .text("Disconnected")
-                .position(0.0, 2.0)
-                .colour((255, 0, 0, 255))
-                .alignment(ui::VAttach::Top, ui::HAttach::Center)
-                .attach(&mut *background.borrow_mut());
-            ui::FormattedBuilder::new()
-                .text(disconnect_reason.clone())
-                .position(0.0, 18.0)
-                .max_width(600.0)
-                .alignment(ui::VAttach::Top, ui::HAttach::Center)
-                .attach(&mut *background.borrow_mut());
-            Some(background)
-        } else {
-            None
-        };
-
-        let background = if Renderer::get_texture_optional(
-            renderer.get_textures_ref(),
-            &*format!("#{}", self.background_image),
-        )
-            .is_some()
-        {
-            Some(
-                ui::ImageBuilder::new()
-                    .texture(&*format!("#{}", self.background_image))
-                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
-                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                    .create(ui_container),
-            )
-        } else {
-            None
-        };
-
-        self.elements = Some(UIElements {
-            logo,
-            servers: vec![],
-
-            _add_btn: add,
-            _refresh_btn: refresh,
-            _options_btn: options,
-            _disclaimer: disclaimer,
-
-            _disconnected: disconnected,
-            _background: background,
-        });
-    }*/
 }
 
 impl super::Screen for Launcher {
@@ -239,23 +95,6 @@ impl super::Screen for Launcher {
             head_img_data: None,
             account_type: AccountType::Mojang,
         });*/
-        let background = if Renderer::get_texture_optional(
-            renderer.get_textures_ref(),
-            &*format!("#{}", self.background_image),
-        )
-            .is_some()
-        {
-            Some(
-                ui::ImageBuilder::new()
-                    .texture(&*format!("#{}", self.background_image))
-                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
-                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                    .create(ui_container),
-            )
-        } else {
-            None
-        };
-        self.background = background;
         // Options menu
         let options = ui::ButtonBuilder::new()
             .position(5.0, 25.0)
@@ -324,7 +163,29 @@ impl super::Screen for Launcher {
             })
         }
         self.add.replace(add);
+        let background_selection = ui::ButtonBuilder::new()
+            .position(10.0, 25.0)
+            .size(200.0, 30.0)
+            .alignment(ui::VAttach::Bottom, ui::HAttach::Left)
+            .draw_index(2)
+            .create(ui_container);
+        {
+            let mut background_selection = background_selection.borrow_mut();
+            let txt = ui::TextBuilder::new()
+                .text("Select background")
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .attach(&mut *background_selection);
+            background_selection.add_text(txt);
+            let accounts = self.accounts.clone();
+            let screen_sys = self.screen_sys.clone();
+            background_selection.add_click_func(move |_, game| {
+                let accounts = accounts.clone();
+                let screen_sys = screen_sys.clone();
 
+                true
+            })
+        }
+        self.background_selection.replace(background_selection);
         let mut offset = 0.0;
         for account in self.accounts.clone().lock().iter() {
             // Everything is attached to this
@@ -360,11 +221,11 @@ impl super::Screen for Launcher {
 
     fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
         // Clean up
-        self.background.take();
         self.options.take();
         self.disclaimer.take();
         self.rendered_accounts.clear();
         self.add.take();
+        self.background_selection.take();
     }
 
     fn tick(

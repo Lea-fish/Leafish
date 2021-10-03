@@ -129,7 +129,6 @@ impl super::Screen for DeleteServerEntry {
                     .clone()
                     .replace_screen(Box::new(super::ServerList::new(
                         None,
-                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                     )));
                 true
             });
@@ -153,7 +152,6 @@ impl super::Screen for DeleteServerEntry {
                     .clone()
                     .replace_screen(Box::new(super::ServerList::new(
                         None,
-                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
                     )));
                 true
             });
