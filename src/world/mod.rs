@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use log::warn;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::VecDeque;
@@ -20,11 +19,23 @@ use std::hash::BuildHasherDefault;
 use std::io::{Cursor, Read};
 use std::sync::Arc;
 
+use byteorder::ReadBytesExt;
 use cgmath::prelude::*;
+use collision::Frustum;
+use crossbeam_channel::unbounded;
+use crossbeam_channel::{Receiver, Sender};
+use dashmap::DashMap;
 use flate2::read::ZlibDecoder;
+use instant::Instant;
+use lazy_static::lazy_static;
 pub use leafish_blocks as block;
+use log::warn;
+use parking_lot::RwLock;
+
+use chunk::Chunk;
 
 use crate::chunk_builder;
+use crate::chunk_builder::CullInfo;
 use crate::ecs;
 use crate::entity::block_entity;
 use crate::format;
@@ -33,20 +44,12 @@ use crate::render;
 use crate::shared::{Direction, Position};
 use crate::types::hash::FNVHash;
 use crate::types::{bit, nibble};
-use byteorder::ReadBytesExt;
-use instant::Instant;
+use crate::world::biome::Biome;
+use crate::world::chunk::chunk_section::{ChunkSection, SectionSnapshot};
 
 pub mod biome;
+mod chunk;
 mod storage;
-
-use crate::chunk_builder::CullInfo;
-use crate::world::biome::Biome;
-use collision::Frustum;
-use crossbeam_channel::unbounded;
-use crossbeam_channel::{Receiver, Sender};
-use dashmap::DashMap;
-use lazy_static::lazy_static;
-use parking_lot::RwLock;
 
 pub struct World {
     pub chunks: Arc<DashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>,
@@ -867,7 +870,7 @@ impl World {
                     let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
                     fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
                     if !fill_sky || mask & (1 << i) != 0 {
-                        chunk.sections[i] = Some(Section::new(i as u8, fill_sky));
+                        chunk.sections[i] = Some(ChunkSection::new(i as u8, fill_sky));
                     }
                 }
                 if mask & (1 << i) == 0 {
@@ -939,10 +942,10 @@ impl World {
         let padded = self.protocol_version >= 736;
         let m = bit::Map::from_raw(bits, bit_size as usize, padded);
 
-        for bi in 0..4096 {
-            let id = m.get(bi);
-            section.blocks.set(
-                bi,
+        for block_index in 0..4096 {
+            let id = m.get(block_index);
+            section.blocks_mut().set(
+                block_index,
                 mappings
                     .get(&id)
                     .cloned()
@@ -952,12 +955,12 @@ impl World {
                     }),
             );
             // Spawn block entities
-            let b = section.blocks.get(bi);
+            let b = section.blocks_mut().get(block_index);
             if block_entity::BlockEntityType::get_block_entity(b).is_some() {
                 let pos = Position::new(
-                    (bi & 0xF) as i32,
-                    (bi >> 8) as i32,
-                    ((bi >> 4) & 0xF) as i32,
+                    (block_index & 0xF) as i32,
+                    (block_index >> 8) as i32,
+                    ((block_index >> 4) & 0xF) as i32,
                 ) + (
                     chunk.position.0 << 4,
                     (section_id << 4) as i32,
@@ -1330,7 +1333,7 @@ impl World {
                 continue;
             }
             if chunk.sections[i as usize].as_ref().is_none() {
-                chunk.sections[i as usize].replace(Section::new(i, false));
+                chunk.sections[i as usize].replace(ChunkSection::new(i, false));
             }
             let section = chunk.sections[i as usize].as_mut().unwrap();
 
@@ -1343,7 +1346,7 @@ impl World {
                     continue;
                 }
                 if chunk.sections[i as usize].as_ref().is_none() {
-                    chunk.sections[i as usize].replace(Section::new(i, false));
+                    chunk.sections[i as usize].replace(ChunkSection::new(i, false));
                 }
                 let section = chunk.sections[i as usize].as_mut().unwrap();
 
@@ -1419,282 +1422,11 @@ impl block::WorldAccess for World {
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct CPos(pub i32, pub i32);
 
-pub struct Chunk {
-    position: CPos,
-
-    pub(crate) sections: [Option<Section>; 16],
-    sections_rendered_on: [u32; 16],
-    biomes: [u8; 16 * 16],
-
-    heightmap: [u8; 16 * 16],
-    heightmap_dirty: bool,
-
-    block_entities: HashMap<Position, ecs::Entity, BuildHasherDefault<FNVHash>>,
-}
-
-impl Chunk {
-    fn new(pos: CPos) -> Chunk {
-        Chunk {
-            position: pos,
-            sections: [
-                None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-                None, None,
-            ],
-            sections_rendered_on: [0; 16],
-            biomes: [0; 16 * 16],
-            heightmap: [0; 16 * 16],
-            heightmap_dirty: true,
-            block_entities: HashMap::with_hasher(BuildHasherDefault::default()),
-        }
-    }
-
-    fn calculate_heightmap(&mut self) {
-        for x in 0..16 {
-            for z in 0..16 {
-                let idx = ((z << 4) | x) as usize;
-                for yy in 0..256 {
-                    let sy = 255 - yy;
-                    if let block::Air { .. } = self.get_block(x, sy, z) {
-                        continue;
-                    }
-                    self.heightmap[idx] = sy as u8;
-                    break;
-                }
-            }
-        }
-        self.heightmap_dirty = true;
-    }
-
-    fn set_block(&mut self, x: i32, y: i32, z: i32, b: block::Block) -> bool {
-        let s_idx = y >> 4;
-        if !(0..=15).contains(&s_idx) {
-            return false;
-        }
-        let s_idx = s_idx as usize;
-        if self.sections[s_idx].is_none() {
-            if let block::Air {} = b {
-                return false;
-            }
-            let fill_sky = self.sections.iter().skip(s_idx).all(|v| v.is_none());
-            self.sections[s_idx] = Some(Section::new(s_idx as u8, fill_sky));
-        }
-        {
-            let section = self.sections[s_idx as usize].as_mut().unwrap();
-            if !section.set_block(x, y & 0xF, z, b) {
-                return false;
-            }
-        }
-        let idx = ((z << 4) | x) as usize;
-        match self.heightmap[idx].cmp(&(y as u8)) {
-            Ordering::Less => {
-                self.heightmap[idx] = y as u8;
-                self.heightmap_dirty = true;
-            }
-            Ordering::Equal => {
-                // Find a new lowest
-                for yy in 0..y {
-                    let sy = y - yy - 1;
-                    if let block::Air { .. } = self.get_block(x, sy, z) {
-                        continue;
-                    }
-                    self.heightmap[idx] = sy as u8;
-                    break;
-                }
-                self.heightmap_dirty = true;
-            }
-            Ordering::Greater => (),
-        }
-        true
-    }
-
-    fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
-        let s_idx = y >> 4;
-        if !(0..=15).contains(&s_idx) {
-            return block::Missing {};
-        }
-        match self.sections[s_idx as usize].as_ref() {
-            Some(sec) => sec.get_block(x, y & 0xF, z),
-            None => block::Air {},
-        }
-    }
-
-    fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        let s_idx = y >> 4;
-        if !(0..=15).contains(&s_idx) {
-            return 0;
-        }
-        match self.sections[s_idx as usize].as_ref() {
-            Some(sec) => sec.get_block_light(x, y & 0xF, z),
-            None => 0,
-        }
-    }
-
-    fn set_block_light(&mut self, x: i32, y: i32, z: i32, light: u8) {
-        let s_idx = y >> 4;
-        if !(0..=15).contains(&s_idx) {
-            return;
-        }
-        let s_idx = s_idx as usize;
-        if self.sections[s_idx].is_none() {
-            if light == 0 {
-                return;
-            }
-            let fill_sky = self.sections.iter().skip(s_idx).all(|v| v.is_none());
-            self.sections[s_idx] = Some(Section::new(s_idx as u8, fill_sky));
-        }
-        if let Some(sec) = self.sections[s_idx].as_mut() {
-            sec.set_block_light(x, y & 0xF, z, light)
-        }
-    }
-
-    fn get_sky_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        let s_idx = y >> 4;
-        if !(0..=15).contains(&s_idx) {
-            return 15;
-        }
-        match self.sections[s_idx as usize].as_ref() {
-            Some(sec) => sec.get_sky_light(x, y & 0xF, z),
-            None => 15,
-        }
-    }
-
-    fn set_sky_light(&mut self, x: i32, y: i32, z: i32, light: u8) {
-        let s_idx = y >> 4;
-        if !(0..=15).contains(&s_idx) {
-            return;
-        }
-        let s_idx = s_idx as usize;
-        if self.sections[s_idx].is_none() {
-            if light == 15 {
-                return;
-            }
-            let fill_sky = self.sections.iter().skip(s_idx).all(|v| v.is_none());
-            self.sections[s_idx] = Some(Section::new(s_idx as u8, fill_sky));
-        }
-        if let Some(sec) = self.sections[s_idx as usize].as_mut() {
-            sec.set_sky_light(x, y & 0xF, z, light)
-        }
-    }
-
-    // TODO: make use of "get_biome"
-    #[allow(dead_code)]
-    fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
-        biome::Biome::by_id(self.biomes[((z << 4) | x) as usize] as usize)
-    }
-
-    pub fn capture_snapshot(&self) -> ChunkSnapshot {
-        let mut snapshot_sections = [
-            None, None, None, None, None, None, None, None, None, None, None, None, None, None,
-            None, None,
-        ];
-        for section in self.sections.iter().enumerate() {
-            if section.1.is_some() {
-                snapshot_sections[section.0] =
-                    Some(section.1.as_ref().unwrap().capture_snapshot(self.biomes));
-            }
-        }
-        ChunkSnapshot {
-            position: self.position,
-            sections: snapshot_sections,
-            biomes: self.biomes,
-            heightmap: self.heightmap,
-        }
-    }
-}
-
 pub struct ChunkSnapshot {
     pub position: CPos,
     pub sections: [Option<SectionSnapshot>; 16],
     pub biomes: [u8; 16 * 16],
     pub heightmap: [u8; 16 * 16],
-}
-
-pub struct Section {
-    pub cull_info: chunk_builder::CullInfo,
-    pub render_buffer: Arc<RwLock<render::ChunkBuffer>>,
-
-    y: u8,
-
-    blocks: storage::BlockStorage,
-
-    block_light: nibble::Array,
-    sky_light: nibble::Array,
-
-    dirty: bool,
-    building: bool,
-}
-
-impl Section {
-    fn new(y: u8, fill_sky: bool) -> Self {
-        let sky_light = if fill_sky {
-            nibble::Array::new_def(16 * 16 * 16, 0xF)
-        } else {
-            nibble::Array::new(16 * 16 * 16)
-        };
-        Section {
-            cull_info: chunk_builder::CullInfo::all_vis(),
-            render_buffer: Arc::new(RwLock::new(render::ChunkBuffer::new())),
-            y,
-
-            blocks: storage::BlockStorage::new(16 * 16 * 16),
-
-            block_light: nibble::Array::new(16 * 16 * 16),
-            sky_light,
-
-            dirty: false,
-            building: false,
-        }
-    }
-
-    pub fn capture_snapshot(&self, biomes: [u8; 16 * 16]) -> SectionSnapshot {
-        SectionSnapshot {
-            y: self.y,
-            blocks: self.blocks.clone(),
-            block_light: self.block_light.clone(),
-            sky_light: self.sky_light.clone(),
-            biomes,
-        }
-    }
-
-    fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
-        self.blocks.get(((y << 8) | (z << 4) | x) as usize)
-    }
-
-    fn set_block(&mut self, x: i32, y: i32, z: i32, b: block::Block) -> bool {
-        if self.blocks.set(((y << 8) | (z << 4) | x) as usize, b) {
-            self.dirty = true;
-            self.set_sky_light(x, y, z, 0); // TODO: Do we have to set this every time?
-            self.set_block_light(x, y, z, 0);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        self.block_light.get(((y << 8) | (z << 4) | x) as usize)
-    }
-
-    fn set_block_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
-        self.block_light.set(((y << 8) | (z << 4) | x) as usize, l);
-    }
-
-    fn get_sky_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        self.sky_light.get(((y << 8) | (z << 4) | x) as usize)
-    }
-
-    fn set_sky_light(&mut self, x: i32, y: i32, z: i32, l: u8) {
-        self.sky_light.set(((y << 8) | (z << 4) | x) as usize, l);
-    }
-}
-
-#[derive(Clone)]
-pub struct SectionSnapshot {
-    pub y: u8,
-    pub blocks: storage::BlockStorage,
-    pub block_light: nibble::Array,
-    pub sky_light: nibble::Array,
-    pub biomes: [u8; 16 * 16], // TODO: Remove this by using the chunk's biome!
 }
 
 lazy_static! {
@@ -1705,24 +1437,6 @@ lazy_static! {
         sky_light: nibble::Array::new_def(16 * 16 * 16, 0xF),
         biomes: [0; 16 * 16], // TODO: Verify this!
     };
-}
-
-impl SectionSnapshot {
-    pub fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
-        self.blocks.get(((y << 8) | (z << 4) | x) as usize)
-    }
-
-    pub fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        self.block_light.get(((y << 8) | (z << 4) | x) as usize)
-    }
-
-    pub fn get_sky_light(&self, x: i32, y: i32, z: i32) -> u8 {
-        self.sky_light.get(((y << 8) | (z << 4) | x) as usize)
-    }
-
-    pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
-        biome::Biome::by_id(self.biomes[((z << 4) | x) as usize] as usize)
-    }
 }
 
 // TODO: make use of "x: i32", "y: i32" and "z: i32"
