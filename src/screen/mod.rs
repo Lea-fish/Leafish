@@ -269,8 +269,7 @@ impl ScreenSystem {
                 self.screens.write().push(screen.clone());
                 let mut screens = self.screens.write();
                 let last = screens.get_mut(idx);
-                if last.is_some() {
-                    let mut last = last.unwrap();
+                if let Some(last) = last {
                     if last.active {
                         last.active = false;
                         last.screen

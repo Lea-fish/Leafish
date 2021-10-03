@@ -522,6 +522,7 @@ impl super::Screen for ServerList {
                     back.y = s.y;
                 }
             }
+            #[allow(clippy::if_same_then_else)]
             if s.y < elements._add_btn.borrow().y {
                 // TODO: Make button invisible!
             } else {

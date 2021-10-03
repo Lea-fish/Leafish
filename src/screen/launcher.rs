@@ -141,11 +141,11 @@ impl super::Screen for Launcher {
                         Arc::new(move |account| {
                             let accounts = accounts.clone();
                             let screen_sys = screen_sys.clone();
-                            if account.is_some() {
-                                accounts.clone().lock().push(account.unwrap());
+                            if let Some(account) = account {
+                                accounts.lock().push(account);
                             }
-                            screen_sys.clone().pop_screen();
-                            save_accounts(&*accounts.clone().lock());
+                            screen_sys.pop_screen();
+                            save_accounts(&*accounts.lock());
                         }),
                         game.vars.clone(),
                     )));
@@ -310,7 +310,7 @@ impl super::Screen for Launcher {
     }
 }
 
-fn save_accounts(accounts: &Vec<Account>) {
+fn save_accounts(accounts: &[Account]) {
     let mut file = File::create(paths::get_config_dir().join("accounts.cfg")).unwrap();
     let json = serde_json::to_string(accounts).unwrap();
     file.write_all(json.as_bytes()).unwrap();

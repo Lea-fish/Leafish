@@ -297,7 +297,7 @@ fn main() {
         )));
         screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(
             Arc::new(Mutex::new(
-                screen::launcher::load_accounts().unwrap_or(vec![]),
+                screen::launcher::load_accounts().unwrap_or_default(),
             )),
             screen_sys.clone(),
             active_account.clone(),
@@ -351,7 +351,7 @@ fn main() {
         is_fullscreen: false,
         default_protocol_version,
         clipboard_provider: Arc::new(RwLock::new(clipboard)),
-        current_account: active_account.clone(),
+        current_account: active_account,
     };
     game.renderer.write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {

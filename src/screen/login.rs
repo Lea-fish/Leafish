@@ -246,7 +246,7 @@ fn try_login(
         Account {
             name,
             uuid: None,
-            verification_tokens: vec![password, token.unwrap_or(String::new())],
+            verification_tokens: vec![password, token.unwrap_or_default()],
             head_img_data: None,
             account_type,
         },
