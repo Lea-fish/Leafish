@@ -4,7 +4,7 @@ use crate::resources;
 use crate::shared::Direction;
 use crate::types::bit::Set;
 use crate::world;
-use crate::world::{block, CPos, ComposedSection, World};
+use crate::world::{block, ComposedSection, World, CPos};
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use parking_lot::RwLock;

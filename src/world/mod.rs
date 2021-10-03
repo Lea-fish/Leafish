@@ -81,9 +81,6 @@ pub struct LightUpdate {
     pos: Position,
 }
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
-pub struct CPos(pub i32, pub i32);
-
 lazy_static! {
     static ref EMPTY_SECTION: SectionSnapshot = SectionSnapshot {
         y: 255, // TODO: Check
