@@ -20,8 +20,7 @@ use parking_lot::RwLock;
 
 use crate::chunk_builder::CullInfo;
 use crate::entity::block_entity;
-use crate::world::chunk::chunk_section::{ChunkSection, SectionSnapshot};
-use crate::world::chunk::Chunk;
+use crate::world::chunk::{Chunk, ChunkSection, SectionSnapshot};
 use crate::world::{BlockEntityAction, CPos, LightData, LightType, LightUpdate};
 use crate::{chunk_builder, ecs, render};
 
