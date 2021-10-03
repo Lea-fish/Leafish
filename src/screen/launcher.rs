@@ -18,7 +18,7 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
 
-use crate::format;
+use crate::{format, auth};
 use crate::format::{Component, TextComponent};
 use crate::paths;
 use crate::protocol;
@@ -28,7 +28,7 @@ use crate::ui;
 
 use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
-use crate::screen::{Screen, ScreenSystem};
+use crate::screen::{Screen, ScreenSystem, ServerList};
 use crate::ui::Container;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, TryRecvError};
@@ -65,7 +65,7 @@ impl Clone for Launcher {
 struct RenderAccount {
 
     head_picture: Option<ui::ImageRef>,
-    entry_back: Option<ui::ImageRef>,
+    entry_back: Option<ui::ButtonRef>,
     account_name: Option<ui::TextRef>,
 
 }
@@ -130,7 +130,7 @@ impl super::Screen for Launcher {
         self.disclaimer.replace(disclaimer);
 
         // Add a new server to the list
-        let add = ui::ButtonBuilder::new()
+        let mut add = ui::ButtonBuilder::new()
             .position(200.0, -50.0 - 15.0)
             .size(100.0, 30.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
@@ -158,12 +158,12 @@ impl super::Screen for Launcher {
                         }
                         screen_sys.clone().pop_screen();
                         save_accounts(&*accounts.clone().lock());
-                    }))));
+                    }), game.vars.clone())));
                 true
             })
         }
         self.add.replace(add);
-        let background_selection = ui::ButtonBuilder::new()
+        let mut background_selection = ui::ButtonBuilder::new()
             .position(10.0, 25.0)
             .size(200.0, 30.0)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Left)
@@ -187,17 +187,53 @@ impl super::Screen for Launcher {
         }
         self.background_selection.replace(background_selection);
         let mut offset = 0.0;
-        for account in self.accounts.clone().lock().iter() {
+        let accounts = self.accounts.clone();
+        let accounts = accounts.lock();
+        let iter = accounts.iter().cloned();
+        for account in iter {
+            let account_name = account.name.clone();
             // Everything is attached to this
-            let mut back = ui::ImageBuilder::new()
-                .texture("leafish:solid")
+            let mut back = ui::ButtonBuilder::new()
                 .position(0.0, offset * 105.0)
                 .size(500.0, 100.0)
-                .colour((0, 0, 0, 100))
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container);
+            {
+                let mut back = back.borrow_mut();
+                ui::ImageBuilder::new()
+                    .texture("leafish:solid")
+                    .colour((0, 0, 0, 100))
+                    .position(0.0, offset * 105.0)
+                    .size(500.0, 100.0)
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .attach(&mut *back);
+                let active_account = self.active_account.clone();
+                back.add_click_func(move |_, game| {
+                    let mut client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+                    if client_token.is_empty() {
+                        client_token = std::iter::repeat(())
+                            .map(|()| rand::thread_rng().sample(&rand::distributions::Alphanumeric) as char)
+                            .take(20)
+                            .collect();
+                        game.vars.set(auth::AUTH_CLIENT_TOKEN, client_token);
+                    }
+                    let client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+                    let result = protocol::login::ACCOUNT_IMPLS.get(&account.account_type).unwrap().value().refresh(account.clone(),
+                                                                                                                    &*client_token/*account.verification_tokens.get(1).unwrap()*/);
+                    if result.is_ok() {
+                        active_account.clone().lock().replace(result.ok().unwrap());
+                        game.screen_sys
+                            .clone()
+                            .add_screen(Box::new(ServerList::new(None)));
+                    } else {
+                        println!("password: {} client token: {} auth token: {}", account.verification_tokens.get(0).unwrap(), account.verification_tokens.get(1).unwrap(), &*client_token);
+                        println!("An error occoured while attempting to login {}", result.err().unwrap())
+                    }
+                    true
+                });
+            }
             let account_name = ui::TextBuilder::new()
-                .text(account.name.clone())
+                .text(account_name)
                 .position(0.0, -32.5)
                 .colour((200, 200, 200, 255))
                 .draw_index(1)
