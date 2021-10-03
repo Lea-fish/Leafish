@@ -1173,7 +1173,6 @@ dependencies = [
  "leafish_resources",
  "leafish_shared",
  "log",
- "nfd2",
  "parking_lot",
  "rand 0.8.4",
  "rand_pcg 0.3.1",
@@ -1475,15 +1474,6 @@ name = "ndk-sys"
 version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c44922cb3dbb1c70b5e5f443d63b64363a898564d739ba5198e3a9138442868d"
-
-[[package]]
-name = "nfd2"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "306127f5ff8cb7c8cd3a8cf0fc162f4dc76ed589efa01ee84eb5593e7be97f75"
-dependencies = [
- "cc",
-]
 
 [[package]]
 name = "nix"
