@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::io::Cursor;
-
 use lazy_static::lazy_static;
 pub use leafish_blocks as block;
 
@@ -22,18 +20,13 @@ use crate::shared::Position;
 use crate::types::nibble;
 use crate::world::chunk::SectionSnapshot;
 
-pub use self::{chunk::*, world::*};
+pub use self::{chunk::*, lighting::*, world::*};
 
 pub mod biome;
 mod chunk;
+mod lighting;
 mod storage;
 mod world;
-
-pub struct LightData {
-    pub arrays: Cursor<Vec<u8>>,
-    pub block_light_mask: i32,
-    pub sky_light_mask: i32,
-}
 
 #[derive(Clone, Debug)]
 pub enum BlockEntityAction {
@@ -48,37 +41,6 @@ pub enum BlockEntityAction {
             format::Component,
         )>,
     ),
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum LightType {
-    Block,
-    Sky,
-}
-
-// TODO: make use of "get_light" and "set_light"
-impl LightType {
-    #[allow(dead_code)]
-    fn get_light(self, world: &World, pos: Position) -> u8 {
-        match self {
-            LightType::Block => world.get_block_light(pos),
-            LightType::Sky => world.get_sky_light(pos),
-        }
-    }
-    #[allow(dead_code)]
-    fn set_light(self, world: &World, pos: Position, light: u8) {
-        match self {
-            LightType::Block => world.set_block_light(pos, light),
-            LightType::Sky => world.set_sky_light(pos, light),
-        }
-    }
-}
-
-// TODO: make use of "ty: LightType" and "pos: Position"
-#[allow(dead_code)]
-pub struct LightUpdate {
-    ty: LightType,
-    pos: Position,
 }
 
 lazy_static! {
