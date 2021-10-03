@@ -51,7 +51,7 @@ jobs:
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
+          sudo apt-get install -y --no-install-recommends libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgtk-3-dev
 
       - name: "[Linux ONLY] Check formatting"
         if: ${{ matrix.os == 'ubuntu-latest' }}
