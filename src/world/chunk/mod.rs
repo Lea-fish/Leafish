@@ -6,11 +6,14 @@ use leafish_blocks as block;
 use leafish_protocol::types::hash::FNVHash;
 use leafish_shared::position::Position;
 
+pub use self::{chunk_snapshot::*};
+
 use crate::ecs;
+use crate::world::{biome, CPos};
 use crate::world::chunk::chunk_section::ChunkSection;
-use crate::world::{biome, CPos, ChunkSnapshot};
 
 pub mod chunk_section;
+mod chunk_snapshot;
 
 pub struct Chunk {
     pub(crate) position: CPos,
