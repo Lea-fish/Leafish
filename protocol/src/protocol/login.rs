@@ -23,14 +23,14 @@ pub trait AccountImpl {
 #[derive(Serialize, Deserialize)]
 pub struct Account {
     pub name: String,
-    pub uuid: Option<UUID>,
+    pub uuid: Option<String>,
     pub verification_tokens: Vec<String>, // this represents the verification tokens used to verify the account, such as hashed passwords, actual tokens, etc
     pub head_img_data: Option<Vec<u8>>,
     pub account_type: AccountType,
 }
 
 impl Account {
-    pub fn new(name: String, uuid: Option<UUID>, account_type: AccountType) -> Self {
+    pub fn new(name: String, uuid: Option<String>, account_type: AccountType) -> Self {
         Account {
             name,
             uuid,
