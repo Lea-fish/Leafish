@@ -108,7 +108,7 @@ lazy_static! {
         Arc::new(DashMap::new());
 }
 
-#[derive(Serialize, Deserialize, PartialEq, Eq, Hash)]
+#[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub enum AccountType {
     Mojang,
     Microsoft,
