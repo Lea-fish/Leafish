@@ -57,7 +57,7 @@ impl Clone for Launcher {
 
 struct RenderAccount {
     _head_picture: Option<ui::ImageRef>,
-    _entry_back: Option<ui::ButtonRef>,
+    _entry_back: Option<ui::ImageRef>,
     _account_name: Option<ui::TextRef>,
 }
 
@@ -179,20 +179,15 @@ impl super::Screen for Launcher {
         for account in iter {
             let account_name = account.name.clone();
             // Everything is attached to this
-            let back = ui::ButtonBuilder::new()
+            let back = ui::ImageBuilder::new()
+                .texture("leafish:solid")
+                .colour((0, 0, 0, 150))
                 .position(0.0, offset * 105.0)
                 .size(500.0, 100.0)
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container);
             {
                 let mut back = back.borrow_mut();
-                ui::ImageBuilder::new()
-                    .texture("leafish:solid")
-                    .colour((0, 0, 0, 100))
-                    .position(0.0, offset * 105.0)
-                    .size(500.0, 100.0)
-                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                    .attach(&mut *back);
                 let active_account = self.active_account.clone();
                 back.add_click_func(move |_, game| {
                     let mut client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
@@ -231,6 +226,14 @@ impl super::Screen for Launcher {
                             "An error occoured while attempting to login {}",
                             result.err().unwrap()
                         )
+                    }
+                    true
+                });
+                back.add_hover_func(|el, hovered, _| {
+                    if hovered {
+                        el.colour = (0, 0, 0, 100);
+                    } else {
+                        el.colour = (0, 0, 0, 150);
                     }
                     true
                 });

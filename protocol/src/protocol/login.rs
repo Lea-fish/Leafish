@@ -1,4 +1,3 @@
-use crate::protocol::UUID;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
