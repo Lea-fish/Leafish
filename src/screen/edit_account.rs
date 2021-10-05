@@ -12,25 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::BTreeMap;
-use std::fs;
-
-use crate::ui;
-use crate::{paths, render};
+use crate::render;
+use crate::{ui, Game};
 
 use crate::screen::Screen;
-use serde_json::{self, Value};
+use std::rc::Rc;
 
-pub struct EditServerEntry {
+pub struct EditAccountEntry {
     elements: Option<UIElements>,
-    entry_info: Option<(usize, String, String)>,
+    entry_info: Option<(String, String)>,
+    done_callback: Rc<dyn Fn(&mut Game, String, String)>, // game, name, password
 }
 
-impl Clone for EditServerEntry {
+impl Clone for EditAccountEntry {
     fn clone(&self) -> Self {
-        EditServerEntry {
+        Self {
             elements: None,
             entry_info: self.entry_info.clone(),
+            done_callback: self.done_callback.clone(),
         }
     }
 }
@@ -39,85 +38,53 @@ struct UIElements {
     logo: ui::logo::Logo,
 
     _name: ui::TextBoxRef,
-    _address: ui::TextBoxRef,
+    _password: ui::TextBoxRef,
     _done: ui::ButtonRef,
     _cancel: ui::ButtonRef,
 }
 
-impl EditServerEntry {
-    pub fn new(entry_info: Option<(usize, String, String)>) -> EditServerEntry {
-        EditServerEntry {
+impl EditAccountEntry {
+    pub fn new(
+        entry_info: Option<(String, String)>,
+        done_callback: Rc<dyn Fn(&mut Game, String, String)>,
+    ) -> Self {
+        Self {
             elements: None,
             entry_info,
+            done_callback,
         }
-    }
-
-    fn save_servers(index: Option<usize>, name: &str, address: &str) {
-        let mut servers_info = match fs::File::open(paths::get_data_dir().join("servers.json")) {
-            Ok(val) => serde_json::from_reader(val).unwrap(),
-            Err(_) => {
-                let mut info = BTreeMap::default();
-                info.insert("servers".to_owned(), Value::Array(vec![]));
-                Value::Object(info.into_iter().collect())
-            }
-        };
-
-        let new_entry = {
-            let mut entry = BTreeMap::default();
-            entry.insert("name".to_owned(), Value::String(name.to_owned()));
-            entry.insert("address".to_owned(), Value::String(address.to_owned()));
-            Value::Object(entry.into_iter().collect())
-        };
-
-        {
-            let servers = servers_info
-                .as_object_mut()
-                .unwrap()
-                .get_mut("servers")
-                .unwrap()
-                .as_array_mut()
-                .unwrap();
-            if let Some(index) = index {
-                *servers.get_mut(index).unwrap() = new_entry;
-            } else {
-                servers.push(new_entry);
-            }
-        }
-
-        let mut out = fs::File::create(paths::get_data_dir().join("servers.json")).unwrap();
-        serde_json::to_writer_pretty(&mut out, &servers_info).unwrap();
     }
 }
 
-impl super::Screen for EditServerEntry {
+impl super::Screen for EditAccountEntry {
     fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         // Name
-        let server_name = ui::TextBoxBuilder::new()
-            .input(self.entry_info.as_ref().map_or("", |v| &v.1))
+        let account_name = ui::TextBoxBuilder::new()
+            .input(self.entry_info.as_ref().map_or("", |v| &v.0))
             .position(0.0, -20.0)
             .size(400.0, 40.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .create(ui_container);
-        ui::TextBox::make_focusable(&server_name, ui_container);
+        ui::TextBox::make_focusable(&account_name, ui_container);
         ui::TextBuilder::new()
             .text("Name:")
             .position(0.0, -18.0)
-            .attach(&mut *server_name.borrow_mut());
+            .attach(&mut *account_name.borrow_mut());
 
         // Address
-        let server_address = ui::TextBoxBuilder::new()
-            .input(self.entry_info.as_ref().map_or("", |v| &v.2))
+        let account_password = ui::TextBoxBuilder::new()
+            .input(self.entry_info.as_ref().map_or("", |v| &v.1))
             .position(0.0, 40.0)
             .size(400.0, 40.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .create(ui_container);
-        ui::TextBox::make_focusable(&server_address, ui_container);
+        ui::TextBox::make_focusable(&account_password, ui_container);
         ui::TextBuilder::new()
-            .text("Address:")
+            .text("Password:")
             .position(0.0, -18.0)
-            .attach(&mut *server_address.borrow_mut());
+            .attach(&mut *account_password.borrow_mut());
 
         // Done
         let done = ui::ButtonBuilder::new()
@@ -132,18 +99,16 @@ impl super::Screen for EditServerEntry {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *done);
             done.add_text(txt);
-            let index = self.entry_info.as_ref().map(|v| v.0);
-            let server_name = server_name.clone();
-            let server_address = server_address.clone();
+            let server_name = account_name.clone();
+            let server_address = account_password.clone();
+            let callback = self.done_callback.clone();
             done.add_click_func(move |_, game| {
-                Self::save_servers(
-                    index,
-                    &server_name.borrow().input,
-                    &server_address.borrow().input,
+                (*callback.clone())(
+                    game,
+                    server_name.borrow().input.clone(),
+                    server_address.borrow().input.clone(),
                 );
-                game.screen_sys
-                    .clone()
-                    .replace_screen(Box::new(super::ServerList::new(None)));
+                game.screen_sys.clone().pop_screen();
                 true
             });
         }
@@ -162,17 +127,15 @@ impl super::Screen for EditServerEntry {
                 .attach(&mut *cancel);
             cancel.add_text(txt);
             cancel.add_click_func(|_, game| {
-                game.screen_sys
-                    .clone()
-                    .replace_screen(Box::new(super::ServerList::new(None)));
+                game.screen_sys.clone().pop_screen();
                 true
             });
         }
 
         self.elements = Some(UIElements {
             logo,
-            _name: server_name,
-            _address: server_address,
+            _name: account_name,
+            _password: account_password,
             _done: done,
             _cancel: cancel,
         });

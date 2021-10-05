@@ -52,7 +52,7 @@ crossbeam-channel = "0.5.1" # check if flume would be better in terms of perform
 # flume = "0.10.8" # replaced by crossbeam channel
 # tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
 rayon = "1.5.1"
-# nfd2 = "0.3.0" # used to open native file dialogs - sadly i don't think we can use this what about rfd?
+rfd = "0.5.0"
 
 reqwest = { version = "0.11.4", features = [ "blocking" ]}
 glutin = "0.27.0"
@@ -72,7 +72,3 @@ version = "0"
 [dependencies.leafish_protocol]
 path = "./protocol"
 version = "0"
-
-#[dependencies.std_or_web]
-#path = "./std_or_web"
-#version = "0"

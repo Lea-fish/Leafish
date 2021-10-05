@@ -233,7 +233,7 @@ impl super::Screen for Login {
     }
 }
 
-fn try_login(
+pub fn try_login(
     refresh: bool,
     name: String,
     token: Option<String>,

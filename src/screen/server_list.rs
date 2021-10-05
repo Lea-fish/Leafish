@@ -23,7 +23,6 @@ use crate::format::{Component, TextComponent};
 use crate::paths;
 use crate::protocol;
 use crate::render;
-use crate::settings;
 use crate::ui;
 
 use crate::render::hud::{Hud, HudContext};
@@ -35,6 +34,8 @@ use crossbeam_channel::{Receiver, TryRecvError};
 use instant::Duration;
 use parking_lot::RwLock;
 use rand::Rng;
+use serde_json::Value;
+use std::collections::BTreeMap;
 
 pub struct ServerList {
     elements: Option<UIElements>,
@@ -244,12 +245,17 @@ impl ServerList {
                 let sname = name.clone();
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
-                    game.screen_sys.clone().replace_screen(Box::new(
-                        super::delete_server::DeleteServerEntry::new(
-                            index,
-                            &sname,
-                            &saddr,
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                    let text = format!("Are you sure you wish to delete {} {}?", &sname, &saddr);
+                    game.screen_sys.clone().add_screen(Box::new(
+                        super::confirm_box::ConfirmBox::new(
+                            text,
+                            Rc::new(|game| {
+                                game.screen_sys.pop_screen();
+                            }),
+                            Rc::new(move |game| {
+                                game.screen_sys.pop_screen();
+                                Self::delete_server(index);
+                            }),
                         ),
                     ));
                     true
@@ -351,6 +357,31 @@ impl ServerList {
                 }
             });
         }
+    }
+
+    fn delete_server(index: usize) {
+        let mut servers_info = match fs::File::open(paths::get_data_dir().join("servers.json")) {
+            Ok(val) => serde_json::from_reader(val).unwrap(),
+            Err(_) => {
+                let mut info = BTreeMap::default();
+                info.insert("servers".to_owned(), Value::Array(vec![]));
+                Value::Object(info.into_iter().collect())
+            }
+        };
+
+        {
+            let servers = servers_info
+                .as_object_mut()
+                .unwrap()
+                .get_mut("servers")
+                .unwrap()
+                .as_array_mut()
+                .unwrap();
+            servers.remove(index);
+        }
+
+        let mut out = fs::File::create(paths::get_data_dir().join("servers.json")).unwrap();
+        serde_json::to_writer_pretty(&mut out, &servers_info).unwrap();
     }
 
     fn init_list(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {

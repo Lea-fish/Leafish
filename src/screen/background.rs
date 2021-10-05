@@ -11,6 +11,8 @@ pub struct Background {
     vars: Rc<console::Vars>,
     screen_sys: Arc<ScreenSystem>,
     active: bool,
+    delay: f64,
+    last_path: String,
 }
 
 impl Clone for Background {
@@ -26,28 +28,31 @@ impl Background {
             vars,
             screen_sys,
             active: false,
+            delay: 0.0,
+            last_path: "".to_string(),
         }
     }
 }
 
 impl Screen for Background {
     fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let background = if Renderer::get_texture_optional(
-            renderer.get_textures_ref(),
-            &*format!("#{}", self.vars.get(BACKGROUND_IMAGE)),
-        )
-        .is_some()
-        {
-            Some(
-                ui::ImageBuilder::new()
-                    .texture(&*format!("#{}", self.vars.get(BACKGROUND_IMAGE)))
-                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
-                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                    .create(ui_container),
-            )
-        } else {
-            None
-        };
+        let path = self.vars.get(BACKGROUND_IMAGE);
+        self.last_path = (*path).clone();
+        let background =
+            if Renderer::get_texture_optional(renderer.get_textures_ref(), &*format!("#{}", path))
+                .is_some()
+            {
+                Some(
+                    ui::ImageBuilder::new()
+                        .draw_index(i16::MIN as isize)
+                        .texture(&*format!("#{}", self.vars.get(BACKGROUND_IMAGE)))
+                        .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                        .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                        .create(ui_container),
+                )
+            } else {
+                None
+            };
         self.active = true;
         self.background = background;
     }
@@ -62,18 +67,30 @@ impl Screen for Background {
 
     fn tick(
         &mut self,
-        _: f64,
+        delta: f64,
         renderer: &mut Renderer,
         ui_container: &mut Container,
     ) -> Option<Box<dyn Screen>> {
-        let hide = self.screen_sys.is_any_ingame();
-        if self.active {
-            if hide {
-                self.active = false;
-                self.deinit(renderer, ui_container);
+        self.delay += delta;
+        if self.delay >= 0.1 {
+            self.delay = 0.0;
+            let hide = self.screen_sys.is_any_ingame();
+            if self.active {
+                if hide {
+                    self.active = false;
+                    self.deinit(renderer, ui_container);
+                    return None;
+                }
+            } else if !hide {
+                self.init(renderer, ui_container);
+                return None;
             }
-        } else if !hide {
-            self.init(renderer, ui_container);
+            let curr_path = (*self.vars.get(BACKGROUND_IMAGE)).clone();
+            if !self.last_path.eq(&curr_path) {
+                self.last_path = curr_path;
+                self.deinit(renderer, ui_container);
+                self.init(renderer, ui_container);
+            }
         }
         None
     }

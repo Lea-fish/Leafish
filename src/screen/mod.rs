@@ -17,12 +17,13 @@ pub use self::server_list::*;
 mod login;
 pub use self::login::*;
 
+pub mod confirm_box;
 pub mod connecting;
-pub mod delete_server;
 pub mod edit_server;
 
 pub mod background;
 pub mod chat;
+pub mod edit_account;
 pub mod launcher;
 pub mod respawn;
 pub mod settings_menu;

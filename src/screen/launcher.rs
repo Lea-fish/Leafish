@@ -23,12 +23,15 @@ use crate::ui;
 
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem, ServerList};
+use crate::settings::BACKGROUND_IMAGE;
 use crate::ui::Container;
 use leafish_protocol::protocol::login::Account;
 use parking_lot::Mutex;
 use rand::Rng;
+use rfd::FileDialog;
 use std::fs::File;
 use std::io::{Read, Write};
+use std::rc::Rc;
 
 /// SAFETY: We don't alter components which, which aren't thread safe on other threads than the main one.
 unsafe impl Send for Launcher {}
@@ -57,7 +60,7 @@ impl Clone for Launcher {
 
 struct RenderAccount {
     _head_picture: Option<ui::ImageRef>,
-    _entry_back: Option<ui::ButtonRef>,
+    _entry_back: Option<ui::ImageRef>,
     _account_name: Option<ui::TextRef>,
 }
 
@@ -166,8 +169,18 @@ impl super::Screen for Launcher {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *background_selection);
             background_selection.add_text(txt);
-            background_selection.add_click_func(move |_, _game| {
-                // TODO: Support this via the NFD2 lib or via the RFD lib
+            background_selection.add_click_func(move |_, game| {
+                let files = FileDialog::new()
+                    .add_filter("picture", &["png", "jpg", "img"])
+                    .set_directory(
+                        dirs::picture_dir()
+                            .map_or(String::new(), |x| x.as_path().to_str().unwrap().to_string()),
+                    )
+                    .pick_file();
+                if let Some(files) = files {
+                    let file_name = files.as_path().to_str().unwrap();
+                    game.vars.set(BACKGROUND_IMAGE, file_name.to_string());
+                }
                 true
             })
         }
@@ -176,23 +189,22 @@ impl super::Screen for Launcher {
         let accounts = self.accounts.clone();
         let accounts = accounts.lock();
         let iter = accounts.iter().cloned();
-        for account in iter {
-            let account_name = account.name.clone();
+        for account in iter.enumerate() {
+            let idx = account.0;
+            let account = account.1;
+            let account_name_text = account.name.clone();
+            let account_password_text = account.verification_tokens.get(0).unwrap().clone();
+            let account_type = account.account_type.clone();
             // Everything is attached to this
-            let back = ui::ButtonBuilder::new()
+            let back = ui::ImageBuilder::new()
+                .texture("leafish:solid")
+                .colour((0, 0, 0, 150))
                 .position(0.0, offset * 105.0)
                 .size(500.0, 100.0)
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container);
             {
                 let mut back = back.borrow_mut();
-                ui::ImageBuilder::new()
-                    .texture("leafish:solid")
-                    .colour((0, 0, 0, 100))
-                    .position(0.0, offset * 105.0)
-                    .size(500.0, 100.0)
-                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                    .attach(&mut *back);
                 let active_account = self.active_account.clone();
                 back.add_click_func(move |_, game| {
                     let mut client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
@@ -211,10 +223,7 @@ impl super::Screen for Launcher {
                         .get(&account.account_type)
                         .unwrap()
                         .value()
-                        .refresh(
-                            account.clone(),
-                            &*client_token, /*account.verification_tokens.get(1).unwrap()*/
-                        );
+                        .refresh(account.clone(), &*client_token);
                     if result.is_ok() {
                         active_account.clone().lock().replace(result.ok().unwrap());
                         game.screen_sys
@@ -222,7 +231,7 @@ impl super::Screen for Launcher {
                             .add_screen(Box::new(ServerList::new(None)));
                     } else {
                         println!(
-                            "password: {} client token: {} auth token: {}",
+                            "password: {} account token: {} client token: {}",
                             account.verification_tokens.get(0).unwrap(),
                             account.verification_tokens.get(1).unwrap(),
                             &*client_token
@@ -234,9 +243,17 @@ impl super::Screen for Launcher {
                     }
                     true
                 });
+                back.add_hover_func(|el, hovered, _| {
+                    if hovered {
+                        el.colour = (0, 0, 0, 100);
+                    } else {
+                        el.colour = (0, 0, 0, 150);
+                    }
+                    true
+                });
             }
             let account_name = ui::TextBuilder::new()
-                .text(account_name)
+                .text(account_name_text.clone())
                 .position(0.0, -32.5)
                 .colour((200, 200, 200, 255))
                 .draw_index(1)
@@ -249,6 +266,95 @@ impl super::Screen for Launcher {
                 .colour((0, 0, 0, 255))
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container);
+            // Delete entry button
+            let delete_entry = ui::ButtonBuilder::new()
+                .position(0.0, 0.0)
+                .size(25.0, 25.0)
+                .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
+                .attach(&mut *back.borrow_mut());
+            {
+                let mut btn = delete_entry.borrow_mut();
+                let txt = ui::TextBuilder::new()
+                    .text("X")
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .attach(&mut *btn);
+                btn.add_text(txt);
+                let accounts = self.accounts.clone();
+                btn.add_click_func(move |_, game| {
+                    let accounts = accounts.clone();
+                    let idx = idx;
+                    game.screen_sys.clone().add_screen(Box::new(
+                        super::confirm_box::ConfirmBox::new(
+                            String::from("Do you want to delete this account?"),
+                            Rc::new(|game| {
+                                game.screen_sys.pop_screen();
+                            }),
+                            Rc::new(move |game| {
+                                accounts.clone().lock().remove(idx);
+                                save_accounts(&accounts.clone().lock());
+                                game.screen_sys.pop_screen();
+                            }),
+                        ),
+                    ));
+                    true
+                })
+            }
+
+            // Edit entry button
+            let edit_entry = ui::ButtonBuilder::new()
+                .position(25.0, 0.0)
+                .size(25.0, 25.0)
+                .alignment(ui::VAttach::Bottom, ui::HAttach::Right)
+                .attach(&mut *back.borrow_mut());
+            {
+                let mut btn = edit_entry.borrow_mut();
+                let txt = ui::TextBuilder::new()
+                    .text("E")
+                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                    .attach(&mut *btn);
+                btn.add_text(txt);
+                let aname = account_name_text.clone();
+                let apw = account_password_text;
+                let account_type = account_type.clone();
+                let accounts = self.accounts.clone();
+                btn.add_click_func(move |_, game| {
+                    let accounts = accounts.clone();
+                    let account_type = account_type.clone();
+                    let idx = idx;
+                    game.screen_sys.clone().add_screen(Box::new(
+                        super::edit_account::EditAccountEntry::new(
+                            Some((aname.clone(), apw.clone())),
+                            Rc::new(move |game, name, password| {
+                                let client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+                                let account = crate::screen::login::try_login(
+                                    false,
+                                    name,
+                                    None,
+                                    password,
+                                    account_type.clone(),
+                                    client_token,
+                                );
+                                let accounts = accounts.clone();
+                                let mut accounts = accounts.lock();
+                                match account {
+                                    Ok(account) => {
+                                        drop(std::mem::replace(&mut (*accounts)[idx], account));
+                                    }
+                                    Err(err) => {
+                                        println!(
+                                            "An error occoured while modifying the account! {}",
+                                            err
+                                        );
+                                        // TODO: Display this!
+                                    }
+                                }
+                                save_accounts(&*accounts);
+                            }),
+                        ),
+                    ));
+                    true
+                })
+            }
             self.rendered_accounts.push(RenderAccount {
                 _head_picture: Some(head),
                 _entry_back: Some(back),
