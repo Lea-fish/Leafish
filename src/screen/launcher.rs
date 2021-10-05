@@ -22,6 +22,7 @@ use crate::render;
 use crate::ui;
 
 use crate::render::Renderer;
+use crate::settings::BACKGROUND_IMAGE;
 use crate::screen::{Screen, ScreenSystem, ServerList};
 use crate::ui::Container;
 use leafish_protocol::protocol::login::Account;
@@ -30,6 +31,7 @@ use rand::Rng;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::rc::Rc;
+use rfd::FileDialog;
 
 /// SAFETY: We don't alter components which, which aren't thread safe on other threads than the main one.
 unsafe impl Send for Launcher {}
@@ -167,8 +169,15 @@ impl super::Screen for Launcher {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *background_selection);
             background_selection.add_text(txt);
-            background_selection.add_click_func(move |_, _game| {
-                // TODO: Support this via the NFD2 lib or via the RFD lib
+            background_selection.add_click_func(move |_, game| {
+                let files = FileDialog::new()
+                    .add_filter("picture", &["png", "jpg", "img"])
+                    .set_directory(dirs::picture_dir().map_or(String::new(), |x| x.as_path().to_str().unwrap().to_string()))
+                    .pick_file();
+                if let Some(files) = files {
+                    let file_name = files.as_path().to_str().unwrap();
+                    game.vars.set(BACKGROUND_IMAGE, file_name.to_string());
+                }
                 true
             })
         }
