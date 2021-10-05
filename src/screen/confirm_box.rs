@@ -67,10 +67,6 @@ impl super::Screen for ConfirmBox {
         // Prompt
         let prompt = ui::TextBuilder::new()
             .text(
-                /*format!(
-                    "Are you sure you wish to delete {} {}?",
-                    self.name, self.address
-                )*/
                 self.prompt.clone(),
             )
             .position(0.0, 40.0)

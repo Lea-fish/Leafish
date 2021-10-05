@@ -22,16 +22,16 @@ use crate::render;
 use crate::ui;
 
 use crate::render::Renderer;
-use crate::settings::BACKGROUND_IMAGE;
 use crate::screen::{Screen, ScreenSystem, ServerList};
+use crate::settings::BACKGROUND_IMAGE;
 use crate::ui::Container;
 use leafish_protocol::protocol::login::Account;
 use parking_lot::Mutex;
 use rand::Rng;
+use rfd::FileDialog;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::rc::Rc;
-use rfd::FileDialog;
 
 /// SAFETY: We don't alter components which, which aren't thread safe on other threads than the main one.
 unsafe impl Send for Launcher {}
@@ -172,7 +172,10 @@ impl super::Screen for Launcher {
             background_selection.add_click_func(move |_, game| {
                 let files = FileDialog::new()
                     .add_filter("picture", &["png", "jpg", "img"])
-                    .set_directory(dirs::picture_dir().map_or(String::new(), |x| x.as_path().to_str().unwrap().to_string()))
+                    .set_directory(
+                        dirs::picture_dir()
+                            .map_or(String::new(), |x| x.as_path().to_str().unwrap().to_string()),
+                    )
                     .pick_file();
                 if let Some(files) = files {
                     let file_name = files.as_path().to_str().unwrap();

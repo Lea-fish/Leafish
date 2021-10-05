@@ -38,23 +38,21 @@ impl Screen for Background {
     fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         let path = self.vars.get(BACKGROUND_IMAGE);
         self.last_path = (*path).clone();
-        let background = if Renderer::get_texture_optional(
-            renderer.get_textures_ref(),
-            &*format!("#{}", path),
-        )
-        .is_some()
-        {
-            Some(
-                ui::ImageBuilder::new()
-                    .draw_index(i16::MIN as isize)
-                    .texture(&*format!("#{}", self.vars.get(BACKGROUND_IMAGE)))
-                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
-                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                    .create(ui_container),
-            )
-        } else {
-            None
-        };
+        let background =
+            if Renderer::get_texture_optional(renderer.get_textures_ref(), &*format!("#{}", path))
+                .is_some()
+            {
+                Some(
+                    ui::ImageBuilder::new()
+                        .draw_index(i16::MIN as isize)
+                        .texture(&*format!("#{}", self.vars.get(BACKGROUND_IMAGE)))
+                        .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                        .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                        .create(ui_container),
+                )
+            } else {
+                None
+            };
         self.active = true;
         self.background = background;
     }
