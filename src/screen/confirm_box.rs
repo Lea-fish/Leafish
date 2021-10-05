@@ -66,9 +66,7 @@ impl super::Screen for ConfirmBox {
 
         // Prompt
         let prompt = ui::TextBuilder::new()
-            .text(
-                self.prompt.clone(),
-            )
+            .text(self.prompt.clone())
             .position(0.0, 40.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .create(ui_container);
