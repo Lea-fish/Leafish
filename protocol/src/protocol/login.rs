@@ -77,7 +77,7 @@ impl Account {
     }
 
     pub fn login(
-        username: &str,
+        username: &str, // accountname(not ingame name) (email or username(for old accounts))
         password: &str,
         token: &str,
         account_type: AccountType,
@@ -98,7 +98,7 @@ impl Clone for Account {
             uuid: self.uuid.clone(),
             verification_tokens: self.verification_tokens.to_vec(),
             head_img_data: self.head_img_data.as_ref().map(|x| x.to_vec()),
-            account_type: AccountType::Mojang,
+            account_type: self.account_type.clone(),
         }
     }
 }

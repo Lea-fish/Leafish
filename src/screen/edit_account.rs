@@ -78,6 +78,7 @@ impl super::Screen for EditAccountEntry {
             .input(self.entry_info.as_ref().map_or("", |v| &v.1))
             .position(0.0, 40.0)
             .size(400.0, 40.0)
+            .password(true)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .create(ui_container);
         ui::TextBox::make_focusable(&account_password, ui_container);
@@ -99,14 +100,14 @@ impl super::Screen for EditAccountEntry {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *done);
             done.add_text(txt);
-            let server_name = account_name.clone();
-            let server_address = account_password.clone();
+            let account_name = account_name.clone();
+            let account_password = account_password.clone();
             let callback = self.done_callback.clone();
             done.add_click_func(move |_, game| {
                 (*callback.clone())(
                     game,
-                    server_name.borrow().input.clone(),
-                    server_address.borrow().input.clone(),
+                    account_name.borrow().input.clone(),
+                    account_password.borrow().input.clone(),
                 );
                 game.screen_sys.clone().pop_screen();
                 true

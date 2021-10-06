@@ -25,14 +25,14 @@ const VALIDATE_URL: &str = "https://authserver.mojang.com/validate";
 pub struct MojangAccount {}
 
 impl AccountImpl for MojangAccount {
-    fn login(&self, username: &str, password: &str, token: &str) -> Result<Account, super::Error> {
+    fn login(&self, name: &str, password: &str, token: &str) -> Result<Account, super::Error> {
         let req_msg = json!({
-        "username": username,
+        "username": name,
         "password": password,
         "clientToken": token,
         "agent": {
             "name": "Minecraft",
-            "version": 1
+            "version": 1,
         }});
         let req = serde_json::to_string(&req_msg)?;
 
@@ -73,6 +73,7 @@ impl AccountImpl for MojangAccount {
             )
             .ok(),
             verification_tokens: vec![
+                name.to_string(),
                 "".to_string(),
                 ret.get("accessToken")
                     .and_then(|v| v.as_str())
@@ -86,8 +87,8 @@ impl AccountImpl for MojangAccount {
 
     fn refresh(&self, account: Account, token: &str) -> Result<Account, super::Error> {
         let req_msg = json!({
-        "accessToken": account.verification_tokens.get(1).unwrap(),
-        "clientToken": token
+        "accessToken": account.verification_tokens.get(2).unwrap(),
+        "clientToken": token,
         });
         let req = serde_json::to_string(&req_msg)?;
 
@@ -130,6 +131,7 @@ impl AccountImpl for MojangAccount {
                 verification_tokens: if account.verification_tokens.is_empty() {
                     vec![
                         String::new(),
+                        String::new(),
                         ret.get("accessToken")
                             .and_then(|v| v.as_str())
                             .unwrap()
@@ -137,8 +139,8 @@ impl AccountImpl for MojangAccount {
                     ]
                 } else {
                     let mut new_tokens = account.verification_tokens.to_vec();
-                    if new_tokens.len() >= 2 {
-                        new_tokens.drain(1..);
+                    if new_tokens.len() >= 3 {
+                        new_tokens.drain(2..);
                     }
                     new_tokens.push(
                         ret.get("accessToken")
@@ -187,7 +189,7 @@ impl AccountImpl for MojangAccount {
         };
 
         let join_msg = json!({
-            "accessToken": account.verification_tokens.get(1).unwrap(),
+            "accessToken": account.verification_tokens.get(2).unwrap(),
             "selectedProfile": account.uuid.as_ref().unwrap(),
             "serverId": hash_str
         });
