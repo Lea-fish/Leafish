@@ -1597,7 +1597,6 @@ impl Server {
             .write()
             .remove_all_entities_gracefully();
         *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
-        let _ = EntityType::Zombie.create_entity(&mut self.entities.clone().write(), 1478.5, 47.0, -474.5, 0.0, 0.0)/*create_zombie(&mut self.entities.clone().write())*/;
         if *self.dead.read() {
             *self.dead.write() = false;
             *self.just_died.write() = false;

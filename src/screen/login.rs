@@ -235,7 +235,7 @@ impl super::Screen for Login {
 
 pub fn try_login(
     refresh: bool,
-    name: String,
+    account_name: String,
     token: Option<String>,
     password: String,
     account_type: AccountType,
@@ -244,9 +244,9 @@ pub fn try_login(
     try_login_account(
         refresh,
         Account {
-            name,
+            name: String::new(),
             uuid: None,
-            verification_tokens: vec![password, token.unwrap_or_default()],
+            verification_tokens: vec![account_name, password, token.unwrap_or_default()],
             head_img_data: None,
             account_type,
         },
@@ -262,14 +262,19 @@ fn try_login_account(
     client_token: String,
 ) -> Result<Account, Error> {
     let password = if !account.verification_tokens.is_empty() {
-        account.verification_tokens.get(0).unwrap()
+        account.verification_tokens.get(1).unwrap()
     } else {
         &DEFAULT_PW
     };
     if refresh && (account.name.is_empty() || password.is_empty()) {
-        // password is at idx 0 in the verification tokens
+        // password is at idx 1 in the verification tokens
         account.refresh(&*client_token)
     } else {
-        Account::login(&account.name, password, &*client_token, AccountType::Mojang)
+        Account::login(
+            account.verification_tokens.get(0).unwrap(),
+            password,
+            &*client_token,
+            account.account_type,
+        )
     }
 }

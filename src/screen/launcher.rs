@@ -193,7 +193,8 @@ impl super::Screen for Launcher {
             let idx = account.0;
             let account = account.1;
             let account_name_text = account.name.clone();
-            let account_password_text = account.verification_tokens.get(0).unwrap().clone();
+            let account_account_name_text = account.verification_tokens.get(0).unwrap().clone();
+            let account_password_text = account.verification_tokens.get(1).unwrap().clone();
             let account_type = account.account_type.clone();
             // Everything is attached to this
             let back = ui::ImageBuilder::new()
@@ -204,9 +205,16 @@ impl super::Screen for Launcher {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .create(ui_container);
             {
+                let account_password_text = account_password_text.clone();
+                let account_account_name_text = account_account_name_text.clone();
+                let account_type = account_type.clone();
+                let accounts = self.accounts.clone();
                 let mut back = back.borrow_mut();
                 let active_account = self.active_account.clone();
                 back.add_click_func(move |_, game| {
+                    let accounts = accounts.clone();
+                    let account_type = account_type.clone();
+                    let idx = idx;
                     let mut client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
                     if client_token.is_empty() {
                         client_token = std::iter::repeat(())
@@ -231,15 +239,44 @@ impl super::Screen for Launcher {
                             .add_screen(Box::new(ServerList::new(None)));
                     } else {
                         println!(
-                            "password: {} account token: {} client token: {}",
-                            account.verification_tokens.get(0).unwrap(),
-                            account.verification_tokens.get(1).unwrap(),
-                            &*client_token
-                        );
-                        println!(
                             "An error occoured while attempting to login {}",
                             result.err().unwrap()
-                        )
+                        );
+                        game.screen_sys.clone().add_screen(Box::new(
+                            super::edit_account::EditAccountEntry::new(
+                                Some((
+                                    account_account_name_text.clone(),
+                                    account_password_text.clone(),
+                                )),
+                                Rc::new(move |game, name, password| {
+                                    let client_token =
+                                        game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+                                    let account = crate::screen::login::try_login(
+                                        false,
+                                        name,
+                                        None,
+                                        password,
+                                        account_type.clone(),
+                                        client_token,
+                                    );
+                                    let accounts = accounts.clone();
+                                    let mut accounts = accounts.lock();
+                                    match account {
+                                        Ok(account) => {
+                                            drop(std::mem::replace(&mut (*accounts)[idx], account));
+                                            save_accounts(&*accounts);
+                                        }
+                                        Err(err) => {
+                                            println!(
+                                                "An error occoured while modifying the account! {}",
+                                                err
+                                            );
+                                            // TODO: Display this!
+                                        }
+                                    }
+                                }),
+                            ),
+                        ));
                     }
                     true
                 });
@@ -339,6 +376,7 @@ impl super::Screen for Launcher {
                                 match account {
                                     Ok(account) => {
                                         drop(std::mem::replace(&mut (*accounts)[idx], account));
+                                        save_accounts(&*accounts);
                                     }
                                     Err(err) => {
                                         println!(
@@ -348,7 +386,6 @@ impl super::Screen for Launcher {
                                         // TODO: Display this!
                                     }
                                 }
-                                save_accounts(&*accounts);
                             }),
                         ),
                     ));
