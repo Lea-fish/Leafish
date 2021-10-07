@@ -992,7 +992,7 @@ impl Server {
 
         *self.tick_timer.write() += delta;
         while *self.tick_timer.read() >= 3.0 && self.is_connected() {
-            self.minecraft_tick();
+            self.minecraft_tick(game);
             *self.tick_timer.write() -= 3.0;
         }
         let renderer = &mut renderer.write();
@@ -1122,7 +1122,7 @@ impl Server {
         offset * 0.8 + 0.2
     }
 
-    pub fn minecraft_tick(&self) {
+    pub fn minecraft_tick(&self, game: &mut Game) {
         if let Some(player) = *self.player.clone().write() {
             let movement = self
                 .entities
@@ -1170,6 +1170,12 @@ impl Server {
                 on_ground,
             )
             .unwrap();
+        }
+        if !game.focused {
+            if self.block_break_info.lock().pressed {
+                self.abort_breaking();
+            }
+            return;
         }
         let break_delay = self.block_break_info.lock().delay;
         if break_delay > 0 {
