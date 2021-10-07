@@ -692,18 +692,12 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
                         if game.focused && game.server.is_some() {
-                            game.server
-                                .as_ref()
-                                .unwrap()
-                                .on_right_click(game.renderer.clone());
+                            game.server.as_ref().unwrap().on_right_click();
                         }
                     }
                     (ElementState::Pressed, MouseButton::Left) => {
                         if game.focused && game.server.is_some() {
-                            game.server
-                                .as_ref()
-                                .unwrap()
-                                .on_left_click(game.renderer.clone());
+                            game.server.as_ref().unwrap().on_left_click();
                         }
                     }
                     (_, _) => (),
