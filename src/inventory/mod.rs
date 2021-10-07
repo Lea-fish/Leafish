@@ -1554,7 +1554,7 @@ impl Material {
         format!("{:?}", self)
     }
 
-    pub fn texture_locations(&self) -> (String, String) {
+    pub fn block_texture_locations(&self) -> (String, String) {
         // TODO: Compute this at compile time and only lookup at runtime in (O(1))
         let mut result = String::new();
         for (i, c) in self.name().chars().enumerate() {
@@ -1567,6 +1567,81 @@ impl Material {
                 result.push(c);
             }
         }
-        (format!("items/{}", result), format!("blocks/{}", result))
+        let result = Self::map_texture_name(result);
+        (format!("block/{}", result), String::new())
+    }
+
+    pub fn item_texture_locations(&self) -> (String, String) {
+        // TODO: Compute this at compile time and only lookup at runtime in (O(1))
+        let mut result = String::new();
+        for (i, c) in self.name().chars().enumerate() {
+            if c.is_uppercase() {
+                if i != 0 {
+                    result.push('_');
+                }
+                result.push(c.to_ascii_lowercase());
+            } else {
+                result.push(c);
+            }
+        }
+        let result = Self::map_texture_name(result);
+        (format!("item/{}", result), format!("block/{}", result))
+    }
+
+    pub fn map_texture_name(inpt: String) -> String {
+        // ? -> 1.16.5 texture name conversion
+        // lime_stained_hardened_clay
+        // green_stained_hardened_clay
+        // silver_stained_glass
+        // blue_stained_hardened_clay
+        // purple_stained_hardened_clay
+        // cyan_stained_hardened_clay
+        // skull
+        // light_blue_stained_hardened_clay
+        // brown_stained_hardened_clay
+        // gray_stained_hardened_clay
+        // quartz_column
+        // yellow_stained_hardened_clay
+        // orange_stained_hardened_clay
+        // pink_stained_hardened_clay
+        // red_stained_hardened_clay
+        // silver_wool
+        // reeds(sugarcane?)
+        // syringa
+        // paeonia
+        // black_stained_hardened_clay
+        // lit_redstone_lamp
+        // unpowered_repeater
+        // powered_repeater
+        // standing_banner
+        // wall_banner
+        // fence
+        // trapdoor
+        // silver_carpet
+        // houstonia
+        // golden_rail
+        // bed
+
+        // smooth -> polished (not in all cases tho - see sandstone!)
+        let inpt = inpt
+            .replace("stained_hardened_clay", "terracotta");
+        let result = match inpt.as_str() {
+            "smooth_andesite" => "polished_andesite",
+            "smooth_diorite" => "polished_diorite",
+            "stone_monster_egg" => "infested_stone",
+            "cobblestone_monster_egg" => "infested_cobblestone",
+            "mossy_brick_monster_egg" => "infested_mossy_stone_bricks",
+            "noteblock" => "note_block",
+            "melon_block" => "melon",
+            "brick_block" => "bricks",
+            "double_rose" => "rose_bush",
+            "portal" => "nether_portal",
+            "double_fern" => "large_fern",
+            "web" => "cobweb",
+            "snow_layer" => "snow",
+            _ => inpt
+                .as_str(),
+        };
+        String::from(result)
     }
 }

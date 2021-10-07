@@ -91,10 +91,14 @@ impl InventoryWindow {
         renderer: &Renderer,
     ) {
         let icon_scale = Hud::icon_scale(renderer);
-        let textures = item.material.texture_locations();
-        let texture = if Renderer::get_texture_optional(&renderer.textures, &*textures.0).is_some()
+        let textures = item.material.item_texture_locations();
+        let texture = if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &*format!("minecraft:{}", textures.0))
         {
-            textures.0
+            if tex.dummy {
+                textures.1
+            } else {
+                textures.0
+            }
         } else {
             textures.1
         };

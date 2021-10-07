@@ -19,6 +19,7 @@ use image::GenericImageView;
 use parking_lot::RwLock;
 use rand::seq::SliceRandom;
 use rand::Rng;
+use crate::inventory::Material;
 
 pub struct Factory {
     resources: Arc<RwLock<resources::Manager>>,
@@ -179,7 +180,8 @@ impl Factory {
         z: i32,
         buf: &mut W,
     ) -> usize {
-        let (plugin, name) = block.get_model();
+        let (plugin, mut name) = block.get_model();
+        name = Material::map_texture_name(name);
         let key = Key(plugin.to_owned(), name.to_owned());
         let mut missing_variant;
         {
@@ -301,7 +303,7 @@ impl Factory {
                 error!("Couldn't find model name");
                 return None;
             }
-        };
+        }.replace("minecraft:block/", "").replace("minecraft:", "");
 
         let file = match self
             .resources
@@ -338,7 +340,8 @@ impl Factory {
     }
 
     fn parse_model(&self, plugin: &str, v: &serde_json::Value) -> Option<RawModel> {
-        let parent = v.get("parent").and_then(|v| v.as_str()).unwrap_or("");
+        let parent = v.get("parent").and_then(|v| v.as_str()).unwrap_or("").replace("minecraft:", "");
+        let parent = parent.as_str();
         let mut model = if !parent.is_empty() && !parent.starts_with("builtin/") {
             let file = match self
                 .resources

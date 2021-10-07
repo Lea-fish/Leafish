@@ -518,9 +518,10 @@ impl Server {
                                     .entities
                                     .clone()
                                     .write()
-                                    .get_component_mut(*entity, server.target_rotation)
-                                    .unwrap();
-                                rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
+                                    .get_component_mut(*entity, server.target_rotation);
+                                if let Some(rotation) = rotation {
+                                    rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
+                                }
                             }
                         }
                         MappedPacket::JoinGame(join) => {
@@ -1727,11 +1728,12 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_position)
-                .unwrap();
-            position.position.x += entity_move.delta_x;
-            position.position.y += entity_move.delta_y;
-            position.position.z += entity_move.delta_z;
+                .get_component_mut(*entity, self.target_position);
+            if let Some(position) = position {
+                position.position.x += entity_move.delta_x;
+                position.position.y += entity_move.delta_y;
+                position.position.z += entity_move.delta_z;
+            }
         }
     }
 
@@ -1742,10 +1744,11 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_rotation)
-                .unwrap();
-            rotation.yaw = -(yaw / 256.0) * PI * 2.0;
-            rotation.pitch = -(pitch / 256.0) * PI * 2.0;
+                .get_component_mut(*entity, self.target_rotation);
+            if let Some(rotation) = rotation {
+                rotation.yaw = -(yaw / 256.0) * PI * 2.0;
+                rotation.pitch = -(pitch / 256.0) * PI * 2.0;
+            }
         }
     }
 
@@ -1764,19 +1767,21 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_position)
-                .unwrap();
-            let rotation = self
-                .entities
-                .clone()
-                .write()
-                .get_component_mut(*entity, self.target_rotation)
-                .unwrap();
-            position.position.x += delta_x;
-            position.position.y += delta_y;
-            position.position.z += delta_z;
-            rotation.yaw = -(yaw / 256.0) * PI * 2.0;
-            rotation.pitch = -(pitch / 256.0) * PI * 2.0;
+                .get_component_mut(*entity, self.target_position);
+            if let Some(position) = position {
+                let rotation = self
+                    .entities
+                    .clone()
+                    .write()
+                    .get_component_mut(*entity, self.target_rotation);
+                if let Some(rotation) = rotation {
+                    position.position.x += delta_x;
+                    position.position.y += delta_y;
+                    position.position.z += delta_z;
+                    rotation.yaw = -(yaw / 256.0) * PI * 2.0;
+                    rotation.pitch = -(pitch / 256.0) * PI * 2.0;
+                }
+            }
         }
     }
 
