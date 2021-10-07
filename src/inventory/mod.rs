@@ -1,5 +1,7 @@
 pub(crate) mod material;
 pub mod player_inventory;
+pub mod chest_inventory;
+pub mod base_inventory;
 
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::render::hud::HudContext;
@@ -12,17 +14,15 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 
 pub trait Inventory {
-    fn size(&self) -> i16;
+    fn size(&self) -> u16;
 
     fn id(&self) -> i8;
 
     fn name(&self) -> Option<&String>;
 
-    fn get_item(&self, slot: i16) -> &Option<Item>;
+    fn get_item(&self, slot: u16) -> Option<Item>;
 
-    fn get_item_mut(&mut self, slot: i16) -> &mut Option<Item>;
-
-    fn set_item(&mut self, slot: i16, item: Option<Item>);
+    fn set_item(&mut self, slot: u16, item: Option<Item>);
 
     fn init(
         &mut self,
@@ -106,6 +106,7 @@ impl InventoryContext {
 }
 
 pub enum InventoryType {
+    Base, // For internal use only.
     Main,
     Chest,
     Hopper,
@@ -120,13 +121,13 @@ pub enum InventoryType {
     EntityEquipment,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Item {
     pub stack: Stack,
     pub material: Material,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Material {
     Air,                             // 1.7.10 (id: 0, stack: 0)| 1.13 (id: 9648)
     Stone,                           // 1.7.10 (id: 1)| 1.13 (id: 22948)

@@ -693,7 +693,7 @@ impl Server {
                                 top_inventory.clone().read().player_inventory.clone()
                             };
                             let curr_slots = inventory.clone().read().size();
-                            if set_slot.slot < 0 || set_slot.slot >= curr_slots {
+                            if set_slot.slot < 0 || set_slot.slot >= curr_slots as i16 {
                                 if set_slot.slot == -1 {
                                     let item = set_slot.item.map(|stack| {
                                         let id = stack.id;
@@ -726,7 +726,7 @@ impl Server {
                                         ),
                                     }
                                 });
-                                inventory.clone().write().set_item(set_slot.slot, item);
+                                inventory.clone().write().set_item(set_slot.slot as u16, item);
                             }
                         }
                         MappedPacket::EntityVelocity(_velocity) => {
@@ -1368,7 +1368,7 @@ impl Server {
                                 .unwrap()
                                 .clone()
                                 .read()
-                                .get_item((36 + hud_context.clone().read().get_slot_index()) as i16)
+                                .get_item((36 + hud_context.clone().read().get_slot_index()) as u16)
                                 .as_ref()
                                 .map(|item| item.stack.clone())
                         }),

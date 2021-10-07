@@ -10,14 +10,14 @@ use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
 
-pub struct PlayerInventory {
+pub struct ChestInventory {
     slots: Vec<Slot>,
     dirty: bool,
     version: Version,
     hud_context: Arc<RwLock<HudContext>>,
 }
 
-impl PlayerInventory {
+impl ChestInventory {
     pub fn new(
         version: Version,
         renderer: &Renderer,
@@ -142,7 +142,7 @@ impl PlayerInventory {
             });
             slots.push(slot);
         }
-        PlayerInventory {
+        Self {
             slots,
             dirty: false,
             version,
@@ -235,17 +235,9 @@ impl PlayerInventory {
         }
         self.dirty = true;
     }
-
-    pub(crate) fn get_raw_slot_mut(&mut self, idx: u16) -> &mut Slot {
-        self.slots.get_mut(idx as usize).unwrap()
-    }
-
-    pub(crate) fn get_raw_slot(&self, idx: u16) -> &Slot {
-        self.slots.get(idx as usize).unwrap()
-    }
 }
 
-impl Inventory for PlayerInventory {
+impl Inventory for ChestInventory {
     fn size(&self) -> u16 {
         self.slots.len() as u16
     }
