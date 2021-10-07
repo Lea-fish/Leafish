@@ -459,7 +459,6 @@ impl Screen for Hud {
             return game.server.as_ref().unwrap().key_press(
                 down,
                 action_key,
-                game.screen_sys.clone(),
                 &mut game.focused.clone(),
             );
         }

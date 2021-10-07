@@ -114,6 +114,8 @@ struct EntityState {
 }
 
 /// Stores and manages a collection of entities.
+// TODO: Try to make this more efficient!
+// Anyvec?
 #[derive(Default)]
 pub struct Manager {
     num_components: usize,

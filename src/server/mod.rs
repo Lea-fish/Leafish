@@ -135,6 +135,7 @@ pub struct Server {
     pub chat_open: AtomicBool,
     pub chat_ctx: Arc<ChatContext>,
     screen_sys: Arc<ScreenSystem>,
+    renderer: Arc<RwLock<Renderer>>,
 }
 
 #[derive(Debug)]
@@ -145,6 +146,7 @@ pub struct BlockBreakInfo {
     progress: f32,
     delay: u8,
     active: bool,
+    pressed: bool,
 }
 
 #[derive(Debug)]
@@ -410,8 +412,8 @@ impl Server {
             render_list_computer.0.clone(),
             render_list_computer.1,
             hud_context,
-            &renderer.read(),
             screen_sys,
+            renderer,
         ));
         server.hud_context.clone().write().server = Some(server.clone());
 
@@ -429,15 +431,6 @@ impl Server {
                 let pck = read.read_packet();
                 match pck {
                     Ok(pck) => match pck.map() {
-                        /*MappedPacket::KeepAliveClientbound(keep_alive) => {
-                            server.on_keep_alive_i64(keep_alive);
-                        }
-                        MappedPacket::KeepAliveClientbound_VarInt(keep_alive) => {
-                            server.on_keep_alive_varint(keep_alive);
-                        }
-                        MappedPacket::KeepAliveClientbound_i32(keep_alive) => {
-                            server.on_keep_alive_i32(keep_alive);
-                        }*/
                         MappedPacket::KeepAliveClientbound(keep_alive) => packet::send_keep_alive(
                             server.conn.clone().write().as_mut().unwrap(),
                             server.mapped_protocol_version,
@@ -840,8 +833,8 @@ impl Server {
         render_list_computer: Sender<bool>,
         render_list_computer_notify: Receiver<bool>,
         hud_context: Arc<RwLock<HudContext>>,
-        renderer: &Renderer,
         screen_sys: Arc<ScreenSystem>,
+        renderer: Arc<RwLock<Renderer>>,
     ) -> Server {
         let mut entities = ecs::Manager::new();
         entity::add_systems(&mut entities);
@@ -853,7 +846,7 @@ impl Server {
         let version = Version::from_id(protocol_version as u32);
         let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
             version,
-            renderer,
+            &renderer.read(),
             hud_context.clone(),
         )));
         hud_context.write().player_inventory =
@@ -915,11 +908,13 @@ impl Server {
                 progress: 0.0,
                 delay: 0,
                 active: false,
+                pressed: false,
             }),
             last_chat_open: AtomicBool::new(false),
             chat_open: AtomicBool::new(false),
             chat_ctx: Arc::new(ChatContext::new()),
             screen_sys,
+            renderer,
         }
     }
 
@@ -965,38 +960,42 @@ impl Server {
             self.version.store(version, Ordering::Release);
             self.world.clone().flag_dirty_all();
         }
-        let renderer = &mut renderer.write();
-        // TODO: Check if the world type actually needs a sun
-        if self.sun_model.read().is_none() {
-            self.sun_model.write().replace(sun::SunModel::new(renderer));
-        }
+        {
+            let renderer = &mut renderer.write();
+            // TODO: Check if the world type actually needs a sun
+            if self.sun_model.read().is_none() {
+                self.sun_model.write().replace(sun::SunModel::new(renderer));
+            }
 
-        // Copy to camera
-        if let Some(player) = *self.player.clone().read() {
-            let position = self
-                .entities
-                .clone()
-                .read()
-                .get_component(player, self.position)
-                .unwrap(); // TODO: This panicked, check why!
-            let rotation = self
-                .entities
-                .clone()
-                .read()
-                .get_component(player, self.rotation)
-                .unwrap();
-            renderer.camera.pos =
-                cgmath::Point3::from_vec(position.position + cgmath::Vector3::new(0.0, 1.62, 0.0));
-            renderer.camera.yaw = rotation.yaw;
-            renderer.camera.pitch = rotation.pitch;
+            // Copy to camera
+            if let Some(player) = *self.player.clone().read() {
+                let position = self
+                    .entities
+                    .clone()
+                    .read()
+                    .get_component(player, self.position)
+                    .unwrap(); // TODO: This panicked, check why!
+                let rotation = self
+                    .entities
+                    .clone()
+                    .read()
+                    .get_component(player, self.rotation)
+                    .unwrap();
+                renderer.camera.pos = cgmath::Point3::from_vec(
+                    position.position + cgmath::Vector3::new(0.0, 1.62, 0.0),
+                );
+                renderer.camera.yaw = rotation.yaw;
+                renderer.camera.pitch = rotation.pitch;
+            }
+            self.entity_tick(renderer, delta, game.focused, *self.dead.read());
         }
-        self.entity_tick(renderer, delta, game.focused, *self.dead.read());
 
         *self.tick_timer.write() += delta;
         while *self.tick_timer.read() >= 3.0 && self.is_connected() {
-            self.minecraft_tick();
+            self.minecraft_tick(game);
             *self.tick_timer.write() -= 3.0;
         }
+        let renderer = &mut renderer.write();
 
         self.update_time(renderer, delta);
         if let Some(sun_model) = self.sun_model.write().as_mut() {
@@ -1123,7 +1122,7 @@ impl Server {
         offset * 0.8 + 0.2
     }
 
-    pub fn minecraft_tick(&self) {
+    pub fn minecraft_tick(&self, game: &mut Game) {
         if let Some(player) = *self.player.clone().write() {
             let movement = self
                 .entities
@@ -1172,6 +1171,12 @@ impl Server {
             )
             .unwrap();
         }
+        if !game.focused {
+            if self.block_break_info.lock().pressed {
+                self.abort_breaking();
+            }
+            return;
+        }
         let break_delay = self.block_break_info.lock().delay;
         if break_delay > 0 {
             self.block_break_info.lock().delay -= 1;
@@ -1197,16 +1202,12 @@ impl Server {
                 .unwrap();
                 self.block_break_info.lock().progress += 0.1; // TODO: Make this value meaningful
             }
+        } else if self.block_break_info.lock().pressed {
+            self.on_left_click();
         }
     }
 
-    pub fn key_press(
-        &self,
-        down: bool,
-        key: Actionkey,
-        screen_sys: Arc<ScreenSystem>,
-        focused: &mut bool,
-    ) -> bool {
+    pub fn key_press(&self, down: bool, key: Actionkey, focused: &mut bool) -> bool {
         if *focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
             let mut state_changed = false;
             if let Some(player) = *self.player.clone().write() {
@@ -1229,10 +1230,12 @@ impl Server {
                             .read()
                             .player_inventory
                             .clone();
-                        screen_sys.add_screen(Box::new(render::inventory::InventoryWindow::new(
-                            player_inv,
-                            self.inventory_context.clone(),
-                        )));
+                        self.screen_sys.add_screen(Box::new(
+                            render::inventory::InventoryWindow::new(
+                                player_inv,
+                                self.inventory_context.clone(),
+                            ),
+                        ));
                         return true;
                     }
                 }
@@ -1250,7 +1253,8 @@ impl Server {
                 }
                 Actionkey::ToggleChat => {
                     if down {
-                        screen_sys.add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
+                        self.screen_sys
+                            .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
                         return true;
                     }
                 }
@@ -1260,7 +1264,7 @@ impl Server {
         false
     }
 
-    pub fn on_left_click(&self, renderer: Arc<RwLock<render::Renderer>>) {
+    pub fn on_left_click(&self) {
         packet::send_arm_swing(
             self.conn.clone().write().as_mut().unwrap(),
             self.mapped_protocol_version,
@@ -1276,13 +1280,14 @@ impl Server {
                 .write()
                 .get_component(*self.player.clone().read().as_ref().unwrap(), self.gamemode)
                 .unwrap();
-            if !matches!(gamemode, GameMode::Spectator) && self.block_break_info.lock().delay == 0 {
+            if gamemode.can_interact_with_world() && self.block_break_info.lock().delay == 0 {
+                self.block_break_info.lock().pressed = true;
                 // TODO: Check this
                 if let Some((pos, _, face, _)) = target::trace_ray(
                     &world,
                     4.0,
-                    renderer.read().camera.pos.to_vec(),
-                    renderer.read().view_vector.cast().unwrap(),
+                    self.renderer.read().camera.pos.to_vec(),
+                    self.renderer.read().view_vector.cast().unwrap(),
                     target::test_block,
                 ) {
                     packet::send_digging(
@@ -1308,7 +1313,10 @@ impl Server {
     }
 
     pub fn abort_breaking(&self) {
-        // TODO: Call this on hand switching (hotbar scrolling)
+        if self.block_break_info.lock().pressed {
+            self.block_break_info.lock().pressed = false;
+        }
+        // TODO: Call this on hand switching (hotbar scrolling), but let pressed as it is!
         if self.block_break_info.lock().active {
             self.block_break_info.lock().active = false;
             self.block_break_info.lock().delay = 5;
@@ -1325,7 +1333,7 @@ impl Server {
         }
     }
 
-    pub fn on_right_click(&self, renderer: Arc<RwLock<render::Renderer>>) {
+    pub fn on_right_click(&self) {
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
             let gamemode = *self
@@ -1334,13 +1342,13 @@ impl Server {
                 .write()
                 .get_component(*self.player.clone().read().as_ref().unwrap(), self.gamemode)
                 .unwrap();
-            if !matches!(gamemode, GameMode::Spectator) {
+            if gamemode.can_interact_with_world() {
                 // TODO: Check this
                 if let Some((pos, _, face, at)) = target::trace_ray(
                     &world,
                     4.0,
-                    renderer.read().camera.pos.to_vec(),
-                    renderer.read().view_vector.cast().unwrap(),
+                    self.renderer.read().camera.pos.to_vec(),
+                    self.renderer.read().view_vector.cast().unwrap(),
                     target::test_block,
                 ) {
                     let hud_context = self.hud_context.clone();
