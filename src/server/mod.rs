@@ -431,15 +431,6 @@ impl Server {
                 let pck = read.read_packet();
                 match pck {
                     Ok(pck) => match pck.map() {
-                        /*MappedPacket::KeepAliveClientbound(keep_alive) => {
-                            server.on_keep_alive_i64(keep_alive);
-                        }
-                        MappedPacket::KeepAliveClientbound_VarInt(keep_alive) => {
-                            server.on_keep_alive_varint(keep_alive);
-                        }
-                        MappedPacket::KeepAliveClientbound_i32(keep_alive) => {
-                            server.on_keep_alive_i32(keep_alive);
-                        }*/
                         MappedPacket::KeepAliveClientbound(keep_alive) => packet::send_keep_alive(
                             server.conn.clone().write().as_mut().unwrap(),
                             server.mapped_protocol_version,
