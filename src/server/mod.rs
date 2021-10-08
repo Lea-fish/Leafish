@@ -57,6 +57,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
+use crate::inventory::chest_inventory::ChestInventory;
 
 pub mod plugin_messages;
 mod sun;
@@ -1129,7 +1130,7 @@ impl Server {
                 .clone()
                 .write()
                 .get_component_mut(player, self.player_movement)
-                .unwrap();
+                .unwrap(); // TODO: This panicked - check why (none - unwrap)!
             let on_ground = self
                 .entities
                 .clone()
@@ -1224,12 +1225,14 @@ impl Server {
             match key {
                 Actionkey::OpenInv => {
                     if down {
-                        let player_inv = self
+                        /*let player_inv = self
                             .inventory_context
                             .clone()
                             .read()
                             .player_inventory
-                            .clone();
+                            .clone();*/
+                        let player_inv = Arc::new(RwLock::new(ChestInventory::new(self.mapped_protocol_version.clone(),
+                                                             &*self.renderer.clone().read(), self.hud_context.clone(), 45, "Test!".to_string())));
                         self.screen_sys.add_screen(Box::new(
                             render::inventory::InventoryWindow::new(
                                 player_inv,
