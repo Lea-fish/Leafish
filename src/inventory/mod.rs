@@ -12,6 +12,7 @@ use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 use std::sync::Arc;
+use crate::inventory::base_inventory::BaseInventory;
 
 pub trait Inventory {
     fn size(&self) -> u16;
@@ -84,6 +85,7 @@ pub struct InventoryContext {
     pub hotbar_index: u8,
     pub inventory: Option<Arc<RwLock<dyn Inventory + Send + Sync>>>,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
+    pub base_inventory: Arc<RwLock<BaseInventory>>,
 }
 
 impl InventoryContext {
@@ -92,15 +94,17 @@ impl InventoryContext {
         renderer: &Renderer,
         hud_context: Arc<RwLock<HudContext>>,
     ) -> Self {
-        InventoryContext {
+        let player_inventory = Arc::new(RwLock::new(PlayerInventory::new(
+            version,
+            renderer,
+            hud_context.clone(),
+        )));
+        Self {
             cursor: None,
             hotbar_index: 0,
             inventory: None,
-            player_inventory: Arc::new(RwLock::new(PlayerInventory::new(
-                version,
-                renderer,
-                hud_context,
-            ))),
+            player_inventory: player_inventory.clone(),
+            base_inventory: Arc::new(RwLock::new(BaseInventory::new(hud_context, player_inventory)))
         }
     }
 }

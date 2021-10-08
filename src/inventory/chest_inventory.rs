@@ -330,7 +330,7 @@ impl Inventory for ChestInventory {
             inventory_window.elements.get_mut(1).unwrap().clear();
             for slot in self.slots.iter() {
                 if slot.item.is_some() {
-                    inventory_window.draw_item(
+                    inventory_window.draw_item_internally(
                         slot.item.as_ref().unwrap(),
                         slot.x,
                         slot.y,
@@ -359,11 +359,10 @@ impl Inventory for ChestInventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
-        inventory_window.clear_elements();
         self.init(renderer, ui_container, inventory_window);
     }
 
     fn ty(&self) -> InventoryType {
-        InventoryType::Main
+        InventoryType::Chest
     }
 }

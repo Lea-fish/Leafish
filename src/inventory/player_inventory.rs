@@ -142,7 +142,7 @@ impl PlayerInventory {
             });
             slots.push(slot);
         }
-        PlayerInventory {
+        Self {
             slots,
             dirty: false,
             version,
@@ -210,25 +210,6 @@ impl PlayerInventory {
             y_offset + -((3_f64 + 1.0 / 8.0) * slot_offset + size + hot_bar_offset * 2.0),
             size,
         );
-        for y in (0..3).rev() {
-            for x in 0..9 {
-                self.slots
-                    .get_mut(9 + x + 9 * (2 - y))
-                    .unwrap()
-                    .update_position(
-                        x_offset + x as f64 * slot_offset,
-                        y_offset + -(y as f64 * slot_offset * 2.0 + hot_bar_offset),
-                        size,
-                    );
-            }
-        }
-        for i in 0..9 {
-            self.slots.get_mut(36 + i).unwrap().update_position(
-                x_offset + i as f64 * (size + size * 1.0 / 8.0),
-                y_offset,
-                size,
-            );
-        }
         if self.version > Version::V1_8 {
             let slot = self.slots.get_mut(45).unwrap();
             slot.update_position(-(scale * 3.0), scale * 5.0 - scale * 18.0, size);
@@ -279,7 +260,7 @@ impl Inventory for PlayerInventory {
         inventory_window: &mut InventoryWindow,
     ) {
         inventory_window.elements.push(vec![]);
-        let basic_elements = inventory_window.elements.get_mut(0).unwrap();
+        let basic_elements = inventory_window.elements.get_mut(1).unwrap();
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, 166.0 / 256.0))
@@ -335,14 +316,28 @@ impl Inventory for PlayerInventory {
     ) {
         if self.dirty {
             self.dirty = false;
-            inventory_window.elements.get_mut(1).unwrap().clear();
-            for slot in self.slots.iter() {
-                if slot.item.is_some() {
-                    inventory_window.draw_item(
-                        slot.item.as_ref().unwrap(),
+            inventory_window.elements.get_mut(2).unwrap().clear();
+            for slot in 0..9 {
+                let slot = self.slots.get(slot).unwrap();
+                if let Some(item) = &slot.item {
+                    inventory_window.draw_item_internally(
+                        item,
                         slot.x,
                         slot.y,
-                        1,
+                        2,
+                        ui_container,
+                        renderer,
+                    );
+                }
+            }
+            if self.slots.len() == 46 {
+                let slot = self.slots.get(45).unwrap();
+                if let Some(item) = &slot.item {
+                    inventory_window.draw_item_internally(
+                        item,
+                        slot.x,
+                        slot.y,
+                        2,
                         ui_container,
                         renderer,
                     );
@@ -367,7 +362,6 @@ impl Inventory for PlayerInventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
-        inventory_window.clear_elements();
         self.init(renderer, ui_container, inventory_window);
     }
 
