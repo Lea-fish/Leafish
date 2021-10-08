@@ -18,7 +18,7 @@ pub use leafish_blocks as block;
 use crate::format;
 use crate::shared::Position;
 use crate::types::nibble;
-use crate::world::chunk::SectionSnapshot;
+use crate::world::chunk::ChunkSectionSnapshot;
 
 pub use self::{chunk::*, lighting::*, world::*};
 
@@ -44,7 +44,7 @@ pub enum BlockEntityAction {
 }
 
 lazy_static! {
-    static ref EMPTY_SECTION: SectionSnapshot = SectionSnapshot {
+    static ref EMPTY_SECTION: ChunkSectionSnapshot = ChunkSectionSnapshot {
         y: 255, // TODO: Check
         blocks: storage::BlockStorage::new(16 * 16 * 16),
         block_light: nibble::Array::new(16 * 16 * 16),

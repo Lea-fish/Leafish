@@ -42,8 +42,8 @@ impl ChunkSection {
         }
     }
 
-    pub fn capture_snapshot(&self, biomes: [u8; 16 * 16]) -> SectionSnapshot {
-        SectionSnapshot {
+    pub fn capture_snapshot(&self, biomes: [u8; 16 * 16]) -> ChunkSectionSnapshot {
+        ChunkSectionSnapshot {
             y: self.y,
             blocks: self.blocks.clone(),
             block_light: self.block_light.clone(),
@@ -89,7 +89,7 @@ impl ChunkSection {
 }
 
 #[derive(Clone)]
-pub struct SectionSnapshot {
+pub struct ChunkSectionSnapshot {
     pub y: u8,
     pub blocks: storage::BlockStorage,
     pub block_light: nibble::Array,
@@ -97,7 +97,7 @@ pub struct SectionSnapshot {
     pub biomes: [u8; 16 * 16], // TODO: Remove this by using the chunk's biome!
 }
 
-impl SectionSnapshot {
+impl ChunkSectionSnapshot {
     pub fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
         self.blocks.get(((y << 8) | (z << 4) | x) as usize)
     }

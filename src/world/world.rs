@@ -20,7 +20,7 @@ use parking_lot::RwLock;
 
 use crate::chunk_builder::CullInfo;
 use crate::entity::block_entity;
-use crate::world::chunk::{Chunk, ChunkSection, SectionSnapshot};
+use crate::world::chunk::{Chunk, ChunkSection, ChunkSectionSnapshot};
 use crate::world::{BlockEntityAction, CPos, LightData, LightType, LightUpdate};
 use crate::{chunk_builder, ecs, render};
 
@@ -732,7 +732,7 @@ impl World {
         }
     }
 
-    pub fn capture_snapshot(&self, x: i32, y: i32, z: i32) -> Option<SectionSnapshot> {
+    pub fn capture_snapshot(&self, x: i32, y: i32, z: i32) -> Option<ChunkSectionSnapshot> {
         // TODO: Improve performance!
         let cx = x >> 4;
         let cy = y >> 4;

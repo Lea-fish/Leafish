@@ -3,13 +3,13 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 
 use crate::world::biome::Biome;
-use crate::world::chunk::chunk_section::SectionSnapshot;
+use crate::world::chunk::chunk_section::ChunkSectionSnapshot;
 use crate::world::{biome, CPos, World, EMPTY_SECTION};
 
 // TODO: make use of "x: i32", "y: i32" and "z: i32"
 #[allow(dead_code)]
 pub struct ComposedSection {
-    sections: [Option<SectionSnapshot>; 27],
+    sections: [Option<ChunkSectionSnapshot>; 27],
     x: i32,
     y: i32,
     z: i32,
