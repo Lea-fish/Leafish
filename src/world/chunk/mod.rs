@@ -6,13 +6,12 @@ use leafish_blocks as block;
 use leafish_protocol::types::hash::FNVHash;
 use leafish_shared::position::Position;
 
-pub use self::{chunk_section::*, chunk_snapshot::*, composed_section::*};
-
 use crate::ecs;
 use crate::world::biome;
 
+pub use self::{chunk_section::*, composed_section::*};
+
 mod chunk_section;
-mod chunk_snapshot;
 mod composed_section;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
@@ -199,4 +198,11 @@ impl Chunk {
             heightmap: self.heightmap,
         }
     }
+}
+
+pub struct ChunkSnapshot {
+    pub position: CPos,
+    pub sections: [Option<ChunkSectionSnapshot>; 16],
+    pub biomes: [u8; 16 * 16],
+    pub heightmap: [u8; 16 * 16],
 }

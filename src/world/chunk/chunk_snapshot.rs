@@ -1,9 +1,0 @@
-use crate::world::chunk::chunk_section::ChunkSectionSnapshot;
-use crate::world::CPos;
-
-pub struct ChunkSnapshot {
-    pub position: CPos,
-    pub sections: [Option<ChunkSectionSnapshot>; 16],
-    pub biomes: [u8; 16 * 16],
-    pub heightmap: [u8; 16 * 16],
-}
