@@ -13,7 +13,6 @@ use std::sync::atomic::Ordering;
 pub struct ChestInventory {
     slots: Vec<Slot>,
     dirty: bool,
-    version: Version,
     hud_context: Arc<RwLock<HudContext>>,
     name: String,
     slot_count: u16,
@@ -21,7 +20,6 @@ pub struct ChestInventory {
 
 impl ChestInventory {
     pub fn new(
-        version: Version,
         renderer: &Renderer,
         hud_context: Arc<RwLock<HudContext>>,
         slot_count: u16,
@@ -49,7 +47,6 @@ impl ChestInventory {
         Self {
             slots,
             dirty: false,
-            version,
             hud_context,
             name,
             slot_count,
@@ -97,13 +94,15 @@ impl Inventory for ChestInventory {
     }
 
     fn set_item(&mut self, slot: u16, item: Option<Item>) {
-        self.slots[slot as usize].item = item;
-        self.dirty = true;
-        self.hud_context
-            .clone()
-            .read()
-            .dirty_slots
-            .store(true, Ordering::Relaxed);
+        if self.slots.len() > slot as usize { // TODO: Fix OOB access properly and remove this dirty workaround!
+            self.slots[slot as usize].item = item;
+            self.dirty = true;
+            self.hud_context
+                .clone()
+                .read()
+                .dirty_slots
+                .store(true, Ordering::Relaxed);
+        }
     }
 
     fn init(
@@ -191,7 +190,7 @@ impl Inventory for ChestInventory {
         }
     }
 
-    fn close(&mut self, _inventory_window: &mut InventoryWindow) {
+    fn close(&mut self) {
         // TODO
     }
 
@@ -211,6 +210,6 @@ impl Inventory for ChestInventory {
     }
 
     fn ty(&self) -> InventoryType {
-        InventoryType::Chest
+        InventoryType::Chest((self.size() / 9) as u8)
     }
 }

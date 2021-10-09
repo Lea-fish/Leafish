@@ -13,6 +13,9 @@ use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 use std::sync::Arc;
 use crate::inventory::base_inventory::BaseInventory;
+use leafish_protocol::format::Component;
+use crate::inventory::chest_inventory::ChestInventory;
+use crate::screen::ScreenSystem;
 
 pub trait Inventory {
     fn size(&self) -> u16;
@@ -39,7 +42,7 @@ pub trait Inventory {
         inventory_window: &mut InventoryWindow,
     );
 
-    fn close(&mut self, inventory_window: &mut InventoryWindow);
+    fn close(&mut self);
 
     fn click_at(&self, cursor: (u32, u32)); // TODO: Pass mouse data (buttons, wheel etc and shift button state)
 
@@ -53,6 +56,39 @@ pub trait Inventory {
     );
 
     fn ty(&self) -> InventoryType;
+}
+
+pub fn inventory_from_type(ty: InventoryType, title: Component, renderer: Arc<RwLock<Renderer>>, hud_context: Arc<RwLock<HudContext>>) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
+    match ty {
+        /*InventoryType::Base => {}
+        InventoryType::Main => {}*/
+        InventoryType::Chest(rows) => {
+            let renderer = renderer.clone();
+            let renderer = renderer.read();
+            let renderer = &*renderer;
+            Some(Arc::new(RwLock::new(ChestInventory::new(renderer, hud_context.clone(), rows as u16 * 9, title.to_string()))))
+        },
+        /*InventoryType::Dropper => {}
+        InventoryType::Anvil => {}
+        InventoryType::Beacon => {}
+        InventoryType::BlastFurnace => {}
+        InventoryType::BrewingStand => {}
+        InventoryType::CraftingTable => {}
+        InventoryType::EnchantingTable => {}
+        InventoryType::Furnace => {}
+        InventoryType::Grindstone => {}
+        InventoryType::Hopper => {}
+        InventoryType::Lectern => {}
+        InventoryType::Loom => {}
+        InventoryType::Merchant => {}
+        InventoryType::ShulkerBox => {}
+        InventoryType::SmithingTable => {}
+        InventoryType::Smoker => {}
+        InventoryType::CartographyTable => {}
+        InventoryType::Stonecutter => {}
+        InventoryType::Horse => {}*/
+        _ => None,
+    }
 }
 
 pub struct Slot {
@@ -84,6 +120,7 @@ pub struct InventoryContext {
     pub cursor: Option<Item>,
     pub hotbar_index: u8,
     pub inventory: Option<Arc<RwLock<dyn Inventory + Send + Sync>>>,
+    pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
     pub base_inventory: Arc<RwLock<BaseInventory>>,
 }
@@ -103,26 +140,96 @@ impl InventoryContext {
             cursor: None,
             hotbar_index: 0,
             inventory: None,
+            has_inv_open: false,
             player_inventory: player_inventory.clone(),
             base_inventory: Arc::new(RwLock::new(BaseInventory::new(hud_context, player_inventory)))
         }
     }
+
+    pub fn open_inventory(&mut self, inventory: Arc<RwLock<dyn Inventory + Sync + Send>>, screen_sys: Arc<ScreenSystem>, self_ref: Arc<RwLock<InventoryContext>>) {
+        self.try_close_inventory(screen_sys.clone());
+        println!("closed!");
+        screen_sys.add_screen(Box::new(
+            InventoryWindow::new(
+                inventory.clone(),
+                self_ref.clone(),
+                self.base_inventory.clone(),
+            ),
+        ));
+        self.has_inv_open = true;
+        println!("added screen!");
+    }
+
+    pub fn try_close_inventory(&mut self, screen_sys: Arc<ScreenSystem>) -> bool {
+        if self.has_inv_open {
+            self.has_inv_open = false;
+            screen_sys.pop_screen();
+            return true;
+        }
+        false
+    }
 }
 
+#[derive(Debug)]
 pub enum InventoryType {
     Base, // For internal use only.
     Main,
-    Chest,
-    Hopper,
-    Enchanter,
+    Chest(u8), // rows
+    Dropper, // Dropper and Dispenser
     Anvil,
     Beacon,
-    Brewer,
+    BlastFurnace,
+    BrewingStand,
     CraftingTable,
-    Dropper,
-    Horse,
+    EnchantingTable,
+    Furnace,
+    Grindstone,
+    Hopper,
+    Lectern,
+    Loom,
     Merchant,
-    EntityEquipment,
+    ShulkerBox,
+    SmithingTable,
+    Smoker,
+    CartographyTable,
+    Stonecutter,
+    Horse,
+}
+
+impl InventoryType {
+
+    pub fn from_id(id: i32) -> Self {
+        match id {
+            0..=5 => InventoryType::Chest((1 + id) as u8),
+            6 => InventoryType::Dropper,
+            7 => InventoryType::Anvil,
+            8 => InventoryType::Beacon,
+            9 => InventoryType::BlastFurnace,
+            10 => InventoryType::BrewingStand,
+            11 => InventoryType::CraftingTable,
+            12 => InventoryType::EnchantingTable,
+            13 => InventoryType::Furnace,
+            14 => InventoryType::Grindstone,
+            15 => InventoryType::Hopper,
+            16 => InventoryType::Lectern,
+            17 => InventoryType::Loom,
+            18 => InventoryType::Merchant,
+            19 => InventoryType::ShulkerBox,
+            20 => InventoryType::SmithingTable,
+            21 => InventoryType::Smoker,
+            22 => InventoryType::CartographyTable,
+            23 => InventoryType::Stonecutter,
+            _ => InventoryType::Chest(1),
+        }
+    }
+
+    pub fn from_name(name: String) -> Self {
+        match name.as_str() {
+
+            _ => InventoryType::Chest(1),
+        }
+    }
+
 }
 
 #[derive(Debug, Clone)]

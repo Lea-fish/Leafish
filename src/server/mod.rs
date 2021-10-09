@@ -17,7 +17,7 @@ use crate::entity::player::create_local;
 use crate::entity::EntityType;
 use crate::format;
 use crate::inventory::material::versions::to_material;
-use crate::inventory::{Inventory, InventoryContext, Item};
+use crate::inventory::{Inventory, InventoryContext, Item, InventoryType, inventory_from_type};
 use crate::protocol::{self, forge, mapped_packet, packet};
 use crate::render;
 use crate::render::hud::HudContext;
@@ -730,6 +730,22 @@ impl Server {
                                 inventory.clone().write().set_item(set_slot.slot as u16, item);
                             }
                         }
+                        MappedPacket::WindowClose(close) => {
+                            server.inventory_context.clone().write().try_close_inventory(server.screen_sys.clone());
+                        }
+                        MappedPacket::WindowOpen(open) => {
+                            if open.ty_name.is_some() {
+                                print!("inv type: {}", open.ty_name.as_ref().unwrap());
+                            } else {
+                                let inv_type = InventoryType::from_id(open.ty.unwrap());
+                                println!("inv type: {:?}", &inv_type);
+                                let inventory = inventory_from_type(inv_type, open.title, server.renderer.clone(), server.hud_context.clone());
+                                if let Some(inventory) = inventory {
+                                    println!("opening...!");
+                                    server.inventory_context.clone().write().open_inventory(inventory.clone(), server.screen_sys.clone(), server.inventory_context.clone());
+                                }
+                            }
+                        }
                         MappedPacket::EntityVelocity(_velocity) => {
                             // TODO: Only apply the velocity to the local player due to jittering of other players
                             /* if let Some(entity) =
@@ -1231,14 +1247,9 @@ impl Server {
                             .read()
                             .player_inventory
                             .clone();*/
-                        let player_inv = Arc::new(RwLock::new(ChestInventory::new(self.mapped_protocol_version.clone(),
+                        let player_inv = Arc::new(RwLock::new(ChestInventory::new(
                                                              &*self.renderer.clone().read(), self.hud_context.clone(), 45, "Test!".to_string())));
-                        self.screen_sys.add_screen(Box::new(
-                            render::inventory::InventoryWindow::new(
-                                player_inv,
-                                self.inventory_context.clone(),
-                            ),
-                        ));
+                        self.inventory_context.clone().write().open_inventory(player_inv.clone(), self.screen_sys.clone(), self.inventory_context.clone());
                         return true;
                     }
                 }

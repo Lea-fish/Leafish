@@ -346,7 +346,7 @@ impl Inventory for PlayerInventory {
         }
     }
 
-    fn close(&mut self, _inventory_window: &mut InventoryWindow) {
+    fn close(&mut self) {
         // TODO
     }
 

@@ -2,11 +2,12 @@ use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::Screen;
-use crate::ui;
+use crate::{ui, Game};
 use crate::ui::{Container, ImageRef, TextRef};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use crate::inventory::base_inventory::BaseInventory;
+use glutin::event::VirtualKeyCode;
 
 #[derive(Clone)]
 pub struct InventoryWindow {
@@ -36,16 +37,14 @@ impl Screen for InventoryWindow {
 
     fn deinit(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
         self.inventory_context.clone().write().inventory = None;
-        self.base_inventory.clone().write().close(self);
-        self.inventory.clone().write().close(self);
+        self.base_inventory.clone().write().close();
+        self.inventory.clone().write().close();
         self.clear_elements();
     }
 
-    fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-    }
+    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
-    fn on_deactive(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-    }
+    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
     fn tick(
         &mut self,
@@ -89,18 +88,27 @@ impl Screen for InventoryWindow {
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
     }
+
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+        if key == VirtualKeyCode::Escape && !down {
+            self.inventory_context.clone().write().try_close_inventory(game.screen_sys.clone());
+            return true;
+        }
+        false
+    }
 }
 
 impl InventoryWindow {
     pub fn new(
         inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
         inventory_context: Arc<RwLock<InventoryContext>>,
+        base_inventory: Arc<RwLock<BaseInventory>>,
     ) -> Self {
         Self {
             elements: vec![],
             text_elements: vec![],
             inventory,
-            base_inventory: inventory_context.clone().read().base_inventory.clone(),
+            base_inventory,
             inventory_context,
         }
     }
