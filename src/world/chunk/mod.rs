@@ -9,10 +9,9 @@ use leafish_shared::position::Position;
 use crate::ecs;
 use crate::world::biome;
 
-pub use self::{chunk_section::*, composed_section::*};
+pub use self::chunk_section::*;
 
 mod chunk_section;
-mod composed_section;
 
 #[derive(PartialEq, Eq, Hash, Clone, Copy)]
 pub struct CPos(pub i32, pub i32);

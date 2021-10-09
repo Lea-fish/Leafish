@@ -9,7 +9,7 @@ use std::sync::Arc;
 pub fn render_liquid<W: Write>(
     textures: Arc<RwLock<render::TextureManager>>,
     lava: bool,
-    snapshot: &world::ComposedSection,
+    snapshot: &world::ChunkSectionSnapshotGroup,
     x: i32,
     y: i32,
     z: i32,
@@ -127,8 +127,8 @@ pub fn render_liquid<W: Write>(
 }
 
 fn average_liquid_level(
-    get: fn(&world::ComposedSection, i32, i32, i32) -> Option<i32>,
-    snapshot: &world::ComposedSection,
+    get: fn(&world::ChunkSectionSnapshotGroup, i32, i32, i32) -> Option<i32>,
+    snapshot: &world::ChunkSectionSnapshotGroup,
     x: i32,
     y: i32,
     z: i32,
@@ -150,14 +150,24 @@ fn average_liquid_level(
     level
 }
 
-fn get_water_level(snapshot: &world::ComposedSection, x: i32, y: i32, z: i32) -> Option<i32> {
+fn get_water_level(
+    snapshot: &world::ChunkSectionSnapshotGroup,
+    x: i32,
+    y: i32,
+    z: i32,
+) -> Option<i32> {
     match snapshot.get_block(x, y, z) {
         block::Block::Water { level } | block::Block::FlowingWater { level } => Some(level as i32),
         _ => None,
     }
 }
 
-fn get_lava_level(snapshot: &world::ComposedSection, x: i32, y: i32, z: i32) -> Option<i32> {
+fn get_lava_level(
+    snapshot: &world::ChunkSectionSnapshotGroup,
+    x: i32,
+    y: i32,
+    z: i32,
+) -> Option<i32> {
     match snapshot.get_block(x, y, z) {
         block::Block::Lava { level } | block::Block::FlowingLava { level } => Some(level as i32),
         _ => None,
