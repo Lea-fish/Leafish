@@ -1,7 +1,7 @@
 use crate::world::biome::Biome;
-use crate::world::EMPTY_SECTION;
 use crate::world::{biome, storage, CPos, World};
 use crate::{chunk_builder, render};
+use lazy_static::lazy_static;
 pub use leafish_blocks as block;
 use leafish_protocol::types::nibble;
 use parking_lot::RwLock;
@@ -116,6 +116,16 @@ impl ChunkSectionSnapshot {
     pub fn get_biome(&self, x: i32, z: i32) -> biome::Biome {
         biome::Biome::by_id(self.biomes[((z << 4) | x) as usize] as usize)
     }
+}
+
+lazy_static! {
+    static ref EMPTY_SECTION: ChunkSectionSnapshot = ChunkSectionSnapshot {
+        y: 255, // TODO: Check
+        blocks: storage::BlockStorage::new(16 * 16 * 16),
+        block_light: nibble::Array::new(16 * 16 * 16),
+        sky_light: nibble::Array::new_def(16 * 16 * 16, 0xF),
+        biomes: [0; 16 * 16], // TODO: Verify this!
+    };
 }
 
 // TODO: make use of "x: i32", "y: i32" and "z: i32"

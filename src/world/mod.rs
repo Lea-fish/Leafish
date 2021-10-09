@@ -12,13 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use lazy_static::lazy_static;
 pub use leafish_blocks as block;
 
 use crate::format;
 use crate::shared::Position;
-use crate::types::nibble;
-use crate::world::chunk::ChunkSectionSnapshot;
 
 pub use self::{chunk::*, lighting::*, world::*};
 
@@ -41,14 +38,4 @@ pub enum BlockEntityAction {
             format::Component,
         )>,
     ),
-}
-
-lazy_static! {
-    static ref EMPTY_SECTION: ChunkSectionSnapshot = ChunkSectionSnapshot {
-        y: 255, // TODO: Check
-        blocks: storage::BlockStorage::new(16 * 16 * 16),
-        block_light: nibble::Array::new(16 * 16 * 16),
-        sky_light: nibble::Array::new_def(16 * 16 * 16, 0xF),
-        biomes: [0; 16 * 16], // TODO: Verify this!
-    };
 }
