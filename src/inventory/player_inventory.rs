@@ -231,7 +231,7 @@ impl Inventory for PlayerInventory {
         self.slots.len() as u16
     }
 
-    fn id(&self) -> i8 {
+    fn id(&self) -> i32 {
         -1
     }
 

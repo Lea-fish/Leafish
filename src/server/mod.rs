@@ -58,6 +58,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use crate::inventory::chest_inventory::ChestInventory;
+use leafish_protocol::item::Stack;
 
 pub mod plugin_messages;
 mod sun;
@@ -681,54 +682,13 @@ impl Server {
                                 warn!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
                             }
                         }
-                        MappedPacket::WindowItems(_window_items) => {
-                            debug!("items!");
+                        MappedPacket::WindowItems(items) => {
+                            for item in items.items.into_iter().enumerate() {
+                                server.on_set_slot(items.id as i16, item.0 as i16, item.1);
+                            }
                         }
                         MappedPacket::WindowSetSlot(set_slot) => {
-                            let top_inventory = server.inventory_context.clone();
-                            let inventory = if let Some(inventory) =
-                                top_inventory.clone().read().inventory.as_ref()
-                            {
-                                inventory.clone()
-                            } else {
-                                top_inventory.clone().read().player_inventory.clone()
-                            };
-                            let curr_slots = inventory.clone().read().size();
-                            if set_slot.slot < 0 || set_slot.slot >= curr_slots as i16 {
-                                if set_slot.slot == -1 {
-                                    let item = set_slot.item.map(|stack| {
-                                        let id = stack.id;
-                                        Item {
-                                            stack,
-                                            material: to_material(
-                                                id as u16,
-                                                server.mapped_protocol_version,
-                                            ),
-                                        }
-                                    });
-                                    top_inventory.write().cursor = item; // TODO: Set to HUD and make it dirty!
-                                } else {
-                                    warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
-                                }
-                            } else {
-                                debug!(
-                                    "set item to {}, {}, {}",
-                                    set_slot.id,
-                                    set_slot.slot,
-                                    set_slot.item.as_ref().map_or(0, |s| s.id)
-                                );
-                                let item = set_slot.item.map(|stack| {
-                                    let id = stack.id;
-                                    Item {
-                                        stack,
-                                        material: to_material(
-                                            id as u16,
-                                            server.mapped_protocol_version,
-                                        ),
-                                    }
-                                });
-                                inventory.clone().write().set_item(set_slot.slot as u16, item);
-                            }
+                            server.on_set_slot(set_slot.id as i16, set_slot.slot, set_slot.item);
                         }
                         MappedPacket::WindowClose(close) => {
                             server.inventory_context.clone().write().try_close_inventory(server.screen_sys.clone());
@@ -739,7 +699,7 @@ impl Server {
                             } else {
                                 let inv_type = InventoryType::from_id(open.ty.unwrap());
                                 println!("inv type: {:?}", &inv_type);
-                                let inventory = inventory_from_type(inv_type, open.title, server.renderer.clone(), server.hud_context.clone());
+                                let inventory = inventory_from_type(inv_type, open.title, server.renderer.clone(), server.hud_context.clone(), open.id);
                                 if let Some(inventory) = inventory {
                                     println!("opening...!");
                                     server.inventory_context.clone().write().open_inventory(inventory.clone(), server.screen_sys.clone(), server.inventory_context.clone());
@@ -1248,7 +1208,7 @@ impl Server {
                             .player_inventory
                             .clone();*/
                         let player_inv = Arc::new(RwLock::new(ChestInventory::new(
-                                                             &*self.renderer.clone().read(), self.hud_context.clone(), 45, "Test!".to_string())));
+                                                             &*self.renderer.clone().read(), self.hud_context.clone(), 45, "Test!".to_string(), 1)));
                         self.inventory_context.clone().write().open_inventory(player_inv.clone(), self.screen_sys.clone(), self.inventory_context.clone());
                         return true;
                     }
@@ -1546,6 +1506,53 @@ impl Server {
             .as_mut()
             .unwrap()
             .write_plugin_message(channel, data); // TODO handle errors
+    }
+
+    fn on_set_slot(&self, inventory_id: i16, slot: i16, item: Option<Stack>) {
+        let top_inventory = self.inventory_context.clone();
+        let inventory = if let Some(inventory) =
+        top_inventory.clone().read().inventory.as_ref()
+        {
+            inventory.clone()
+        } else {
+            top_inventory.clone().read().player_inventory.clone()
+        };
+        let curr_slots = inventory.clone().read().size();
+        if slot < 0 || slot >= curr_slots as i16 {
+            if slot == -1 {
+                let item = item.map(|stack| {
+                    let id = stack.id;
+                    Item {
+                        stack,
+                        material: to_material(
+                            id as u16,
+                            self.mapped_protocol_version,
+                        ),
+                    }
+                });
+                top_inventory.write().cursor = item; // TODO: Set to HUD and make it dirty!
+            } else {
+                warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", inventory_id + 1, curr_slots);
+            }
+        } else {
+            debug!(
+                                    "set item to {}, {}, {}",
+                                    inventory_id,
+                                    slot,
+                                    item.as_ref().map_or(0, |s| s.id)
+                                );
+            let item = item.map(|stack| {
+                let id = stack.id;
+                Item {
+                    stack,
+                    material: to_material(
+                        id as u16,
+                        self.mapped_protocol_version,
+                    ),
+                }
+            });
+            inventory.clone().write().set_item(slot as u16, item);
+        }
     }
 
     fn on_game_join(&self, gamemode: u8, entity_id: i32) {

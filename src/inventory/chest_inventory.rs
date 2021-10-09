@@ -16,6 +16,7 @@ pub struct ChestInventory {
     hud_context: Arc<RwLock<HudContext>>,
     name: String,
     slot_count: u16,
+    id: i32,
 }
 
 impl ChestInventory {
@@ -24,22 +25,27 @@ impl ChestInventory {
         hud_context: Arc<RwLock<HudContext>>,
         slot_count: u16,
         name: String,
+        id: i32,
     ) -> Self {
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
+        let slot_offset = size + size * 1.0 / 8.0;
         let x_offset = -(size * 4.5);
-        let y_offset = size * 4.25;
+        let y = 114;
+        let rows = slot_count / 9;
+        let y_size = y + rows * 18;
+        let y_offset = (renderer.safe_height as f64 / scale - y_size as f64) / 2.0 + slot_offset / 2.0;
+        // let y_offset = size * 4.25;
         let hot_bar_offset = scale * 4.0;
         let mut slots = vec![];
-        for y in (0..3).rev() {
+        let rows = (slot_count / 9) as usize;
+        for y in (0..rows).rev() {
             for x in 0..9 {
                 slots.push(Slot::new(
                     x_offset + (x as f64) * (size + size * 1.0 / 8.0),
                     y_offset
                         + -((y as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0)
-                            + size
-                            + size * 1.0 / 8.0
-                            + hot_bar_offset),
+                            + hot_bar_offset / 2.0),
                     size,
                 ));
             }
@@ -50,24 +56,30 @@ impl ChestInventory {
             hud_context,
             name,
             slot_count,
+            id,
         }
     }
 
     fn update_icons(&mut self, renderer: &Renderer) {
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
-        let x_offset = -(size * 4.5);
-        let y_offset = size * 4.18;
-        let hot_bar_offset = scale * 4.0;
         let slot_offset = size + size * 1.0 / 8.0;
-        for y in (0..3).rev() {
+        let x_offset = -(size * 4.5);
+        let y = 114;
+        let rows = self.size() / 9;
+        let y_size = y + rows * 18;
+        let y_offset = (renderer.safe_height as f64 / scale - y_size as f64) / 2.0 - slot_offset / 2.0;
+        // let y_offset = size * 4.18;
+        let hot_bar_offset = scale * 4.0;
+        let rows = (self.slot_count / 9) as usize;
+        for y in (0..rows).rev() {
             for x in 0..9 {
                 self.slots
-                    .get_mut(x + 9 * (2 - y))
+                    .get_mut(x + 9 * ((rows - 1) - y))
                     .unwrap()
                     .update_position(
                         x_offset + x as f64 * slot_offset,
-                        y_offset + -(y as f64 * slot_offset * 2.0 + hot_bar_offset),
+                        y_offset + -(y as f64 * slot_offset + hot_bar_offset / 2.0),
                         size,
                     );
             }
@@ -81,8 +93,8 @@ impl Inventory for ChestInventory {
         self.slot_count
     }
 
-    fn id(&self) -> i8 {
-        -1
+    fn id(&self) -> i32 {
+        self.id
     }
 
     fn name(&self) -> Option<&String> {

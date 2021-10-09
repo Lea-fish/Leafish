@@ -20,7 +20,7 @@ use crate::screen::ScreenSystem;
 pub trait Inventory {
     fn size(&self) -> u16;
 
-    fn id(&self) -> i8;
+    fn id(&self) -> i32;
 
     fn name(&self) -> Option<&String>;
 
@@ -58,7 +58,7 @@ pub trait Inventory {
     fn ty(&self) -> InventoryType;
 }
 
-pub fn inventory_from_type(ty: InventoryType, title: Component, renderer: Arc<RwLock<Renderer>>, hud_context: Arc<RwLock<HudContext>>) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
+pub fn inventory_from_type(ty: InventoryType, title: Component, renderer: Arc<RwLock<Renderer>>, hud_context: Arc<RwLock<HudContext>>, id: i32) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
     match ty {
         /*InventoryType::Base => {}
         InventoryType::Main => {}*/
@@ -66,7 +66,7 @@ pub fn inventory_from_type(ty: InventoryType, title: Component, renderer: Arc<Rw
             let renderer = renderer.clone();
             let renderer = renderer.read();
             let renderer = &*renderer;
-            Some(Arc::new(RwLock::new(ChestInventory::new(renderer, hud_context.clone(), rows as u16 * 9, title.to_string()))))
+            Some(Arc::new(RwLock::new(ChestInventory::new(renderer, hud_context.clone(), rows as u16 * 9, title.to_string(), id))))
         },
         /*InventoryType::Dropper => {}
         InventoryType::Anvil => {}

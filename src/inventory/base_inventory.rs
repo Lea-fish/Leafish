@@ -34,6 +34,7 @@ impl BaseInventory {
     }
 
     fn update_icons(&mut self, renderer: &Renderer) {
+        return;
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
         let x_offset = size * self.x_offset;
@@ -77,7 +78,7 @@ impl Inventory for BaseInventory {
         36
     }
 
-    fn id(&self) -> i8 {
+    fn id(&self) -> i32 {
         -1
     }
 
