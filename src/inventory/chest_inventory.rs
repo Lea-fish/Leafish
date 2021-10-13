@@ -217,14 +217,14 @@ impl Inventory for ChestInventory {
         // TODO
     }
 
-    fn click_at(&self, cursor: (u32, u32)) {
+    fn click_at(&self, _cursor: (u32, u32)) {
         // TODO
     }
 
     fn resize(
         &mut self,
-        width: u32,
-        height: u32,
+        _width: u32,
+        _height: u32,
         renderer: &mut Renderer,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,

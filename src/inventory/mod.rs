@@ -148,7 +148,6 @@ impl InventoryContext {
 
     pub fn open_inventory(&mut self, inventory: Arc<RwLock<dyn Inventory + Sync + Send>>, screen_sys: Arc<ScreenSystem>, self_ref: Arc<RwLock<InventoryContext>>) {
         self.try_close_inventory(screen_sys.clone());
-        println!("closed!");
         screen_sys.add_screen(Box::new(
             InventoryWindow::new(
                 inventory.clone(),
@@ -157,7 +156,6 @@ impl InventoryContext {
             ),
         ));
         self.has_inv_open = true;
-        println!("added screen!");
     }
 
     pub fn try_close_inventory(&mut self, screen_sys: Arc<ScreenSystem>) -> bool {

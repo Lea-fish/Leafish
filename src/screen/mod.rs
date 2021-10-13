@@ -111,7 +111,6 @@ unsafe impl Sync for ScreenSystem {}
 pub struct ScreenSystem {
     screens: Arc<RwLock<Vec<ScreenInfo>>>,
     pre_computed_screens: Arc<RwLock<Vec<ScreenInfo>>>,
-    remove_queue: Arc<RwLock<Vec<ScreenInfo>>>,
     lowest_offset: AtomicIsize,
 }
 
@@ -147,10 +146,7 @@ impl ScreenSystem {
     pub fn pop_screen(&self) {
         if self.pre_computed_screens.clone().read().last().is_some() {
             // TODO: Improve thread safety (becuz of possible race conditions (which are VERY UNLIKELY to happen - and only if screens get added and removed very fast (in one tick)))
-            self.remove_queue
-                .clone()
-                .write()
-                .push(self.pre_computed_screens.clone().write().pop().unwrap());
+            self.pre_computed_screens.clone().write().pop();
             let curr_offset = self.lowest_offset.load(Ordering::Acquire);
             let new_offset = self.pre_computed_screens.clone().read().len() as isize;
             if curr_offset == -1 || new_offset < curr_offset {
@@ -228,18 +224,6 @@ impl ScreenSystem {
         window: &Window,
     ) -> bool {
         let renderer = &mut renderer.write();
-        for screen in self.remove_queue.clone().write().drain(..) {
-            if screen.active {
-                screen
-                    .screen
-                    .clone()
-                    .lock()
-                    .on_deactive(renderer, ui_container);
-            }
-            if screen.init {
-                screen.screen.clone().lock().deinit(renderer, ui_container);
-            }
-        }
         let lowest = self.lowest_offset.load(Ordering::Acquire);
         if lowest != -1 {
             let screens_len = self.screens.read().len();
@@ -257,7 +241,17 @@ impl ScreenSystem {
             };
             if lowest <= screens_len as isize {
                 for _ in 0..(screens_len as isize - lowest) {
-                    self.screens.clone().write().pop();
+                    let mut screen = self.screens.clone().write().pop().unwrap();
+                    if screen.active {
+                        screen
+                            .screen
+                            .clone()
+                            .lock()
+                            .on_deactive(renderer, ui_container);
+                    }
+                    if screen.init {
+                        screen.screen.clone().lock().deinit(renderer, ui_container);
+                    }
                 }
             }
             for screen in self

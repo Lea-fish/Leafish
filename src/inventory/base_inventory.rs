@@ -42,21 +42,14 @@ impl BaseInventory {
         let slot_offset = size + size * 1.0 / 8.0;
         for y in (0..3).rev() {
             for x in 0..9 {
-                /*self.player_inventory.clone().write()
-                    .get_raw_slot_mut(9 + x + 9 * (2 - y))
-                    .update_position(
-                        x_offset + x as f64 * slot_offset,
-                        y_offset + -(y as f64 * slot_offset * 2.0 + hot_bar_offset),
-                        size,
-                    );*/
                 self.player_inventory.clone().write()
                     .get_raw_slot_mut(9 + x + 9 * (2 - y))
                     .update_position(
                         x_offset + x as f64 * slot_offset,
-                        y_offset + -((y as f64) * slot_offset + hot_bar_offset),
+                        y_offset + -((y as f64) * slot_offset + hot_bar_offset + slot_offset),
                         size,
                     );
-                println!("inv {} | y: {}: {}, {}", 9 * (2 - y) + x, y, x_offset + x as f64 * slot_offset, y_offset/* + -(y as f64 * slot_offset * 2.0 + hot_bar_offset)*/);
+                println!("inv {} | y: {}: {}, {}", 9 * (2 - y) + x, y, x_offset + x as f64 * slot_offset, y_offset + -((y as f64) * slot_offset + hot_bar_offset/* + slot_offset*/)/* + -(y as f64 * slot_offset * 2.0 + hot_bar_offset)*/);
             }
         }
         for i in 0..9 {
@@ -76,8 +69,6 @@ impl BaseInventory {
         self.update_icons(renderer);
     }
 }
-// 85.91780821917808
-// 213.7716894977169
 
 impl Inventory for BaseInventory {
     fn size(&self) -> u16 {

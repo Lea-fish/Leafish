@@ -81,20 +81,20 @@ impl Screen for InventoryWindow {
         );
     }
 
-    fn is_closable(&self) -> bool {
-        true
-    }
-
-    fn clone_screen(&self) -> Box<dyn Screen> {
-        Box::new(self.clone())
-    }
-
     fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
         if key == VirtualKeyCode::Escape && !down {
             self.inventory_context.clone().write().try_close_inventory(game.screen_sys.clone());
             return true;
         }
         false
+    }
+
+    fn is_closable(&self) -> bool {
+        true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }
 
