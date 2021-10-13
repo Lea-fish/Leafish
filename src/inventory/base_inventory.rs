@@ -34,7 +34,6 @@ impl BaseInventory {
     }
 
     fn update_icons(&mut self, renderer: &Renderer) {
-        return;
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
         let x_offset = size * self.x_offset;
@@ -43,14 +42,21 @@ impl BaseInventory {
         let slot_offset = size + size * 1.0 / 8.0;
         for y in (0..3).rev() {
             for x in 0..9 {
-                self.player_inventory.clone().write()
+                /*self.player_inventory.clone().write()
                     .get_raw_slot_mut(9 + x + 9 * (2 - y))
                     .update_position(
                         x_offset + x as f64 * slot_offset,
                         y_offset + -(y as f64 * slot_offset * 2.0 + hot_bar_offset),
                         size,
+                    );*/
+                self.player_inventory.clone().write()
+                    .get_raw_slot_mut(9 + x + 9 * (2 - y))
+                    .update_position(
+                        x_offset + x as f64 * slot_offset,
+                        y_offset + -((y as f64) * slot_offset + hot_bar_offset),
+                        size,
                     );
-                // println!("inv {} | y: {}: {}, {}", 9 * (2 - y) + x, y, x_offset + x as f64 * slot_offset, y_offset + -(y as f64 * slot_offset * 2.0 + hot_bar_offset));
+                println!("inv {} | y: {}: {}, {}", 9 * (2 - y) + x, y, x_offset + x as f64 * slot_offset, y_offset/* + -(y as f64 * slot_offset * 2.0 + hot_bar_offset)*/);
             }
         }
         for i in 0..9 {
@@ -59,7 +65,7 @@ impl BaseInventory {
                 y_offset,
                 size,
             );
-           // println!("hotbar {}: {}, {}", i, x_offset + i as f64 * (size + size * 1.0 / 8.0), y_offset);
+           println!("hotbar {}: {}, {}", i, x_offset + i as f64 * (size + size * 1.0 / 8.0), y_offset);
         }
         self.dirty = true;
     }
@@ -92,6 +98,7 @@ impl Inventory for BaseInventory {
 
     fn set_item(&mut self, slot: u16, item: Option<Item>) {
         self.player_inventory.clone().write().set_item(9 + slot, item);
+        self.dirty = true;
     }
 
     fn init(
@@ -130,6 +137,7 @@ impl Inventory for BaseInventory {
                         0,
                         ui_container,
                         renderer,
+                        VAttach::Top,
                     );
                 }
             }

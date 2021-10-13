@@ -9,11 +9,13 @@ use std::sync::Arc;
 use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
+use crate::inventory::base_inventory::BaseInventory;
 
 pub struct ChestInventory {
     slots: Vec<Slot>,
     dirty: bool,
     hud_context: Arc<RwLock<HudContext>>,
+    inv_below: Arc<RwLock<BaseInventory>>,
     name: String,
     slot_count: u16,
     id: i32,
@@ -23,6 +25,7 @@ impl ChestInventory {
     pub fn new(
         renderer: &Renderer,
         hud_context: Arc<RwLock<HudContext>>,
+        inv_below: Arc<RwLock<BaseInventory>>,
         slot_count: u16,
         name: String,
         id: i32,
@@ -54,6 +57,7 @@ impl ChestInventory {
             slots,
             dirty: false,
             hud_context,
+            inv_below,
             name,
             slot_count,
             id,
@@ -65,10 +69,11 @@ impl ChestInventory {
         let size = scale * 16.0;
         let slot_offset = size + size * 1.0 / 8.0;
         let x_offset = -(size * 4.5);
+        let icon_scale = Hud::icon_scale(renderer);
         let y = 114;
-        let rows = self.size() / 9;
+        let rows = self.slot_count / 9;
         let y_size = y + rows * 18;
-        let y_offset = (renderer.safe_height as f64 / scale - y_size as f64) / 2.0 - slot_offset / 2.0;
+        let y_offset = (renderer.safe_height as f64 / icon_scale - y_size as f64) / 2.0;
         // let y_offset = size * 4.18;
         let hot_bar_offset = scale * 4.0;
         let rows = (self.slot_count / 9) as usize;
@@ -79,18 +84,20 @@ impl ChestInventory {
                     .unwrap()
                     .update_position(
                         x_offset + x as f64 * slot_offset,
-                        y_offset + -(y as f64 * slot_offset + hot_bar_offset / 2.0),
+                        scale * (y_offset + (rows * 18) as f64) + -((y as f64) * slot_offset)/*y_offset + -(y as f64 * slot_offset)*/,
                         size,
                     );
             }
         }
+        // (y_offset + (rows * 18) as f64) + 96.0
+        self.inv_below.clone().write().update_offset(x_offset / size, (y_offset + (rows * 18 + 89) as f64) / 16.0, renderer);
         self.dirty = true;
     }
 }
 
 impl Inventory for ChestInventory {
     fn size(&self) -> u16 {
-        self.slot_count
+        self.slot_count + 36
     }
 
     fn id(&self) -> i32 {
@@ -106,7 +113,7 @@ impl Inventory for ChestInventory {
     }
 
     fn set_item(&mut self, slot: u16, item: Option<Item>) {
-        if self.slots.len() > slot as usize { // TODO: Fix OOB access properly and remove this dirty workaround!
+        if self.slots.len() > slot as usize {
             self.slots[slot as usize].item = item;
             self.dirty = true;
             self.hud_context
@@ -114,6 +121,9 @@ impl Inventory for ChestInventory {
                 .read()
                 .dirty_slots
                 .store(true, Ordering::Relaxed);
+        } else {
+            println!("tried to set item {:?} to slot {} real {}", item.as_ref(), slot, slot - self.slot_count);
+            self.inv_below.clone().write().set_item(slot - self.slot_count, item);
         }
     }
 
@@ -127,7 +137,7 @@ impl Inventory for ChestInventory {
         let basic_elements = inventory_window.elements.get_mut(1).unwrap();
         let icon_scale = Hud::icon_scale(renderer);
         let y = 114;
-        let rows = self.size() / 9;
+        let rows = self.slot_count / 9;
         let y_size = y + rows * 18;
         let y = (renderer.safe_height as f64 / icon_scale - y_size as f64) / 2.0;
         let player_inv_img = ui::ImageBuilder::new()
@@ -196,6 +206,7 @@ impl Inventory for ChestInventory {
                         2,
                         ui_container,
                         renderer,
+                        VAttach::Top,
                     );
                 }
             }
@@ -206,14 +217,14 @@ impl Inventory for ChestInventory {
         // TODO
     }
 
-    fn click_at(&self, _cursor: (u32, u32)) {
+    fn click_at(&self, cursor: (u32, u32)) {
         // TODO
     }
 
     fn resize(
         &mut self,
-        _width: u32,
-        _height: u32,
+        width: u32,
+        height: u32,
         renderer: &mut Renderer,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
@@ -222,6 +233,6 @@ impl Inventory for ChestInventory {
     }
 
     fn ty(&self) -> InventoryType {
-        InventoryType::Chest((self.size() / 9) as u8)
+        InventoryType::Chest((self.slot_count / 9) as u8)
     }
 }

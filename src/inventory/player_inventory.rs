@@ -327,6 +327,7 @@ impl Inventory for PlayerInventory {
                         2,
                         ui_container,
                         renderer,
+                        VAttach::Middle,
                     );
                 }
             }
@@ -340,6 +341,7 @@ impl Inventory for PlayerInventory {
                         2,
                         ui_container,
                         renderer,
+                        VAttach::Middle,
                     );
                 }
             }

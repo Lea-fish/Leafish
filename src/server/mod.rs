@@ -699,7 +699,7 @@ impl Server {
                             } else {
                                 let inv_type = InventoryType::from_id(open.ty.unwrap());
                                 println!("inv type: {:?}", &inv_type);
-                                let inventory = inventory_from_type(inv_type, open.title, server.renderer.clone(), server.hud_context.clone(), open.id);
+                                let inventory = inventory_from_type(inv_type, open.title, server.renderer.clone(), server.hud_context.clone(), server.inventory_context.read().base_inventory.clone(), open.id);
                                 if let Some(inventory) = inventory {
                                     println!("opening...!");
                                     server.inventory_context.clone().write().open_inventory(inventory.clone(), server.screen_sys.clone(), server.inventory_context.clone());
@@ -1208,7 +1208,7 @@ impl Server {
                             .player_inventory
                             .clone();*/
                         let player_inv = Arc::new(RwLock::new(ChestInventory::new(
-                                                             &*self.renderer.clone().read(), self.hud_context.clone(), 45, "Test!".to_string(), 1)));
+                                                             &*self.renderer.clone().read(), self.hud_context.clone(), self.inventory_context.read().base_inventory.clone(), 45, "Test!".to_string(), 1)));
                         self.inventory_context.clone().write().open_inventory(player_inv.clone(), self.screen_sys.clone(), self.inventory_context.clone());
                         return true;
                     }
@@ -1509,13 +1509,18 @@ impl Server {
     }
 
     fn on_set_slot(&self, inventory_id: i16, slot: i16, item: Option<Stack>) {
+        println!("set item {:?} to slot {} to inv {}", item.as_ref(), slot, inventory_id);
         let top_inventory = self.inventory_context.clone();
-        let inventory = if let Some(inventory) =
+        let inventory = if inventory_id == -1 || inventory_id == 0 {
+            println!("using player inventory! {}", inventory_id);
+            top_inventory.clone().read().player_inventory.clone() // TODO: This caused a race condition, check why!
+        } else if let Some(inventory) =
         top_inventory.clone().read().inventory.as_ref()
         {
             inventory.clone()
         } else {
-            top_inventory.clone().read().player_inventory.clone()
+            println!("Couldn't set item to slot {}", slot);
+            return;
         };
         let curr_slots = inventory.clone().read().size();
         if slot < 0 || slot >= curr_slots as i16 {
@@ -1532,7 +1537,7 @@ impl Server {
                 });
                 top_inventory.write().cursor = item; // TODO: Set to HUD and make it dirty!
             } else {
-                warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", inventory_id + 1, curr_slots);
+                warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", slot, curr_slots);
             }
         } else {
             debug!(

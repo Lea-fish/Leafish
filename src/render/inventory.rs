@@ -3,7 +3,7 @@ use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::Screen;
 use crate::{ui, Game};
-use crate::ui::{Container, ImageRef, TextRef};
+use crate::ui::{Container, ImageRef, TextRef, VAttach};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use crate::inventory::base_inventory::BaseInventory;
@@ -122,6 +122,7 @@ impl InventoryWindow {
         elements: &mut Vec<ImageRef>,
         ui_container: &mut Container,
         renderer: &Renderer,
+        v_attach: VAttach,
     ) {
         let icon_scale = Hud::icon_scale(renderer);
         let textures = item.material.texture_locations();
@@ -138,7 +139,7 @@ impl InventoryWindow {
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)
-            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+            .alignment(v_attach, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)
             .texture(format!("minecraft:{}", texture))
             .create(ui_container);
@@ -153,8 +154,9 @@ impl InventoryWindow {
         elements_idx: usize,
         ui_container: &mut Container,
         renderer: &Renderer,
+        v_attach: VAttach,
     ) {
-        Self::draw_item(item, x, y, self.elements.get_mut(elements_idx).unwrap(), ui_container, renderer);
+        Self::draw_item(item, x, y, self.elements.get_mut(elements_idx).unwrap(), ui_container, renderer, v_attach);
     }
 
     fn clear_elements(&mut self) {
