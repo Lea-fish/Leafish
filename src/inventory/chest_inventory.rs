@@ -38,7 +38,6 @@ impl ChestInventory {
         let rows = slot_count / 9;
         let y_size = y + rows * 18;
         let y_offset = (renderer.safe_height as f64 / scale - y_size as f64) / 2.0 + slot_offset / 2.0;
-        // let y_offset = size * 4.25;
         let hot_bar_offset = scale * 4.0;
         let mut slots = vec![];
         let rows = (slot_count / 9) as usize;
@@ -74,8 +73,6 @@ impl ChestInventory {
         let rows = self.slot_count / 9;
         let y_size = y + rows * 18;
         let y_offset = (renderer.safe_height as f64 / icon_scale - y_size as f64) / 2.0;
-        // let y_offset = size * 4.18;
-        let hot_bar_offset = scale * 4.0;
         let rows = (self.slot_count / 9) as usize;
         for y in (0..rows).rev() {
             for x in 0..9 {
@@ -84,12 +81,11 @@ impl ChestInventory {
                     .unwrap()
                     .update_position(
                         x_offset + x as f64 * slot_offset,
-                        scale * (y_offset + (rows * 18) as f64) + -((y as f64) * slot_offset)/*y_offset + -(y as f64 * slot_offset)*/,
+                        scale * (y_offset + (rows * 18) as f64) + -((y as f64) * slot_offset),
                         size,
                     );
             }
         }
-        // (y_offset + (rows * 18) as f64) + 96.0
         self.inv_below.clone().write().update_offset(x_offset / size, (y_offset + (rows * 18 + 89) as f64) / 16.0, renderer);
         self.dirty = true;
     }

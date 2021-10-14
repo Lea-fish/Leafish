@@ -1201,14 +1201,12 @@ impl Server {
             match key {
                 Actionkey::OpenInv => {
                     if down {
-                        /*let player_inv = self
+                        let player_inv = self
                             .inventory_context
                             .clone()
                             .read()
                             .player_inventory
-                            .clone();*/
-                        let player_inv = Arc::new(RwLock::new(ChestInventory::new(
-                                                             &*self.renderer.clone().read(), self.hud_context.clone(), self.inventory_context.read().base_inventory.clone(), 45, "Test!".to_string(), 1)));
+                            .clone();
                         self.inventory_context.clone().write().open_inventory(player_inv.clone(), self.screen_sys.clone(), self.inventory_context.clone());
                         return true;
                     }

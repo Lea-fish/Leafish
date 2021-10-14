@@ -23,11 +23,16 @@ impl BaseInventory {
     pub fn new(
         hud_context: Arc<RwLock<HudContext>>,
         player_inventory: Arc<RwLock<PlayerInventory>>,
+        renderer: &Renderer,
     ) -> Self {
+        let icon_scale = Hud::icon_scale(renderer);
+        let size = 16.0;
+        let hot_bar_offset = 6.0;
+        let slot_offset = size + size * 1.0 / 8.0;
         Self {
             dirty: false,
             x_offset: -4.5,
-            y_offset: 4.18,
+            y_offset: ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0 - slot_offset - hot_bar_offset) / 16.0,
             hud_context,
             player_inventory,
         }
@@ -36,6 +41,8 @@ impl BaseInventory {
     fn update_icons(&mut self, renderer: &Renderer) {
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
+        println!("base x offset {}", self.x_offset);
+        println!("base y offset {}", self.y_offset);
         let x_offset = size * self.x_offset;
         let y_offset = size * self.y_offset;
         let hot_bar_offset = scale * 4.0;

@@ -16,6 +16,9 @@ use crate::inventory::base_inventory::BaseInventory;
 use leafish_protocol::format::Component;
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::screen::ScreenSystem;
+use std::collections::HashMap;
+use std::hash::BuildHasherDefault;
+use leafish_protocol::types::hash::FNVHash;
 
 pub trait Inventory {
     fn size(&self) -> u16;
@@ -96,7 +99,7 @@ pub struct Slot {
     pub y: f64,
     pub size: f64,
     pub item: Option<Item>,
-    // TODO: Is valid fn for Anvil, crafting, armor etc.
+    // TODO: Add is valid fn for Anvil, crafting, armor etc.
 }
 
 impl Slot {
@@ -123,6 +126,12 @@ pub struct InventoryContext {
     pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
     pub base_inventory: Arc<RwLock<BaseInventory>>,
+    pub tmp_inv: Arc<RwLock<Option<IncompleteInventory>>>,
+}
+
+pub struct IncompleteInventory {
+    pub id: i32,
+    pub items: HashMap<i32, Option<Item>, BuildHasherDefault<FNVHash>>,
 }
 
 impl InventoryContext {
@@ -142,7 +151,8 @@ impl InventoryContext {
             inventory: None,
             has_inv_open: false,
             player_inventory: player_inventory.clone(),
-            base_inventory: Arc::new(RwLock::new(BaseInventory::new(hud_context, player_inventory)))
+            base_inventory: Arc::new(RwLock::new(BaseInventory::new(hud_context, player_inventory, renderer))),
+            tmp_inv: Arc::new(Default::default()),
         }
     }
 
