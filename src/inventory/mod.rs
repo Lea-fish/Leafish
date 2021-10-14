@@ -244,10 +244,8 @@ impl InventoryType {
         }
     }
 
-    pub fn from_name(name: String) -> Self {
-        match name.as_str() {
-            _ => InventoryType::Chest(1),
-        }
+    pub fn from_name(_name: String) -> Self {
+        InventoryType::Chest(1)
     }
 }
 
