@@ -70,12 +70,11 @@ pub fn inventory_from_type(
         /*InventoryType::Internal => {}
         InventoryType::Main => {}*/
         InventoryType::Chest(rows) => {
-            let renderer = renderer.clone();
             let renderer = renderer.read();
             let renderer = &*renderer;
             Some(Arc::new(RwLock::new(ChestInventory::new(
                 renderer,
-                hud_context.clone(),
+                hud_context,
                 inv_below,
                 rows as u16 * 9,
                 title.to_string(),
@@ -175,7 +174,7 @@ impl InventoryContext {
         self.try_close_inventory(screen_sys.clone());
         screen_sys.add_screen(Box::new(InventoryWindow::new(
             inventory.clone(),
-            self_ref.clone(),
+            self_ref,
             self.base_inventory.clone(),
         )));
         self.safe_inventory.replace(inventory.clone());

@@ -125,6 +125,7 @@ impl PlayerInventory {
         }
     }
 
+    #[allow(clippy::eq_op)]
     fn update_icons(&mut self, renderer: &Renderer) {
         let scale = Hud::icon_scale(renderer);
         let base = scale * ((renderer.safe_height as f64 / scale - 166.0) / 2.0);
@@ -247,6 +248,7 @@ impl Inventory for PlayerInventory {
             .store(true, Ordering::Relaxed);
     }
 
+    #[allow(clippy::eq_op)]
     fn init(
         &mut self,
         renderer: &mut Renderer,

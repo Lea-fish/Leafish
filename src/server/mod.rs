@@ -1220,7 +1220,7 @@ impl Server {
                             .player_inventory
                             .clone();
                         self.inventory_context.clone().write().open_inventory(
-                            player_inv.clone(),
+                            player_inv,
                             self.screen_sys.clone(),
                             self.inventory_context.clone(),
                         );
@@ -1531,8 +1531,8 @@ impl Server {
         );
         let top_inventory = self.inventory_context.clone();
         let inventory = if inventory_id == -1 || inventory_id == 0 {
-            top_inventory.clone().read().player_inventory.clone() // TODO: This caused a race condition, check why!
-        } else if let Some(inventory) = top_inventory.clone().read().safe_inventory.as_ref() {
+            top_inventory.read().player_inventory.clone() // TODO: This caused a race condition, check why!
+        } else if let Some(inventory) = top_inventory.read().safe_inventory.as_ref() {
             inventory.clone()
         } else {
             println!("Couldn't set item to slot {}", slot);
