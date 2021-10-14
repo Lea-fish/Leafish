@@ -1,4 +1,4 @@
-use crate::inventory::{Inventory, InventoryType, Item, Material, Slot};
+use crate::inventory::{Inventory, InventoryType, Item, Slot};
 use crate::render::hud::{Hud, HudContext};
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
@@ -6,10 +6,9 @@ use crate::ui;
 use crate::ui::{Container, HAttach, VAttach};
 use std::sync::Arc;
 
-use leafish_protocol::protocol::Version;
+use crate::inventory::base_inventory::BaseInventory;
 use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
-use crate::inventory::base_inventory::BaseInventory;
 
 pub struct ChestInventory {
     slots: Vec<Slot>,
@@ -37,7 +36,8 @@ impl ChestInventory {
         let y = 114;
         let rows = slot_count / 9;
         let y_size = y + rows * 18;
-        let y_offset = (renderer.safe_height as f64 / scale - y_size as f64) / 2.0 + slot_offset / 2.0;
+        let y_offset =
+            (renderer.safe_height as f64 / scale - y_size as f64) / 2.0 + slot_offset / 2.0;
         let hot_bar_offset = scale * 4.0;
         let mut slots = vec![];
         let rows = (slot_count / 9) as usize;
@@ -86,7 +86,11 @@ impl ChestInventory {
                     );
             }
         }
-        self.inv_below.clone().write().update_offset(x_offset / size, (y_offset + (rows * 18 + 89) as f64) / 16.0, renderer);
+        self.inv_below.clone().write().update_offset(
+            x_offset / size,
+            (y_offset + (rows * 18 + 89) as f64) / 16.0,
+            renderer,
+        );
         self.dirty = true;
     }
 }
@@ -118,8 +122,10 @@ impl Inventory for ChestInventory {
                 .dirty_slots
                 .store(true, Ordering::Relaxed);
         } else {
-            println!("tried to set item {:?} to slot {} real {}", item.as_ref(), slot, slot - self.slot_count);
-            self.inv_below.clone().write().set_item(slot - self.slot_count, item);
+            self.inv_below
+                .clone()
+                .write()
+                .set_item(slot - self.slot_count, item);
         }
     }
 
@@ -145,7 +151,12 @@ impl Inventory for ChestInventory {
             .create(ui_container);
         basic_elements.push(player_inv_img);
         let top_inv_img = ui::ImageBuilder::new()
-            .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, (rows * 18 + 17) as f64 / 256.0))
+            .texture_coords((
+                0.0 / 256.0,
+                0.0 / 256.0,
+                176.0 / 256.0,
+                (rows * 18 + 17) as f64 / 256.0,
+            ))
             .position(0.0, icon_scale * y)
             .alignment(ui::VAttach::Top, ui::HAttach::Center)
             .size(icon_scale * 176.0, icon_scale * (rows * 18 + 17) as f64)
@@ -159,7 +170,11 @@ impl Inventory for ChestInventory {
             .alignment(VAttach::Top, HAttach::Center)
             .scale_x(scale)
             .scale_y(scale)
-            .position(icon_scale * -(176.0 / 2.0 - 8.0 - renderer.ui.size_of_string(self.name().unwrap()) / 4.0), icon_scale * (6.0 + y))
+            .position(
+                icon_scale
+                    * -(176.0 / 2.0 - 8.0 - renderer.ui.size_of_string(self.name().unwrap()) / 4.0),
+                icon_scale * (6.0 + y),
+            )
             .text(self.name().unwrap())
             .colour((64, 64, 64, 255))
             .shadow(false)
@@ -169,7 +184,10 @@ impl Inventory for ChestInventory {
             .alignment(VAttach::Top, HAttach::Center)
             .scale_x(scale)
             .scale_y(scale)
-            .position(icon_scale * -(176.0 / 2.0 - 8.0 - renderer.ui.size_of_string("Inventory") / 4.0), (icon_scale * (6.0 + y + (rows * 18 + 13) as f64)))
+            .position(
+                icon_scale * -(176.0 / 2.0 - 8.0 - renderer.ui.size_of_string("Inventory") / 4.0),
+                icon_scale * (6.0 + y + (rows * 18 + 13) as f64),
+            )
             .text("Inventory")
             .colour((64, 64, 64, 255))
             .shadow(false)

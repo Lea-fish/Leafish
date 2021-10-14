@@ -1,24 +1,21 @@
+pub mod base_inventory;
+pub mod chest_inventory;
 pub(crate) mod material;
 pub mod player_inventory;
-pub mod chest_inventory;
-pub mod base_inventory;
 
+use crate::inventory::base_inventory::BaseInventory;
+use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::render::hud::HudContext;
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
+use crate::screen::ScreenSystem;
 use crate::ui::Container;
+use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 use std::sync::Arc;
-use crate::inventory::base_inventory::BaseInventory;
-use leafish_protocol::format::Component;
-use crate::inventory::chest_inventory::ChestInventory;
-use crate::screen::ScreenSystem;
-use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
-use leafish_protocol::types::hash::FNVHash;
 
 pub trait Inventory {
     fn size(&self) -> u16;
@@ -61,16 +58,30 @@ pub trait Inventory {
     fn ty(&self) -> InventoryType;
 }
 
-pub fn inventory_from_type(ty: InventoryType, title: Component, renderer: Arc<RwLock<Renderer>>, hud_context: Arc<RwLock<HudContext>>, inv_below: Arc<RwLock<BaseInventory>>, id: i32) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
+pub fn inventory_from_type(
+    ty: InventoryType,
+    title: Component,
+    renderer: Arc<RwLock<Renderer>>,
+    hud_context: Arc<RwLock<HudContext>>,
+    inv_below: Arc<RwLock<BaseInventory>>,
+    id: i32,
+) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
     match ty {
-        /*InventoryType::Base => {}
+        /*InventoryType::Internal => {}
         InventoryType::Main => {}*/
         InventoryType::Chest(rows) => {
             let renderer = renderer.clone();
             let renderer = renderer.read();
             let renderer = &*renderer;
-            Some(Arc::new(RwLock::new(ChestInventory::new(renderer, hud_context.clone(), inv_below, rows as u16 * 9, title.to_string(), id))))
-        },
+            Some(Arc::new(RwLock::new(ChestInventory::new(
+                renderer,
+                hud_context.clone(),
+                inv_below,
+                rows as u16 * 9,
+                title.to_string(),
+                id,
+            ))))
+        }
         /*InventoryType::Dropper => {}
         InventoryType::Anvil => {}
         InventoryType::Beacon => {}
@@ -123,15 +134,10 @@ pub struct InventoryContext {
     pub cursor: Option<Item>,
     pub hotbar_index: u8,
     pub inventory: Option<Arc<RwLock<dyn Inventory + Send + Sync>>>,
+    pub safe_inventory: Option<Arc<RwLock<dyn Inventory + Send + Sync>>>,
     pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
     pub base_inventory: Arc<RwLock<BaseInventory>>,
-    pub tmp_inv: Arc<RwLock<Option<IncompleteInventory>>>,
-}
-
-pub struct IncompleteInventory {
-    pub id: i32,
-    pub items: HashMap<i32, Option<Item>, BuildHasherDefault<FNVHash>>,
 }
 
 impl InventoryContext {
@@ -149,28 +155,37 @@ impl InventoryContext {
             cursor: None,
             hotbar_index: 0,
             inventory: None,
+            safe_inventory: None,
             has_inv_open: false,
             player_inventory: player_inventory.clone(),
-            base_inventory: Arc::new(RwLock::new(BaseInventory::new(hud_context, player_inventory, renderer))),
-            tmp_inv: Arc::new(Default::default()),
+            base_inventory: Arc::new(RwLock::new(BaseInventory::new(
+                hud_context,
+                player_inventory,
+                renderer,
+            ))),
         }
     }
 
-    pub fn open_inventory(&mut self, inventory: Arc<RwLock<dyn Inventory + Sync + Send>>, screen_sys: Arc<ScreenSystem>, self_ref: Arc<RwLock<InventoryContext>>) {
+    pub fn open_inventory(
+        &mut self,
+        inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
+        screen_sys: Arc<ScreenSystem>,
+        self_ref: Arc<RwLock<InventoryContext>>,
+    ) {
         self.try_close_inventory(screen_sys.clone());
-        screen_sys.add_screen(Box::new(
-            InventoryWindow::new(
-                inventory.clone(),
-                self_ref.clone(),
-                self.base_inventory.clone(),
-            ),
-        ));
+        screen_sys.add_screen(Box::new(InventoryWindow::new(
+            inventory.clone(),
+            self_ref.clone(),
+            self.base_inventory.clone(),
+        )));
+        self.safe_inventory.replace(inventory.clone());
         self.has_inv_open = true;
     }
 
     pub fn try_close_inventory(&mut self, screen_sys: Arc<ScreenSystem>) -> bool {
         if self.has_inv_open {
             self.has_inv_open = false;
+            self.safe_inventory.take();
             screen_sys.pop_screen();
             return true;
         }
@@ -180,10 +195,10 @@ impl InventoryContext {
 
 #[derive(Debug)]
 pub enum InventoryType {
-    Base, // For internal use only.
+    Internal, // For internal use only.
     Main,
     Chest(u8), // rows
-    Dropper, // Dropper and Dispenser
+    Dropper,   // Dropper and Dispenser
     Anvil,
     Beacon,
     BlastFurnace,
@@ -205,7 +220,6 @@ pub enum InventoryType {
 }
 
 impl InventoryType {
-
     pub fn from_id(id: i32) -> Self {
         match id {
             0..=5 => InventoryType::Chest((1 + id) as u8),
@@ -233,11 +247,9 @@ impl InventoryType {
 
     pub fn from_name(name: String) -> Self {
         match name.as_str() {
-
             _ => InventoryType::Chest(1),
         }
     }
-
 }
 
 #[derive(Debug, Clone)]

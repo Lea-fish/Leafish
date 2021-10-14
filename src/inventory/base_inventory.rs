@@ -1,15 +1,13 @@
-use crate::inventory::{Inventory, InventoryType, Item, Material, Slot};
+use crate::inventory::{Inventory, InventoryType, Item};
 use crate::render::hud::{Hud, HudContext};
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
-use crate::ui;
-use crate::ui::{Container, HAttach, VAttach};
+use crate::ui::{Container, VAttach};
 use std::sync::Arc;
 
-use leafish_protocol::protocol::Version;
+use crate::inventory::player_inventory::PlayerInventory;
 use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
-use crate::inventory::player_inventory::PlayerInventory;
 
 pub struct BaseInventory {
     dirty: bool,
@@ -33,7 +31,10 @@ impl BaseInventory {
         Self {
             dirty: false,
             x_offset: -4.5,
-            y_offset: ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0 - slot_offset - hot_bar_offset) / 16.0,
+            y_offset: ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0
+                - slot_offset
+                - hot_bar_offset)
+                / 16.0,
             custom_offset: false,
             hud_context,
             player_inventory,
@@ -43,31 +44,33 @@ impl BaseInventory {
     fn update_icons(&mut self, renderer: &Renderer) {
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
-        println!("base x offset {}", self.x_offset);
-        println!("base y offset {}", self.y_offset);
         let x_offset = size * self.x_offset;
         let y_offset = size * self.y_offset;
         let hot_bar_offset = scale * 4.0;
         let slot_offset = size + size * 1.0 / 8.0;
         for y in (0..3).rev() {
             for x in 0..9 {
-                self.player_inventory.clone().write()
+                self.player_inventory
+                    .clone()
+                    .write()
                     .get_raw_slot_mut(9 + x + 9 * (2 - y))
                     .update_position(
                         x_offset + x as f64 * slot_offset,
                         y_offset + -((y as f64) * slot_offset + hot_bar_offset + slot_offset),
                         size,
                     );
-                println!("inv {} | y: {}: {}, {}", 9 * (2 - y) + x, y, x_offset + x as f64 * slot_offset, y_offset + -((y as f64) * slot_offset + hot_bar_offset/* + slot_offset*/)/* + -(y as f64 * slot_offset * 2.0 + hot_bar_offset)*/);
             }
         }
         for i in 0..9 {
-            self.player_inventory.clone().write().get_raw_slot_mut(36 + i).update_position(
-                x_offset + i as f64 * (size + size * 1.0 / 8.0),
-                y_offset,
-                size,
-            );
-           println!("hotbar {}: {}, {}", i, x_offset + i as f64 * (size + size * 1.0 / 8.0), y_offset);
+            self.player_inventory
+                .clone()
+                .write()
+                .get_raw_slot_mut(36 + i)
+                .update_position(
+                    x_offset + i as f64 * (size + size * 1.0 / 8.0),
+                    y_offset,
+                    size,
+                );
         }
         self.dirty = true;
     }
@@ -94,11 +97,19 @@ impl Inventory for BaseInventory {
     }
 
     fn get_item(&self, slot: u16) -> Option<Item> {
-        self.player_inventory.clone().write().get_raw_slot_mut(9 + slot).item.clone()
+        self.player_inventory
+            .clone()
+            .write()
+            .get_raw_slot_mut(9 + slot)
+            .item
+            .clone()
     }
 
     fn set_item(&mut self, slot: u16, item: Option<Item>) {
-        self.player_inventory.clone().write().set_item(9 + slot, item);
+        self.player_inventory
+            .clone()
+            .write()
+            .set_item(9 + slot, item);
         self.dirty = true;
     }
 
@@ -114,7 +125,10 @@ impl Inventory for BaseInventory {
             let size = 16.0;
             let hot_bar_offset = 6.0;
             let slot_offset = size + size * 1.0 / 8.0;
-            self.y_offset = ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0 - slot_offset - hot_bar_offset) / 16.0;
+            self.y_offset = ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0
+                - slot_offset
+                - hot_bar_offset)
+                / 16.0;
         }
         self.update_icons(renderer);
         self.hud_context
@@ -172,6 +186,6 @@ impl Inventory for BaseInventory {
     }
 
     fn ty(&self) -> InventoryType {
-        InventoryType::Base
+        InventoryType::Internal
     }
 }

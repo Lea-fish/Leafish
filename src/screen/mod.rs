@@ -241,7 +241,7 @@ impl ScreenSystem {
             };
             if lowest <= screens_len as isize {
                 for _ in 0..(screens_len as isize - lowest) {
-                    let mut screen = self.screens.clone().write().pop().unwrap();
+                    let screen = self.screens.clone().write().pop().unwrap();
                     if screen.active {
                         screen
                             .screen

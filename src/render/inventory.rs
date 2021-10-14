@@ -1,13 +1,13 @@
+use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::Screen;
-use crate::{ui, Game};
 use crate::ui::{Container, ImageRef, TextRef, VAttach};
+use crate::{ui, Game};
+use glutin::event::VirtualKeyCode;
 use parking_lot::RwLock;
 use std::sync::Arc;
-use crate::inventory::base_inventory::BaseInventory;
-use glutin::event::VirtualKeyCode;
 
 #[derive(Clone)]
 pub struct InventoryWindow {
@@ -83,7 +83,10 @@ impl Screen for InventoryWindow {
 
     fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
         if key == VirtualKeyCode::Escape && !down {
-            self.inventory_context.clone().write().try_close_inventory(game.screen_sys.clone());
+            self.inventory_context
+                .clone()
+                .write()
+                .try_close_inventory(game.screen_sys.clone());
             return true;
         }
         false
@@ -126,16 +129,16 @@ impl InventoryWindow {
     ) {
         let icon_scale = Hud::icon_scale(renderer);
         let textures = item.material.texture_locations();
-        let texture = if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &*textures.0)
-        {
-            if tex.dummy {
-                textures.1
+        let texture =
+            if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
+                if tex.dummy {
+                    textures.1
+                } else {
+                    textures.0
+                }
             } else {
-                textures.0
-            }
-        } else {
-            textures.1
-        };
+                textures.1
+            };
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)
@@ -156,7 +159,15 @@ impl InventoryWindow {
         renderer: &Renderer,
         v_attach: VAttach,
     ) {
-        Self::draw_item(item, x, y, self.elements.get_mut(elements_idx).unwrap(), ui_container, renderer, v_attach);
+        Self::draw_item(
+            item,
+            x,
+            y,
+            self.elements.get_mut(elements_idx).unwrap(),
+            ui_container,
+            renderer,
+            v_attach,
+        );
     }
 
     fn clear_elements(&mut self) {
