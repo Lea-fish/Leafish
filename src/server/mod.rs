@@ -17,7 +17,7 @@ use crate::entity::player::create_local;
 use crate::entity::EntityType;
 use crate::format;
 use crate::inventory::material::versions::to_material;
-use crate::inventory::{Inventory, InventoryContext, Item};
+use crate::inventory::{inventory_from_type, Inventory, InventoryContext, InventoryType, Item};
 use crate::protocol::{self, forge, mapped_packet, packet};
 use crate::render;
 use crate::render::hud::HudContext;
@@ -38,6 +38,7 @@ use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use instant::{Duration, Instant};
 use leafish_protocol::format::{Component, TextComponent};
+use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
@@ -680,53 +681,41 @@ impl Server {
                                 warn!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
                             }
                         }
-                        MappedPacket::WindowItems(_window_items) => {
-                            debug!("items!");
+                        MappedPacket::WindowItems(items) => {
+                            for item in items.items.into_iter().enumerate() {
+                                server.on_set_slot(items.id as i16, item.0 as i16, item.1);
+                            }
                         }
                         MappedPacket::WindowSetSlot(set_slot) => {
-                            let top_inventory = server.inventory_context.clone();
-                            let inventory = if let Some(inventory) =
-                                top_inventory.clone().read().inventory.as_ref()
-                            {
-                                inventory.clone()
+                            server.on_set_slot(set_slot.id as i16, set_slot.slot, set_slot.item);
+                        }
+                        MappedPacket::WindowClose(_close) => {
+                            server
+                                .inventory_context
+                                .clone()
+                                .write()
+                                .try_close_inventory(server.screen_sys.clone());
+                        }
+                        MappedPacket::WindowOpen(open) => {
+                            if open.ty_name.is_some() {
+                                print!("inv type name: {}", open.ty_name.as_ref().unwrap());
                             } else {
-                                top_inventory.clone().read().player_inventory.clone()
-                            };
-                            let curr_slots = inventory.clone().read().size();
-                            if set_slot.slot < 0 || set_slot.slot >= curr_slots {
-                                if set_slot.slot == -1 {
-                                    let item = set_slot.item.map(|stack| {
-                                        let id = stack.id;
-                                        Item {
-                                            stack,
-                                            material: to_material(
-                                                id as u16,
-                                                server.mapped_protocol_version,
-                                            ),
-                                        }
-                                    });
-                                    top_inventory.write().cursor = item; // TODO: Set to HUD and make it dirty!
-                                } else {
-                                    warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", set_slot.id + 1, curr_slots);
-                                }
-                            } else {
-                                debug!(
-                                    "set item to {}, {}, {}",
-                                    set_slot.id,
-                                    set_slot.slot,
-                                    set_slot.item.as_ref().map_or(0, |s| s.id)
+                                let inv_type = InventoryType::from_id(open.ty.unwrap());
+                                let inventory = inventory_from_type(
+                                    inv_type,
+                                    open.title,
+                                    server.renderer.clone(),
+                                    server.hud_context.clone(),
+                                    server.inventory_context.read().base_inventory.clone(),
+                                    open.id,
                                 );
-                                let item = set_slot.item.map(|stack| {
-                                    let id = stack.id;
-                                    Item {
-                                        stack,
-                                        material: to_material(
-                                            id as u16,
-                                            server.mapped_protocol_version,
-                                        ),
-                                    }
-                                });
-                                inventory.clone().write().set_item(set_slot.slot, item);
+                                if let Some(inventory) = inventory {
+                                    server.inventory_context.clone().write().open_inventory(
+                                        inventory.clone(),
+                                        server.screen_sys.clone(),
+                                        server.inventory_context.clone(),
+                                    );
+                                }
                             }
                         }
                         MappedPacket::EntityVelocity(_velocity) => {
@@ -1129,7 +1118,7 @@ impl Server {
                 .clone()
                 .write()
                 .get_component_mut(player, self.player_movement)
-                .unwrap();
+                .unwrap(); // TODO: This panicked - check why (none - unwrap)!
             let on_ground = self
                 .entities
                 .clone()
@@ -1230,12 +1219,11 @@ impl Server {
                             .read()
                             .player_inventory
                             .clone();
-                        self.screen_sys.add_screen(Box::new(
-                            render::inventory::InventoryWindow::new(
-                                player_inv,
-                                self.inventory_context.clone(),
-                            ),
-                        ));
+                        self.inventory_context.clone().write().open_inventory(
+                            player_inv,
+                            self.screen_sys.clone(),
+                            self.inventory_context.clone(),
+                        );
                         return true;
                     }
                 }
@@ -1368,7 +1356,7 @@ impl Server {
                                 .unwrap()
                                 .clone()
                                 .read()
-                                .get_item((36 + hud_context.clone().read().get_slot_index()) as i16)
+                                .get_item((36 + hud_context.clone().read().get_slot_index()) as u16)
                                 .as_ref()
                                 .map(|item| item.stack.clone())
                         }),
@@ -1532,6 +1520,48 @@ impl Server {
             .as_mut()
             .unwrap()
             .write_plugin_message(channel, data); // TODO handle errors
+    }
+
+    fn on_set_slot(&self, inventory_id: i16, slot: i16, item: Option<Stack>) {
+        println!(
+            "set item {:?} to slot {} to inv {}",
+            item.as_ref(),
+            slot,
+            inventory_id
+        );
+        let top_inventory = self.inventory_context.clone();
+        let inventory = if inventory_id == -1 || inventory_id == 0 {
+            top_inventory.read().player_inventory.clone() // TODO: This caused a race condition, check why!
+        } else if let Some(inventory) = top_inventory.read().safe_inventory.as_ref() {
+            inventory.clone()
+        } else {
+            println!("Couldn't set item to slot {}", slot);
+            return;
+        };
+        let curr_slots = inventory.clone().read().size();
+        if slot < 0 || slot as u16 >= curr_slots {
+            if slot == -1 {
+                let item = item.map(|stack| {
+                    let id = stack.id;
+                    Item {
+                        stack,
+                        material: to_material(id as u16, self.mapped_protocol_version),
+                    }
+                });
+                top_inventory.write().cursor = item; // TODO: Set to HUD and make it dirty!
+            } else {
+                warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", slot, curr_slots);
+            }
+        } else {
+            let item = item.map(|stack| {
+                let id = stack.id;
+                Item {
+                    stack,
+                    material: to_material(id as u16, self.mapped_protocol_version),
+                }
+            });
+            inventory.clone().write().set_item(slot as u16, item);
+        }
     }
 
     fn on_game_join(&self, gamemode: u8, entity_id: i32) {

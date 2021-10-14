@@ -1,9 +1,11 @@
+use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::Screen;
-use crate::ui;
-use crate::ui::{Container, ImageRef, TextRef};
+use crate::ui::{Container, ImageRef, TextRef, VAttach};
+use crate::{ui, Game};
+use glutin::event::VirtualKeyCode;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -12,27 +14,37 @@ pub struct InventoryWindow {
     pub elements: Vec<Vec<ImageRef>>,
     pub text_elements: Vec<Vec<TextRef>>,
     pub inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
+    base_inventory: Arc<RwLock<BaseInventory>>,
     inventory_context: Arc<RwLock<InventoryContext>>,
 }
 
 impl Screen for InventoryWindow {
-    fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
         self.inventory_context
             .clone()
             .write()
             .inventory
             .replace(self.inventory.clone());
+        self.base_inventory
+            .clone()
+            .write()
+            .init(renderer, ui_container, self);
         self.inventory
             .clone()
             .write()
             .init(renderer, ui_container, self);
     }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn deinit(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
         self.inventory_context.clone().write().inventory = None;
-        self.inventory.clone().write().close(self);
+        self.base_inventory.clone().write().close();
+        self.inventory.clone().write().close();
         self.clear_elements();
     }
+
+    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+
+    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
     fn tick(
         &mut self,
@@ -40,6 +52,10 @@ impl Screen for InventoryWindow {
         renderer: &mut Renderer,
         ui_container: &mut Container,
     ) -> Option<Box<dyn Screen>> {
+        self.base_inventory
+            .clone()
+            .write()
+            .tick(renderer, ui_container, self);
         self.inventory
             .clone()
             .write()
@@ -48,6 +64,14 @@ impl Screen for InventoryWindow {
     }
 
     fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+        self.clear_elements();
+        self.base_inventory.clone().write().resize(
+            renderer.safe_width,
+            renderer.safe_height,
+            renderer,
+            ui_container,
+            self,
+        );
         self.inventory.clone().write().resize(
             renderer.safe_width,
             renderer.safe_height,
@@ -55,6 +79,17 @@ impl Screen for InventoryWindow {
             ui_container,
             self,
         );
+    }
+
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+        if key == VirtualKeyCode::Escape && !down {
+            self.inventory_context
+                .clone()
+                .write()
+                .try_close_inventory(game.screen_sys.clone());
+            return true;
+        }
+        false
     }
 
     fn is_closable(&self) -> bool {
@@ -70,11 +105,13 @@ impl InventoryWindow {
     pub fn new(
         inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
         inventory_context: Arc<RwLock<InventoryContext>>,
+        base_inventory: Arc<RwLock<BaseInventory>>,
     ) -> Self {
-        InventoryWindow {
+        Self {
             elements: vec![],
             text_elements: vec![],
             inventory,
+            base_inventory,
             inventory_context,
         }
     }
@@ -82,6 +119,37 @@ impl InventoryWindow {
 
 impl InventoryWindow {
     pub fn draw_item(
+        item: &Item,
+        x: f64,
+        y: f64,
+        elements: &mut Vec<ImageRef>,
+        ui_container: &mut Container,
+        renderer: &Renderer,
+        v_attach: VAttach,
+    ) {
+        let icon_scale = Hud::icon_scale(renderer);
+        let textures = item.material.texture_locations();
+        let texture =
+            if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
+                if tex.dummy {
+                    textures.1
+                } else {
+                    textures.0
+                }
+            } else {
+                textures.1
+            };
+        let image = ui::ImageBuilder::new()
+            .texture_coords((0.0, 0.0, 1.0, 1.0))
+            .position(x, y)
+            .alignment(v_attach, ui::HAttach::Center)
+            .size(icon_scale * 16.0, icon_scale * 16.0)
+            .texture(format!("minecraft:{}", texture))
+            .create(ui_container);
+        elements.push(image);
+    }
+
+    pub fn draw_item_internally(
         &mut self,
         item: &Item,
         x: f64,
@@ -89,26 +157,20 @@ impl InventoryWindow {
         elements_idx: usize,
         ui_container: &mut Container,
         renderer: &Renderer,
+        v_attach: VAttach,
     ) {
-        let icon_scale = Hud::icon_scale(renderer);
-        let textures = item.material.texture_locations();
-        let texture = if Renderer::get_texture_optional(&renderer.textures, &*textures.0).is_some()
-        {
-            textures.0
-        } else {
-            textures.1
-        };
-        let image = ui::ImageBuilder::new()
-            .texture_coords((0.0, 0.0, 1.0, 1.0))
-            .position(x, y)
-            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-            .size(icon_scale * 16.0, icon_scale * 16.0)
-            .texture(format!("minecraft:{}", texture))
-            .create(ui_container);
-        self.elements.get_mut(elements_idx).unwrap().push(image);
+        Self::draw_item(
+            item,
+            x,
+            y,
+            self.elements.get_mut(elements_idx).unwrap(),
+            ui_container,
+            renderer,
+            v_attach,
+        );
     }
 
-    pub fn clear_elements(&mut self) {
+    fn clear_elements(&mut self) {
         for element in &mut self.elements {
             element.clear();
         }
