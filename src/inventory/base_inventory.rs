@@ -15,6 +15,7 @@ pub struct BaseInventory {
     dirty: bool,
     x_offset: f64,
     y_offset: f64,
+    custom_offset: bool,
     hud_context: Arc<RwLock<HudContext>>,
     player_inventory: Arc<RwLock<PlayerInventory>>,
 }
@@ -33,6 +34,7 @@ impl BaseInventory {
             dirty: false,
             x_offset: -4.5,
             y_offset: ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0 - slot_offset - hot_bar_offset) / 16.0,
+            custom_offset: false,
             hud_context,
             player_inventory,
         }
@@ -73,6 +75,7 @@ impl BaseInventory {
     pub fn update_offset(&mut self, x_offset: f64, y_offset: f64, renderer: &Renderer) {
         self.x_offset = x_offset;
         self.y_offset = y_offset;
+        self.custom_offset = true;
         self.update_icons(renderer);
     }
 }
@@ -106,6 +109,13 @@ impl Inventory for BaseInventory {
         inventory_window: &mut InventoryWindow,
     ) {
         inventory_window.elements.push(vec![]);
+        if !self.custom_offset {
+            let icon_scale = Hud::icon_scale(renderer);
+            let size = 16.0;
+            let hot_bar_offset = 6.0;
+            let slot_offset = size + size * 1.0 / 8.0;
+            self.y_offset = ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0 - slot_offset - hot_bar_offset) / 16.0;
+        }
         self.update_icons(renderer);
         self.hud_context
             .clone()
