@@ -105,10 +105,6 @@ pub trait Screen {
         false
     }
 
-    fn is_in_game(&self) -> bool {
-        false
-    }
-
     fn is_tick_always(&self) -> bool {
         false
     }
@@ -130,6 +126,7 @@ impl Clone for Box<dyn Screen> {
 pub enum ScreenType {
     Other(String),
     Chat,
+    InGame,
 }
 
 #[derive(Clone)]
@@ -197,14 +194,14 @@ impl ScreenSystem {
 
     pub fn is_current_ingame(&self) -> bool {
         if let Some(last) = self.pre_computed_screens.clone().read().last() {
-            return last.is_in_game();
+            return last.ty() == ScreenType::InGame;
         }
         false
     }
 
     pub fn is_any_ingame(&self) -> bool {
         for screen in self.pre_computed_screens.clone().read().iter().rev() {
-            if screen.is_in_game() {
+            if screen.ty() == ScreenType::InGame {
                 return true;
             }
         }
@@ -371,7 +368,8 @@ impl ScreenSystem {
             .screen
             .clone()
             .lock()
-            .is_in_game();
+            .ty()
+            == ScreenType::InGame;
     }
 
     pub fn on_scroll(&self, x: f64, y: f64) {

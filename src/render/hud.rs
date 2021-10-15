@@ -506,10 +506,6 @@ impl Screen for Hud {
         false
     }
 
-    fn is_in_game(&self) -> bool {
-        true
-    }
-
     fn is_tick_always(&self) -> bool {
         true
     }
