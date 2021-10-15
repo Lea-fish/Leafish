@@ -1,6 +1,6 @@
 use crate::render::hud::Hud;
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui;
 use crate::ui::{Container, ImageRef};
 use leafish_protocol::protocol::packet::play::serverbound::ClientStatus;
@@ -39,7 +39,12 @@ impl Respawn {
 }
 
 impl super::Screen for Respawn {
-    fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         let icon_scale = Hud::icon_scale(renderer);
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
@@ -123,23 +128,33 @@ impl super::Screen for Respawn {
         });
     }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
         self.elements = None;
     }
 
     fn tick(
         &mut self,
-        _delta: f64,
+        _screen_sys: &ScreenSystem,
         _renderer: &mut Renderer,
         _ui_container: &mut Container,
-    ) -> Option<Box<dyn Screen>> {
+        _delta: f64,
+    ) {
         // TODO
-        None
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        self.on_deactive(renderer, ui_container);
-        self.on_active(renderer, ui_container);
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
+        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_active(screen_sys, renderer, ui_container);
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

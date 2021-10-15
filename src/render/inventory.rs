@@ -2,7 +2,7 @@ use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui::{Container, ImageRef, TextRef, VAttach};
 use crate::{ui, Game};
 use glutin::event::VirtualKeyCode;
@@ -19,7 +19,12 @@ pub struct InventoryWindow {
 }
 
 impl Screen for InventoryWindow {
-    fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn init(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         self.inventory_context
             .clone()
             .write()
@@ -35,23 +40,41 @@ impl Screen for InventoryWindow {
             .init(renderer, ui_container, self);
     }
 
-    fn deinit(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn deinit(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
         self.inventory_context.clone().write().inventory = None;
         self.base_inventory.clone().write().close();
         self.inventory.clone().write().close();
         self.clear_elements();
     }
 
-    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    }
 
     fn tick(
         &mut self,
-        _delta: f64,
+        _screen_sys: &ScreenSystem,
         renderer: &mut Renderer,
         ui_container: &mut Container,
-    ) -> Option<Box<dyn Screen>> {
+        _delta: f64,
+    ) {
         self.base_inventory
             .clone()
             .write()
@@ -60,10 +83,14 @@ impl Screen for InventoryWindow {
             .clone()
             .write()
             .tick(renderer, ui_container, self);
-        None
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn on_resize(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         self.clear_elements();
         self.base_inventory.clone().write().resize(
             renderer.safe_width,
@@ -81,15 +108,13 @@ impl Screen for InventoryWindow {
         );
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if key == VirtualKeyCode::Escape && !down {
             self.inventory_context
                 .clone()
                 .write()
                 .try_close_inventory(game.screen_sys.clone());
-            return true;
         }
-        false
     }
 
     fn is_closable(&self) -> bool {

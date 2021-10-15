@@ -18,7 +18,7 @@ use std::fs;
 use crate::ui;
 use crate::{paths, render};
 
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use serde_json::{self, Value};
 
 pub struct EditServerEntry {
@@ -90,7 +90,12 @@ impl EditServerEntry {
 }
 
 impl super::Screen for EditServerEntry {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         // Name
@@ -178,20 +183,25 @@ impl super::Screen for EditServerEntry {
         });
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.elements = None
     }
 
     fn tick(
         &mut self,
-        _delta: f64,
+        _screen_sys: &ScreenSystem,
         renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         elements.logo.tick(renderer);
-        None
     }
 
     fn is_closable(&self) -> bool {

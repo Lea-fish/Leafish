@@ -17,7 +17,7 @@ use std::sync::Arc;
 use crate::protocol::packet;
 use crate::render::hud::{Hud, START_TICKS};
 use crate::render::{hud, Renderer};
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem, ScreenType};
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
 use crate::{render, Game};
@@ -109,15 +109,20 @@ impl Chat {
 }
 
 impl super::Screen for Chat {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
-        let scale = Hud::icon_scale(renderer);
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
+        /*let scale = Hud::icon_scale(renderer);
         let history_size = self.context.messages.clone().read().len();
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
             let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
             let lines = (renderer.ui.size_of_string(&*message.1.to_string())
-                / (hud::CHAT_WIDTH * scale))
+                / hud::CHAT_WIDTH)
                 .ceil() as u8;
             component_lines += lines;
         }
@@ -131,8 +136,8 @@ impl super::Screen for Chat {
                     .position(1.0 * scale, scale * 85.0 / 2.0)
                     .size(
                         500.0 / 2.0 * scale,
-                        5.0 * scale * (component_lines as f64)
-                            + cmp::min(10, history_size) as f64 * 0.4 * scale,
+                        (5.0 * (component_lines as f64)
+                            + cmp::min(10, history_size) as f64 * 0.4) * scale,
                     )
                     .colour((0, 0, 0, 100))
                     .create(ui_container),
@@ -146,7 +151,7 @@ impl super::Screen for Chat {
                 .position(1.0 * scale, 1.0 * scale)
                 .size(
                     renderer.safe_width as f64 - 2.0 * scale,
-                    (5.0 * scale + 0.4 * scale) * 1.5,
+                    (5.0 + 0.4) * 1.5 * scale,
                 )
                 .colour((0, 0, 0, 100))
                 .create(ui_container),
@@ -156,26 +161,32 @@ impl super::Screen for Chat {
         for i in 0..cmp::min(10, history_size) {
             let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
             let lines = (renderer.ui.size_of_string(&*message.1.to_string())
-                / (hud::CHAT_WIDTH * scale))
+                / hud::CHAT_WIDTH)
                 .ceil() as u8;
             let text = ui::FormattedBuilder::new()
                 .draw_index(0)
                 .alignment(VAttach::Bottom, HAttach::Left)
                 .position(
                     1.0 * scale,
-                    scale * 85.0 / 2.0
-                        + ((component_lines as f64) * 5.0) * scale
-                        + i as f64 * 0.4 * scale,
+                    (85.0 / 2.0
+                        + ((component_lines as f64) * 5.0)
+                        + i as f64 * 0.4) * scale,
                 )
                 .text(message.1)
                 .max_width(hud::CHAT_WIDTH * scale)
                 .create(ui_container);
             self.rendered_messages.push(text);
             component_lines += lines;
-        }
+        }*/
+        self.render_chat(renderer, ui_container);
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         self.rendered_messages.clear();
         self.background.clear();
         self.animated_tex = None;
@@ -183,10 +194,11 @@ impl super::Screen for Chat {
 
     fn tick(
         &mut self,
-        _delta: f64,
+        _screen_sys: &ScreenSystem,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let scale = Hud::icon_scale(renderer);
         if self.animation == 0 {
             self.animation = 20;
@@ -231,20 +243,25 @@ impl super::Screen for Chat {
         if self.context.dirty.load(Ordering::Acquire) {
             self.context.dirty.store(false, Ordering::Release);
             self.rendered_messages.clear();
+            self.background.clear();
             self.render_chat(renderer, ui_container);
         }
-        None
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        self.on_deactive(renderer, ui_container);
-        self.on_active(renderer, ui_container);
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
+        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_active(screen_sys, renderer, ui_container);
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if key == VirtualKeyCode::Escape && !down {
             game.screen_sys.clone().pop_screen();
-            return true;
+            return;
         }
         if key == VirtualKeyCode::Return && !down {
             if !self.written.is_empty() {
@@ -255,7 +272,7 @@ impl super::Screen for Chat {
                 );
             }
             game.screen_sys.clone().pop_screen();
-            return true;
+            return;
         }
         if key == VirtualKeyCode::V && game.is_ctrl_pressed {
             if let Ok(clipboard) = game.clipboard_provider.clone().write().get_contents() {
@@ -281,7 +298,6 @@ impl super::Screen for Chat {
                 self.dirty_written = true;
             }
         }
-        false
     }
 
     fn on_char_receive(&mut self, received: char, game: &mut Game) {
@@ -326,6 +342,10 @@ impl super::Screen for Chat {
 
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
+    }
+
+    fn ty(&self) -> ScreenType {
+        ScreenType::Chat
     }
 }
 

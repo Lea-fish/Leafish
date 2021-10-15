@@ -3,7 +3,7 @@ use crate::render;
 use crate::settings;
 use crate::ui;
 
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
 
 pub struct UIElements {
@@ -38,7 +38,12 @@ impl SettingsMenu {
 }
 
 impl super::Screen for SettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
@@ -193,17 +198,23 @@ impl super::Screen for SettingsMenu {
         });
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         self.elements = None;
     }
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
-        _delta: f64,
+        _screen_sys: &ScreenSystem,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
@@ -217,7 +228,6 @@ impl super::Screen for SettingsMenu {
                 ui::Mode::Scaled => renderer.height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -256,7 +266,12 @@ impl VideoSettingsMenu {
 }
 
 impl super::Screen for VideoSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
@@ -366,17 +381,23 @@ impl super::Screen for VideoSettingsMenu {
             _buttons: buttons,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         self.elements = None;
     }
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
-        _delta: f64,
+        _screen_sys: &ScreenSystem,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
@@ -390,7 +411,6 @@ impl super::Screen for VideoSettingsMenu {
                 ui::Mode::Scaled => renderer.height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -429,7 +449,12 @@ impl AudioSettingsMenu {
 }
 
 impl super::Screen for AudioSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
@@ -465,17 +490,23 @@ impl super::Screen for AudioSettingsMenu {
             _buttons: buttons,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         self.elements = None;
     }
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
-        _delta: f64,
+        _screen_sys: &ScreenSystem,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
@@ -489,7 +520,6 @@ impl super::Screen for AudioSettingsMenu {
                 ui::Mode::Scaled => renderer.height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -528,7 +558,12 @@ impl SkinSettingsMenu {
 }
 
 impl super::Screen for SkinSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
@@ -654,17 +689,23 @@ impl super::Screen for SkinSettingsMenu {
             _buttons: buttons,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         self.elements = None;
     }
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
-        _delta: f64,
+        _screen_sys: &ScreenSystem,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
@@ -678,7 +719,6 @@ impl super::Screen for SkinSettingsMenu {
                 ui::Mode::Scaled => renderer.height as f64,
             };
         }
-        None
     }
 
     // Events

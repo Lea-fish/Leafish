@@ -26,7 +26,7 @@ use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
 use crate::render;
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem, ScreenType};
 use crate::server::Server;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
@@ -221,6 +221,7 @@ pub struct Hud {
     hud_context: Arc<RwLock<HudContext>>,
     random: ThreadRng,
     last_tick: Instant,
+    render_chat: bool,
 }
 
 impl Hud {
@@ -243,12 +244,18 @@ impl Hud {
             hud_context,
             random: rand::thread_rng(),
             last_tick: Instant::now(),
+            render_chat: false,
         }
     }
 }
 
 impl Screen for Hud {
-    fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn init(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         if self.hud_context.clone().read().enabled {
             self.render_slots(renderer, ui_container);
             self.render_slots_items(renderer, ui_container);
@@ -266,7 +273,12 @@ impl Screen for Hud {
         }
     }
 
-    fn deinit(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn deinit(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
         self.elements.clear();
         self.health_elements.clear();
         self.exp_elements.clear();
@@ -281,27 +293,40 @@ impl Screen for Hud {
         self.chat_background_elements.clear();
     }
 
-    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    }
 
     fn tick(
         &mut self,
-        _delta: f64,
+        screen_sys: &ScreenSystem,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn Screen>> {
+        _delta: f64,
+    ) {
         if !self.hud_context.clone().read().enabled {
             if self.last_enabled {
-                self.on_deactive(renderer, ui_container);
+                self.on_deactive(screen_sys, renderer, ui_container);
                 self.last_enabled = false;
             }
-            return None;
+            return;
         }
         if self.hud_context.clone().read().enabled && !self.last_enabled {
-            self.on_active(renderer, ui_container);
+            self.on_active(screen_sys, renderer, ui_container);
             self.last_enabled = true;
-            return None;
+            return;
         }
         if self.hud_context.clone().read().debug {
             self.render_debug(renderer, ui_container);
@@ -371,7 +396,14 @@ impl Screen for Hud {
             self.debug_elements.clear();
             self.render_debug(renderer, ui_container);
         }
-        if self // TODO: Fix overlapping with chat window!
+        if !self.chat_background_elements.is_empty()
+            && screen_sys.current_screen_ty() == ScreenType::Chat
+        {
+            self.chat_background_elements.clear();
+            self.chat_elements.clear();
+            self.render_chat = true;
+        }
+        if (self
             .hud_context
             .clone()
             .read()
@@ -382,10 +414,12 @@ impl Screen for Hud {
             .chat_ctx
             .clone()
             .is_dirty()
+            || self.render_chat)
+            && screen_sys.current_screen_ty() != ScreenType::Chat
         {
             self.render_chat(renderer, ui_container);
+            self.render_chat = false;
         }
-        None
     }
 
     fn on_scroll(&mut self, _: f64, y: f64) {
@@ -442,39 +476,42 @@ impl Screen for Hud {
         self.hud_context.clone().write().dirty_slot_index = true;
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         if self.hud_context.clone().read().enabled {
-            self.deinit(renderer, ui_container);
-            self.init(renderer, ui_container);
+            self.deinit(screen_sys, renderer, ui_container);
+            self.init(screen_sys, renderer, ui_container);
         }
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if key == VirtualKeyCode::Escape && !down && game.focused {
             game.screen_sys
                 .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
-            return true;
+            return;
         }
         if let Some(action_key) = settings::Actionkey::get_by_keycode(key, &game.vars) {
-            return game.server.as_ref().unwrap().key_press(
-                down,
-                action_key,
-                &mut game.focused.clone(),
-            );
+            game.server
+                .as_ref()
+                .unwrap()
+                .key_press(down, action_key, &mut game.focused.clone());
         }
-        false
     }
 
     fn is_closable(&self) -> bool {
         false
     }
 
-    fn is_in_game(&self) -> bool {
+    fn is_tick_always(&self) -> bool {
         true
     }
 
-    fn is_tick_always(&self) -> bool {
-        true
+    fn ty(&self) -> ScreenType {
+        ScreenType::InGame
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

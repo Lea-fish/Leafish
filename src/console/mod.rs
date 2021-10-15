@@ -356,7 +356,8 @@ impl Console {
                 if offset >= 210.0 {
                     break;
                 }
-                let (_, height) = ui::Formatted::compute_size(renderer, line, w - 10.0, 1.0);
+                let (_, height) =
+                    ui::Formatted::compute_size(renderer, line, w - 10.0, 1.0, 1.0, 1.0);
                 elements.lines.push(
                     ui::FormattedBuilder::new()
                         .text(line.clone())

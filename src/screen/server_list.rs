@@ -27,7 +27,7 @@ use crate::ui;
 
 use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui::Container;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, TryRecvError};
@@ -465,7 +465,7 @@ impl ServerList {
         // If we are kicked from a server display the reason
         let disconnected = if let Some(ref disconnect_reason) = self.disconnect_reason {
             let (width, height) =
-                ui::Formatted::compute_size(renderer, disconnect_reason, 600.0, 1.0);
+                ui::Formatted::compute_size(renderer, disconnect_reason, 600.0, 1.0, 1.0, 1.0);
             let background = ui::ImageBuilder::new()
                 .texture("leafish:solid")
                 .position(0.0, 3.0)
@@ -509,12 +509,22 @@ impl ServerList {
 }
 
 impl super::Screen for ServerList {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         self.init_list(renderer, ui_container);
         *self.needs_reload.borrow_mut() = true;
     }
 
-    fn on_deactive(&mut self, renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         {
             let elements = self.elements.as_mut().unwrap();
@@ -530,10 +540,11 @@ impl super::Screen for ServerList {
 
     fn tick(
         &mut self,
-        delta: f64,
+        _screen_sys: &ScreenSystem,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        delta: f64,
+    ) {
         if *self.needs_reload.borrow() {
             self.reload_server_list(renderer, ui_container);
         }
@@ -633,7 +644,6 @@ impl super::Screen for ServerList {
                 }
             }
         }
-        None
     }
 
     fn on_scroll(&mut self, _: f64, y: f64) {
@@ -659,10 +669,15 @@ impl super::Screen for ServerList {
         }
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         // TODO: Don't ping the servers on resize!
-        self.on_deactive(renderer, ui_container);
-        self.on_active(renderer, ui_container);
+        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_active(screen_sys, renderer, ui_container);
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

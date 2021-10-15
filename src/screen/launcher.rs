@@ -33,10 +33,6 @@ use std::fs::File;
 use std::io::{Read, Write};
 use std::rc::Rc;
 
-/// SAFETY: We don't alter components which, which aren't thread safe on other threads than the main one.
-unsafe impl Send for Launcher {}
-unsafe impl Sync for Launcher {}
-
 pub struct Launcher {
     rendered_accounts: Vec<RenderAccount>,
     options: Option<ui::ButtonRef>,
@@ -84,7 +80,12 @@ impl Launcher {
 }
 
 impl super::Screen for Launcher {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         // Options menu
         let options = ui::ButtonBuilder::new()
             .position(5.0, 25.0)
@@ -401,7 +402,12 @@ impl super::Screen for Launcher {
         }
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.options.take();
         self.disclaimer.take();
@@ -412,17 +418,21 @@ impl super::Screen for Launcher {
 
     fn tick(
         &mut self,
-        _: f64,
+        _screen_sys: &ScreenSystem,
         _renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
-        // self.logo.tick(renderer);
-        None
+        _: f64,
+    ) {
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        self.on_deactive(renderer, ui_container);
-        self.on_active(renderer, ui_container);
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
+        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_active(screen_sys, renderer, ui_container);
     }
 
     /*

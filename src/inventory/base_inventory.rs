@@ -167,7 +167,7 @@ impl Inventory for BaseInventory {
     }
 
     fn close(&mut self) {
-        // TODO
+        self.custom_offset = false;
     }
 
     fn click_at(&self, _cursor: (u32, u32)) {
