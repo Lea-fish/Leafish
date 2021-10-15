@@ -152,10 +152,9 @@ impl super::Screen for EditAccountEntry {
         _delta: f64,
         renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+    ) {
         let elements = self.elements.as_mut().unwrap();
         elements.logo.tick(renderer);
-        None
     }
 
     fn is_closable(&self) -> bool {

@@ -170,7 +170,7 @@ impl super::Screen for Login {
         _delta: f64,
         renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+    ) {
         let elements = self.elements.as_mut().unwrap();
 
         if elements.try_login.get() && elements.login_res.is_none() {
@@ -212,7 +212,7 @@ impl super::Screen for Login {
                 match res {
                     Ok(account) => {
                         self.callback.clone().deref()(Some(account));
-                        return None;
+                        return;
                     }
                     Err(err) => {
                         elements.login_error.borrow_mut().text = format!("{}", err);
@@ -225,7 +225,6 @@ impl super::Screen for Login {
         }
 
         elements.logo.tick(renderer);
-        None
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

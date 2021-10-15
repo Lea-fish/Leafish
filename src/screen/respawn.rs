@@ -127,14 +127,8 @@ impl super::Screen for Respawn {
         self.elements = None;
     }
 
-    fn tick(
-        &mut self,
-        _delta: f64,
-        _renderer: &mut Renderer,
-        _ui_container: &mut Container,
-    ) -> Option<Box<dyn Screen>> {
+    fn tick(&mut self, _delta: f64, _renderer: &mut Renderer, _ui_container: &mut Container) {
         // TODO
-        None
     }
 
     fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {

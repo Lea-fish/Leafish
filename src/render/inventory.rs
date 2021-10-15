@@ -46,12 +46,7 @@ impl Screen for InventoryWindow {
 
     fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
-    fn tick(
-        &mut self,
-        _delta: f64,
-        renderer: &mut Renderer,
-        ui_container: &mut Container,
-    ) -> Option<Box<dyn Screen>> {
+    fn tick(&mut self, _delta: f64, renderer: &mut Renderer, ui_container: &mut Container) {
         self.base_inventory
             .clone()
             .write()
@@ -60,7 +55,6 @@ impl Screen for InventoryWindow {
             .clone()
             .write()
             .tick(renderer, ui_container, self);
-        None
     }
 
     fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
@@ -81,15 +75,13 @@ impl Screen for InventoryWindow {
         );
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if key == VirtualKeyCode::Escape && !down {
             self.inventory_context
                 .clone()
                 .write()
                 .try_close_inventory(game.screen_sys.clone());
-            return true;
         }
-        false
     }
 
     fn is_closable(&self) -> bool {

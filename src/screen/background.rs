@@ -65,12 +65,7 @@ impl Screen for Background {
 
     fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
 
-    fn tick(
-        &mut self,
-        delta: f64,
-        renderer: &mut Renderer,
-        ui_container: &mut Container,
-    ) -> Option<Box<dyn Screen>> {
+    fn tick(&mut self, delta: f64, renderer: &mut Renderer, ui_container: &mut Container) {
         self.delay += delta;
         if self.delay >= 0.1 {
             self.delay = 0.0;
@@ -79,11 +74,11 @@ impl Screen for Background {
                 if hide {
                     self.active = false;
                     self.deinit(renderer, ui_container);
-                    return None;
+                    return;
                 }
             } else if !hide {
                 self.init(renderer, ui_container);
-                return None;
+                return;
             }
             let curr_path = (*self.vars.get(BACKGROUND_IMAGE)).clone();
             if !self.last_path.eq(&curr_path) {
@@ -92,7 +87,6 @@ impl Screen for Background {
                 self.init(renderer, ui_container);
             }
         }
-        None
     }
 
     fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {

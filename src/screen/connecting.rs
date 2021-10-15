@@ -88,11 +88,9 @@ impl super::Screen for Connecting {
         _delta: f64,
         renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+    ) {
         let elements = self.elements.as_mut().unwrap();
-
         elements.logo.tick(renderer);
-        None
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

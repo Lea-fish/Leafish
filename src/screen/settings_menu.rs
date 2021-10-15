@@ -203,7 +203,7 @@ impl super::Screen for SettingsMenu {
         _delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
@@ -217,7 +217,6 @@ impl super::Screen for SettingsMenu {
                 ui::Mode::Scaled => renderer.height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -376,7 +375,7 @@ impl super::Screen for VideoSettingsMenu {
         _delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
@@ -390,7 +389,6 @@ impl super::Screen for VideoSettingsMenu {
                 ui::Mode::Scaled => renderer.height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -475,7 +473,7 @@ impl super::Screen for AudioSettingsMenu {
         _delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
@@ -489,7 +487,6 @@ impl super::Screen for AudioSettingsMenu {
                 ui::Mode::Scaled => renderer.height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -664,7 +661,7 @@ impl super::Screen for SkinSettingsMenu {
         _delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
@@ -678,7 +675,6 @@ impl super::Screen for SkinSettingsMenu {
                 ui::Mode::Scaled => renderer.height as f64,
             };
         }
-        None
     }
 
     // Events

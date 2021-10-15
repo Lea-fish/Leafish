@@ -290,18 +290,18 @@ impl Screen for Hud {
         _delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn Screen>> {
+    ) {
         if !self.hud_context.clone().read().enabled {
             if self.last_enabled {
                 self.on_deactive(renderer, ui_container);
                 self.last_enabled = false;
             }
-            return None;
+            return;
         }
         if self.hud_context.clone().read().enabled && !self.last_enabled {
             self.on_active(renderer, ui_container);
             self.last_enabled = true;
-            return None;
+            return;
         }
         if self.hud_context.clone().read().debug {
             self.render_debug(renderer, ui_container);
@@ -385,7 +385,6 @@ impl Screen for Hud {
         {
             self.render_chat(renderer, ui_container);
         }
-        None
     }
 
     fn on_scroll(&mut self, _: f64, y: f64) {
@@ -449,20 +448,18 @@ impl Screen for Hud {
         }
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if key == VirtualKeyCode::Escape && !down && game.focused {
             game.screen_sys
                 .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
-            return true;
+            return;
         }
         if let Some(action_key) = settings::Actionkey::get_by_keycode(key, &game.vars) {
-            return game.server.as_ref().unwrap().key_press(
-                down,
-                action_key,
-                &mut game.focused.clone(),
-            );
+            game.server
+                .as_ref()
+                .unwrap()
+                .key_press(down, action_key, &mut game.focused.clone());
         }
-        false
     }
 
     fn is_closable(&self) -> bool {

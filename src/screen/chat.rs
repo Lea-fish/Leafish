@@ -186,7 +186,7 @@ impl super::Screen for Chat {
         _delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+    ) {
         let scale = Hud::icon_scale(renderer);
         if self.animation == 0 {
             self.animation = 20;
@@ -233,7 +233,6 @@ impl super::Screen for Chat {
             self.rendered_messages.clear();
             self.render_chat(renderer, ui_container);
         }
-        None
     }
 
     fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
@@ -241,10 +240,10 @@ impl super::Screen for Chat {
         self.on_active(renderer, ui_container);
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) -> bool {
+    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if key == VirtualKeyCode::Escape && !down {
             game.screen_sys.clone().pop_screen();
-            return true;
+            return;
         }
         if key == VirtualKeyCode::Return && !down {
             if !self.written.is_empty() {
@@ -255,7 +254,7 @@ impl super::Screen for Chat {
                 );
             }
             game.screen_sys.clone().pop_screen();
-            return true;
+            return;
         }
         if key == VirtualKeyCode::V && game.is_ctrl_pressed {
             if let Ok(clipboard) = game.clipboard_provider.clone().write().get_contents() {
@@ -281,7 +280,6 @@ impl super::Screen for Chat {
                 self.dirty_written = true;
             }
         }
-        false
     }
 
     fn on_char_receive(&mut self, received: char, game: &mut Game) {
