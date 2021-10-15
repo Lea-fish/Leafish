@@ -2,7 +2,7 @@ use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui::{Container, ImageRef, TextRef, VAttach};
 use crate::{ui, Game};
 use glutin::event::VirtualKeyCode;
@@ -19,7 +19,12 @@ pub struct InventoryWindow {
 }
 
 impl Screen for InventoryWindow {
-    fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn init(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         self.inventory_context
             .clone()
             .write()
@@ -35,18 +40,41 @@ impl Screen for InventoryWindow {
             .init(renderer, ui_container, self);
     }
 
-    fn deinit(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn deinit(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
         self.inventory_context.clone().write().inventory = None;
         self.base_inventory.clone().write().close();
         self.inventory.clone().write().close();
         self.clear_elements();
     }
 
-    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    }
 
-    fn tick(&mut self, _delta: f64, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn tick(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _delta: f64,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         self.base_inventory
             .clone()
             .write()
@@ -57,7 +85,12 @@ impl Screen for InventoryWindow {
             .tick(renderer, ui_container, self);
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn on_resize(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         self.clear_elements();
         self.base_inventory.clone().write().resize(
             renderer.safe_width,

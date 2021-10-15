@@ -16,7 +16,7 @@ use crate::render;
 use crate::ui;
 use crate::Game;
 
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
 
 pub struct ConfirmBox {
@@ -61,7 +61,12 @@ impl ConfirmBox {
 }
 
 impl super::Screen for ConfirmBox {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         // Prompt
@@ -119,13 +124,19 @@ impl super::Screen for ConfirmBox {
         });
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.elements = None
     }
 
     fn tick(
         &mut self,
+        _screen_sys: &ScreenSystem,
         _delta: f64,
         renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,

@@ -24,7 +24,7 @@ use crate::console;
 use crate::console::Vars;
 use crate::protocol;
 use crate::render;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui;
 use leafish_protocol::protocol::login::{Account, AccountType};
 use leafish_protocol::protocol::Error;
@@ -71,7 +71,12 @@ impl Login {
 }
 
 impl super::Screen for Login {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         let try_login = Rc::new(Cell::new(false));
@@ -160,13 +165,19 @@ impl super::Screen for Login {
             password_txt,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.elements = None
     }
 
     fn tick(
         &mut self,
+        _screen_sys: &ScreenSystem,
         _delta: f64,
         renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,

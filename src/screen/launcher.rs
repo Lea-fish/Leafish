@@ -80,7 +80,12 @@ impl Launcher {
 }
 
 impl super::Screen for Launcher {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         // Options menu
         let options = ui::ButtonBuilder::new()
             .position(5.0, 25.0)
@@ -397,7 +402,12 @@ impl super::Screen for Launcher {
         }
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.options.take();
         self.disclaimer.take();
@@ -408,15 +418,21 @@ impl super::Screen for Launcher {
 
     fn tick(
         &mut self,
+        _screen_sys: &ScreenSystem,
         _: f64,
         _renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
     ) {
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        self.on_deactive(renderer, ui_container);
-        self.on_active(renderer, ui_container);
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
+        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_active(screen_sys, renderer, ui_container);
     }
 
     /*

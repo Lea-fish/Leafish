@@ -1142,6 +1142,8 @@ impl UIElement for Formatted {
                     max_width: self.max_width,
                     renderer,
                     transparency: self.transparency,
+                    scale_x: self.scale_x,
+                    scale_y: self.scale_y,
                 };
                 state.build(&self.text, format::Color::White);
                 self.text_elements = state.text;
@@ -1183,8 +1185,14 @@ impl UIElement for Formatted {
     fn tick(&mut self, renderer: &mut render::Renderer) {
         self.super_tick(renderer);
         if self.is_dirty() {
-            let (w, h) =
-                Self::compute_size(renderer, &self.text, self.max_width, self.transparency);
+            let (w, h) = Self::compute_size(
+                renderer,
+                &self.text,
+                self.max_width,
+                self.transparency,
+                self.scale_x,
+                self.scale_y,
+            );
             self.width = w;
             self.height = h;
         }
@@ -1202,6 +1210,8 @@ impl Formatted {
         text: &format::Component,
         max_width: f64,
         transparency: f64,
+        scale_x: f64,
+        scale_y: f64,
     ) -> (f64, f64) {
         let mut state = FormatState {
             lines: 0,
@@ -1211,6 +1221,8 @@ impl Formatted {
             max_width,
             renderer,
             transparency,
+            scale_x,
+            scale_y,
         };
         state.build(text, format::Color::White);
         (state.width + 2.0, (state.lines + 1) as f64 * 18.0)
@@ -1223,6 +1235,8 @@ struct FormatState<'a> {
     offset: f64,
     width: f64,
     transparency: f64,
+    scale_x: f64,
+    scale_y: f64,
     text: Vec<Element>,
     renderer: &'a render::Renderer,
 }
@@ -1238,7 +1252,7 @@ impl<'a> FormatState<'a> {
         match *c {
             format::Component::Text(ref txt) => {
                 let col = FormatState::get_color(&txt.modifier, color);
-                self.append_text(&txt.text, col);
+                self.append_text(self.scale_x, self.scale_y, &txt.text, col);
                 let modi = &txt.modifier;
                 if let Some(ref extra) = modi.extra {
                     for e in extra {
@@ -1249,7 +1263,7 @@ impl<'a> FormatState<'a> {
         }
     }
 
-    fn append_text(&mut self, txt: &str, color: format::Color) {
+    fn append_text(&mut self, scale_x: f64, scale_y: f64, txt: &str, color: format::Color) {
         let mut width = 0.0;
         let mut last = 0;
         for (i, c) in txt.char_indices() {
@@ -1260,6 +1274,8 @@ impl<'a> FormatState<'a> {
                     .text(&txt[last..i])
                     .position(self.offset, (self.lines * 18 + 1) as f64)
                     .colour((rr, gg, bb, (self.transparency * 255_f64) as u8))
+                    .scale_x(scale_x)
+                    .scale_y(scale_y)
                     .create(self);
                 last = i;
                 if c == '\n' {
@@ -1281,6 +1297,8 @@ impl<'a> FormatState<'a> {
                 .text(&txt[last..])
                 .position(self.offset, (self.lines * 18 + 1) as f64)
                 .colour((rr, gg, bb, (self.transparency * 255_f64) as u8))
+                .scale_x(scale_x)
+                .scale_y(scale_y)
                 .create(self);
             self.offset += self.renderer.ui.size_of_string(&txt[last..]) + 2.0;
             if self.offset > self.width {

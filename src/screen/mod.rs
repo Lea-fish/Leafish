@@ -31,6 +31,7 @@ pub mod settings_menu;
 pub use self::settings_menu::{AudioSettingsMenu, SettingsMenu, VideoSettingsMenu};
 
 use crate::render::Renderer;
+use crate::screen::ScreenType::Other;
 use crate::ui;
 use crate::ui::Container;
 use crate::{render, Game};
@@ -43,16 +44,39 @@ use winit::window::Window;
 
 pub trait Screen {
     // Called once
-    fn init(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {}
-    fn deinit(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {}
+    fn init(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
+    }
+    fn deinit(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
+    }
 
     // May be called multiple times
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container);
-    fn on_deactive(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container);
+    fn on_active(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    );
+    fn on_deactive(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    );
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
+        screen_sys: &ScreenSystem,
         delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
@@ -61,7 +85,13 @@ pub trait Screen {
     // Events
     fn on_scroll(&mut self, _x: f64, _y: f64) {}
 
-    fn on_resize(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {} // TODO: make non-optional!
+    fn on_resize(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    } // TODO: make non-optional!
 
     fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if key == VirtualKeyCode::Escape && !down && self.is_closable() {
@@ -83,6 +113,10 @@ pub trait Screen {
         false
     }
 
+    fn ty(&self) -> ScreenType {
+        Other(String::new())
+    }
+
     fn clone_screen(&self) -> Box<dyn Screen>;
 }
 
@@ -90,6 +124,12 @@ impl Clone for Box<dyn Screen> {
     fn clone(&self) -> Box<dyn Screen> {
         self.clone_screen()
     }
+}
+
+#[derive(Eq, PartialEq)]
+pub enum ScreenType {
+    Other(String),
+    Chat,
 }
 
 #[derive(Clone)]
@@ -171,6 +211,13 @@ impl ScreenSystem {
         false
     }
 
+    pub fn current_screen_ty(&self) -> ScreenType {
+        if let Some(last) = self.pre_computed_screens.clone().read().last() {
+            return last.ty();
+        }
+        ScreenType::Other(String::new())
+    }
+
     pub fn receive_char(&self, received: char, game: &mut Game) {
         if let Some(screen) = self.screens.clone().read().last() {
             screen.screen.clone().lock().on_char_receive(received, game);
@@ -215,9 +262,13 @@ impl ScreenSystem {
                             .screen
                             .clone()
                             .lock()
-                            .on_deactive(renderer, ui_container);
+                            .on_deactive(self, renderer, ui_container);
                     }
-                    screen.screen.clone().lock().deinit(renderer, ui_container);
+                    screen
+                        .screen
+                        .clone()
+                        .lock()
+                        .deinit(self, renderer, ui_container);
                 }
             }
             for screen in self
@@ -241,17 +292,21 @@ impl ScreenSystem {
                         last.screen
                             .clone()
                             .lock()
-                            .on_deactive(renderer, ui_container);
+                            .on_deactive(self, renderer, ui_container);
                     }
                 }
                 let mut current = screens.last_mut().unwrap();
-                current.screen.clone().lock().init(renderer, ui_container);
+                current
+                    .screen
+                    .clone()
+                    .lock()
+                    .init(self, renderer, ui_container);
                 current.active = true;
                 current
                     .screen
                     .clone()
                     .lock()
-                    .on_active(renderer, ui_container);
+                    .on_active(self, renderer, ui_container);
             }
             self.lowest_offset.store(-1, Ordering::Release);
             if !was_closable {
@@ -277,7 +332,7 @@ impl ScreenSystem {
                     .screen
                     .clone()
                     .lock()
-                    .on_active(renderer, ui_container);
+                    .on_active(self, renderer, ui_container);
             }
             if current.last_width != renderer.safe_width as i32
                 || current.last_height != renderer.safe_height as i32
@@ -290,7 +345,7 @@ impl ScreenSystem {
                                 .screen
                                 .clone()
                                 .lock()
-                                .on_resize(renderer, ui_container);
+                                .on_resize(self, renderer, ui_container);
                             screen.1.last_width = renderer.safe_width as i32;
                             screen.1.last_height = renderer.safe_height as i32;
                         }
@@ -307,7 +362,7 @@ impl ScreenSystem {
                         .screen
                         .clone()
                         .lock()
-                        .tick(delta, renderer, ui_container);
+                        .tick(self, delta, renderer, ui_container);
                 }
             }
         }

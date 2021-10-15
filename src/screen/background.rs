@@ -35,7 +35,12 @@ impl Background {
 }
 
 impl Screen for Background {
-    fn init(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn init(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         let path = self.vars.get(BACKGROUND_IMAGE);
         self.last_path = (*path).clone();
         let background =
@@ -57,15 +62,38 @@ impl Screen for Background {
         self.background = background;
     }
 
-    fn deinit(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn deinit(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
         self.background.take();
     }
 
-    fn on_active(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {}
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut Renderer,
+        _ui_container: &mut Container,
+    ) {
+    }
 
-    fn tick(&mut self, delta: f64, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn tick(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        delta: f64,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
         self.delay += delta;
         if self.delay >= 0.1 {
             self.delay = 0.0;
@@ -73,25 +101,30 @@ impl Screen for Background {
             if self.active {
                 if hide {
                     self.active = false;
-                    self.deinit(renderer, ui_container);
+                    self.deinit(screen_sys, renderer, ui_container);
                     return;
                 }
             } else if !hide {
-                self.init(renderer, ui_container);
+                self.init(screen_sys, renderer, ui_container);
                 return;
             }
             let curr_path = (*self.vars.get(BACKGROUND_IMAGE)).clone();
             if !self.last_path.eq(&curr_path) {
                 self.last_path = curr_path;
-                self.deinit(renderer, ui_container);
-                self.init(renderer, ui_container);
+                self.deinit(screen_sys, renderer, ui_container);
+                self.init(screen_sys, renderer, ui_container);
             }
         }
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        self.deinit(renderer, ui_container);
-        self.init(renderer, ui_container);
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: &mut Renderer,
+        ui_container: &mut Container,
+    ) {
+        self.deinit(screen_sys, renderer, ui_container);
+        self.init(screen_sys, renderer, ui_container);
     }
 
     fn is_tick_always(&self) -> bool {

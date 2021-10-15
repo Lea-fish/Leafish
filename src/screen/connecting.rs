@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::render;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui;
 
 pub struct Connecting {
@@ -47,7 +47,12 @@ impl Connecting {
 }
 
 impl super::Screen for Connecting {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: &mut render::Renderer,
+        ui_container: &mut ui::Container,
+    ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         let connect_msg = ui::TextBuilder::new()
@@ -78,13 +83,19 @@ impl super::Screen for Connecting {
             _connect_msg: connect_msg,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: &mut render::Renderer,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.elements = None
     }
 
     fn tick(
         &mut self,
+        _screen_sys: &ScreenSystem,
         _delta: f64,
         renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
