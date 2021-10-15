@@ -126,10 +126,7 @@ impl ScreenSystem {
     }
 
     pub fn close_closable_screens(&self) {
-        loop {
-            if !self.is_current_closable() {
-                break;
-            }
+        while self.is_current_closable() {
             self.pop_screen();
         }
     }
@@ -153,18 +150,16 @@ impl ScreenSystem {
 
     pub fn is_current_closable(&self) -> bool {
         if let Some(last) = self.pre_computed_screens.clone().read().last() {
-            last.is_closable()
-        } else {
-            false
+            return last.is_closable();
         }
+        false
     }
 
     pub fn is_current_ingame(&self) -> bool {
         if let Some(last) = self.pre_computed_screens.clone().read().last() {
-            last.is_in_game()
-        } else {
-            false
+            return last.is_in_game();
         }
+        false
     }
 
     pub fn is_any_ingame(&self) -> bool {
