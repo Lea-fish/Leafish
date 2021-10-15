@@ -419,9 +419,9 @@ impl super::Screen for Launcher {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _: f64,
         _renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
+        _: f64,
     ) {
     }
 

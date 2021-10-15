@@ -541,9 +541,9 @@ impl super::Screen for ServerList {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
+        delta: f64,
     ) {
         if *self.needs_reload.borrow() {
             self.reload_server_list(renderer, ui_container);

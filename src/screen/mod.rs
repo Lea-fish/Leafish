@@ -77,9 +77,9 @@ pub trait Screen {
     fn tick(
         &mut self,
         screen_sys: &ScreenSystem,
-        delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
+        delta: f64,
     );
 
     // Events
@@ -359,7 +359,7 @@ impl ScreenSystem {
                         .screen
                         .clone()
                         .lock()
-                        .tick(self, delta, renderer, ui_container);
+                        .tick(self, renderer, ui_container, delta);
                 }
             }
         }

@@ -90,9 +90,9 @@ impl Screen for Background {
     fn tick(
         &mut self,
         screen_sys: &ScreenSystem,
-        delta: f64,
         renderer: &mut Renderer,
         ui_container: &mut Container,
+        delta: f64,
     ) {
         self.delay += delta;
         if self.delay >= 0.1 {

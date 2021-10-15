@@ -96,9 +96,9 @@ impl super::Screen for Connecting {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _delta: f64,
         renderer: &mut render::Renderer,
         _ui_container: &mut ui::Container,
+        _delta: f64,
     ) {
         let elements = self.elements.as_mut().unwrap();
         elements.logo.tick(renderer);

@@ -71,9 +71,9 @@ impl Screen for InventoryWindow {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _delta: f64,
         renderer: &mut Renderer,
         ui_container: &mut Container,
+        _delta: f64,
     ) {
         self.base_inventory
             .clone()

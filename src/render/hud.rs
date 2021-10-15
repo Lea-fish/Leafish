@@ -312,9 +312,9 @@ impl Screen for Hud {
     fn tick(
         &mut self,
         screen_sys: &ScreenSystem,
-        _delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
+        _delta: f64,
     ) {
         if !self.hud_context.clone().read().enabled {
             if self.last_enabled {
@@ -510,12 +510,12 @@ impl Screen for Hud {
         true
     }
 
-    fn clone_screen(&self) -> Box<dyn Screen> {
-        Box::new(self.clone())
-    }
-
     fn ty(&self) -> ScreenType {
         ScreenType::InGame
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
     }
 }
 

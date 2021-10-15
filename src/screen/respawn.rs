@@ -140,9 +140,9 @@ impl super::Screen for Respawn {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _delta: f64,
         _renderer: &mut Renderer,
         _ui_container: &mut Container,
+        _delta: f64,
     ) {
         // TODO
     }

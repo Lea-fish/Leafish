@@ -199,9 +199,9 @@ impl super::Screen for Chat {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _delta: f64,
         renderer: &mut render::Renderer,
         ui_container: &mut ui::Container,
+        _delta: f64,
     ) {
         let scale = Hud::icon_scale(renderer);
         if self.animation == 0 {
