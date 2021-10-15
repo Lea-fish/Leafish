@@ -364,12 +364,12 @@ impl ScreenSystem {
             }
         }
         // Handle current
-        return !self.screens.clone().read()[len - 1]
+        return self.screens.clone().read()[len - 1]
             .screen
             .clone()
             .lock()
             .ty()
-            == ScreenType::InGame;
+            != ScreenType::InGame;
     }
 
     pub fn on_scroll(&self, x: f64, y: f64) {
