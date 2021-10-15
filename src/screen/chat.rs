@@ -71,10 +71,6 @@ impl ChatContext {
         }
         ret
     }
-
-    pub fn undirty(&self) {
-        self.dirty.store(false, Ordering::Release);
-    }
 }
 
 impl Default for ChatContext {

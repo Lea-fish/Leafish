@@ -1088,15 +1088,6 @@ impl Hud {
                 .clone()
                 .tick_visible_messages();
             let history_size = messages.len();
-            self.hud_context
-                .clone()
-                .read()
-                .server
-                .as_ref()
-                .unwrap()
-                .chat_ctx
-                .clone()
-                .undirty();
 
             let mut component_lines = 0;
             for message in messages.iter().take(cmp::min(10, history_size)) {
