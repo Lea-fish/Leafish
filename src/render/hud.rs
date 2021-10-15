@@ -513,6 +513,10 @@ impl Screen for Hud {
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
     }
+
+    fn ty(&self) -> ScreenType {
+        ScreenType::InGame
+    }
 }
 
 impl Hud {
