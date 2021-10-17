@@ -19,7 +19,7 @@ use std::sync::Arc;
 use std::thread;
 
 use crate::format;
-use crate::format::{Component, TextComponent};
+use crate::format::{Component, ComponentType};
 use crate::paths;
 use crate::protocol;
 use crate::render;
@@ -172,8 +172,8 @@ impl ServerList {
                     if let Err(error) = result {
                         game.screen_sys
                             .clone()
-                            .add_screen(Box::new(ServerList::new(Some(Component::Text(
-                                TextComponent::new(&*error.to_string()),
+                            .add_screen(Box::new(ServerList::new(Some(Component::new(
+                                ComponentType::new(&*error.to_string()),
                             )))));
                     } else {
                         game.screen_sys
@@ -215,14 +215,14 @@ impl ServerList {
 
             // Server's message of the day
             let motd = ui::FormattedBuilder::new()
-                .text(Component::Text(TextComponent::new("Connecting...")))
+                .text(Component::new(ComponentType::new("Connecting...")))
                 .position(100.0, 23.0)
                 .max_width(700.0 - (90.0 + 10.0 + 5.0))
                 .attach(&mut *back.borrow_mut());
 
             // Version information
             let version = ui::FormattedBuilder::new()
-                .text(Component::Text(TextComponent::new("")))
+                .text(Component::new(ComponentType::new("")))
                 .position(100.0, 5.0)
                 .max_width(700.0 - (90.0 + 10.0 + 5.0))
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Left)
@@ -315,8 +315,7 @@ impl ServerList {
                     .and_then(|conn| conn.do_status())
                 {
                     Ok(res) => {
-                        let mut desc = res.0.description;
-                        format::convert_legacy(&mut desc);
+                        let desc = res.0.description;
                         let favicon = if let Some(icon) = res.0.favicon {
                             let data_base64 = &icon["data:image/png;base64,".len()..];
                             let data_base64: String =
@@ -340,10 +339,9 @@ impl ServerList {
                     }
                     Err(err) => {
                         let e = format!("{}", err);
-                        let mut msg = TextComponent::new(&e);
-                        msg.modifier.color = Some(format::Color::Red);
+                        let msg = ComponentType::new_with_color(&e, format::Color::Red);
                         let _ = send.send(PingInfo {
-                            motd: Component::Text(msg),
+                            motd: Component::new(msg),
                             ping: Duration::new(99999, 0),
                             exists: false,
                             online: 0,
@@ -620,11 +618,11 @@ impl super::Screen for ServerList {
                             } else {
                                 &res.protocol_name
                             };
-                            let mut txt = TextComponent::new(st);
-                            txt.modifier.color = Some(format::Color::Yellow);
-                            let mut msg = Component::Text(txt);
-                            format::convert_legacy(&mut msg);
-                            s.version.borrow_mut().set_text(msg);
+                            let msg_component = Component::new(ComponentType::new_with_color(
+                                st,
+                                format::Color::Yellow,
+                            ));
+                            s.version.borrow_mut().set_text(msg_component);
                         }
                         if let Some(favicon) = res.favicon {
                             let name: String = std::iter::repeat(())
@@ -642,9 +640,9 @@ impl super::Screen for ServerList {
                     }
                     Err(TryRecvError::Disconnected) => {
                         s.done_ping = true;
-                        let mut txt = TextComponent::new("Channel dropped");
-                        txt.modifier.color = Some(format::Color::Red);
-                        s.motd.borrow_mut().set_text(Component::Text(txt));
+                        s.motd.borrow_mut().set_text(Component::new(
+                            ComponentType::new_with_color("Channel dropped", format::Color::Red),
+                        ));
                     }
                     _ => {}
                 }

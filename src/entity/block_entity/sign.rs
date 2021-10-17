@@ -28,10 +28,10 @@ pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
     m.world.get_entity_mut(e).unwrap().insert(SignInfo {
         model: None,
         lines: [
-            Component::Text(format::TextComponent::new("")),
-            Component::Text(format::TextComponent::new("")),
-            Component::Text(format::TextComponent::new("")),
-            Component::Text(format::TextComponent::new("")),
+            Component::new(format::ComponentType::new("")),
+            Component::new(format::ComponentType::new("")),
+            Component::new(format::ComponentType::new("")),
+            Component::new(format::ComponentType::new("")),
         ],
         offset_x: 0.0,
         offset_y: 0.0,
@@ -171,7 +171,7 @@ fn add_sign(
             y_scale: Y_SCALE,
             x_scale: X_SCALE,
         };
-        state.build(line, format::Color::Black);
+        state.build(line, Some(format::Color::Black));
         let width = state.width;
         // Center align text
         for vert in &mut state.text {

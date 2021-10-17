@@ -23,7 +23,7 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::format::{Color, Component, TextComponent};
+use crate::format::{Color, Component, ComponentType};
 use crate::render;
 use crate::ui;
 use parking_lot::Mutex;
@@ -251,7 +251,7 @@ impl Default for Console {
 impl Console {
     pub fn new() -> Console {
         Console {
-            history: vec![Component::Text(TextComponent::new("")); 200],
+            history: vec![Component::new(ComponentType::new("")); 200],
             dirty: false,
             logfile: fs::File::create(paths::get_cache_dir().join("client.log"))
                 .expect("failed to open log file"),
@@ -398,37 +398,32 @@ impl Console {
             println!("{}", line);
 
             self.history.remove(0);
-            let mut msg = TextComponent::new("");
-            msg.modifier.extra = Some(vec![
-                Component::Text(TextComponent::new("[")),
-                {
-                    let mut msg = TextComponent::new(file);
-                    msg.modifier.color = Some(Color::Green);
-                    Component::Text(msg)
-                },
-                Component::Text(TextComponent::new(":")),
-                {
-                    let mut msg = TextComponent::new(&format!("{}", record.line().unwrap_or(0)));
-                    msg.modifier.color = Some(Color::Aqua);
-                    Component::Text(msg)
-                },
-                Component::Text(TextComponent::new("]")),
-                Component::Text(TextComponent::new("[")),
-                {
-                    let mut msg = TextComponent::new(&format!("{}", record.level()));
-                    msg.modifier.color = Some(match record.level() {
-                        log::Level::Debug => Color::Green,
-                        log::Level::Error => Color::Red,
-                        log::Level::Warn => Color::Yellow,
-                        log::Level::Info => Color::Aqua,
-                        log::Level::Trace => Color::Blue,
-                    });
-                    Component::Text(msg)
-                },
-                Component::Text(TextComponent::new("] ")),
-                Component::Text(TextComponent::new(&format!("{}", record.args()))),
-            ]);
-            self.history.push(Component::Text(msg));
+            let component = Component {
+                list: vec![
+                    ComponentType::new("["),
+                    ComponentType::new_with_color(file, Color::Green),
+                    ComponentType::new(":"),
+                    ComponentType::new_with_color(
+                        &format!("{}", record.line().unwrap_or(0)),
+                        Color::Aqua,
+                    ),
+                    ComponentType::new("]"),
+                    ComponentType::new("["),
+                    ComponentType::new_with_color(
+                        &format!("{}", record.level()),
+                        match record.level() {
+                            log::Level::Debug => Color::Green,
+                            log::Level::Error => Color::Red,
+                            log::Level::Warn => Color::Yellow,
+                            log::Level::Info => Color::Aqua,
+                            log::Level::Trace => Color::Blue,
+                        },
+                    ),
+                    ComponentType::new("] "),
+                    ComponentType::new(&format!("{}", record.args())),
+                ],
+            };
+            self.history.push(component);
             self.dirty = true;
         }
     }

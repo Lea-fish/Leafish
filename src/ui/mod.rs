@@ -1137,7 +1137,7 @@ impl UIElement for Formatted {
                     scale_x: self.scale_x,
                     scale_y: self.scale_y,
                 };
-                state.build(&self.text, format::Color::White);
+                state.build(&self.text, Some(format::Color::White));
                 self.text_elements = state.text;
             }
 
@@ -1216,7 +1216,7 @@ impl Formatted {
             scale_x,
             scale_y,
         };
-        state.build(text, format::Color::White);
+        state.build(text, Some(format::Color::White));
         (state.width + 2.0, (state.lines + 1) as f64 * 18.0)
     }
 }
@@ -1240,18 +1240,18 @@ impl ElementHolder for FormatState {
 }
 
 impl FormatState {
-    fn build(&mut self, c: &format::Component, color: format::Color) {
-        match *c {
-            format::Component::Text(ref txt) => {
-                let col = FormatState::get_color(&txt.modifier, color);
-                self.append_text(self.scale_x, self.scale_y, &txt.text, col);
-                let modi = &txt.modifier;
-                if let Some(ref extra) = modi.extra {
-                    for e in extra {
-                        self.build(e, col);
-                    }
-                }
-            }
+    pub fn build(&mut self, components: &format::Component, color: Option<format::Color>) {
+        for component in components.list.iter() {
+            self.append_text(
+                self.scale_x,
+                self.scale_y,
+                component.get_text(),
+                if let Some(color) = color {
+                    component.get_modifier().color.if_none_use_this_color(color)
+                } else {
+                    component.get_modifier().color
+                },
+            )
         }
     }
 
@@ -1297,10 +1297,6 @@ impl FormatState {
                 self.width = self.offset;
             }
         }
-    }
-
-    fn get_color(modi: &format::Modifier, color: format::Color) -> format::Color {
-        modi.color.unwrap_or(color)
     }
 }
 
