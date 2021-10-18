@@ -251,7 +251,7 @@ impl Default for Console {
 impl Console {
     pub fn new() -> Console {
         Console {
-            history: vec![Component::new(ComponentType::new("")); 200],
+            history: vec![Component::new(ComponentType::new("", None)); 200],
             dirty: false,
             logfile: fs::File::create(paths::get_cache_dir().join("client.log"))
                 .expect("failed to open log file"),
@@ -400,27 +400,27 @@ impl Console {
             self.history.remove(0);
             let component = Component {
                 list: vec![
-                    ComponentType::new("["),
-                    ComponentType::new_with_color(file, Color::Green),
-                    ComponentType::new(":"),
-                    ComponentType::new_with_color(
+                    ComponentType::new("[", None),
+                    ComponentType::new(file, Some(Color::Green)),
+                    ComponentType::new(":", None),
+                    ComponentType::new(
                         &format!("{}", record.line().unwrap_or(0)),
-                        Color::Aqua,
+                        Some(Color::Aqua),
                     ),
-                    ComponentType::new("]"),
-                    ComponentType::new("["),
-                    ComponentType::new_with_color(
+                    ComponentType::new("]", None),
+                    ComponentType::new("[", None),
+                    ComponentType::new(
                         &format!("{}", record.level()),
-                        match record.level() {
+                        Some(match record.level() {
                             log::Level::Debug => Color::Green,
                             log::Level::Error => Color::Red,
                             log::Level::Warn => Color::Yellow,
                             log::Level::Info => Color::Aqua,
                             log::Level::Trace => Color::Blue,
-                        },
+                        }),
                     ),
-                    ComponentType::new("] "),
-                    ComponentType::new(&format!("{}", record.args())),
+                    ComponentType::new("] ", None),
+                    ComponentType::new(&format!("{}", record.args()), None),
                 ],
             };
             self.history.push(component);

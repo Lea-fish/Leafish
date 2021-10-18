@@ -106,6 +106,7 @@ impl std::fmt::Debug for Chat {
     }
 }
 
+// TODO: Add multiple language support.
 pub fn translate(str: &str) -> &str {
     match str {
             "commands.message.sameTarget" => "You can't send a private message to yourself!",

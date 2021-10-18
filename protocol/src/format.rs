@@ -369,20 +369,20 @@ pub enum ComponentType {
 }
 
 impl ComponentType {
-    pub fn new(val: &str) -> Self {
-        Self::Text {
-            text: val.to_owned(),
-            modifier: Modifier::default(),
-        }
-    }
-
-    pub fn new_with_color(val: &str, color: Color) -> Self {
-        Self::Text {
-            text: val.to_owned(),
-            modifier: Modifier {
-                color,
-                ..Default::default()
-            },
+    pub fn new(val: &str, color: Option<Color>) -> Self {
+        if let Some(color) = color {
+            Self::Text {
+                text: val.to_owned(),
+                modifier: Modifier {
+                    color,
+                    ..Default::default()
+                },
+            }
+        } else {
+            Self::Text {
+                text: val.to_owned(),
+                modifier: Modifier::default(),
+            }
         }
     }
 
@@ -591,7 +591,7 @@ pub mod color {
             }
         }
 
-        pub fn if_none_use_this_color(self, color: Color) -> Self {
+        pub fn use_or_def(self, color: Color) -> Self {
             if self == Color::None {
                 color
             } else {
@@ -680,7 +680,7 @@ mod test {
             _ => panic!("Could not parse hex color correct"),
         }
 
-        match Color::from_str("rEd") {
+        match Color::from_str("red") {
             Ok(Color::Red) => {}
             _ => panic!("Wrong type"),
         }

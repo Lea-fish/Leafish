@@ -465,7 +465,7 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
             y_scale: 0.16,
             x_scale: 0.01,
         };
-        let name = format::Component::new(format::ComponentType::new(&player_model.name));
+        let name = format::Component::new(format::ComponentType::new(&player_model.name, None));
         state.build(&name, Some(format::Color::Black));
         // TODO: Remove black shadow and add dark, transparent box around name
         let width = state.width;

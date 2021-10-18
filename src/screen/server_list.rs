@@ -173,7 +173,7 @@ impl ServerList {
                         game.screen_sys
                             .clone()
                             .add_screen(Box::new(ServerList::new(Some(Component::new(
-                                ComponentType::new(&*error.to_string()),
+                                ComponentType::new(&error.to_string(), None),
                             )))));
                     } else {
                         game.screen_sys
@@ -215,14 +215,14 @@ impl ServerList {
 
             // Server's message of the day
             let motd = ui::FormattedBuilder::new()
-                .text(Component::new(ComponentType::new("Connecting...")))
+                .text(Component::new(ComponentType::new("Connecting...", None)))
                 .position(100.0, 23.0)
                 .max_width(700.0 - (90.0 + 10.0 + 5.0))
                 .attach(&mut *back.borrow_mut());
 
             // Version information
             let version = ui::FormattedBuilder::new()
-                .text(Component::new(ComponentType::new("")))
+                .text(Component::new(ComponentType::new("", None)))
                 .position(100.0, 5.0)
                 .max_width(700.0 - (90.0 + 10.0 + 5.0))
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Left)
@@ -339,7 +339,7 @@ impl ServerList {
                     }
                     Err(err) => {
                         let e = format!("{}", err);
-                        let msg = ComponentType::new_with_color(&e, format::Color::Red);
+                        let msg = ComponentType::new(&e, Some(format::Color::Red));
                         let _ = send.send(PingInfo {
                             motd: Component::new(msg),
                             ping: Duration::new(99999, 0),
@@ -618,10 +618,8 @@ impl super::Screen for ServerList {
                             } else {
                                 &res.protocol_name
                             };
-                            let msg_component = Component::new(ComponentType::new_with_color(
-                                st,
-                                format::Color::Yellow,
-                            ));
+                            let msg_component =
+                                Component::new(ComponentType::new(st, Some(format::Color::Yellow)));
                             s.version.borrow_mut().set_text(msg_component);
                         }
                         if let Some(favicon) = res.favicon {
@@ -640,9 +638,12 @@ impl super::Screen for ServerList {
                     }
                     Err(TryRecvError::Disconnected) => {
                         s.done_ping = true;
-                        s.motd.borrow_mut().set_text(Component::new(
-                            ComponentType::new_with_color("Channel dropped", format::Color::Red),
-                        ));
+                        s.motd
+                            .borrow_mut()
+                            .set_text(Component::new(ComponentType::new(
+                                "Channel dropped",
+                                Some(format::Color::Red),
+                            )));
                     }
                     _ => {}
                 }

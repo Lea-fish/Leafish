@@ -289,9 +289,9 @@ pub fn compute_player_model_components(
             y_scale: 0.16,
             x_scale: 0.01,
         };
-        let name = format::Component::new(format::ComponentType::new_with_color(
+        let name = format::Component::new(format::ComponentType::new(
             name.as_ref().unwrap(),
-            format::Color::Black,
+            Some(format::Color::Black),
         ));
         state.build(&name, None);
         // TODO: Remove black shadow and add dark, transparent box around name

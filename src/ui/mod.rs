@@ -1247,7 +1247,7 @@ impl FormatState {
                 self.scale_y,
                 component.get_text(),
                 if let Some(color) = color {
-                    component.get_modifier().color.if_none_use_this_color(color)
+                    component.get_modifier().color.use_or_def(color)
                 } else {
                     component.get_modifier().color
                 },

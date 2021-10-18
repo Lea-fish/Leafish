@@ -28,10 +28,10 @@ pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
     m.world.get_entity_mut(e).unwrap().insert(SignInfo {
         model: None,
         lines: [
-            Component::new(format::ComponentType::new("")),
-            Component::new(format::ComponentType::new("")),
-            Component::new(format::ComponentType::new("")),
-            Component::new(format::ComponentType::new("")),
+            Component::new(format::ComponentType::new("", None)),
+            Component::new(format::ComponentType::new("", None)),
+            Component::new(format::ComponentType::new("", None)),
+            Component::new(format::ComponentType::new("", None)),
         ],
         offset_x: 0.0,
         offset_y: 0.0,

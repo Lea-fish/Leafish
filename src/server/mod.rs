@@ -795,10 +795,10 @@ impl Server {
                                 .clone()
                                 .write()
                                 .disconnect_reason
-                                .replace(Component::new(format::ComponentType::new(&*format!(
-                                    "An error occurred while reading a packet: {}",
-                                    err
-                                ))));
+                                .replace(Component::new(format::ComponentType::new(
+                                    &*format!("An error occurred while reading a packet: {}", err),
+                                    None,
+                                )));
                         }
                     }
                 }
