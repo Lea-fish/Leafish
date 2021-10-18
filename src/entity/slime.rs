@@ -65,7 +65,7 @@ impl SlimeRenderer {
         let position = m.get_key();
         let rotation = m.get_key();
         let light = m.get_key();
-        SlimeRenderer {
+        Self {
             slime_model,
             position,
             rotation,

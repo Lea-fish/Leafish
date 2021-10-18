@@ -51,6 +51,7 @@ pub mod server;
 pub mod settings;
 pub mod ui;
 pub mod world;
+pub mod particle;
 
 use crate::render::hud::HudContext;
 use leafish_protocol::protocol::login::{Account, AccountType};

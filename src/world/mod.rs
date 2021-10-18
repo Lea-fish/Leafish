@@ -38,6 +38,8 @@ use std::io::{Cursor, Read};
 use std::sync::Arc;
 
 pub use self::{chunk::*, lighting::*};
+use bevy_ecs::prelude::Mut;
+use crate::entity::block_entity::sign::SignInfo;
 
 pub mod biome;
 mod chunk;
@@ -212,7 +214,6 @@ impl World {
 
     #[allow(clippy::verbose_bit_mask)] // "llvm generates better code" for updates_performed & 0xFFF "on x86"
     pub fn tick(&self, m: &mut ecs::Manager) {
-        let sign_info: ecs::Key<block_entity::sign::SignInfo> = m.get_key();
         while let Ok(action) = self.block_entity_actions.1.try_recv() {
             match action {
                 BlockEntityAction::Remove(pos) => {
@@ -245,7 +246,7 @@ impl World {
                     let (pos, line1, line2, line3, line4) = *bx;
                     if let Some(chunk) = self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
                         if let Some(entity) = chunk.block_entities.get(&pos) {
-                            if let Some(sign) = m.get_component_mut(*entity, sign_info) {
+                            if let Some(sign) = m.world.get_entity_mut(*entity).unwrap().get_mut::<SignInfo>() {
                                 sign.lines = [line1, line2, line3, line4];
                                 sign.dirty = true;
                             }

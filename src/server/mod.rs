@@ -58,6 +58,12 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
+use dashmap::DashMap;
+use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
+use crate::particle::ParticleType;
+use cgmath::Vector3;
+use bevy_ecs::prelude::{Entity, SystemStage};
+use crate::ecs::Manager;
 
 pub mod plugin_messages;
 mod sun;
@@ -103,19 +109,10 @@ pub struct Server {
     version: AtomicUsize,
 
     // Entity accessors
-    game_info: ecs::Key<entity::GameInfo>,
-    player_movement: ecs::Key<entity::player::PlayerMovement>,
-    gravity: ecs::Key<entity::Gravity>,
-    position: ecs::Key<entity::Position>,
-    target_position: ecs::Key<entity::TargetPosition>,
-    velocity: ecs::Key<entity::Velocity>,
-    gamemode: ecs::Key<GameMode>,
-    pub rotation: ecs::Key<entity::Rotation>,
-    target_rotation: ecs::Key<entity::TargetRotation>,
     block_break_info: Mutex<BlockBreakInfo>,
     //
-    pub player: Arc<RwLock<Option<ecs::Entity>>>,
-    entity_map: Arc<RwLock<HashMap<i32, ecs::Entity, BuildHasherDefault<FNVHash>>>>,
+    pub player: Arc<RwLock<Option<Entity>>>,
+    entity_map: Arc<RwLock<HashMap<i32, Entity, BuildHasherDefault<FNVHash>>>>,
     players: Arc<RwLock<HashMap<protocol::UUID, PlayerInfo, BuildHasherDefault<FNVHash>>>>,
 
     tick_timer: RwLock<f64>,
@@ -137,6 +134,7 @@ pub struct Server {
     pub chat_ctx: Arc<ChatContext>,
     screen_sys: Arc<ScreenSystem>,
     renderer: Arc<RwLock<Renderer>>,
+    active_block_break_anims: Arc<DashMap<i32, Entity>>,
 }
 
 #[derive(Debug)]
@@ -736,6 +734,23 @@ impl Server {
                                 );
                             }*/
                         }
+                        MappedPacket::BlockBreakAnimation(block_break) => {
+                            println!("Block_break_anim: {}", block_break.stage);
+                            if block_break.stage >= 10 {
+                                server.entities.clone().write().remove_component(server.active_block_break_anims.remove(&block_break.entity_id).unwrap().1, server.block_break_anim);
+                            } else if let Some(anim) = server.active_block_break_anims.clone().get_mut(&block_break.entity_id) {
+                                let anim = server.entities.clone().write().get_component_mut(*anim.value(), server.block_break_anim).unwrap();
+                                anim.update(block_break.stage);
+                            } else {
+                                let entity = server.entities.clone().write().create_entity();
+                                server.entities.clone().write().add_component_direct(entity, BlockEffectData {
+                                    position: Vector3::new(block_break.location.x as f64, block_break.location.y as f64, block_break.location.z as f64),
+                                    status: block_break.stage,
+                                });
+                                let particle = ParticleType::BlockBreak.create_particle(&mut *server.entities.clone().write(), entity);
+                                server.active_block_break_anims.clone().insert(block_break.entity_id, particle.unwrap());
+                            }
+                        }
                         _ => {
                             // debug!("other packet!");
                         }
@@ -825,8 +840,10 @@ impl Server {
         screen_sys: Arc<ScreenSystem>,
         renderer: Arc<RwLock<Renderer>>,
     ) -> Server {
-        let mut entities = ecs::Manager::new();
-        entity::add_systems(&mut entities);
+        let mut entities = Manager::new();
+        let mut parallel = SystemStage::parallel();
+        let mut sync = SystemStage::single_threaded();
+        entity::add_systems(&mut entities, &mut parallel, &mut sync);
 
         let world_entity = entities.get_world();
         let game_info = entities.get_key();
@@ -841,6 +858,7 @@ impl Server {
         hud_context.write().player_inventory =
             Some(inventory_context.read().player_inventory.clone());
         EntityType::init(&mut entities);
+        ParticleType::init(&mut entities);
 
         let version = resources.read().version();
         Server {
@@ -856,16 +874,6 @@ impl Server {
             version: AtomicUsize::new(version),
             resources,
 
-            // Entity accessors
-            game_info,
-            player_movement: entities.get_key(),
-            gravity: entities.get_key(),
-            position: entities.get_key(),
-            target_position: entities.get_key(),
-            velocity: entities.get_key(),
-            gamemode: entities.get_key(),
-            rotation: entities.get_key(),
-            target_rotation: entities.get_key(),
             //
             entities: Arc::new(RwLock::new(entities)),
             player: Arc::new(RwLock::new(None)),
@@ -904,6 +912,7 @@ impl Server {
             chat_ctx: Arc::new(ChatContext::new()),
             screen_sys,
             renderer,
+            active_block_break_anims: Arc::new(Default::default()),
         }
     }
 

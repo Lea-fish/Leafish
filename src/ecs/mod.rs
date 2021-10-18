@@ -24,6 +24,34 @@ use std::ptr;
 use crate::render;
 use crate::world;
 use std::sync::RwLock;
+use bevy_ecs::prelude::*;
+
+// System labels to enforce a run order of our systems
+#[derive(SystemLabel, Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SystemExecStage {
+    Normal,
+    Render,
+    RemoveHandling,
+}
+
+pub struct Manager {
+
+    pub world: World,
+    pub schedule: Schedule,
+
+}
+
+impl Manager {
+
+    pub fn new() -> Self {
+        Self {
+            world: Default::default(),
+            schedule: Default::default(),
+        }
+    }
+
+}
+/*
 
 /// Used to reference an entity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -90,18 +118,18 @@ pub trait System {
     fn entity_added(
         &mut self,
         _m: &mut Manager,
-        _e: Entity,
         _world: &world::World,
         _renderer: &mut render::Renderer,
+        _e: Entity,
     ) {
     }
 
     fn entity_removed(
         &mut self,
         _m: &mut Manager,
-        _e: Entity,
         _world: &world::World,
         _renderer: &mut render::Renderer,
+        _e: Entity,
     ) {
     }
 }
@@ -113,6 +141,7 @@ struct EntityState {
     removed: bool,
 }
 
+/*
 /// Stores and manages a collection of entities.
 // TODO: Try to make this more efficient!
 // Anyvec?
@@ -129,7 +158,7 @@ pub struct Manager {
     render_systems: Option<Vec<Box<dyn System + Send + Sync>>>,
 
     changed_entity_components: HashSet<Entity, BuildHasherDefault<FNVHash>>,
-}
+}*/
 
 impl Manager {
     /// Creates a new manager.
@@ -419,7 +448,7 @@ impl Manager {
         for sys in &mut systems {
             if new_set.includes_set(&sys.filter().bits) && !old_set.includes_set(&sys.filter().bits)
             {
-                sys.entity_added(self, e, world, renderer);
+                sys.entity_added(self, world, renderer, e);
             }
         }
         self.systems = Some(systems);
@@ -437,7 +466,7 @@ impl Manager {
         for sys in &mut systems {
             if new_set.includes_set(&sys.filter().bits) && !old_set.includes_set(&sys.filter().bits)
             {
-                sys.entity_added(self, e, world, renderer);
+                sys.entity_added(self, world, renderer, e);
             }
         }
         self.render_systems = Some(systems);
@@ -500,7 +529,7 @@ impl Manager {
         for sys in &mut systems {
             if !new_set.includes_set(&sys.filter().bits) && old_set.includes_set(&sys.filter().bits)
             {
-                sys.entity_removed(self, e, world, renderer);
+                sys.entity_removed(self, world, renderer, e);
             }
         }
         self.systems = Some(systems);
@@ -518,7 +547,7 @@ impl Manager {
         for sys in &mut systems {
             if !new_set.includes_set(&sys.filter().bits) && old_set.includes_set(&sys.filter().bits)
             {
-                sys.entity_removed(self, e, world, renderer);
+                sys.entity_removed(self, world, renderer, e);
             }
         }
         self.render_systems = Some(systems);
@@ -697,3 +726,4 @@ impl Drop for ComponentMem {
         }
     }
 }
+*/

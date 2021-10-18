@@ -1,8 +1,6 @@
 use super::{
     Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity,
 };
-use crate::ecs;
-use crate::ecs::Entity;
 use crate::entity::{resolve_textures, CustomEntityRenderer, EntityRenderer, EntityType};
 use crate::format;
 use crate::render;
@@ -17,15 +15,23 @@ use collision::{Aabb, Aabb3};
 use instant::Instant;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
+use crate::particle::ParticleRenderer;
+use bevy_ecs::prelude::*;
+use crate::ecs::Manager;
+use std::sync::Arc;
+use parking_lot::RwLock;
+use crate::render::Renderer;
 
-pub fn add_systems(m: &mut ecs::Manager) {
+pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
     let sys = MovementHandler::new(m);
     m.add_system(sys);
     let sys = EntityRenderer::new(m);
     m.add_render_system(sys);
+    let sys = ParticleRenderer::new(m);
+    m.add_render_system(sys);
 }
 
-pub fn create_local(m: &mut ecs::Manager) -> ecs::Entity {
+pub fn create_local(m: &mut Manager) -> Entity {
     let entity = m.create_entity();
     m.add_component_direct(entity, Position::new(0.0, 0.0, 0.0));
     let mut tpos = TargetPosition::new(0.0, 0.0, 0.0);
@@ -49,7 +55,7 @@ pub fn create_local(m: &mut ecs::Manager) -> ecs::Entity {
     entity
 }
 
-pub fn create_remote(m: &mut ecs::Manager, name: &str) -> ecs::Entity {
+pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
     let entity = m.create_entity();
     m.add_component_direct(entity, Position::new(0.0, 0.0, 0.0));
     m.add_component_direct(entity, TargetPosition::new(0.0, 0.0, 0.0));
@@ -112,67 +118,16 @@ impl PlayerModel {
     }
 }
 
-pub struct PlayerRenderer {
-    player_model: ecs::Key<PlayerModel>,
-    position: ecs::Key<Position>,
-    rotation: ecs::Key<Rotation>,
-    game_info: ecs::Key<GameInfo>,
-    light: ecs::Key<Light>,
-}
-
-impl PlayerRenderer {
-    pub fn new(m: &mut ecs::Manager) -> Self {
-        let player_model = m.get_key();
-        let position = m.get_key();
-        let rotation = m.get_key();
-        let light = m.get_key();
-        PlayerRenderer {
-            player_model,
-            position,
-            rotation,
-            game_info: m.get_key(),
-            light,
-        }
-    }
-}
-
-enum PlayerModelPart {
-    Head = 0,
-    Body = 1,
-    LegLeft = 2,
-    LegRight = 3,
-    ArmLeft = 4,
-    ArmRight = 5,
-    NameTag = 6,
-    // Cape = 7, // TODO
-}
-
-// TODO: Setup culling
-impl CustomEntityRenderer for PlayerRenderer {
-    fn update(
-        &self,
-        m: &mut ecs::Manager,
-        world: &world::World,
-        renderer: &mut render::Renderer,
-        _: bool,
-        _: bool,
-        e: Entity,
-    ) {
+fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<GameInfo>, mut query: Query<(&mut PlayerModel, &Position, &Rotation, &Light)>) {
+    for (mut player_model, position, rotation, light) in query.iter_mut() {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
-        let world_entity = m.get_world();
-        let delta = m
-            .get_component_mut(world_entity, self.game_info)
-            .unwrap()
+        let delta = game_info
             .delta;
-        let player_model = m.get_component_mut(e, self.player_model).unwrap();
-        let position = m.get_component_mut(e, self.position).unwrap();
-        let rotation = m.get_component_mut(e, self.rotation).unwrap();
-        let light = m.get_component(e, self.light).unwrap();
 
         if player_model.dirty {
-            self.entity_removed(m, e, world, renderer);
-            self.entity_added(m, e, world, renderer);
+            remove_player(renderer.clone(), player_model);
+            add_player(renderer.clone(), player_model);
         }
 
         if let Some(pmodel) = player_model.model {
@@ -216,16 +171,16 @@ impl CustomEntityRenderer for PlayerRenderer {
 
             mdl.matrix[PlayerModelPart::Head as usize] = offset_matrix
                 * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(-rotation.pitch as f32)),
-                    disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
-                });
+                scale: 1.0,
+                rot: Quaternion::from_angle_x(Rad(-rotation.pitch as f32)),
+                disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
+            });
             mdl.matrix[PlayerModelPart::Body as usize] = offset_matrix
                 * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(0.0)),
-                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-                });
+                scale: 1.0,
+                rot: Quaternion::from_angle_x(Rad(0.0)),
+                disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+            });
 
             let mut time = player_model.time;
             let mut dir = player_model.dir;
@@ -237,16 +192,16 @@ impl CustomEntityRenderer for PlayerRenderer {
 
             mdl.matrix[PlayerModelPart::LegRight as usize] = offset_matrix
                 * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(ang as f32)),
-                    disp: Vector3::new(2.0 / 16.0, -12.0 / 16.0, 0.0),
-                });
+                scale: 1.0,
+                rot: Quaternion::from_angle_x(Rad(ang as f32)),
+                disp: Vector3::new(2.0 / 16.0, -12.0 / 16.0, 0.0),
+            });
             mdl.matrix[PlayerModelPart::LegLeft as usize] = offset_matrix
                 * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(-ang as f32)),
-                    disp: Vector3::new(-2.0 / 16.0, -12.0 / 16.0, 0.0),
-                });
+                scale: 1.0,
+                rot: Quaternion::from_angle_x(Rad(-ang as f32)),
+                disp: Vector3::new(-2.0 / 16.0, -12.0 / 16.0, 0.0),
+            });
 
             let mut i_time = player_model.idle_time;
             i_time += delta * 0.02;
@@ -263,28 +218,28 @@ impl CustomEntityRenderer for PlayerRenderer {
 
             mdl.matrix[PlayerModelPart::ArmRight as usize] = offset_matrix
                 * Matrix4::from_translation(Vector3::new(
-                    6.0 / 16.0,
-                    -12.0 / 16.0 - 12.0 / 16.0,
-                    0.0,
-                ))
+                6.0 / 16.0,
+                -12.0 / 16.0 - 12.0 / 16.0,
+                0.0,
+            ))
                 * Matrix4::from(Quaternion::from_angle_x(Rad(-(ang * 0.75) as f32)))
                 * Matrix4::from(Quaternion::from_angle_z(Rad(
-                    (i_time.cos() * 0.06 - 0.06) as f32
-                )))
+                (i_time.cos() * 0.06 - 0.06) as f32
+            )))
                 * Matrix4::from(Quaternion::from_angle_x(Rad((i_time.sin() * 0.06
-                    - ((7.5 - (player_model.arm_time - 7.5).abs()) / 7.5))
-                    as f32)));
+                - ((7.5 - (player_model.arm_time - 7.5).abs()) / 7.5))
+                as f32)));
 
             mdl.matrix[PlayerModelPart::ArmLeft as usize] = offset_matrix
                 * Matrix4::from_translation(Vector3::new(
-                    -6.0 / 16.0,
-                    -12.0 / 16.0 - 12.0 / 16.0,
-                    0.0,
-                ))
+                -6.0 / 16.0,
+                -12.0 / 16.0 - 12.0 / 16.0,
+                0.0,
+            ))
                 * Matrix4::from(Quaternion::from_angle_x(Rad((ang * 0.75) as f32)))
                 * Matrix4::from(Quaternion::from_angle_z(Rad(
-                    -(i_time.cos() * 0.06 - 0.06) as f32
-                )))
+                -(i_time.cos() * 0.06 - 0.06) as f32
+            )))
                 * Matrix4::from(Quaternion::from_angle_x(Rad(-(i_time.sin() * 0.06) as f32)));
 
             let mut update = true;
@@ -314,198 +269,207 @@ impl CustomEntityRenderer for PlayerRenderer {
             player_model.dir = dir;
         }
     }
+}
 
-    fn entity_added(
-        &self,
-        m: &mut ecs::Manager,
-        e: ecs::Entity,
-        _: &world::World,
-        renderer: &mut render::Renderer,
-    ) {
-        let player_model = m.get_component_mut(e, self.player_model).unwrap();
+fn player_added(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut PlayerModel), (Added<PlayerModel>)>) {
+    for (mut player_model) in query.iter_mut() {
+        add_player(*renderer, player_model);
+    }
+}
 
-        player_model.dirty = false;
+fn player_removed(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedComponents<PlayerModel>, mut query: Query<(Entity, &mut PlayerModel)>) {
+    for (_entity, mut player_model) in query.iter_mut() {
+        remove_player(*renderer, player_model);
+    }
+}
 
-        let skin = if let Some(url) = player_model.skin_url.as_ref() {
-            renderer.get_skin(renderer.get_textures_ref(), url)
-        } else {
-            render::Renderer::get_texture(renderer.get_textures_ref(), "entity/steve")
-        };
+// TODO: Setup culling
+fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
+    player_model.dirty = false;
 
-        // TODO: Replace this shit entirely!
-        macro_rules! srel {
+    let skin = if let Some(url) = player_model.skin_url.as_ref() {
+        renderer.read().get_skin(renderer.get_textures_ref(), url)
+    } else {
+        render::Renderer::get_texture(renderer.read().get_textures_ref(), "entity/steve")
+    };
+
+    // TODO: Replace this shit entirely!
+    macro_rules! srel {
             ($x:expr, $y:expr, $w:expr, $h:expr) => {
                 Some(skin.relative(($x) / 64.0, ($y) / 64.0, ($w) / 64.0, ($h) / 64.0))
             };
         }
 
-        let mut head_verts = vec![];
-        if player_model.has_head {
-            model::append_box(
-                &mut head_verts,
-                -4.0 / 16.0,
-                0.0,
-                -4.0 / 16.0,
-                8.0 / 16.0,
-                8.0 / 16.0,
-                8.0 / 16.0,
-                resolve_textures(&skin, 8.0, 8.0, 8.0, 0.0, 0.0),
-            );
-            model::append_box(
-                &mut head_verts,
-                -4.2 / 16.0,
-                -0.2 / 16.0,
-                -4.2 / 16.0,
-                8.4 / 16.0,
-                8.4 / 16.0,
-                8.4 / 16.0,
-                resolve_textures(&skin, 8.0, 8.0, 8.0, 32.0, 0.0),
-            );
-        }
-
-        // TODO: Cape
-        let mut body_verts = vec![];
+    let mut head_verts = vec![];
+    if player_model.has_head {
         model::append_box(
-            &mut body_verts,
+            &mut head_verts,
             -4.0 / 16.0,
-            -6.0 / 16.0,
-            -2.0 / 16.0,
+            0.0,
+            -4.0 / 16.0,
             8.0 / 16.0,
-            12.0 / 16.0,
-            4.0 / 16.0,
-            resolve_textures(&skin, 8.0, 12.0, 4.0, 16.0, 16.0),
+            8.0 / 16.0,
+            8.0 / 16.0,
+            resolve_textures(&skin, 8.0, 8.0, 8.0, 0.0, 0.0),
         );
         model::append_box(
-            &mut body_verts,
+            &mut head_verts,
             -4.2 / 16.0,
-            -6.2 / 16.0,
-            -2.2 / 16.0,
+            -0.2 / 16.0,
+            -4.2 / 16.0,
             8.4 / 16.0,
-            12.4 / 16.0,
-            4.4 / 16.0,
-            resolve_textures(&skin, 8.0, 12.0, 4.0, 16.0, 16.0),
+            8.4 / 16.0,
+            8.4 / 16.0,
+            resolve_textures(&skin, 8.0, 8.0, 8.0, 32.0, 0.0),
         );
+    }
 
-        let mut part_verts = vec![vec![]; 4];
+    // TODO: Cape
+    let mut body_verts = vec![];
+    model::append_box(
+        &mut body_verts,
+        -4.0 / 16.0,
+        -6.0 / 16.0,
+        -2.0 / 16.0,
+        8.0 / 16.0,
+        12.0 / 16.0,
+        4.0 / 16.0,
+        resolve_textures(&skin, 8.0, 12.0, 4.0, 16.0, 16.0),
+    );
+    model::append_box(
+        &mut body_verts,
+        -4.2 / 16.0,
+        -6.2 / 16.0,
+        -2.2 / 16.0,
+        8.4 / 16.0,
+        12.4 / 16.0,
+        4.4 / 16.0,
+        resolve_textures(&skin, 8.0, 12.0, 4.0, 16.0, 16.0),
+    );
 
-        for (i, offsets) in [
-            [16.0, 48.0, 0.0, 48.0],  // Left leg
-            [0.0, 16.0, 0.0, 32.0],   // Right Leg
-            [32.0, 48.0, 48.0, 48.0], // Left arm
-            [40.0, 16.0, 40.0, 32.0], // Right arm
-        ]
+    let mut part_verts = vec![vec![]; 4];
+
+    for (i, offsets) in [
+        [16.0, 48.0, 0.0, 48.0],  // Left leg
+        [0.0, 16.0, 0.0, 32.0],   // Right Leg
+        [32.0, 48.0, 48.0, 48.0], // Left arm
+        [40.0, 16.0, 40.0, 32.0], // Right arm
+    ]
         .iter()
         .enumerate()
-        {
-            // TODO: Fix alex (slim) skins
-            let alex = i > 1;
-            let width = if alex {
-                // arms of alex (slim) skins have 3/4 of the width of normal skins!
-                3.0
-            } else {
-                4.0
-            };
-            let (ox, oy) = (offsets[0], offsets[1]);
-            model::append_box(
-                &mut part_verts[i],
-                -2.0 / 16.0,
-                -12.0 / 16.0,
-                -2.0 / 16.0,
-                4.0 / 16.0,
-                12.0 / 16.0,
-                4.0 / 16.0,
-                [
-                    srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),     // Down
-                    srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),     // Up
-                    srel!(ox + 4.0, oy + 4.0, width, 12.0),  // North
-                    srel!(ox + 12.0, oy + 4.0, width, 12.0), // South
-                    srel!(ox + 8.0, oy + 4.0, width, 12.0),  // West
-                    srel!(ox + 0.0, oy + 4.0, width, 12.0),  // East
-                ],
-            );
-            let (ox, oy) = (offsets[2], offsets[3]);
-            model::append_box(
-                &mut part_verts[i],
-                -2.2 / 16.0,
-                -12.2 / 16.0,
-                -2.2 / 16.0,
-                4.4 / 16.0,
-                12.4 / 16.0,
-                4.4 / 16.0,
-                [
-                    srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),   // Down
-                    srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),   // Up
-                    srel!(ox + 4.0, oy + 4.0, 4.0, 12.0),  // North
-                    srel!(ox + 12.0, oy + 4.0, 4.0, 12.0), // South
-                    srel!(ox + 8.0, oy + 4.0, 4.0, 12.0),  // West
-                    srel!(ox + 0.0, oy + 4.0, 4.0, 12.0),  // East
-                ],
-            );
-        }
-
-        let mut name_verts = vec![];
-        if player_model.has_name_tag {
-            let mut state = FormatState {
-                width: 0.0,
-                offset: 0.0,
-                text: Vec::new(),
-                renderer,
-                y_scale: 0.16,
-                x_scale: 0.01,
-            };
-            let mut name = format::Component::Text(format::TextComponent::new(&player_model.name));
-            format::convert_legacy(&mut name);
-            state.build(&name, format::Color::Black);
-            // TODO: Remove black shadow and add dark, transparent box around name
-            let width = state.width;
-            // Center align text
-            for vert in &mut state.text {
-                vert.x += width * 0.5;
-                vert.r = 64;
-                vert.g = 64;
-                vert.b = 64;
-            }
-            name_verts.extend_from_slice(&state.text);
-            for vert in &mut state.text {
-                vert.x -= 0.01;
-                vert.y -= 0.01;
-                vert.z -= 0.05;
-                vert.r = 255;
-                vert.g = 255;
-                vert.b = 255;
-            }
-            name_verts.extend_from_slice(&state.text);
-        }
-
-        player_model.model = Some(renderer.model.create_model(
-            model::DEFAULT,
-            vec![
-                head_verts,
-                body_verts,
-                part_verts[0].clone(),
-                part_verts[1].clone(),
-                part_verts[2].clone(),
-                part_verts[3].clone(),
-                name_verts,
+    {
+        // TODO: Fix alex (slim) skins
+        let alex = i > 1;
+        let width = if alex {
+            // arms of alex (slim) skins have 3/4 of the width of normal skins!
+            3.0
+        } else {
+            4.0
+        };
+        let (ox, oy) = (offsets[0], offsets[1]);
+        model::append_box(
+            &mut part_verts[i],
+            -2.0 / 16.0,
+            -12.0 / 16.0,
+            -2.0 / 16.0,
+            4.0 / 16.0,
+            12.0 / 16.0,
+            4.0 / 16.0,
+            [
+                srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),     // Down
+                srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),     // Up
+                srel!(ox + 4.0, oy + 4.0, width, 12.0),  // North
+                srel!(ox + 12.0, oy + 4.0, width, 12.0), // South
+                srel!(ox + 8.0, oy + 4.0, width, 12.0),  // West
+                srel!(ox + 0.0, oy + 4.0, width, 12.0),  // East
             ],
-        ));
+        );
+        let (ox, oy) = (offsets[2], offsets[3]);
+        model::append_box(
+            &mut part_verts[i],
+            -2.2 / 16.0,
+            -12.2 / 16.0,
+            -2.2 / 16.0,
+            4.4 / 16.0,
+            12.4 / 16.0,
+            4.4 / 16.0,
+            [
+                srel!(ox + 8.0, oy + 0.0, 4.0, 4.0),   // Down
+                srel!(ox + 4.0, oy + 0.0, 4.0, 4.0),   // Up
+                srel!(ox + 4.0, oy + 4.0, 4.0, 12.0),  // North
+                srel!(ox + 12.0, oy + 4.0, 4.0, 12.0), // South
+                srel!(ox + 8.0, oy + 4.0, 4.0, 12.0),  // West
+                srel!(ox + 0.0, oy + 4.0, 4.0, 12.0),  // East
+            ],
+        );
     }
 
-    fn entity_removed(
-        &self,
-        m: &mut ecs::Manager,
-        e: ecs::Entity,
-        _: &world::World,
-        renderer: &mut render::Renderer,
-    ) {
-        let player_model = m.get_component_mut(e, self.player_model).unwrap();
-        if let Some(model) = player_model.model.take() {
-            renderer.model.remove_model(model);
-            if let Some(url) = player_model.skin_url.as_ref() {
-                renderer.get_textures_ref().read().release_skin(url);
-            }
+    let mut name_verts = vec![];
+    if player_model.has_name_tag {
+        let mut state = FormatState {
+            width: 0.0,
+            offset: 0.0,
+            text: Vec::new(),
+            renderer: &mut *renderer.clone().write(),
+            y_scale: 0.16,
+            x_scale: 0.01,
+        };
+        let mut name = format::Component::Text(format::TextComponent::new(&player_model.name));
+        format::convert_legacy(&mut name);
+        state.build(&name, format::Color::Black);
+        // TODO: Remove black shadow and add dark, transparent box around name
+        let width = state.width;
+        // Center align text
+        for vert in &mut state.text {
+            vert.x += width * 0.5;
+            vert.r = 64;
+            vert.g = 64;
+            vert.b = 64;
+        }
+        name_verts.extend_from_slice(&state.text);
+        for vert in &mut state.text {
+            vert.x -= 0.01;
+            vert.y -= 0.01;
+            vert.z -= 0.05;
+            vert.r = 255;
+            vert.g = 255;
+            vert.b = 255;
+        }
+        name_verts.extend_from_slice(&state.text);
+    }
+
+    player_model.model = Some(renderer.model.create_model(
+        model::DEFAULT,
+        vec![
+            head_verts,
+            body_verts,
+            part_verts[0].clone(),
+            part_verts[1].clone(),
+            part_verts[2].clone(),
+            part_verts[3].clone(),
+            name_verts,
+        ],
+    ));
+}
+
+fn remove_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
+    if let Some(model) = player_model.model.take() {
+        renderer.clone().write().model.remove_model(model);
+        if let Some(url) = player_model.skin_url.as_ref() {
+            renderer.read().get_textures_ref().read().release_skin(url);
         }
     }
+}
+
+enum PlayerModelPart {
+    Head = 0,
+    Body = 1,
+    LegLeft = 2,
+    LegRight = 3,
+    ArmLeft = 4,
+    ArmRight = 5,
+    NameTag = 6,
+    // Cape = 7, // TODO
 }
 
 #[derive(Default)]
@@ -562,233 +526,177 @@ impl PlayerMovement {
     }
 }
 
-struct MovementHandler {
-    filter: ecs::Filter,
-    movement: ecs::Key<PlayerMovement>,
-    gravity: ecs::Key<Gravity>,
-    gamemode: ecs::Key<GameMode>,
-    position: ecs::Key<TargetPosition>,
-    velocity: ecs::Key<Velocity>,
-    bounds: ecs::Key<Bounds>,
-    rotation: ecs::Key<Rotation>,
-}
-
-impl MovementHandler {
-    pub fn new(m: &mut ecs::Manager) -> MovementHandler {
-        let movement = m.get_key();
-        let position = m.get_key();
-        let velocity = m.get_key();
-        let bounds = m.get_key();
-        let rotation = m.get_key();
-        MovementHandler {
-            filter: ecs::Filter::new()
-                .with(movement)
-                .with(position)
-                .with(velocity)
-                .with(bounds)
-                .with(rotation),
-            movement,
-            gravity: m.get_key(),
-            gamemode: m.get_key(),
-            position,
-            velocity,
-            bounds,
-            rotation,
+pub fn handle_movement(world: Res<Arc<crate::world::World>>, mut commands: Commands, mut query: Query<(Entity, &mut PlayerMovement, &mut Position, &mut Velocity, &Bounds, &Rotation, &GameMode, Option<&Gravity>), (Without<PlayerMovement>, With<Gravity>)>) {
+    for (entity, mut movement, mut position, mut velocity, bounds, rotation, gravity, gamemode) in query.iter_mut() {
+        if movement.flying && gravity.is_some() {
+            commands.entity(entity).remove::<Gravity>();
+        } else if !movement.flying && gravity.is_none() {
+            commands.entity(entity).insert(Gravity::new());
         }
-    }
-}
+        movement.flying |= gamemode.always_fly();
+        if (dead || !focused)
+            && (movement.pressed_keys.len() > 1
+            || (!movement.pressed_keys.is_empty()
+            && !movement.is_key_pressed(Actionkey::OpenInv)))
+        {
+            movement.pressed_keys.insert(Actionkey::Backward, false);
+            movement.pressed_keys.insert(Actionkey::Forward, false);
+            movement.pressed_keys.insert(Actionkey::Right, false);
+            movement.pressed_keys.insert(Actionkey::Left, false);
+            movement.pressed_keys.insert(Actionkey::Jump, false);
+            movement.pressed_keys.insert(Actionkey::Sneak, false);
+            movement.pressed_keys.insert(Actionkey::Sprint, false);
+        }
 
-impl ecs::System for MovementHandler {
-    fn filter(&self) -> &ecs::Filter {
-        &self.filter
-    }
+        // Detect double-tapping jump to toggle creative flight
+        if movement.is_key_pressed(Actionkey::Jump) {
+            if movement.when_last_jump_pressed.is_none() {
+                movement.when_last_jump_pressed = Some(Instant::now());
+                if movement.when_last_jump_released.is_some() {
+                    let dt = movement.when_last_jump_pressed.unwrap()
+                        - movement.when_last_jump_released.unwrap();
+                    if dt.as_secs() == 0
+                        && dt.subsec_millis() <= crate::settings::DOUBLE_JUMP_MS
+                    {
+                        movement.want_to_fly = !movement.want_to_fly;
+                        //info!("double jump! dt={:?} toggle want_to_fly = {}", dt, movement.want_to_fly);
 
-    fn update(
-        &mut self,
-        m: &mut ecs::Manager,
-        world: &world::World,
-        _: &mut render::Renderer,
-        focused: bool,
-        dead: bool,
-    ) {
-        for e in m.find(&self.filter) {
-            let movement = m.get_component_mut(e, self.movement).unwrap();
-            if movement.flying && m.get_component(e, self.gravity).is_some() {
-                m.remove_component(e, self.gravity);
-            } else if !movement.flying && m.get_component(e, self.gravity).is_none() {
-                m.add_component(e, self.gravity, Gravity::new());
-            }
-            let gamemode = m.get_component(e, self.gamemode).unwrap();
-            movement.flying |= gamemode.always_fly();
-            if (dead || !focused)
-                && (movement.pressed_keys.len() > 1
-                    || (!movement.pressed_keys.is_empty()
-                        && !movement.is_key_pressed(Actionkey::OpenInv)))
-            {
-                movement.pressed_keys.insert(Actionkey::Backward, false);
-                movement.pressed_keys.insert(Actionkey::Forward, false);
-                movement.pressed_keys.insert(Actionkey::Right, false);
-                movement.pressed_keys.insert(Actionkey::Left, false);
-                movement.pressed_keys.insert(Actionkey::Jump, false);
-                movement.pressed_keys.insert(Actionkey::Sneak, false);
-                movement.pressed_keys.insert(Actionkey::Sprint, false);
-            }
-
-            // Detect double-tapping jump to toggle creative flight
-            if movement.is_key_pressed(Actionkey::Jump) {
-                if movement.when_last_jump_pressed.is_none() {
-                    movement.when_last_jump_pressed = Some(Instant::now());
-                    if movement.when_last_jump_released.is_some() {
-                        let dt = movement.when_last_jump_pressed.unwrap()
-                            - movement.when_last_jump_released.unwrap();
-                        if dt.as_secs() == 0
-                            && dt.subsec_millis() <= crate::settings::DOUBLE_JUMP_MS
-                        {
-                            movement.want_to_fly = !movement.want_to_fly;
-                            //info!("double jump! dt={:?} toggle want_to_fly = {}", dt, movement.want_to_fly);
-
-                            if gamemode.can_fly() && !gamemode.always_fly() {
-                                movement.flying = movement.want_to_fly;
-                            }
+                        if gamemode.can_fly() && !gamemode.always_fly() {
+                            movement.flying = movement.want_to_fly;
                         }
                     }
                 }
-            } else if movement.when_last_jump_pressed.is_some() {
-                movement.when_last_jump_released = Some(Instant::now());
-                movement.when_last_jump_pressed = None;
+            }
+        } else if movement.when_last_jump_pressed.is_some() {
+            movement.when_last_jump_released = Some(Instant::now());
+            movement.when_last_jump_pressed = None;
+        }
+
+        let player_bounds = bounds.bounds;
+
+        let mut last_position = position.position;
+
+        if world.is_chunk_loaded(
+            (position.position.x as i32) >> 4,
+            (position.position.z as i32) >> 4,
+        ) {
+            let (forward, yaw, is_forward) = movement.calculate_movement(rotation.yaw);
+            let mut speed = 0.21585;
+            let mut additional_speed =
+                if movement.is_key_pressed(Actionkey::Sprint) && is_forward {
+                    0.2806 - 0.21585
+                } else {
+                    0.0
+                };
+            let looking_vec = calculate_looking_vector(rotation.yaw, rotation.pitch);
+            if movement.flying {
+                speed *= 2.5;
+                additional_speed *= 2.5;
+
+                if movement.is_key_pressed(Actionkey::Jump) {
+                    position.position.y += speed + additional_speed;
+                }
+                if movement.is_key_pressed(Actionkey::Sneak) {
+                    position.position.y -= speed + additional_speed;
+                }
+            } else if gravity.as_ref().map_or(false, |v| v.on_ground) {
+                if movement.is_key_pressed(Actionkey::Jump) && velocity.velocity.y.abs() < 0.001
+                {
+                    velocity.velocity.y = 0.42;
+                }
+            } else {
+                velocity.velocity.y -= 0.08;
+                if velocity.velocity.y < -3.92 {
+                    velocity.velocity.y = -3.92;
+                }
+            }
+            velocity.velocity.y *= 0.98;
+            velocity.velocity.x *= 0.98;
+            velocity.velocity.z *= 0.98;
+            // position.position.x += look_vec.0 * speed;
+            // position.position.z -= look_vec.1 * speed;
+            position.position.x +=
+                forward * yaw.cos() * (speed + looking_vec.0 * additional_speed); // TODO: Multiply with speed only for walking forwards
+            position.position.z -=
+                forward * yaw.sin() * (speed + looking_vec.1 * additional_speed);
+            position.position.y += velocity.velocity.y;
+            if (velocity.velocity.x.abs() * 0.2) < 0.005 {
+                velocity.velocity.x = 0.0;
             }
 
-            let position = m.get_component_mut(e, self.position).unwrap();
-            let rotation = m.get_component(e, self.rotation).unwrap();
-            let velocity = m.get_component_mut(e, self.velocity).unwrap();
-            let gravity = m.get_component_mut(e, self.gravity);
+            if (velocity.velocity.y.abs() * 0.2) < 0.005 {
+                velocity.velocity.y = 0.0;
+            }
 
-            let player_bounds = m.get_component(e, self.bounds).unwrap().bounds;
+            if (velocity.velocity.z.abs() * 0.2) < 0.005 {
+                velocity.velocity.z = 0.0;
+            }
 
-            let mut last_position = position.position;
+            if !gamemode.noclip() {
+                let mut target = position.position;
+                position.position.y = last_position.y;
+                position.position.z = last_position.z;
 
-            if world.is_chunk_loaded(
-                (position.position.x as i32) >> 4,
-                (position.position.z as i32) >> 4,
-            ) {
-                let (forward, yaw, is_forward) = movement.calculate_movement(rotation.yaw);
-                let mut speed = 0.21585;
-                let mut additional_speed =
-                    if movement.is_key_pressed(Actionkey::Sprint) && is_forward {
-                        0.2806 - 0.21585
-                    } else {
-                        0.0
-                    };
-                let looking_vec = calculate_looking_vector(rotation.yaw, rotation.pitch);
-                if movement.flying {
-                    speed *= 2.5;
-                    additional_speed *= 2.5;
+                // We handle each axis separately to allow for a sliding
+                // effect when pushing up against walls.
 
-                    if movement.is_key_pressed(Actionkey::Jump) {
-                        position.position.y += speed + additional_speed;
+                let (bounds, xhit) =
+                    check_collisions(&**world, position, &last_position, player_bounds);
+                position.position.x = bounds.min.x + 0.3;
+                last_position.x = position.position.x;
+
+                position.position.z = target.z;
+                let (bounds, zhit) =
+                    check_collisions(&**world, position, &last_position, player_bounds);
+                position.position.z = bounds.min.z + 0.3;
+                last_position.z = position.position.z;
+
+                // Half block jumps
+                // Minecraft lets you 'jump' up 0.5 blocks
+                // for slabs and stairs (or smaller blocks).
+                // Currently we implement this as a teleport to the
+                // top of the block if we could move there
+                // but this isn't smooth.
+                if (xhit || zhit) && gravity.as_ref().map_or(false, |v| v.on_ground) {
+                    let mut ox = position.position.x;
+                    let mut oz = position.position.z;
+                    position.position.x = target.x;
+                    position.position.z = target.z;
+                    for offset in 1..9 {
+                        let mini = player_bounds.add_v(cgmath::Vector3::new(
+                            0.0,
+                            offset as f64 / 16.0,
+                            0.0,
+                        ));
+                        let (_, hit) = check_collisions(&**world, position, &last_position, mini);
+                        if !hit {
+                            target.y += offset as f64 / 16.0;
+                            ox = target.x;
+                            oz = target.z;
+                            break;
+                        }
                     }
-                    if movement.is_key_pressed(Actionkey::Sneak) {
-                        position.position.y -= speed + additional_speed;
-                    }
-                } else if gravity.as_ref().map_or(false, |v| v.on_ground) {
-                    if movement.is_key_pressed(Actionkey::Jump) && velocity.velocity.y.abs() < 0.001
-                    {
-                        velocity.velocity.y = 0.42;
-                    }
-                } else {
-                    velocity.velocity.y -= 0.08;
-                    if velocity.velocity.y < -3.92 {
-                        velocity.velocity.y = -3.92;
-                    }
+                    position.position.x = ox;
+                    position.position.z = oz;
                 }
-                velocity.velocity.y *= 0.98;
-                velocity.velocity.x *= 0.98;
-                velocity.velocity.z *= 0.98;
-                // position.position.x += look_vec.0 * speed;
-                // position.position.z -= look_vec.1 * speed;
-                position.position.x +=
-                    forward * yaw.cos() * (speed + looking_vec.0 * additional_speed); // TODO: Multiply with speed only for walking forwards
-                position.position.z -=
-                    forward * yaw.sin() * (speed + looking_vec.1 * additional_speed);
-                position.position.y += velocity.velocity.y;
-                if (velocity.velocity.x.abs() * 0.2) < 0.005 {
-                    velocity.velocity.x = 0.0;
-                }
 
-                if (velocity.velocity.y.abs() * 0.2) < 0.005 {
+                position.position.y = target.y;
+                let (bounds, yhit) =
+                    check_collisions(&**world, position, &last_position, player_bounds);
+                position.position.y = bounds.min.y;
+                last_position.y = position.position.y;
+                if yhit {
                     velocity.velocity.y = 0.0;
                 }
 
-                if (velocity.velocity.z.abs() * 0.2) < 0.005 {
-                    velocity.velocity.z = 0.0;
-                }
-
-                if !gamemode.noclip() {
-                    let mut target = position.position;
-                    position.position.y = last_position.y;
-                    position.position.z = last_position.z;
-
-                    // We handle each axis separately to allow for a sliding
-                    // effect when pushing up against walls.
-
-                    let (bounds, xhit) =
-                        check_collisions(world, position, &last_position, player_bounds);
-                    position.position.x = bounds.min.x + 0.3;
-                    last_position.x = position.position.x;
-
-                    position.position.z = target.z;
-                    let (bounds, zhit) =
-                        check_collisions(world, position, &last_position, player_bounds);
-                    position.position.z = bounds.min.z + 0.3;
-                    last_position.z = position.position.z;
-
-                    // Half block jumps
-                    // Minecraft lets you 'jump' up 0.5 blocks
-                    // for slabs and stairs (or smaller blocks).
-                    // Currently we implement this as a teleport to the
-                    // top of the block if we could move there
-                    // but this isn't smooth.
-                    if (xhit || zhit) && gravity.as_ref().map_or(false, |v| v.on_ground) {
-                        let mut ox = position.position.x;
-                        let mut oz = position.position.z;
-                        position.position.x = target.x;
-                        position.position.z = target.z;
-                        for offset in 1..9 {
-                            let mini = player_bounds.add_v(cgmath::Vector3::new(
-                                0.0,
-                                offset as f64 / 16.0,
-                                0.0,
-                            ));
-                            let (_, hit) = check_collisions(world, position, &last_position, mini);
-                            if !hit {
-                                target.y += offset as f64 / 16.0;
-                                ox = target.x;
-                                oz = target.z;
-                                break;
-                            }
-                        }
-                        position.position.x = ox;
-                        position.position.z = oz;
-                    }
-
-                    position.position.y = target.y;
-                    let (bounds, yhit) =
-                        check_collisions(world, position, &last_position, player_bounds);
-                    position.position.y = bounds.min.y;
-                    last_position.y = position.position.y;
-                    if yhit {
-                        velocity.velocity.y = 0.0;
-                    }
-
-                    if let Some(gravity) = gravity {
-                        let ground =
-                            Aabb3::new(Point3::new(-0.3, -0.005, -0.3), Point3::new(0.3, 0.0, 0.3));
-                        let prev = gravity.on_ground;
-                        let (_, hit) = check_collisions(world, position, &last_position, ground);
-                        gravity.on_ground = hit;
-                        if !prev && gravity.on_ground {
-                            movement.did_touch_ground = true;
-                        }
+                if let Some(gravity) = gravity {
+                    let ground =
+                        Aabb3::new(Point3::new(-0.3, -0.005, -0.3), Point3::new(0.3, 0.0, 0.3));
+                    let prev = gravity.on_ground;
+                    let (_, hit) = check_collisions(&**world, position, &last_position, ground);
+                    gravity.on_ground = hit;
+                    if !prev && gravity.on_ground {
+                        movement.did_touch_ground = true;
                     }
                 }
             }

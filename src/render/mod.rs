@@ -22,6 +22,8 @@ pub mod inventory;
 pub mod model;
 pub mod ui;
 
+// TODO: Fix skin misassignment - happens even if this client joins only one server and stays there
+// TODO: But only one person gets a random skin from another person, but if the first person rejoins, their skin gets normal again.
 use crate::gl;
 use crate::paths;
 use crate::resources;
@@ -691,7 +693,7 @@ impl Renderer {
             }
             let mut old_skins = vec![];
             for (skin, refcount) in &tex.skins {
-                if refcount.load(Ordering::Relaxed) == 0 {
+                if refcount.load(Ordering::Relaxed) <= 0 {
                     old_skins.push(skin.clone());
                 }
             }
@@ -1057,6 +1059,9 @@ impl TextureManager {
         self.skins
             .iter_mut()
             .for_each(|skin| skin.1.store(0, Ordering::Relaxed));
+        /*for skin in self.skins.drain() {
+            self.unload_skin(skin.0.as_str())
+        }*/
     }
 
     fn add_defaults(&mut self) {

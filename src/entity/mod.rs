@@ -2,8 +2,6 @@ pub mod block_entity;
 pub mod player;
 
 use crate::ecs;
-use crate::ecs::{Entity, Filter, Manager, System};
-use crate::entity::player::PlayerRenderer;
 use crate::entity::slime::{SlimeModel, SlimeRenderer};
 use crate::entity::zombie::{ZombieModel, ZombieRenderer};
 use crate::render::{Renderer, Texture};
@@ -13,6 +11,8 @@ use collision::Aabb3;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use std::sync::Arc;
+use bevy_ecs::prelude::*;
+use crate::ecs::{SystemExecStage, Manager};
 
 pub mod player_like;
 pub mod slime;
@@ -57,24 +57,19 @@ srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
     [0.0, 0.0, 0.0, 1.0],
 */
 
-pub fn add_systems(m: &mut ecs::Manager) {
-    let sys = systems::UpdateLastPosition::new(m);
-    m.add_system(sys);
+pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
+    parallel.add_system(systems::update_last_position);
 
-    player::add_systems(m);
+    player::add_systems(m, parallel, sync);
 
-    let sys = systems::ApplyVelocity::new(m);
-    m.add_system(sys);
-    let sys = systems::ApplyGravity::new(m);
-    m.add_system(sys);
-    let sys = systems::LerpPosition::new(m);
-    m.add_render_system(sys);
-    let sys = systems::LerpRotation::new(m);
-    m.add_render_system(sys);
-    let sys = systems::LightEntity::new(m);
-    m.add_render_system(sys);
+    // TODO: Enforce more exec ordering for velocity impl (velocity and gravity application order etc)
+    sync.add_system(systems::apply_velocity.label(SystemExecStage::Normal))
+        .add_system(systems::apply_gravity.label(SystemExecStage::Normal))
+        .add_system(systems::lerp_position.label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(systems::lerp_rotation.label(SystemExecStage::Render).after(SystemExecStage::Normal));
+    parallel.add_system(systems::light_entity);
 
-    block_entity::add_systems(m);
+    block_entity::add_systems(m, parallel, sync);
 }
 
 /// Location of an entity in the world.
@@ -224,7 +219,7 @@ impl EntityRenderer {
         let position = manager.get_key();
         let rotation = manager.get_key();
         let entity_type = manager.get_key();
-        EntityRenderer {
+        Self {
             filter: ecs::Filter::new()
                 .with(position)
                 .with(rotation)
@@ -258,7 +253,7 @@ impl System for EntityRenderer {
         }
     }
 
-    fn entity_added(&mut self, m: &mut Manager, e: Entity, world: &World, renderer: &mut Renderer) {
+    fn entity_added(&mut self, m: &mut Manager, world: &World, renderer: &mut Renderer, e: Entity) {
         let entity_type = m.get_component(e, self.entity_type).unwrap();
         let c_renderer = entity_type.get_renderer();
         c_renderer.entity_added(m, e, world, renderer);
@@ -267,9 +262,9 @@ impl System for EntityRenderer {
     fn entity_removed(
         &mut self,
         m: &mut Manager,
-        e: Entity,
         world: &World,
         renderer: &mut Renderer,
+        e: Entity,
     ) {
         let entity_type = m.get_component(e, self.entity_type).unwrap();
         let c_renderer = entity_type.get_renderer();
@@ -290,8 +285,8 @@ pub trait CustomEntityRenderer {
 
     fn entity_added(
         &self,
-        manager: &mut ecs::Manager,
-        entity: ecs::Entity,
+        manager: &mut Manager,
+        entity: Entity,
         world: &World,
         renderer: &mut Renderer,
     );
@@ -299,7 +294,7 @@ pub trait CustomEntityRenderer {
     fn entity_removed(
         &self,
         manager: &mut Manager,
-        entity: ecs::Entity,
+        entity: Entity,
         world: &World,
         renderer: &mut Renderer,
     );

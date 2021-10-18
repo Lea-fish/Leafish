@@ -6,10 +6,10 @@ use leafish_blocks as block;
 use leafish_protocol::types::hash::FNVHash;
 use leafish_shared::position::Position;
 
-use crate::ecs;
 use crate::world::biome;
 
 pub use self::chunk_section::*;
+use bevy_ecs::prelude::Entity;
 
 mod chunk_section;
 
@@ -26,7 +26,7 @@ pub struct Chunk {
     pub(crate) heightmap: [u8; 16 * 16],
     pub(crate) heightmap_dirty: bool,
 
-    pub(crate) block_entities: HashMap<Position, ecs::Entity, BuildHasherDefault<FNVHash>>,
+    pub(crate) block_entities: HashMap<Position, Entity, BuildHasherDefault<FNVHash>>,
 }
 
 impl Chunk {
