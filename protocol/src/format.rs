@@ -370,19 +370,15 @@ pub enum ComponentType {
 
 impl ComponentType {
     pub fn new(val: &str, color: Option<Color>) -> Self {
-        if let Some(color) = color {
-            Self::Text {
-                text: val.to_owned(),
-                modifier: Modifier {
+        Self::Text {
+            text: val.to_string(),
+            modifier: match color {
+                Some(color) => Modifier {
                     color,
-                    ..Default::default()
+                    ..Modifier::default()
                 },
-            }
-        } else {
-            Self::Text {
-                text: val.to_owned(),
-                modifier: Modifier::default(),
-            }
+                None => Modifier::default(),
+            },
         }
     }
 
