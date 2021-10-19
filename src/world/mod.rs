@@ -221,7 +221,7 @@ impl World {
                         self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
                     {
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            m.remove_entity(entity);
+                            m.world.despawn(entity);
                         }
                     }
                 }
@@ -231,7 +231,7 @@ impl World {
                     {
                         // Remove existing entity
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            m.remove_entity(entity);
+                            m.world.despawn(entity);
                         }
                         let block = chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF);
                         if let Some(entity_type) =
@@ -790,7 +790,7 @@ impl World {
     pub fn unload_chunk(&self, x: i32, z: i32, m: &mut ecs::Manager) {
         if let Some(chunk) = self.chunks.clone().remove(&CPos(x, z)) {
             for entity in chunk.1.block_entities.values() {
-                m.remove_entity(*entity);
+                m.world.despawn(*entity);
             }
         }
     }

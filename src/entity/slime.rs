@@ -1,13 +1,15 @@
 use super::{Bounds, GameInfo, Light, Position, Rotation, Velocity};
-use crate::ecs;
-use crate::ecs::Entity;
-use crate::entity::{resolve_textures, CustomEntityRenderer, EntityType};
+use crate::ecs::Manager;
+use crate::entity::{resolve_textures, EntityType};
 use crate::render;
 use crate::render::model;
 use crate::render::Renderer;
 use crate::world;
 use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::Aabb3;
+use bevy_ecs::prelude::*;
+use std::sync::Arc;
+use parking_lot::RwLock;
 
 pub struct SlimeModel {
     model: Option<model::ModelKey>,
@@ -33,144 +35,92 @@ impl SlimeModel {
     }
 }
 
-pub fn create_slime(m: &mut ecs::Manager) -> ecs::Entity {
-    let entity = m.create_entity();
-    m.add_component_direct(entity, Position::new(1478.5, 44.0, -474.5));
-    m.add_component_direct(entity, Rotation::new(0.0, 0.0));
-    m.add_component_direct(entity, Velocity::new(0.0, 0.0, 0.0));
-    m.add_component_direct(
-        entity,
-        Bounds::new(Aabb3::new(
+pub fn create_slime(m: &mut Manager) -> Entity {
+    let mut entity = m.world.spawn();
+    entity.insert(Position::new(1478.5, 44.0, -474.5))
+        .insert(Rotation::new(0.0, 0.0))
+        .insert(Velocity::new(0.0, 0.0, 0.0))
+        .insert(Bounds::new(Aabb3::new(
             Point3::new(-0.3, 0.0, -0.3),
             Point3::new(0.3, 1.8, 0.3),
-        )),
-    );
-    m.add_component_direct(entity, Light::new());
-    m.add_component_direct(entity, EntityType::Slime);
-    m.add_component_direct(entity, SlimeModel::new("test"));
-    entity
+        )))
+        .insert(Light::new())
+        .insert(EntityType::Slime)
+        .insert(SlimeModel::new("test"));
+    entity.id()
 }
 
-pub struct SlimeRenderer {
-    slime_model: ecs::Key<SlimeModel>,
-    position: ecs::Key<Position>,
-    rotation: ecs::Key<Rotation>,
-    game_info: ecs::Key<GameInfo>,
-    light: ecs::Key<Light>,
+
+
+pub fn update_slime(game_info: Res<GameInfo>, renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut SlimeModel, &Position, &Rotation, &Light)>) {
+   for (mut slime_model, position, rotation, light) in query.iter_mut() {
+       use std::f32::consts::PI;
+       use std::f64::consts::PI as PI64;
+       let delta = game_info
+           .delta;
+
+       /*if slime_model.dirty {
+           self.entity_removed(m, e, world, renderer);
+           self.entity_added(m, e, world, renderer);
+       }*/
+
+       if let Some(pmodel) = slime_model.model {
+           let mdl = renderer.clone().write().model.get_model(pmodel).unwrap();
+
+           mdl.block_light = light.block_light;
+           mdl.sky_light = light.sky_light;
+
+           let offset = Vector3::new(
+               position.position.x as f32,
+               -position.position.y as f32,
+               position.position.z as f32,
+           );
+           let offset_matrix = Matrix4::from(Decomposed {
+               scale: 1.0,
+               rot: Quaternion::from_angle_y(Rad(PI + rotation.yaw as f32)),
+               disp: offset,
+           });
+
+           mdl.matrix[SlimeModelPart::Body as usize] = offset_matrix
+               * Matrix4::from(Decomposed {
+               scale: 1.0,
+               rot: Quaternion::from_angle_x(Rad(0.0)),
+               disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+           });
+
+           mdl.matrix[SlimeModelPart::Eyes as usize] = offset_matrix
+               * Matrix4::from(Decomposed {
+               scale: 1.0,
+               rot: Quaternion::from_angle_x(Rad(0.0)),
+               disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+           });
+
+           // TODO This sucks
+           /*if slime_model.has_name_tag {
+               let ang = (position.position.x - renderer.camera.pos.x)
+                   .atan2(position.position.z - renderer.camera.pos.z)
+                   as f32;
+               mdl.matrix[SlimeModelPart::NameTag as usize] = Matrix4::from(Decomposed {
+                   scale: 1.0,
+                   rot: Quaternion::from_angle_y(Rad(ang)),
+                   disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
+               });
+           }*/
+
+           let mut i_time = slime_model.idle_time;
+           i_time += delta * 0.02;
+           if i_time > PI64 * 2.0 {
+               i_time -= PI64 * 2.0;
+           }
+           slime_model.idle_time = i_time;
+       }
+   }
 }
 
-impl SlimeRenderer {
-    pub fn new(m: &mut ecs::Manager) -> Self {
-        let slime_model = m.get_key();
-        let position = m.get_key();
-        let rotation = m.get_key();
-        let light = m.get_key();
-        Self {
-            slime_model,
-            position,
-            rotation,
-            game_info: m.get_key(),
-            light,
-        }
-    }
-}
-
-enum SlimeModelPart {
-    Body = 0,
-    Eyes = 1,
-}
-
-// TODO: Setup culling
-impl CustomEntityRenderer for SlimeRenderer {
-    fn update(
-        &self,
-        m: &mut ecs::Manager,
-        _world: &world::World,
-        renderer: &mut render::Renderer,
-        _: bool,
-        _: bool,
-        e: Entity,
-    ) {
-        use std::f32::consts::PI;
-        use std::f64::consts::PI as PI64;
-        let world_entity = m.get_world();
-        let delta = m
-            .get_component_mut(world_entity, self.game_info)
-            .unwrap()
-            .delta;
-        let slime_model = m.get_component_mut(e, self.slime_model).unwrap();
-        let position = m.get_component_mut(e, self.position).unwrap();
-        let rotation = m.get_component_mut(e, self.rotation).unwrap();
-        let light = m.get_component(e, self.light).unwrap();
-
-        /*if slime_model.dirty {
-            self.entity_removed(m, e, world, renderer);
-            self.entity_added(m, e, world, renderer);
-        }*/
-
-        if let Some(pmodel) = slime_model.model {
-            let mdl = renderer.model.get_model(pmodel).unwrap();
-
-            mdl.block_light = light.block_light;
-            mdl.sky_light = light.sky_light;
-
-            let offset = Vector3::new(
-                position.position.x as f32,
-                -position.position.y as f32,
-                position.position.z as f32,
-            );
-            let offset_matrix = Matrix4::from(Decomposed {
-                scale: 1.0,
-                rot: Quaternion::from_angle_y(Rad(PI + rotation.yaw as f32)),
-                disp: offset,
-            });
-
-            mdl.matrix[SlimeModelPart::Body as usize] = offset_matrix
-                * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(0.0)),
-                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-                });
-
-            mdl.matrix[SlimeModelPart::Eyes as usize] = offset_matrix
-                * Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_x(Rad(0.0)),
-                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-                });
-
-            // TODO This sucks
-            /*if slime_model.has_name_tag {
-                let ang = (position.position.x - renderer.camera.pos.x)
-                    .atan2(position.position.z - renderer.camera.pos.z)
-                    as f32;
-                mdl.matrix[SlimeModelPart::NameTag as usize] = Matrix4::from(Decomposed {
-                    scale: 1.0,
-                    rot: Quaternion::from_angle_y(Rad(ang)),
-                    disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
-                });
-            }*/
-
-            let mut i_time = slime_model.idle_time;
-            i_time += delta * 0.02;
-            if i_time > PI64 * 2.0 {
-                i_time -= PI64 * 2.0;
-            }
-            slime_model.idle_time = i_time;
-        }
-    }
-
-    #[allow(clippy::eq_op)]
-    fn entity_added(
-        &self,
-        m: &mut ecs::Manager,
-        e: ecs::Entity,
-        _: &world::World,
-        renderer: &mut render::Renderer,
-    ) {
-        let slime_model = m.get_component_mut(e, self.slime_model).unwrap();
+pub fn added_slime(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut SlimeModel)>) {
+    for (mut slime_model) in query.iter_mut() {
         let tex =
-            Renderer::get_texture(renderer.get_textures_ref(), "minecraft:entity/slime/slime");
+            Renderer::get_texture(renderer.read().get_textures_ref(), "minecraft:entity/slime/slime");
         let mut body_verts = vec![];
         model::append_box(
             &mut body_verts,
@@ -252,7 +202,7 @@ impl CustomEntityRenderer for SlimeRenderer {
             name_verts.extend_from_slice(&state.text);
         }*/
 
-        slime_model.model = Some(renderer.model.create_model(
+        slime_model.model = Some(renderer.clone().write().model.create_model(
             model::DEFAULT,
             vec![
                 body_verts, eye_verts,
@@ -260,17 +210,17 @@ impl CustomEntityRenderer for SlimeRenderer {
             ],
         ));
     }
+}
 
-    fn entity_removed(
-        &self,
-        m: &mut ecs::Manager,
-        e: ecs::Entity,
-        _: &world::World,
-        renderer: &mut render::Renderer,
-    ) {
-        let slime_model = m.get_component_mut(e, self.slime_model).unwrap();
+pub fn removed_slime(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut SlimeModel)>) {
+    for (mut slime_model) in query.iter_mut() {
         if let Some(model) = slime_model.model.take() {
-            renderer.model.remove_model(model);
+            renderer.clone().write().model.remove_model(model);
         }
     }
+}
+
+enum SlimeModelPart {
+    Body = 0,
+    Eyes = 1,
 }

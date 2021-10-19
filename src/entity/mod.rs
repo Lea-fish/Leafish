@@ -1,9 +1,7 @@
 pub mod block_entity;
 pub mod player;
 
-use crate::ecs;
-use crate::entity::slime::{SlimeModel, SlimeRenderer};
-use crate::entity::zombie::{ZombieModel, ZombieRenderer};
+use crate::entity::zombie::{ZombieModel};
 use crate::render::{Renderer, Texture};
 use crate::world::World;
 use cgmath::{Point3, Vector3};
@@ -13,6 +11,7 @@ use lazy_static::lazy_static;
 use std::sync::Arc;
 use bevy_ecs::prelude::*;
 use crate::ecs::{SystemExecStage, Manager};
+use crate::entity::slime::SlimeModel;
 
 pub mod player_like;
 pub mod slime;
@@ -207,109 +206,6 @@ impl Light {
     }
 }
 
-pub struct EntityRenderer {
-    filter: ecs::Filter,
-    _position: ecs::Key<Position>,
-    _rotation: ecs::Key<Rotation>,
-    entity_type: ecs::Key<EntityType>,
-}
-
-impl EntityRenderer {
-    pub fn new(manager: &mut Manager) -> Self {
-        let position = manager.get_key();
-        let rotation = manager.get_key();
-        let entity_type = manager.get_key();
-        Self {
-            filter: ecs::Filter::new()
-                .with(position)
-                .with(rotation)
-                .with(entity_type),
-            _position: position,
-            _rotation: rotation,
-            entity_type,
-        }
-    }
-}
-
-impl System for EntityRenderer {
-    fn filter(&self) -> &Filter {
-        &self.filter
-    }
-
-    fn update(
-        &mut self,
-        m: &mut Manager,
-        world: &World,
-        renderer: &mut Renderer,
-        focused: bool,
-        dead: bool,
-    ) {
-        for e in m.find(&self.filter) {
-            /*let position = m.get_component_mut(e, self.position).unwrap();
-            let rotation = m.get_component_mut(e, self.rotation).unwrap();*/
-            let entity_type = m.get_component(e, self.entity_type).unwrap();
-            let c_renderer = entity_type.get_renderer();
-            c_renderer.update(m, world, renderer, focused, dead, e);
-        }
-    }
-
-    fn entity_added(&mut self, m: &mut Manager, world: &World, renderer: &mut Renderer, e: Entity) {
-        let entity_type = m.get_component(e, self.entity_type).unwrap();
-        let c_renderer = entity_type.get_renderer();
-        c_renderer.entity_added(m, e, world, renderer);
-    }
-
-    fn entity_removed(
-        &mut self,
-        m: &mut Manager,
-        world: &World,
-        renderer: &mut Renderer,
-        e: Entity,
-    ) {
-        let entity_type = m.get_component(e, self.entity_type).unwrap();
-        let c_renderer = entity_type.get_renderer();
-        c_renderer.entity_removed(m, e, world, renderer);
-    }
-}
-
-pub trait CustomEntityRenderer {
-    fn update(
-        &self,
-        manager: &mut Manager,
-        world: &World,
-        renderer: &mut Renderer,
-        focused: bool,
-        dead: bool,
-        entity: Entity,
-    );
-
-    fn entity_added(
-        &self,
-        manager: &mut Manager,
-        entity: Entity,
-        world: &World,
-        renderer: &mut Renderer,
-    );
-
-    fn entity_removed(
-        &self,
-        manager: &mut Manager,
-        entity: Entity,
-        world: &World,
-        renderer: &mut Renderer,
-    );
-}
-
-pub struct NOOPEntityRenderer {}
-
-impl CustomEntityRenderer for NOOPEntityRenderer {
-    fn update(&self, _: &mut Manager, _: &World, _: &mut Renderer, _: bool, _: bool, _: Entity) {}
-
-    fn entity_added(&self, _: &mut Manager, _: Entity, _: &World, _: &mut Renderer) {}
-
-    fn entity_removed(&self, _: &mut Manager, _: Entity, _: &World, _: &mut Renderer) {}
-}
-
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum EntityType {
     DroppedItem,
@@ -428,39 +324,17 @@ pub enum EntityType {
     PiglinBrute,
 }
 
-lazy_static! {
-    static ref ENTITY_RENDERERS: Arc<DashMap<EntityType, Arc<dyn CustomEntityRenderer + Send + Sync>>> =
-        Arc::new(DashMap::new());
-    static ref NOOP_RENDERER: Arc<dyn CustomEntityRenderer + Send + Sync> =
-        Arc::new(NOOPEntityRenderer {});
-}
-
 impl EntityType {
-    pub fn init(manager: &mut Manager) {
-        ENTITY_RENDERERS.insert(EntityType::Slime, Arc::new(SlimeRenderer::new(manager)));
-        ENTITY_RENDERERS.insert(EntityType::Player, Arc::new(PlayerRenderer::new(manager)));
-        ENTITY_RENDERERS.insert(EntityType::Zombie, Arc::new(ZombieRenderer::new(manager)));
-    }
-
-    pub fn deinit() {
-        ENTITY_RENDERERS.clear();
-    }
-
-    pub fn get_renderer(&self) -> Arc<dyn CustomEntityRenderer + Send + Sync> {
-        ENTITY_RENDERERS
-            .get(self)
-            .map_or(NOOP_RENDERER.clone(), |x| x.value().clone())
-    }
 
     pub fn create_entity(
         &self,
-        m: &mut ecs::Manager,
+        m: &mut Manager,
         x: f64,
         y: f64,
         z: f64,
         yaw: f64,
         pitch: f64,
-    ) -> Option<ecs::Entity> {
+    ) -> Option<Entity> {
         if self.supported() {
             let ret = self.create_entity_internally(m, x, y, z, yaw, pitch);
             self.create_model(m, ret);
@@ -471,13 +345,13 @@ impl EntityType {
 
     pub fn create_entity_custom_model(
         &self,
-        m: &mut ecs::Manager,
+        m: &mut Manager,
         x: f64,
         y: f64,
         z: f64,
         yaw: f64,
         pitch: f64,
-    ) -> Option<ecs::Entity> {
+    ) -> Option<Entity> {
         if self.supported() {
             return Some(self.create_entity_internally(m, x, y, z, yaw, pitch));
         }
@@ -486,37 +360,28 @@ impl EntityType {
 
     fn create_entity_internally(
         &self,
-        m: &mut ecs::Manager,
+        m: &mut Manager,
         x: f64,
         y: f64,
         z: f64,
         yaw: f64,
         pitch: f64,
-    ) -> ecs::Entity {
+    ) -> Entity {
         let entity = m.create_entity();
         m.add_component_direct(entity, Position::new(x, y, z));
         m.add_component_direct(entity, Rotation::new(yaw, pitch));
         m.add_component_direct(entity, Velocity::new(0.0, 0.0, 0.0));
         m.add_component_direct(entity, TargetPosition::new(x, y, z));
         m.add_component_direct(entity, TargetRotation::new(yaw, pitch));
-        m.add_component_direct(
-            entity,
-            Bounds::new(Aabb3::new(
-                Point3::new(-0.3, 0.0, -0.3),
-                Point3::new(0.3, 1.8, 0.3),
-            )),
-        );
         m.add_component_direct(entity, Light::new());
         m.add_component_direct(entity, *self);
         entity
     }
 
-    fn create_model(&self, m: &mut ecs::Manager, entity: ecs::Entity) {
+    fn create_model(&self, m: &mut Manager, entity: Entity) {
         match self {
-            EntityType::Zombie => {
-                m.add_component_direct(entity, ZombieModel::new(Some(String::from("test"))))
-            }
-            EntityType::Slime => m.add_component_direct(entity, SlimeModel::new("test")),
+            EntityType::Zombie => m.world.entity_mut(entity).insert(ZombieModel::new(Some(String::from("test")))),
+            EntityType::Slime => m.world.entity_mut(entity).insert(SlimeModel::new("test")),
             _ => {}
         };
     }

@@ -64,6 +64,7 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
+use crate::entity::Rotation;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -623,8 +624,7 @@ fn handle_window_event<T>(
                             .entities
                             .clone()
                             .write()
-                            .get_component_mut(player, game.server.as_ref().unwrap().rotation)
-                            .unwrap(); // TODO: This panicked because of unwrap, check why!
+                            .world.entity_mut(player).get_mut::<Rotation>().unwrap(); // TODO: This panicked because of unwrap, check why!
                         rotation.yaw -= rx;
                         rotation.pitch -= ry;
                         if rotation.pitch < (PI / 2.0) + 0.01 {

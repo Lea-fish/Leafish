@@ -1,7 +1,7 @@
 use super::{
     Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity,
 };
-use crate::entity::{resolve_textures, CustomEntityRenderer, EntityRenderer, EntityType};
+use crate::entity::{resolve_textures, EntityType};
 use crate::format;
 use crate::render;
 use crate::render::model::{self, FormatState};
@@ -15,20 +15,28 @@ use collision::{Aabb, Aabb3};
 use instant::Instant;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
-use crate::particle::ParticleRenderer;
 use bevy_ecs::prelude::*;
-use crate::ecs::Manager;
+use crate::ecs::{Manager, SystemExecStage};
 use std::sync::Arc;
 use parking_lot::RwLock;
 use crate::render::Renderer;
+use crate::screen::ScreenSystem;
+use crate::entity::slime::{update_slime, added_slime, removed_slime};
+use crate::entity::zombie::{update_zombie, added_zombie, removed_zombie};
 
-pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
-    let sys = MovementHandler::new(m);
-    m.add_system(sys);
-    let sys = EntityRenderer::new(m);
-    m.add_render_system(sys);
-    let sys = ParticleRenderer::new(m);
-    m.add_render_system(sys);
+pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) { // TODO: Check sync/async usage!
+    sync.add_system(update_render_players.label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(player_added.label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(player_removed.label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
+        .add_system(update_slime.label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(added_slime.label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(removed_slime.label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
+        .add_system(update_zombie.label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(added_zombie.label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(removed_zombie.label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
+        .add_system(handle_movement.label(SystemExecStage::Normal).before(SystemExecStage::Render));
+    // let sys = ParticleRenderer::new(m);
+    // m.add_render_system(sys);
 }
 
 pub fn create_local(m: &mut Manager) -> Entity {
@@ -526,7 +534,7 @@ impl PlayerMovement {
     }
 }
 
-pub fn handle_movement(world: Res<Arc<crate::world::World>>, mut commands: Commands, mut query: Query<(Entity, &mut PlayerMovement, &mut Position, &mut Velocity, &Bounds, &Rotation, &GameMode, Option<&Gravity>), (Without<PlayerMovement>, With<Gravity>)>) {
+pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc<ScreenSystem>>, mut commands: Commands, mut query: Query<(Entity, &mut PlayerMovement, &mut Position, &mut Velocity, &Bounds, &Rotation, &GameMode, Option<&Gravity>), (Without<PlayerMovement>, With<Gravity>)>) {
     for (entity, mut movement, mut position, mut velocity, bounds, rotation, gravity, gamemode) in query.iter_mut() {
         if movement.flying && gravity.is_some() {
             commands.entity(entity).remove::<Gravity>();
@@ -534,7 +542,7 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, mut commands: Comma
             commands.entity(entity).insert(Gravity::new());
         }
         movement.flying |= gamemode.always_fly();
-        if (dead || !focused)
+        if !screen_sys.is_current_ingame()
             && (movement.pressed_keys.len() > 1
             || (!movement.pressed_keys.is_empty()
             && !movement.is_key_pressed(Actionkey::OpenInv)))

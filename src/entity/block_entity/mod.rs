@@ -22,11 +22,11 @@ impl BlockEntityType {
     }
 
     pub fn create_entity(&self, m: &mut ecs::Manager, pos: Position) -> Entity {
-        let e = m.create_entity();
-        m.add_component_direct(e, pos);
+        let mut e = m.world.spawn();
+        e.insert(pos);
         match *self {
-            BlockEntityType::Sign => sign::init_entity(m, e),
+            BlockEntityType::Sign => sign::init_entity(m, e.id()),
         }
-        e
+        e.id()
     }
 }
