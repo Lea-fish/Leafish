@@ -843,12 +843,16 @@ impl Server {
         screen_sys: Arc<ScreenSystem>,
         renderer: Arc<RwLock<Renderer>>,
     ) -> Server {
+        let world = Arc::new(world::World::new(protocol_version, light_updater));
         let mut entities = Manager::new();
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
         entity::add_systems(&mut entities, &mut parallel, &mut sync);
 
         entities.world.insert_resource(entity::GameInfo::new());
+        entities.world.insert_resource(world.clone());
+        entities.world.insert_resource(renderer.clone());
+        entities.world.insert_resource(screen_sys.clone());
 
         let version = Version::from_id(protocol_version as u32);
         let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
@@ -868,7 +872,7 @@ impl Server {
             forge_mods,
             disconnect_data: Arc::new(RwLock::new(DisconnectData::default())),
 
-            world: Arc::new(world::World::new(protocol_version, light_updater)),
+            world: world.clone(),
             world_data: Arc::new(RwLock::new(WorldData::default())),
             version: AtomicUsize::new(version),
             resources,
@@ -1032,20 +1036,25 @@ impl Server {
     fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64, focused: bool, dead: bool) {
         let entities = self.entities.clone();
         let mut entities = entities.write();
-        let mut game_info = entities.world.get_resource_mut::<GameInfo>().unwrap();
-        // Update the game's state for entities to read
-        game_info
-            .delta = delta;
+        {
+            let mut game_info = entities.world.get_resource_mut::<GameInfo>().unwrap();
+            // Update the game's state for entities to read
+            game_info
+                .delta = delta;
+        }
 
         if self.is_connected() || self.disconnect_data.clone().read().just_disconnected {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().just_disconnected = false;
             *self.entity_tick_timer.write() += delta;
             while *self.entity_tick_timer.read() >= 3.0 {
-                let schedule = self.entities.read().schedule.clone();
-                schedule.write().run(&mut self.entities.clone().write().world);
+                println!("pre run!");
+                let schedule = entities.schedule.clone();
+                println!("run!");
+                schedule.write().run(&mut entities.world);
                 *self.entity_tick_timer.write() -= 3.0;
             }
+            println!("finished run!");
             let world = self.world.clone();
             /*self.entities
                 .clone()
