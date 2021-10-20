@@ -274,7 +274,7 @@ impl ScreenSystem {
                 .iter()
                 .skip(lowest as usize)
             {
-                let idx = self.screens.read().len() - 1;
+                let idx = (self.screens.read().len() as isize - 1).max(0) as usize;
                 self.screens.write().push(ScreenInfo {
                     screen: Arc::new(Mutex::new(screen.clone())),
                     active: false,
