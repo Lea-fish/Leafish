@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crate::entity;
-use crate::entity::player::create_local;
-use crate::entity::EntityType;
+use crate::entity::player::{create_local, PlayerMovement, PlayerModel};
+use crate::entity::{EntityType, TargetRotation, GameInfo, Gravity, TargetPosition};
 use crate::format;
 use crate::inventory::material::versions::to_material;
 use crate::inventory::{inventory_from_type, Inventory, InventoryContext, InventoryType, Item};
@@ -62,7 +62,7 @@ use dashmap::DashMap;
 use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::particle::ParticleType;
 use cgmath::Vector3;
-use bevy_ecs::prelude::{Entity, SystemStage};
+use bevy_ecs::prelude::{Entity, SystemStage, Stage};
 use crate::ecs::Manager;
 
 pub mod plugin_messages;
@@ -517,8 +517,7 @@ impl Server {
                                     .entities
                                     .clone()
                                     .write()
-                                    .get_component_mut(*entity, server.target_rotation)
-                                    .unwrap();
+                                    .world.get_entity_mut(*entity).unwrap().get_mut::<TargetRotation>().unwrap();
                                 rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
                             }
                         }
@@ -737,17 +736,17 @@ impl Server {
                         MappedPacket::BlockBreakAnimation(block_break) => {
                             println!("Block_break_anim: {}", block_break.stage);
                             if block_break.stage >= 10 {
-                                server.entities.clone().write().remove_component(server.active_block_break_anims.remove(&block_break.entity_id).unwrap().1, server.block_break_anim);
+                                server.entities.clone().write().world.despawn(server.active_block_break_anims.remove(&block_break.entity_id).unwrap().1);
                             } else if let Some(anim) = server.active_block_break_anims.clone().get_mut(&block_break.entity_id) {
-                                let anim = server.entities.clone().write().get_component_mut(*anim.value(), server.block_break_anim).unwrap();
-                                anim.update(block_break.stage);
+                                let mut anim = server.entities.clone().write().world.get_entity_mut(*anim.value()).unwrap();
+                                anim.get_mut::<BlockBreakEffect>().unwrap().update(block_break.stage);
                             } else {
-                                let entity = server.entities.clone().write().create_entity();
-                                server.entities.clone().write().add_component_direct(entity, BlockEffectData {
+                                let mut entity = server.entities.clone().write().world.spawn();
+                                entity.insert(BlockEffectData {
                                     position: Vector3::new(block_break.location.x as f64, block_break.location.y as f64, block_break.location.z as f64),
                                     status: block_break.stage,
                                 });
-                                let particle = ParticleType::BlockBreak.create_particle(&mut *server.entities.clone().write(), entity);
+                                let particle = ParticleType::BlockBreak.create_particle(&mut *server.entities.clone().write(), entity.id());
                                 server.active_block_break_anims.clone().insert(block_break.entity_id, particle.unwrap());
                             }
                         }
@@ -845,9 +844,7 @@ impl Server {
         let mut sync = SystemStage::single_threaded();
         entity::add_systems(&mut entities, &mut parallel, &mut sync);
 
-        let world_entity = entities.get_world();
-        let game_info = entities.get_key();
-        entities.add_component(world_entity, game_info, entity::GameInfo::new());
+        entities.world.insert_resource(entity::GameInfo::new());
 
         let version = Version::from_id(protocol_version as u32);
         let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
@@ -857,8 +854,6 @@ impl Server {
         )));
         hud_context.write().player_inventory =
             Some(inventory_context.read().player_inventory.clone());
-        EntityType::init(&mut entities);
-        ParticleType::init(&mut entities);
 
         let version = resources.read().version();
         Server {
@@ -920,7 +915,7 @@ impl Server {
         self.conn.clone().write().take().unwrap().close();
         self.disconnect_data.clone().write().disconnect_reason = reason;
         if let Some(player) = self.player.clone().write().take() {
-            self.entities.clone().write().remove_entity(player);
+            self.entities.clone().write().world.despawn(player);
         }
         self.disconnect_data.clone().write().just_disconnected = true;
     }
@@ -971,13 +966,17 @@ impl Server {
                     .entities
                     .clone()
                     .read()
-                    .get_component(player, self.position)
-                    .unwrap(); // TODO: This panicked, check why!
+                    .world
+                    .get_entity(player)
+                    .unwrap().get::<crate::entity::Position>()
+                    .unwrap();
                 let rotation = self
                     .entities
                     .clone()
                     .read()
-                    .get_component(player, self.rotation)
+                    .world
+                    .get_entity(player)
+                    .unwrap().get::<crate::entity::Rotation>()
                     .unwrap();
                 renderer.camera.pos = cgmath::Point3::from_vec(
                     position.position + cgmath::Vector3::new(0.0, 1.62, 0.0),
@@ -1032,13 +1031,9 @@ impl Server {
     }
 
     fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64, focused: bool, dead: bool) {
-        let world_entity = self.entities.clone().read().get_world();
+        let mut game_info = self.entities.clone().read().world.get_resource_mut::<GameInfo>().unwrap();
         // Update the game's state for entities to read
-        self.entities
-            .clone()
-            .write()
-            .get_component_mut(world_entity, self.game_info)
-            .unwrap()
+        game_info
             .delta = delta;
 
         if self.is_connected() || self.disconnect_data.clone().read().just_disconnected {
@@ -1046,32 +1041,26 @@ impl Server {
             self.disconnect_data.clone().write().just_disconnected = false;
             *self.entity_tick_timer.write() += delta;
             while *self.entity_tick_timer.read() >= 3.0 {
-                let world = self.world.clone();
-                self.entities
-                    .clone()
-                    .write()
-                    .tick(&world, renderer, focused, dead);
+                let schedule = self.entities.read().schedule.clone();
+                schedule.write().run(&mut self.entities.clone().write().world);
                 *self.entity_tick_timer.write() -= 3.0;
             }
             let world = self.world.clone();
-            self.entities
+            /*self.entities
                 .clone()
                 .write()
-                .render_tick(&world, renderer, focused, dead);
+                .render_tick(&world, renderer, focused, dead);*/
+            // TODO: Make render systems run only once!
         }
     }
 
     pub fn remove(&mut self, renderer: &mut render::Renderer) {
         let world = self.world.clone();
-        self.entities
-            .clone()
-            .write()
-            .remove_all_entities(&world, renderer);
+        // TODO: Handle remove of all entities if necessary!
         if let Some(sun_model) = self.sun_model.write().as_mut() {
             sun_model.remove(renderer);
         }
         self.target_info.clone().write().clear(renderer);
-        EntityType::deinit();
     }
 
     fn update_time(&self, renderer: &mut render::Renderer, delta: f64) {
@@ -1126,25 +1115,28 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(player, self.player_movement)
-                .unwrap(); // TODO: This panicked - check why (none - unwrap)!
+                .world.entity_mut(player)
+                .get_mut::<PlayerMovement>().unwrap();
             let on_ground = self
                 .entities
                 .clone()
                 .read()
-                .get_component(player, self.gravity)
+                .world.entity(player)
+                .get::<Gravity>()
                 .map_or(false, |v| v.on_ground);
             let position = self
                 .entities
                 .clone()
                 .read()
-                .get_component(player, self.target_position)
+                .world.entity(player)
+                .get::<TargetPosition>()
                 .unwrap();
             let rotation = self
                 .entities
                 .clone()
                 .read()
-                .get_component(player, self.rotation)
+                .world.entity(player)
+                .get::<crate::entity::Rotation>()
                 .unwrap();
 
             // Force the server to know when touched the ground
@@ -1213,7 +1205,8 @@ impl Server {
                     .entities
                     .clone()
                     .write()
-                    .get_component_mut(player, self.player_movement)
+                    .world.entity_mut(player)
+                    .get_mut::<PlayerMovement>()
                 {
                     state_changed = movement.pressed_keys.get(&key).map_or(false, |v| *v) != down;
                     movement.pressed_keys.insert(key, down);
@@ -1273,9 +1266,9 @@ impl Server {
             let world = self.world.clone();
             let gamemode = *self
                 .entities
-                .clone()
-                .write()
-                .get_component(*self.player.clone().read().as_ref().unwrap(), self.gamemode)
+                .read()
+                .world.entity(*self.player.clone().read().as_ref().unwrap())
+                .get::<GameMode>()
                 .unwrap();
             if gamemode.can_interact_with_world() && self.block_break_info.lock().delay == 0 {
                 self.block_break_info.lock().pressed = true;
@@ -1335,9 +1328,9 @@ impl Server {
             let world = self.world.clone();
             let gamemode = *self
                 .entities
-                .clone()
-                .write()
-                .get_component(*self.player.clone().read().as_ref().unwrap(), self.gamemode)
+                .read()
+                .world.entity(*self.player.clone().read().as_ref().unwrap())
+                .get::<GameMode>()
                 .unwrap();
             if gamemode.can_interact_with_world() {
                 // TODO: Check this
@@ -1577,11 +1570,12 @@ impl Server {
         let gamemode = GameMode::from_int((gamemode & 0x7) as i32);
         let player = entity::player::create_local(&mut self.entities.clone().write());
         if let Some(info) = self.players.clone().read().get(&self.uuid) {
-            let model = self
+            let mut model = self
                 .entities
                 .clone()
                 .write()
-                .get_component_mut_direct::<entity::player::PlayerModel>(player)
+                .world.entity_mut(player)
+                .get_mut::<PlayerModel>()
                 .unwrap();
             model.set_skin(info.skin_url.clone());
         }
@@ -1590,12 +1584,13 @@ impl Server {
             .entities
             .clone()
             .write()
-            .get_component_mut(player, self.gamemode)
+            .world.entity_mut(player)
+            .get_mut::<GameMode>()
             .unwrap() = gamemode;
         self.entities
             .clone()
             .write()
-            .get_component_mut(player, self.player_movement)
+            .world.entity_mut(player).get_mut::<PlayerMovement>()
             .unwrap()
             .flying = gamemode.can_fly();
 
@@ -1630,19 +1625,18 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(player, self.gamemode)
+                .world.entity_mut(player)
+                .get_mut::<GameMode>()
                 .unwrap() = gamemode;
             self.entities
                 .clone()
                 .write()
-                .get_component_mut(player, self.player_movement)
+                .world.entity_mut(player)
+                .get_mut::<PlayerMovement>()
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
-        self.entities
-            .clone()
-            .write()
-            .remove_all_entities_gracefully();
+        // TODO: Handle remove of all entities (gracefully) if necessary!
         *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
         if *self.dead.read() {
             *self.dead.write() = false;
@@ -1687,12 +1681,14 @@ impl Server {
                     .entities
                     .clone()
                     .write()
-                    .get_component_mut(player, self.gamemode)
+                    .world.entity_mut(player)
+                    .get_mut::<GameMode>()
                     .unwrap() = gamemode;
                 self.entities
                     .clone()
                     .write()
-                    .get_component_mut(player, self.player_movement)
+                    .world.entity_mut(player)
+                    .get_mut::<PlayerMovement>()
                     .unwrap()
                     .flying = gamemode.can_fly();
             }
@@ -1723,7 +1719,7 @@ impl Server {
     fn on_entity_destroy(&self, entity_destroy: mapped_packet::play::clientbound::EntityDestroy) {
         for id in entity_destroy.entity_ids {
             if let Some(entity) = self.entity_map.clone().write().remove(&id) {
-                self.entities.clone().write().remove_entity(entity);
+                self.entities.clone().write().world.despawn(entity);
             }
         }
     }
@@ -1744,13 +1740,15 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_position)
+                .world.entity_mut(*entity)
+                .get_mut::<TargetPosition>()
                 .unwrap();
             let target_rotation = self
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_rotation)
+                .world.entity_mut(*entity)
+                .get_mut::<TargetRotation>()
                 .unwrap();
             target_position.position.x = x;
             target_position.position.y = y;
@@ -1766,7 +1764,8 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_position)
+                .world.entity_mut(*entity)
+                .get_mut::<TargetPosition>()
                 .unwrap();
             position.position.x += entity_move.delta_x;
             position.position.y += entity_move.delta_y;
@@ -1781,7 +1780,8 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_rotation)
+                .world.entity_mut(*entity)
+                .get_mut::<TargetRotation>()
                 .unwrap();
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
             rotation.pitch = -(pitch / 256.0) * PI * 2.0;
@@ -1803,13 +1803,15 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_position)
+                .world.entity_mut(*entity)
+                .get_mut::<TargetPosition>()
                 .unwrap();
             let rotation = self
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(*entity, self.target_rotation)
+                .world.entity_mut(*entity)
+                .get_mut::<TargetRotation>()
                 .unwrap();
             position.position.x += delta_x;
             position.position.y += delta_y;
@@ -1831,7 +1833,7 @@ impl Server {
     ) {
         use std::f64::consts::PI;
         if let Some(entity) = self.entity_map.clone().write().remove(&entity_id) {
-            self.entities.clone().write().remove_entity(entity);
+            self.entities.clone().write().world.despawn(entity);
         }
         let entity = entity::player::create_remote(
             &mut self.entities.clone().write(),
@@ -1845,25 +1847,29 @@ impl Server {
             .entities
             .clone()
             .write()
-            .get_component_mut(entity, self.position)
+            .world.entity_mut(entity)
+            .get_mut::<crate::entity::Position>()
             .unwrap();
         let target_position = self
             .entities
             .clone()
             .write()
-            .get_component_mut(entity, self.target_position)
+            .world.entity_mut(entity)
+            .get_mut::<TargetPosition>()
             .unwrap();
         let rotation = self
             .entities
             .clone()
             .write()
-            .get_component_mut(entity, self.rotation)
+            .world.entity_mut(entity)
+            .get_mut::<crate::entity::Rotation>()
             .unwrap();
         let target_rotation = self
             .entities
             .clone()
             .write()
-            .get_component_mut(entity, self.target_rotation)
+            .world.entity_mut(entity)
+            .get_mut::<TargetRotation>()
             .unwrap();
         position.position.x = x;
         position.position.y = y;
@@ -1876,11 +1882,12 @@ impl Server {
         target_rotation.yaw = rotation.yaw;
         target_rotation.pitch = rotation.pitch;
         if let Some(info) = self.players.clone().read().get(&uuid) {
-            let model = self
+            let mut model = self
                 .entities
                 .clone()
                 .write()
-                .get_component_mut_direct::<entity::player::PlayerModel>(entity)
+                .world.entity_mut(entity)
+                .get_mut::<PlayerModel>()
                 .unwrap();
             model.set_skin(info.skin_url.clone());
         }
@@ -1894,19 +1901,22 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(player, self.target_position)
+                .world.entity_mut(player)
+                .get_mut::<TargetPosition>()
                 .unwrap();
             let rotation = self
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(player, self.rotation)
+                .world.entity_mut(player)
+                .get_mut::<crate::entity::Rotation>()
                 .unwrap();
             let velocity = self
                 .entities
                 .clone()
                 .write()
-                .get_component_mut(player, self.velocity)
+                .world.entity_mut(player)
+                .get_mut::<crate::entity::Velocity>()
                 .unwrap();
 
             let flags = teleport.flags.unwrap_or(0);
@@ -2134,13 +2144,12 @@ impl Server {
                     // This isn't an issue for other players because this packet
                     // must come before the spawn player packet.
                     if info.uuid == self.uuid {
-                        let model = self
+                        let mut model = self
                             .entities
                             .clone()
                             .write()
-                            .get_component_mut_direct::<entity::player::PlayerModel>(
-                                self.player.clone().write().unwrap(),
-                            )
+                            .world.entity_mut(self.player.clone().write().unwrap())
+                            .get_mut::<entity::player::PlayerModel>()
                             .unwrap();
                         model.set_skin(info.skin_url.clone());
                     }

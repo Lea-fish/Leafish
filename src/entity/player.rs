@@ -25,62 +25,57 @@ use crate::entity::slime::{update_slime, added_slime, removed_slime};
 use crate::entity::zombie::{update_zombie, added_zombie, removed_zombie};
 
 pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) { // TODO: Check sync/async usage!
-    sync.add_system(update_render_players.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(player_added.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(player_removed.label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
-        .add_system(update_slime.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(added_slime.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(removed_slime.label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
-        .add_system(update_zombie.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(added_zombie.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(removed_zombie.label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
-        .add_system(handle_movement.label(SystemExecStage::Normal).before(SystemExecStage::Render));
+    sync.add_system(update_render_players.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(player_added.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(player_removed.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
+        .add_system(update_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(added_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(removed_slime.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
+        .add_system(update_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(added_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(removed_zombie.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
+        .add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render));
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
 }
 
 pub fn create_local(m: &mut Manager) -> Entity {
-    let entity = m.create_entity();
-    m.add_component_direct(entity, Position::new(0.0, 0.0, 0.0));
+    let mut entity = m.world.spawn();
     let mut tpos = TargetPosition::new(0.0, 0.0, 0.0);
     tpos.lerp_amount = 1.0 / 3.0;
-    m.add_component_direct(entity, tpos);
-    m.add_component_direct(entity, Rotation::new(0.0, 0.0));
-    m.add_component_direct(entity, Velocity::new(0.0, 0.0, 0.0));
-    m.add_component_direct(entity, GameMode::Survival);
-    m.add_component_direct(entity, Gravity::new());
-    m.add_component_direct(entity, PlayerMovement::new());
-    m.add_component_direct(
-        entity,
-        Bounds::new(Aabb3::new(
+    entity.insert(Position::new(0.0, 0.0, 0.0))
+        .insert(tpos)
+        .insert(Rotation::new(0.0, 0.0))
+        .insert(Velocity::new(0.0, 0.0, 0.0))
+        .insert(GameMode::Survival)
+        .insert(Gravity::new())
+        .insert(PlayerMovement::new())
+        .insert(Bounds::new(Aabb3::new(
             Point3::new(-0.3, 0.0, -0.3),
             Point3::new(0.3, 1.8, 0.3),
-        )),
-    );
-    m.add_component_direct(entity, PlayerModel::new("", false, false, true));
-    m.add_component_direct(entity, Light::new());
-    m.add_component_direct(entity, EntityType::Player);
-    entity
+        ))).insert(PlayerModel::new("", false, false, true))
+        .insert(Light::new())
+        .insert(EntityType::Player);
+    entity.id()
 }
 
 pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
-    let entity = m.create_entity();
-    m.add_component_direct(entity, Position::new(0.0, 0.0, 0.0));
-    m.add_component_direct(entity, TargetPosition::new(0.0, 0.0, 0.0));
-    m.add_component_direct(entity, Rotation::new(0.0, 0.0));
-    m.add_component_direct(entity, TargetRotation::new(0.0, 0.0));
-    m.add_component_direct(entity, Velocity::new(0.0, 0.0, 0.0));
-    m.add_component_direct(
-        entity,
+    let mut entity = m.world.spawn();
+    entity.insert(Position::new(0.0, 0.0, 0.0))
+    .insert(TargetPosition::new(0.0, 0.0, 0.0))
+    .insert(Rotation::new(0.0, 0.0))
+    .insert(TargetRotation::new(0.0, 0.0))
+    .insert(Velocity::new(0.0, 0.0, 0.0))
+    .insert(
         Bounds::new(Aabb3::new(
             Point3::new(-0.3, 0.0, -0.3),
             Point3::new(0.3, 1.8, 0.3),
         )),
-    );
-    m.add_component_direct(entity, PlayerModel::new(name, true, true, false));
-    m.add_component_direct(entity, Light::new());
-    m.add_component_direct(entity, EntityType::Player);
-    entity
+    )
+    .insert(PlayerModel::new(name, true, true, false))
+    .insert(Light::new())
+    .insert(EntityType::Player);
+    entity.id()
 }
 
 pub struct PlayerModel {
@@ -134,12 +129,12 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
             .delta;
 
         if player_model.dirty {
-            remove_player(renderer.clone(), player_model);
-            add_player(renderer.clone(), player_model);
+            remove_player(renderer.clone(), &mut *player_model);
+            add_player(renderer.clone(), &mut *player_model);
         }
 
         if let Some(pmodel) = player_model.model {
-            let mdl = renderer.model.get_model(pmodel).unwrap();
+            let mdl = renderer.clone().write().model.get_model(pmodel).unwrap();
 
             mdl.block_light = light.block_light;
             mdl.sky_light = light.sky_light;
@@ -167,8 +162,8 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
 
             // TODO This sucks
             if player_model.has_name_tag {
-                let ang = (position.position.x - renderer.camera.pos.x)
-                    .atan2(position.position.z - renderer.camera.pos.z)
+                let ang = (position.position.x - renderer.read().camera.pos.x)
+                    .atan2(position.position.z - renderer.read().camera.pos.z)
                     as f32;
                 mdl.matrix[PlayerModelPart::NameTag as usize] = Matrix4::from(Decomposed {
                     scale: 1.0,
@@ -281,13 +276,13 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
 
 fn player_added(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut PlayerModel), (Added<PlayerModel>)>) {
     for (mut player_model) in query.iter_mut() {
-        add_player(*renderer, player_model);
+        add_player(*renderer, &mut *player_model);
     }
 }
 
 fn player_removed(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedComponents<PlayerModel>, mut query: Query<(Entity, &mut PlayerModel)>) {
     for (_entity, mut player_model) in query.iter_mut() {
-        remove_player(*renderer, player_model);
+        remove_player(*renderer, &mut *player_model);
     }
 }
 
@@ -296,7 +291,8 @@ fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
     player_model.dirty = false;
 
     let skin = if let Some(url) = player_model.skin_url.as_ref() {
-        renderer.read().get_skin(renderer.get_textures_ref(), url)
+        let renderer = renderer.read();
+        renderer.get_skin(renderer.get_textures_ref(), url)
     } else {
         render::Renderer::get_texture(renderer.read().get_textures_ref(), "entity/steve")
     };
@@ -446,7 +442,7 @@ fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
         name_verts.extend_from_slice(&state.text);
     }
 
-    player_model.model = Some(renderer.model.create_model(
+    player_model.model = Some(renderer.clone().write().model.create_model(
         model::DEFAULT,
         vec![
             head_verts,

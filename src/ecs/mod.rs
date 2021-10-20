@@ -23,8 +23,9 @@ use std::ptr;
 
 use crate::render;
 use crate::world;
-use std::sync::RwLock;
+use std::sync::Arc;
 use bevy_ecs::prelude::*;
+use parking_lot::RwLock;
 
 // System labels to enforce a run order of our systems
 #[derive(SystemLabel, Debug, Clone, PartialEq, Eq, Hash)]
@@ -37,7 +38,7 @@ pub enum SystemExecStage {
 pub struct Manager {
 
     pub world: World,
-    pub schedule: Schedule,
+    pub schedule: Arc<RwLock<Schedule>>,
 
 }
 

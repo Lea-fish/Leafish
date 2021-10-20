@@ -448,17 +448,7 @@ fn tick_all(
             game.screen_sys
                 .clone()
                 .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
-            game.server
-                .as_ref()
-                .unwrap()
-                .clone()
-                .entities
-                .clone()
-                .write()
-                .remove_all_entities(
-                    &*game.server.as_ref().unwrap().clone().world.clone(),
-                    &mut *game.renderer.clone().write(),
-                );
+            // TODO: Handle remove of all entities if necessary!
             game.server = None;
             game.renderer.clone().write().reset();
         }

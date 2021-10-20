@@ -12,9 +12,9 @@ use std::sync::Arc;
 use crate::ecs::SystemExecStage;
 
 pub fn add_systems(m: &mut ecs::Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
-    sync.add_system(render_sign.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(on_add_sign.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(on_sign_remove.label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render));
+    sync.add_system(render_sign.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(on_add_sign.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(on_sign_remove.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render));
 }
 
 pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
@@ -51,26 +51,26 @@ pub struct SignInfo {
 pub fn render_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position)>) {
     for (mut info, position) in query.iter_mut() {
         if info.dirty {
-            remove_sign(*renderer, info);
-            add_sign(*renderer, *world, info, position);
+            remove_sign(*renderer, &mut *info);
+            add_sign(*renderer, *world, &mut *info, position);
         }
         if let Some(model) = info.model {
-            let mdl = renderer.model.get_model(model).unwrap();
-            mdl.block_light = world.get_block_light(position) as f32;
-            mdl.sky_light = world.get_sky_light(position) as f32;
+            let mdl = renderer.clone().write().model.get_model(model).unwrap();
+            mdl.block_light = world.get_block_light(*position) as f32;
+            mdl.sky_light = world.get_sky_light(*position) as f32;
         }
     }
 }
 
 pub fn on_add_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position)>) {
    for (mut info, position) in query.iter_mut() {
-       add_sign(*renderer, *world, info, position);
+       add_sign(*renderer, *world, &mut *info, position);
    }
 }
 
 pub fn on_sign_remove(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedComponents<SignInfo>, mut query: Query<(&mut SignInfo)>) {
     for (mut info) in query.iter_mut() {
-        remove_sign(*renderer, info);
+        remove_sign(*renderer, &mut *info);
     }
 }
 
@@ -96,7 +96,7 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
         }
         _ => return,
     }
-    let tex = render::Renderer::get_texture(renderer.get_textures_ref(), "entity/sign");
+    let tex = render::Renderer::get_texture(renderer.clone().write().get_textures_ref(), "entity/sign");
 
     macro_rules! rel {
             ($x:expr, $y:expr, $w:expr, $h:expr) => {
@@ -164,10 +164,10 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
         verts.extend_from_slice(&state.text);
     }
 
-    let model = renderer.model.create_model(model::DEFAULT, vec![verts]);
+    let model = renderer.clone().write().model.create_model(model::DEFAULT, vec![verts]);
 
     {
-        let mdl = renderer.model.get_model(model).unwrap();
+        let mdl = renderer.clone().write().model.get_model(model).unwrap();
         mdl.radius = 2.0;
         mdl.x = position.x as f32 + 0.5;
         mdl.y = position.y as f32 + 0.5;
@@ -191,10 +191,8 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
 }
 
 fn remove_sign(renderer: Arc<RwLock<Renderer>>, info: &mut SignInfo) {
-    if let Some(info) = info {
-        if let Some(model) = info.model {
-            renderer.clone().write().model.remove_model(model);
-        }
-        info.model = None;
+    if let Some(model) = info.model {
+        renderer.clone().write().model.remove_model(model);
     }
+    info.model = None;
 }

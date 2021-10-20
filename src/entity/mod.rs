@@ -12,6 +12,8 @@ use std::sync::Arc;
 use bevy_ecs::prelude::*;
 use crate::ecs::{SystemExecStage, Manager};
 use crate::entity::slime::SlimeModel;
+use bevy_ecs::system::SystemParam;
+use bevy_ecs::component::Component;
 
 pub mod player_like;
 pub mod slime;
@@ -57,16 +59,16 @@ srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
 */
 
 pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
-    parallel.add_system(systems::update_last_position);
+    parallel.add_system(systems::update_last_position.system());
 
     player::add_systems(m, parallel, sync);
 
     // TODO: Enforce more exec ordering for velocity impl (velocity and gravity application order etc)
-    sync.add_system(systems::apply_velocity.label(SystemExecStage::Normal))
-        .add_system(systems::apply_gravity.label(SystemExecStage::Normal))
-        .add_system(systems::lerp_position.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(systems::lerp_rotation.label(SystemExecStage::Render).after(SystemExecStage::Normal));
-    parallel.add_system(systems::light_entity);
+    sync.add_system(systems::apply_velocity.system().label(SystemExecStage::Normal))
+        .add_system(systems::apply_gravity.system().label(SystemExecStage::Normal))
+        .add_system(systems::lerp_position.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(systems::lerp_rotation.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
+    parallel.add_system(systems::light_entity.system());
 
     block_entity::add_systems(m, parallel, sync);
 }
@@ -367,21 +369,25 @@ impl EntityType {
         yaw: f64,
         pitch: f64,
     ) -> Entity {
-        let entity = m.create_entity();
-        m.add_component_direct(entity, Position::new(x, y, z));
-        m.add_component_direct(entity, Rotation::new(yaw, pitch));
-        m.add_component_direct(entity, Velocity::new(0.0, 0.0, 0.0));
-        m.add_component_direct(entity, TargetPosition::new(x, y, z));
-        m.add_component_direct(entity, TargetRotation::new(yaw, pitch));
-        m.add_component_direct(entity, Light::new());
-        m.add_component_direct(entity, *self);
-        entity
+        let mut entity = m.world.spawn();
+        entity.insert(Position::new(x, y, z))
+            .insert(Rotation::new(yaw, pitch))
+            .insert(Velocity::new(0.0, 0.0, 0.0))
+            .insert(TargetPosition::new(x, y, z))
+            .insert(TargetRotation::new(yaw, pitch))
+            .insert(Light::new())
+            .insert(*self);
+        entity.id()
     }
 
     fn create_model(&self, m: &mut Manager, entity: Entity) {
         match self {
-            EntityType::Zombie => m.world.entity_mut(entity).insert(ZombieModel::new(Some(String::from("test")))),
-            EntityType::Slime => m.world.entity_mut(entity).insert(SlimeModel::new("test")),
+            EntityType::Zombie => {
+                m.world.entity_mut(entity).insert(ZombieModel::new(Some(String::from("test"))));
+            },
+            EntityType::Slime => {
+                m.world.entity_mut(entity).insert(SlimeModel::new("test"));
+            },
             _ => {}
         };
     }

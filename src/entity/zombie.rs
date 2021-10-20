@@ -42,7 +42,7 @@ pub fn added_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut commands: Commands
             Point3::new(0.3, 1.8, 0.3),
         )));
         let tex = Renderer::get_texture(
-            renderer.get_textures_ref(),
+            renderer.read().get_textures_ref(),
             "minecraft:entity/zombie/zombie",
         );
         let components = compute_player_model_components(&tex, &zombie_model.name, &mut *renderer.clone().write());

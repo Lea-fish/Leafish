@@ -54,7 +54,7 @@ pub fn effect_removed(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&m
 pub fn effect_updated(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut BlockBreakEffect)>) {
     for (mut effect) in query.iter_mut() {
         if effect.dirty {
-            readd_model(&mut *renderer.clone().write(), effect);
+            readd_model(&mut *renderer.clone().write(), &mut *effect);
             effect.dirty = false;
         }
         if let Some(model) = effect.model {
