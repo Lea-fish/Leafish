@@ -820,6 +820,7 @@ impl Server {
         let (tx, rx) = unbounded();
         let (etx, erx) = unbounded();
         thread::spawn(move || loop {
+           // println!("doing render list thingy!");
             let _: bool = rx.recv().unwrap();
             let server = server.clone().lock().as_ref().unwrap().clone();
             let world = server.world.clone();
@@ -987,8 +988,8 @@ impl Server {
                 renderer.camera.yaw = rotation.yaw;
                 renderer.camera.pitch = rotation.pitch;
             }
-            self.entity_tick(renderer, delta, game.focused, *self.dead.read());
         }
+        self.entity_tick(/*renderer, */delta, game.focused, *self.dead.read());
 
         *self.tick_timer.write() += delta;
         while *self.tick_timer.read() >= 3.0 && self.is_connected() {
@@ -1033,7 +1034,7 @@ impl Server {
         }
     }
 
-    fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64, focused: bool, dead: bool) {
+    fn entity_tick(&self, /*renderer: &mut render::Renderer, */delta: f64, focused: bool, dead: bool) {
         let entities = self.entities.clone();
         let mut entities = entities.write();
         {
@@ -1048,14 +1049,18 @@ impl Server {
             self.disconnect_data.clone().write().just_disconnected = false;
             *self.entity_tick_timer.write() += delta;
             while *self.entity_tick_timer.read() >= 3.0 {
-                println!("pre run!");
+                /*println!("pre run!");
                 let schedule = entities.schedule.clone();
                 println!("run!");
-                schedule.write().run(&mut entities.world);
+                schedule.write().run(&mut entities.world);*/
                 *self.entity_tick_timer.write() -= 3.0;
             }
-            println!("finished run!");
-            let world = self.world.clone();
+            // println!("pre run!");
+            let schedule = entities.schedule.clone();
+            // println!("run!");
+            schedule.write().run(&mut entities.world);
+            // println!("finished run!");
+            // let world = self.world.clone();
             /*self.entities
                 .clone()
                 .write()
