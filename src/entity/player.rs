@@ -34,7 +34,7 @@ pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut Syste
         .add_system(update_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(added_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(removed_zombie.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
-        /*.add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render))*/; // TODO: Readd!
+        .add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render));
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
 }
@@ -536,9 +536,8 @@ impl PlayerMovement {
     }
 }
 
-/* // TODO: Readd!
-pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc<ScreenSystem>>, mut commands: Commands, mut query: Query<(Entity, &mut PlayerMovement, &mut Position, &mut Velocity, &Bounds, &Rotation, &GameMode, Option<&Gravity>), (Without<PlayerMovement>, With<Gravity>)>) {
-    for (entity, mut movement, mut position, mut velocity, bounds, rotation, gravity, gamemode) in query.iter_mut() {
+pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc<ScreenSystem>>, mut commands: Commands, mut query: Query<(Entity, &mut PlayerMovement, &mut TargetPosition, &mut Velocity, &Bounds, &Rotation, &GameMode, Option<&mut Gravity>)/*, (Without<PlayerMovement>, With<Gravity>)*/>) {
+    for (entity, mut movement, mut position, mut velocity, bounds, rotation, gamemode, mut gravity) in query.iter_mut() {
         if movement.flying && gravity.is_some() {
             commands.entity(entity).remove::<Gravity>();
         } else if !movement.flying && gravity.is_none() {
@@ -652,13 +651,13 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
                 // effect when pushing up against walls.
 
                 let (bounds, xhit) =
-                    check_collisions(&**world, position, &last_position, player_bounds);
+                    check_collisions(&**world, &mut position, &last_position, player_bounds);
                 position.position.x = bounds.min.x + 0.3;
                 last_position.x = position.position.x;
 
                 position.position.z = target.z;
                 let (bounds, zhit) =
-                    check_collisions(&**world, position, &last_position, player_bounds);
+                    check_collisions(&**world, &mut position, &last_position, player_bounds);
                 position.position.z = bounds.min.z + 0.3;
                 last_position.z = position.position.z;
 
@@ -679,7 +678,7 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
                             offset as f64 / 16.0,
                             0.0,
                         ));
-                        let (_, hit) = check_collisions(&**world, position, &last_position, mini);
+                        let (_, hit) = check_collisions(&**world, &mut position, &last_position, mini);
                         if !hit {
                             target.y += offset as f64 / 16.0;
                             ox = target.x;
@@ -693,18 +692,18 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
 
                 position.position.y = target.y;
                 let (bounds, yhit) =
-                    check_collisions(&**world, position, &last_position, player_bounds);
+                    check_collisions(&**world, &mut position, &last_position, player_bounds);
                 position.position.y = bounds.min.y;
                 last_position.y = position.position.y;
                 if yhit {
                     velocity.velocity.y = 0.0;
                 }
 
-                if let Some(gravity) = gravity {
+                if let Some(mut gravity) = gravity {
                     let ground =
                         Aabb3::new(Point3::new(-0.3, -0.005, -0.3), Point3::new(0.3, 0.0, 0.3));
                     let prev = gravity.on_ground;
-                    let (_, hit) = check_collisions(&**world, position, &last_position, ground);
+                    let (_, hit) = check_collisions(&**world, &mut position, &last_position, ground);
                     gravity.on_ground = hit;
                     if !prev && gravity.on_ground {
                         movement.did_touch_ground = true;
@@ -713,7 +712,7 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
             }
         }
     }
-}*/
+}
 
 fn calculate_looking_vector(yaw: f64, pitch: f64) -> (f64, f64) {
     let xz = pitch.to_radians().cos();

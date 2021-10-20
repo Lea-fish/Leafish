@@ -51,7 +51,7 @@ use parking_lot::RwLock;
 use rand::{self, Rng};
 use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
-use std::hash::BuildHasherDefault;
+use std::hash::{BuildHasherDefault, Hasher};
 use std::io::Cursor;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -63,7 +63,8 @@ use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::particle::ParticleType;
 use cgmath::Vector3;
 use bevy_ecs::prelude::{Entity, SystemStage, Stage};
-use crate::ecs::Manager;
+use crate::ecs::{Manager, SystemExecStage};
+use bevy_ecs::schedule::{StageLabel, DynHash, DynEq};
 
 pub mod plugin_messages;
 mod sun;
@@ -84,7 +85,7 @@ struct WorldData {
 
 impl Default for WorldData {
     fn default() -> Self {
-        WorldData {
+        Self {
             world_age: 0,
             world_time: 0.0,
             world_time_target: 0.0,
@@ -849,6 +850,7 @@ impl Server {
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
         entity::add_systems(&mut entities, &mut parallel, &mut sync);
+        entities.schedule.clone().write().add_stage("parallel", parallel).add_stage_after("parallel", "sync", sync);
 
         entities.world.insert_resource(entity::GameInfo::new());
         entities.world.insert_resource(world.clone());
