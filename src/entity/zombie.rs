@@ -67,7 +67,9 @@ pub fn update_zombie(game_info: Res<GameInfo>, renderer: Res<Arc<RwLock<Renderer
             .delta;
 
         if let Some(zmodel) = zombie_model.model {
-            let mdl = renderer.clone().write().model.get_model(zmodel).unwrap();
+            let renderer = renderer.clone();
+            let mut renderer = renderer.write();
+            let mdl = renderer.model.get_model(zmodel).unwrap();
 
             mdl.block_light = light.block_light;
             mdl.sky_light = light.sky_light;

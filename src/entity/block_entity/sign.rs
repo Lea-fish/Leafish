@@ -51,11 +51,13 @@ pub struct SignInfo {
 pub fn render_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position)>) {
     for (mut info, position) in query.iter_mut() {
         if info.dirty {
-            remove_sign(*renderer, &mut *info);
-            add_sign(*renderer, *world, &mut *info, position);
+            remove_sign(renderer.clone(), &mut *info);
+            add_sign(renderer.clone(), world.clone(), &mut *info, position);
         }
         if let Some(model) = info.model {
-            let mdl = renderer.clone().write().model.get_model(model).unwrap();
+            let renderer = renderer.clone();
+            let mut renderer = renderer.write();
+            let mdl = renderer.model.get_model(model).unwrap();
             mdl.block_light = world.get_block_light(*position) as f32;
             mdl.sky_light = world.get_sky_light(*position) as f32;
         }
@@ -64,13 +66,13 @@ pub fn render_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::w
 
 pub fn on_add_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position)>) {
    for (mut info, position) in query.iter_mut() {
-       add_sign(*renderer, *world, &mut *info, position);
+       add_sign(renderer.clone(), world.clone(), &mut *info, position);
    }
 }
 
 pub fn on_sign_remove(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedComponents<SignInfo>, mut query: Query<(&mut SignInfo)>) {
     for (mut info) in query.iter_mut() {
-        remove_sign(*renderer, &mut *info);
+        remove_sign(renderer.clone(), &mut *info);
     }
 }
 
@@ -146,11 +148,13 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
     for (i, line) in info.lines.iter().enumerate() {
         const Y_SCALE: f32 = (6.0 / 16.0) / 4.0;
         const X_SCALE: f32 = Y_SCALE / 16.0;
+        let renderer = renderer.clone();
+        let mut renderer = renderer.write();
         let mut state = FormatState {
             width: 0.0,
             offset: 0.0,
             text: Vec::new(),
-            renderer: &mut *renderer.clone().write(),
+            renderer: &mut renderer,
             y_scale: Y_SCALE,
             x_scale: X_SCALE,
         };
@@ -164,28 +168,28 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
         verts.extend_from_slice(&state.text);
     }
 
-    let model = renderer.clone().write().model.create_model(model::DEFAULT, vec![verts]);
+    let renderer = renderer.clone();
+    let mut renderer = renderer.write();
+    let model = renderer.model.create_model(model::DEFAULT, vec![verts]);
 
-    {
-        let mdl = renderer.clone().write().model.get_model(model).unwrap();
-        mdl.radius = 2.0;
-        mdl.x = position.x as f32 + 0.5;
-        mdl.y = position.y as f32 + 0.5;
-        mdl.z = position.z as f32 + 0.5;
-        mdl.matrix[0] = Matrix4::from(Decomposed {
-            scale: 1.0,
-            rot: Quaternion::from_angle_y(Rad(info.rotation as f32)),
-            disp: Vector3::new(
-                position.x as f32 + 0.5,
-                -position.y as f32 - 0.5,
-                position.z as f32 + 0.5,
-            ),
-        }) * Matrix4::from_translation(Vector3::new(
-            info.offset_x as f32,
-            -info.offset_y as f32,
-            info.offset_z as f32,
-        ));
-    }
+    let mdl = renderer.model.get_model(model).unwrap();
+    mdl.radius = 2.0;
+    mdl.x = position.x as f32 + 0.5;
+    mdl.y = position.y as f32 + 0.5;
+    mdl.z = position.z as f32 + 0.5;
+    mdl.matrix[0] = Matrix4::from(Decomposed {
+        scale: 1.0,
+        rot: Quaternion::from_angle_y(Rad(info.rotation as f32)),
+        disp: Vector3::new(
+            position.x as f32 + 0.5,
+            -position.y as f32 - 0.5,
+            position.z as f32 + 0.5,
+        ),
+    }) * Matrix4::from_translation(Vector3::new(
+        info.offset_x as f32,
+        -info.offset_y as f32,
+        info.offset_z as f32,
+    ));
 
     info.model = Some(model);
 }

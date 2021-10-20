@@ -43,12 +43,12 @@ pub fn lerp_position(mut game_info: ResMut<GameInfo>, mut query: Query<(&mut Pos
     }
 }
 
-pub fn lerp_rotation(mut game_info: ResMut<GameInfo>, mut query: Query<(&mut Rotation, &TargetRotation)>) {
+pub fn lerp_rotation(mut game_info: ResMut<GameInfo>, mut query: Query<(&mut Rotation, &mut TargetRotation)>) {
     use std::f64::consts::PI;
     let delta = game_info
         .delta
         .min(5.0);
-    for (mut rot, target_rot) in query.iter_mut() {
+    for (mut rot, mut target_rot) in query.iter_mut() {
         target_rot.yaw = (PI * 2.0 + target_rot.yaw) % (PI * 2.0);
         target_rot.pitch = (PI * 2.0 + target_rot.pitch) % (PI * 2.0);
 

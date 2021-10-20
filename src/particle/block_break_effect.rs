@@ -58,7 +58,9 @@ pub fn effect_updated(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&m
             effect.dirty = false;
         }
         if let Some(model) = effect.model {
-            let mdl = renderer.clone().write().model.get_model(model);
+            let renderer = renderer.clone();
+            let mut renderer = renderer.write();
+            let mdl = renderer.model.get_model(model);
             if let Some(mdl) = mdl {
                 let offset = Vector3::new(
                     effect.position.x as f32,

@@ -65,7 +65,9 @@ pub fn update_slime(game_info: Res<GameInfo>, renderer: Res<Arc<RwLock<Renderer>
        }*/
 
        if let Some(pmodel) = slime_model.model {
-           let mdl = renderer.clone().write().model.get_model(pmodel).unwrap();
+           let renderer = renderer.clone();
+           let mut renderer = renderer.write();
+           let mdl = renderer.model.get_model(pmodel).unwrap();
 
            mdl.block_light = light.block_light;
            mdl.sky_light = light.sky_light;

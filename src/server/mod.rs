@@ -513,10 +513,9 @@ impl Server {
                             if let Some(entity) =
                                 server.entity_map.clone().read().get(&look.entity_id)
                             {
-                                let rotation = server
-                                    .entities
-                                    .clone()
-                                    .write()
+                                let entities = server.entities.clone();
+                                let mut entities = entities.write();
+                                let mut rotation = entities
                                     .world.get_entity_mut(*entity).unwrap().get_mut::<TargetRotation>().unwrap();
                                 rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
                             }
@@ -738,15 +737,20 @@ impl Server {
                             if block_break.stage >= 10 {
                                 server.entities.clone().write().world.despawn(server.active_block_break_anims.remove(&block_break.entity_id).unwrap().1);
                             } else if let Some(anim) = server.active_block_break_anims.clone().get_mut(&block_break.entity_id) {
-                                let mut anim = server.entities.clone().write().world.get_entity_mut(*anim.value()).unwrap();
+                                let entities = server.entities.clone();
+                                let mut entities = entities.write();
+                                let mut anim = entities.world.get_entity_mut(*anim.value()).unwrap();
                                 anim.get_mut::<BlockBreakEffect>().unwrap().update(block_break.stage);
                             } else {
-                                let mut entity = server.entities.clone().write().world.spawn();
+                                let entities = server.entities.clone();
+                                let mut entities = entities.write();
+                                let mut entity = entities.world.spawn();
                                 entity.insert(BlockEffectData {
                                     position: Vector3::new(block_break.location.x as f64, block_break.location.y as f64, block_break.location.z as f64),
                                     status: block_break.stage,
                                 });
-                                let particle = ParticleType::BlockBreak.create_particle(&mut *server.entities.clone().write(), entity.id());
+                                let entity = entity.id();
+                                let particle = ParticleType::BlockBreak.create_particle(&mut entities, entity);
                                 server.active_block_break_anims.clone().insert(block_break.entity_id, particle.unwrap());
                             }
                         }
@@ -962,18 +966,13 @@ impl Server {
 
             // Copy to camera
             if let Some(player) = *self.player.clone().read() {
-                let position = self
-                    .entities
-                    .clone()
-                    .read()
+                let entities = self.entities.read();
+                let position = entities
                     .world
                     .get_entity(player)
                     .unwrap().get::<crate::entity::Position>()
                     .unwrap();
-                let rotation = self
-                    .entities
-                    .clone()
-                    .read()
+                let rotation = entities
                     .world
                     .get_entity(player)
                     .unwrap().get::<crate::entity::Rotation>()
@@ -1031,7 +1030,9 @@ impl Server {
     }
 
     fn entity_tick(&self, renderer: &mut render::Renderer, delta: f64, focused: bool, dead: bool) {
-        let mut game_info = self.entities.clone().read().world.get_resource_mut::<GameInfo>().unwrap();
+        let entities = self.entities.clone();
+        let mut entities = entities.write();
+        let mut game_info = entities.world.get_resource_mut::<GameInfo>().unwrap();
         // Update the game's state for entities to read
         game_info
             .delta = delta;
@@ -1111,43 +1112,41 @@ impl Server {
 
     pub fn minecraft_tick(&self, game: &mut Game) {
         if let Some(player) = *self.player.clone().write() {
-            let movement = self
-                .entities
-                .clone()
-                .write()
-                .world.entity_mut(player)
-                .get_mut::<PlayerMovement>().unwrap();
-            let on_ground = self
-                .entities
-                .clone()
-                .read()
-                .world.entity(player)
-                .get::<Gravity>()
-                .map_or(false, |v| v.on_ground);
-            let position = self
-                .entities
-                .clone()
-                .read()
+            let on_ground = {
+                let entities = self.entities.clone();
+                let mut entities = entities.write();
+                let mut movement = entities
+                    .world.entity_mut(player)
+                    .get_mut::<PlayerMovement>().unwrap();
+                // Force the server to know when touched the ground
+                // otherwise if it happens between ticks the server
+                // will think we are flying.
+                if movement.did_touch_ground {
+                    movement.did_touch_ground = false;
+                    Some(true)
+                } else {
+                    None
+                }
+            }.unwrap_or_else(|| {
+                self
+                    .entities
+                    .read()
+                    .world.entity(player)
+                    .get::<Gravity>()
+                    .map_or(false, |v| v.on_ground)
+            });
+            let entities = self.entities.read();
+
+            let position = entities
                 .world.entity(player)
                 .get::<TargetPosition>()
                 .unwrap();
-            let rotation = self
-                .entities
-                .clone()
-                .read()
+            let rotation = entities
                 .world.entity(player)
                 .get::<crate::entity::Rotation>()
                 .unwrap();
 
-            // Force the server to know when touched the ground
-            // otherwise if it happens between ticks the server
-            // will think we are flying.
-            let on_ground = if movement.did_touch_ground {
-                movement.did_touch_ground = false;
-                true
-            } else {
-                on_ground
-            };
+
 
             // Sync our position to the server
             // Use the smaller packets when possible
@@ -1201,7 +1200,7 @@ impl Server {
         if *focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
             let mut state_changed = false;
             if let Some(player) = *self.player.clone().write() {
-                if let Some(movement) = self
+                if let Some(mut movement) = self
                     .entities
                     .clone()
                     .write()
@@ -1570,10 +1569,9 @@ impl Server {
         let gamemode = GameMode::from_int((gamemode & 0x7) as i32);
         let player = entity::player::create_local(&mut self.entities.clone().write());
         if let Some(info) = self.players.clone().read().get(&self.uuid) {
-            let mut model = self
-                .entities
-                .clone()
-                .write()
+            let entities = self.entities.clone();
+            let mut entities = entities.write();
+            let mut model = entities
                 .world.entity_mut(player)
                 .get_mut::<PlayerModel>()
                 .unwrap();
@@ -1736,23 +1734,23 @@ impl Server {
     ) {
         use std::f64::consts::PI;
         if let Some(entity) = self.entity_map.clone().read().get(&entity_id) {
-            let target_position = self
-                .entities
-                .clone()
-                .write()
-                .world.entity_mut(*entity)
-                .get_mut::<TargetPosition>()
-                .unwrap();
-            let target_rotation = self
-                .entities
-                .clone()
-                .write()
+            {
+                let entities = self.entities.clone();
+                let mut entities = entities.write();
+                let mut target_position = entities
+                    .world.entity_mut(*entity)
+                    .get_mut::<TargetPosition>()
+                    .unwrap();
+                target_position.position.x = x;
+                target_position.position.y = y;
+                target_position.position.z = z;
+            }
+            let entities = self.entities.clone();
+            let mut entities = entities.write();
+            let mut target_rotation = entities
                 .world.entity_mut(*entity)
                 .get_mut::<TargetRotation>()
                 .unwrap();
-            target_position.position.x = x;
-            target_position.position.y = y;
-            target_position.position.z = z;
             target_rotation.yaw = -(yaw / 256.0) * PI * 2.0;
             target_rotation.pitch = -(pitch / 256.0) * PI * 2.0;
         }
@@ -1760,10 +1758,9 @@ impl Server {
 
     fn on_entity_move(&self, entity_move: mapped_packet::play::clientbound::EntityMove) {
         if let Some(entity) = self.entity_map.clone().read().get(&entity_move.entity_id) {
-            let position = self
-                .entities
-                .clone()
-                .write()
+            let entities = self.entities.clone();
+            let mut entities = entities.write();
+            let mut position = entities
                 .world.entity_mut(*entity)
                 .get_mut::<TargetPosition>()
                 .unwrap();
@@ -1776,10 +1773,9 @@ impl Server {
     fn on_entity_look(&self, entity_id: i32, yaw: f64, pitch: f64) {
         use std::f64::consts::PI;
         if let Some(entity) = self.entity_map.clone().read().get(&entity_id) {
-            let rotation = self
-                .entities
-                .clone()
-                .write()
+            let entities = self.entities.clone();
+            let mut entities = entities.write();
+            let mut rotation = entities
                 .world.entity_mut(*entity)
                 .get_mut::<TargetRotation>()
                 .unwrap();
@@ -1799,23 +1795,23 @@ impl Server {
     ) {
         use std::f64::consts::PI;
         if let Some(entity) = self.entity_map.clone().read().get(&entity_id) {
-            let position = self
-                .entities
-                .clone()
-                .write()
+            {
+                let entities = self.entities.clone();
+                let mut entities = entities.write();
+            let mut position = entities
                 .world.entity_mut(*entity)
                 .get_mut::<TargetPosition>()
                 .unwrap();
-            let rotation = self
-                .entities
-                .clone()
-                .write()
+                position.position.x += delta_x;
+                position.position.y += delta_y;
+                position.position.z += delta_z;
+            }
+            let entities = self.entities.clone();
+            let mut entities = entities.write();
+            let mut rotation = entities
                 .world.entity_mut(*entity)
                 .get_mut::<TargetRotation>()
                 .unwrap();
-            position.position.x += delta_x;
-            position.position.y += delta_y;
-            position.position.z += delta_z;
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
             rotation.pitch = -(pitch / 256.0) * PI * 2.0;
         }
@@ -1843,49 +1839,45 @@ impl Server {
                 .get(&uuid)
                 .map_or("MISSING", |v| &v.name),
         );
-        let position = self
-            .entities
-            .clone()
-            .write()
-            .world.entity_mut(entity)
-            .get_mut::<crate::entity::Position>()
-            .unwrap();
-        let target_position = self
-            .entities
-            .clone()
-            .write()
-            .world.entity_mut(entity)
-            .get_mut::<TargetPosition>()
-            .unwrap();
-        let rotation = self
-            .entities
-            .clone()
-            .write()
-            .world.entity_mut(entity)
-            .get_mut::<crate::entity::Rotation>()
-            .unwrap();
-        let target_rotation = self
-            .entities
-            .clone()
-            .write()
+        let entities = self.entities.clone();
+        let mut entities = entities.write();
+        {
+            let mut position = entities
+                .world.entity_mut(entity)
+                .get_mut::<crate::entity::Position>()
+                .unwrap();
+            position.position.x = x;
+            position.position.y = y;
+            position.position.z = z;
+        }
+        {
+            let mut target_position = entities
+                .world.entity_mut(entity)
+                .get_mut::<TargetPosition>()
+                .unwrap();
+            target_position.position.x = x;
+            target_position.position.y = y;
+            target_position.position.z = z;
+        }
+        let (yaw, pitch) = {
+            let mut rotation = entities
+                .world.entity_mut(entity)
+                .get_mut::<crate::entity::Rotation>()
+                .unwrap();
+            rotation.yaw = -(yaw / 256.0) * PI * 2.0;
+            rotation.pitch = -(pitch / 256.0) * PI * 2.0;
+            (rotation.yaw, rotation.pitch)
+        };
+        {
+        let mut target_rotation = entities
             .world.entity_mut(entity)
             .get_mut::<TargetRotation>()
             .unwrap();
-        position.position.x = x;
-        position.position.y = y;
-        position.position.z = z;
-        target_position.position.x = x;
-        target_position.position.y = y;
-        target_position.position.z = z;
-        rotation.yaw = -(yaw / 256.0) * PI * 2.0;
-        rotation.pitch = -(pitch / 256.0) * PI * 2.0;
-        target_rotation.yaw = rotation.yaw;
-        target_rotation.pitch = rotation.pitch;
+        target_rotation.yaw = yaw;
+        target_rotation.pitch = pitch;
+        }
         if let Some(info) = self.players.clone().read().get(&uuid) {
-            let mut model = self
-                .entities
-                .clone()
-                .write()
+            let mut model = entities
                 .world.entity_mut(entity)
                 .get_mut::<PlayerModel>()
                 .unwrap();
@@ -1897,47 +1889,39 @@ impl Server {
     fn on_teleport_player(&self, teleport: mapped_packet::play::clientbound::TeleportPlayer) {
         use std::f64::consts::PI;
         if let Some(player) = *self.player.clone().write() {
-            let position = self
-                .entities
-                .clone()
-                .write()
-                .world.entity_mut(player)
-                .get_mut::<TargetPosition>()
-                .unwrap();
-            let rotation = self
-                .entities
-                .clone()
-                .write()
+            let flags = teleport.flags.unwrap_or(0);
+            let entities = self.entities.clone();
+            let mut entities = entities.write();
+
+            {
+                let mut position = entities
+                    .world.entity_mut(player)
+                    .get_mut::<TargetPosition>()
+                    .unwrap();
+                position.position.x = calculate_relative_teleport(
+                    TeleportFlag::RelX,
+                    flags,
+                    position.position.x,
+                    teleport.x,
+                );
+                position.position.y = calculate_relative_teleport(
+                    TeleportFlag::RelY,
+                    flags,
+                    position.position.y,
+                    teleport.y,
+                );
+                position.position.z = calculate_relative_teleport(
+                    TeleportFlag::RelZ,
+                    flags,
+                    position.position.z,
+                    teleport.z,
+                );
+            }
+            {
+            let mut rotation = entities
                 .world.entity_mut(player)
                 .get_mut::<crate::entity::Rotation>()
                 .unwrap();
-            let velocity = self
-                .entities
-                .clone()
-                .write()
-                .world.entity_mut(player)
-                .get_mut::<crate::entity::Velocity>()
-                .unwrap();
-
-            let flags = teleport.flags.unwrap_or(0);
-            position.position.x = calculate_relative_teleport(
-                TeleportFlag::RelX,
-                flags,
-                position.position.x,
-                teleport.x,
-            );
-            position.position.y = calculate_relative_teleport(
-                TeleportFlag::RelY,
-                flags,
-                position.position.y,
-                teleport.y,
-            );
-            position.position.z = calculate_relative_teleport(
-                TeleportFlag::RelZ,
-                flags,
-                position.position.z,
-                teleport.z,
-            );
             rotation.yaw = calculate_relative_teleport(
                 TeleportFlag::RelYaw,
                 flags,
@@ -1952,6 +1936,12 @@ impl Server {
                 teleport.pitch as f64,
             ) - 180.0)
                 * (PI / 180.0));
+            }
+
+            let mut velocity = entities
+                .world.entity_mut(player)
+                .get_mut::<crate::entity::Velocity>()
+                .unwrap();
 
             if (flags & (TeleportFlag::RelX as u8)) == 0 {
                 velocity.velocity.x = 0.0;
@@ -2144,10 +2134,9 @@ impl Server {
                     // This isn't an issue for other players because this packet
                     // must come before the spawn player packet.
                     if info.uuid == self.uuid {
-                        let mut model = self
-                            .entities
-                            .clone()
-                            .write()
+                        let entities = self.entities.clone();
+                        let mut entities = entities.write();
+                        let mut model = entities
                             .world.entity_mut(self.player.clone().write().unwrap())
                             .get_mut::<entity::player::PlayerModel>()
                             .unwrap();

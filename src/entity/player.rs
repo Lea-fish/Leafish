@@ -34,7 +34,7 @@ pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut Syste
         .add_system(update_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(added_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(removed_zombie.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
-        .add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render));
+        /*.add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render))*/; // TODO: Readd!
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
 }
@@ -134,7 +134,11 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
         }
 
         if let Some(pmodel) = player_model.model {
-            let mdl = renderer.clone().write().model.get_model(pmodel).unwrap();
+            let renderer = renderer.clone();
+            let mut renderer = renderer.write();
+            let cam_x = renderer.camera.pos.x;
+            let cam_z = renderer.camera.pos.z;
+            let mdl = renderer.model.get_model(pmodel).unwrap();
 
             mdl.block_light = light.block_light;
             mdl.sky_light = light.sky_light;
@@ -162,8 +166,8 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
 
             // TODO This sucks
             if player_model.has_name_tag {
-                let ang = (position.position.x - renderer.read().camera.pos.x)
-                    .atan2(position.position.z - renderer.read().camera.pos.z)
+                let ang = (position.position.x - cam_x)
+                    .atan2(position.position.z - cam_z)
                     as f32;
                 mdl.matrix[PlayerModelPart::NameTag as usize] = Matrix4::from(Decomposed {
                     scale: 1.0,
@@ -276,13 +280,13 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
 
 fn player_added(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut PlayerModel), (Added<PlayerModel>)>) {
     for (mut player_model) in query.iter_mut() {
-        add_player(*renderer, &mut *player_model);
+        add_player(renderer.clone(), &mut *player_model);
     }
 }
 
 fn player_removed(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedComponents<PlayerModel>, mut query: Query<(Entity, &mut PlayerModel)>) {
     for (_entity, mut player_model) in query.iter_mut() {
-        remove_player(*renderer, &mut *player_model);
+        remove_player(renderer.clone(), &mut *player_model);
     }
 }
 
@@ -408,13 +412,15 @@ fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
         );
     }
 
+    let renderer = renderer.clone();
+    let mut renderer = renderer.write();
     let mut name_verts = vec![];
     if player_model.has_name_tag {
         let mut state = FormatState {
             width: 0.0,
             offset: 0.0,
             text: Vec::new(),
-            renderer: &mut *renderer.clone().write(),
+            renderer: &mut *renderer,
             y_scale: 0.16,
             x_scale: 0.01,
         };
@@ -442,7 +448,7 @@ fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
         name_verts.extend_from_slice(&state.text);
     }
 
-    player_model.model = Some(renderer.clone().write().model.create_model(
+    player_model.model = Some(renderer.model.create_model(
         model::DEFAULT,
         vec![
             head_verts,
@@ -530,6 +536,7 @@ impl PlayerMovement {
     }
 }
 
+/* // TODO: Readd!
 pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc<ScreenSystem>>, mut commands: Commands, mut query: Query<(Entity, &mut PlayerMovement, &mut Position, &mut Velocity, &Bounds, &Rotation, &GameMode, Option<&Gravity>), (Without<PlayerMovement>, With<Gravity>)>) {
     for (entity, mut movement, mut position, mut velocity, bounds, rotation, gravity, gamemode) in query.iter_mut() {
         if movement.flying && gravity.is_some() {
@@ -706,7 +713,7 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
             }
         }
     }
-}
+}*/
 
 fn calculate_looking_vector(yaw: f64, pitch: f64) -> (f64, f64) {
     let xz = pitch.to_radians().cos();

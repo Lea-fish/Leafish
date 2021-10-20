@@ -607,13 +607,14 @@ fn handle_window_event<T>(
                 window.set_cursor_visible(false);
                 if game.server.is_some() && !*game.server.as_ref().unwrap().clone().dead.read() {
                     if let Some(player) = *game.server.as_ref().unwrap().player.clone().write() {
-                        let rotation = game
+                        let server = game
                             .server
                             .as_ref()
-                            .unwrap()
-                            .entities
-                            .clone()
-                            .write()
+                            .unwrap();
+                        let entities = server.entities.clone();
+                        let mut entities = entities.write();
+                        let mut rotation =
+                        entities
                             .world.entity_mut(player).get_mut::<Rotation>().unwrap(); // TODO: This panicked because of unwrap, check why!
                         rotation.yaw -= rx;
                         rotation.pitch -= ry;
