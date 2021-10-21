@@ -118,7 +118,11 @@ impl PlayerModel {
     pub fn set_skin(&mut self, skin: Option<String>) {
         if *self.skin_url.lock() != skin {
             println!("update skin!");
-            *self.skin_url.lock() = skin;
+            if let Some(skin) = skin {
+                self.skin_url.lock().replace(skin);
+            } else {
+                self.skin_url.lock().take();
+            }
             self.dirty = true;
         }
     }
@@ -284,9 +288,11 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
     }
 }
 
-pub struct CleanupManager {
+#[derive(Default)]
+pub struct CleanupManager { // This thing's purpose is to workaround some missing features and bugs in bevy
 
     pub cleanup_map: Arc<Mutex<HashMap<Entity, Box<dyn Fn() + Send>>>>,
+    pub last_player_cleanup_idx: usize,
 
 }
 
@@ -314,7 +320,7 @@ pub fn player_added(cleanup_manager: Res<CleanupManager>, renderer: Res<Arc<RwLo
 }
 
 // TODO: Use Arc<DashMap<Entity, Fn>> as a workaround
-pub fn player_removed(cleanup_manager: Res<CleanupManager>, mut removed: RemovedComponents<PlayerModel>) {
+pub fn player_removed(mut cleanup_manager: ResMut<CleanupManager>, mut removed: RemovedComponents<PlayerModel>) {
     /*if removed.iter().size_hint().1.unwrap() != 0 {
         println!("removed smth! {}", removed.iter().size_hint().1.unwrap());
         for (entity, mut player_model) in query.iter_mut() {
@@ -325,14 +331,16 @@ pub fn player_removed(cleanup_manager: Res<CleanupManager>, mut removed: Removed
         }
     }*/
     let cleanup_map = cleanup_manager.cleanup_map.clone();
-    for entity in removed.iter() {
-        println!("trying to cleanup player model... : {:?}", entity);
-        if let Some(cleanup_fn) = cleanup_map.lock().remove(&entity) {
-            println!("cleaned up player model!");
-            cleanup_fn();
+    let removed_count = removed.iter().size_hint().1.unwrap();
+    if (removed_count - cleanup_manager.last_player_cleanup_idx) > 0 {
+        for entity in removed.iter().skip(cleanup_manager.last_player_cleanup_idx) {
+            println!("trying to cleanup player model... : {:?}", entity);
+            if let Some(cleanup_fn) = cleanup_map.lock().remove(&entity) {
+                println!("cleaned up player model!");
+                cleanup_fn();
+            }
         }
-    }
-    if removed.iter().size_hint().1.unwrap() > 0 {
+        cleanup_manager.last_player_cleanup_idx = removed_count;
         println!("cleaned up player model!");
     }
 }

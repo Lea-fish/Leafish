@@ -853,9 +853,7 @@ impl Server {
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
-        entities.world.insert_resource(CleanupManager {
-            cleanup_map: Arc::new(Default::default()),
-        });
+        entities.world.insert_resource(CleanupManager::default());
         entity::add_systems(&mut entities, &mut parallel, &mut sync);
         entities.schedule.clone().write().add_stage("parallel", parallel).add_stage_after("parallel", "sync", sync);
 
