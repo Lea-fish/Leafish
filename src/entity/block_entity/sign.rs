@@ -64,16 +64,17 @@ pub fn render_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::w
     }
 }
 
-pub fn on_add_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position)>) {
+pub fn on_add_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position), (Added<SignInfo>)>) {
    for (mut info, position) in query.iter_mut() {
        add_sign(renderer.clone(), world.clone(), &mut *info, position);
    }
 }
 
 pub fn on_sign_remove(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedComponents<SignInfo>, mut query: Query<(&mut SignInfo)>) {
-    for (mut info) in query.iter_mut() {
+    // TODO: Fix this!
+    /*for (mut info) in query.iter_mut() {
         remove_sign(renderer.clone(), &mut *info);
-    }
+    }*/
 }
 
 fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, info: &mut SignInfo, position: &Position) {
@@ -170,6 +171,7 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
 
     let renderer = renderer.clone();
     let mut renderer = renderer.write();
+    println!("create sign model!");
     let model = renderer.model.create_model(model::DEFAULT, vec![verts]);
 
     let mdl = renderer.model.get_model(model).unwrap();
@@ -196,7 +198,7 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
 
 fn remove_sign(renderer: Arc<RwLock<Renderer>>, info: &mut SignInfo) {
     if let Some(model) = info.model {
-        renderer.clone().write().model.remove_model(model);
+        renderer.clone().write().model.remove_model(&model);
     }
     info.model = None;
 }

@@ -46,7 +46,7 @@ pub fn effect_removed(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&m
     for (mut break_effect) in query.iter_mut() {
         println!("removed particle!");
         if let Some(model) = break_effect.model.take() {
-            renderer.clone().write().model.remove_model(model);
+            renderer.clone().write().model.remove_model(&model);
         }
     }
 }
@@ -80,7 +80,7 @@ pub fn effect_updated(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&m
 
 fn readd_model(renderer: &mut Renderer, effect: &mut BlockBreakEffect) {
     if let Some(model) = effect.model.take() {
-        renderer.model.remove_model(model);
+        renderer.model.remove_model(&model);
     }
     if effect.status > -1 {
         let mut model = vec![];

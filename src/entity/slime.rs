@@ -217,7 +217,7 @@ pub fn added_slime(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut 
 pub fn removed_slime(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut SlimeModel)>) {
     for (mut slime_model) in query.iter_mut() {
         if let Some(model) = slime_model.model.take() {
-            renderer.clone().write().model.remove_model(model);
+            renderer.clone().write().model.remove_model(&model);
         }
     }
 }

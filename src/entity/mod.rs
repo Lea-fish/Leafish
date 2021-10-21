@@ -59,7 +59,7 @@ srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
 */
 
 pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
-    parallel.add_system(systems::update_last_position.system());
+    // parallel.add_system(systems::update_last_position.system());
 
     player::add_systems(m, parallel, sync);
 
@@ -67,10 +67,19 @@ pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut Syste
     sync.add_system(systems::apply_velocity.system().label(SystemExecStage::Normal))
         .add_system(systems::apply_gravity.system().label(SystemExecStage::Normal))
         .add_system(systems::lerp_position.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(systems::lerp_rotation.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
-    parallel.add_system(systems::light_entity.system());
+        .add_system(systems::lerp_rotation.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+
+        .add_system(systems::update_last_position.system().label(SystemExecStage::Normal))
+        .add_system(systems::light_entity.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
+    // parallel.add_system(systems::light_entity.system());
+    println!("added systems!");
 
     block_entity::add_systems(m, parallel, sync);
+}
+
+// TODO: Try to use this universally in ecs to handle cleanup!
+pub struct Cleanup {
+
 }
 
 /// Location of an entity in the world.

@@ -23,7 +23,7 @@ impl SunModel {
         use std::f64::consts::PI;
         let phase = ((world_age / 24000) % 8) as i32;
         if phase != self.last_phase {
-            renderer.model.remove_model(self.moon);
+            renderer.model.remove_model(&self.moon);
             self.moon = SunModel::generate_moon(renderer, phase);
             self.last_phase = phase;
         }
@@ -60,8 +60,8 @@ impl SunModel {
     }
 
     pub fn remove(&mut self, renderer: &mut render::Renderer) {
-        renderer.model.remove_model(self.sun);
-        renderer.model.remove_model(self.moon);
+        renderer.model.remove_model(&self.sun);
+        renderer.model.remove_model(&self.moon);
     }
 
     pub fn generate_sun(renderer: &mut render::Renderer) -> model::ModelKey {

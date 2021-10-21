@@ -29,7 +29,7 @@ impl Info {
     pub fn clear(&mut self, renderer: &mut render::Renderer) {
         self.last_block = block::Air {};
         if let Some(model) = self.model.take() {
-            renderer.model.remove_model(model);
+            renderer.model.remove_model(&model);
         }
     }
 
@@ -40,7 +40,7 @@ impl Info {
         self.last_block = bl;
         self.last_pos = pos;
         if let Some(model) = self.model.take() {
-            renderer.model.remove_model(model);
+            renderer.model.remove_model(&model);
         }
         let mut parts = vec![];
 

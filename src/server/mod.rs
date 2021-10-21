@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::entity;
-use crate::entity::player::{create_local, PlayerMovement, PlayerModel};
+use crate::entity::player::{create_local, PlayerMovement, PlayerModel, CleanupManager};
 use crate::entity::{EntityType, TargetRotation, GameInfo, Gravity, TargetPosition};
 use crate::format;
 use crate::inventory::material::versions::to_material;
@@ -849,13 +849,15 @@ impl Server {
         let mut entities = Manager::new();
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
-        entity::add_systems(&mut entities, &mut parallel, &mut sync);
-        entities.schedule.clone().write().add_stage("parallel", parallel).add_stage_after("parallel", "sync", sync);
-
         entities.world.insert_resource(entity::GameInfo::new());
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
+        entities.world.insert_resource(CleanupManager {
+            cleanup_map: Arc::new(Default::default()),
+        });
+        entity::add_systems(&mut entities, &mut parallel, &mut sync);
+        entities.schedule.clone().write().add_stage("parallel", parallel).add_stage_after("parallel", "sync", sync);
 
         let version = Version::from_id(protocol_version as u32);
         let inventory_context = Arc::new(RwLock::new(InventoryContext::new(

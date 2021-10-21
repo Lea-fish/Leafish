@@ -54,7 +54,7 @@ pub fn added_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut commands: Commands
 pub fn removed_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut ZombieModel)>) {
     for (mut zombie_model) in query.iter_mut() {
         if let Some(model) = zombie_model.model.take() {
-            renderer.clone().write().model.remove_model(model);
+            renderer.clone().write().model.remove_model(&model);
         }
     }
 }

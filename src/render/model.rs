@@ -30,6 +30,20 @@ pub struct CollectionKey(usize);
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ModelKey(CollectionKey, usize);
 
+/*
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ModelHandle {
+
+    key: Option<ModelKey>,
+
+
+}
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DynamicTextureHandle {
+
+}*/
+
 impl Manager {
     pub fn new(greg: &glsl::Registry) -> Manager {
         let mut m = Manager {
@@ -78,6 +92,7 @@ impl Manager {
     }
 
     pub fn create_model(&mut self, ckey: CollectionKey, parts: Vec<Vec<Vertex>>) -> ModelKey {
+        println!("create model!");
         let array = gl::VertexArray::new();
         array.bind();
         self.index_buffer.bind(gl::ELEMENT_ARRAY_BUFFER);
@@ -167,9 +182,14 @@ impl Manager {
         key
     }
 
-    pub fn remove_model(&mut self, key: ModelKey) {
+    pub fn remove_model(&mut self, key: &ModelKey) {
         let collection = &mut self.collections[(key.0).0];
-        collection.models.remove(&key);
+        let removed = collection.models.remove(key);
+        println!("removed model: {} x {} y {} z {}", removed.is_some(),
+                 removed.as_ref().map_or(-1.0, |m| m.x),
+                 removed.as_ref().map_or(-1.0, |m| m.y),
+                 removed.as_ref().map_or(-1.0, |m| m.z)
+        );
     }
 
     fn rebuild_model(model: &mut Model) {

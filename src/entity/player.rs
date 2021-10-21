@@ -18,7 +18,7 @@ use std::hash::BuildHasherDefault;
 use bevy_ecs::prelude::*;
 use crate::ecs::{Manager, SystemExecStage};
 use std::sync::Arc;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use crate::render::Renderer;
 use crate::screen::ScreenSystem;
 use crate::entity::slime::{update_slime, added_slime, removed_slime};
@@ -79,8 +79,8 @@ pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
 }
 
 pub struct PlayerModel {
-    model: Option<model::ModelKey>,
-    skin_url: Option<String>,
+    model: Arc<Mutex<Option<model::ModelKey>>>,
+    skin_url: Arc<Mutex<Option<String>>>,
     dirty: bool,
     name: String,
 
@@ -96,10 +96,10 @@ pub struct PlayerModel {
 }
 
 impl PlayerModel {
-    pub fn new(name: &str, has_head: bool, has_name_tag: bool, first_person: bool) -> PlayerModel {
-        PlayerModel {
-            model: None,
-            skin_url: None,
+    pub fn new(name: &str, has_head: bool, has_name_tag: bool, first_person: bool) -> Self {
+        Self {
+            model: Arc::new(Mutex::new(None)),
+            skin_url: Arc::new(Mutex::new(None)),
             dirty: false,
             name: name.to_owned(),
 
@@ -116,24 +116,29 @@ impl PlayerModel {
     }
 
     pub fn set_skin(&mut self, skin: Option<String>) {
-        self.skin_url = skin;
-        self.dirty = true;
+        if *self.skin_url.lock() != skin {
+            println!("update skin!");
+            *self.skin_url.lock() = skin;
+            self.dirty = true;
+        }
     }
 }
 
 fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<GameInfo>, mut query: Query<(&mut PlayerModel, &Position, &Rotation, &Light)>) {
+    let delta = game_info
+        .delta;
     for (mut player_model, position, rotation, light) in query.iter_mut() {
+        // println!("render player!");
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
-        let delta = game_info
-            .delta;
 
         if player_model.dirty {
+            println!("rerender!!!");
             remove_player(renderer.clone(), &mut *player_model);
             add_player(renderer.clone(), &mut *player_model);
         }
 
-        if let Some(pmodel) = player_model.model {
+        if let Some(pmodel) = *player_model.model.clone().lock() {
             let renderer = renderer.clone();
             let mut renderer = renderer.write();
             let cam_x = renderer.camera.pos.x;
@@ -274,19 +279,61 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
             }
             player_model.time = time;
             player_model.dir = dir;
+           // println!("end tick player!");
         }
     }
 }
 
-fn player_added(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut PlayerModel), (Added<PlayerModel>)>) {
-    for (mut player_model) in query.iter_mut() {
+pub struct CleanupManager {
+
+    pub cleanup_map: Arc<Mutex<HashMap<Entity, Box<dyn Fn() + Send>>>>,
+
+}
+
+pub fn player_added(cleanup_manager: Res<CleanupManager>, renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(Entity, &mut PlayerModel), (Added<PlayerModel>)>) {
+    let cleanup_map = cleanup_manager.cleanup_map.clone();
+    for (entity, mut player_model) in query.iter_mut() {
+        println!("add player!");
         add_player(renderer.clone(), &mut *player_model);
+        let renderer = renderer.clone();
+        let model = player_model.model.clone();
+        let skin_url = player_model.skin_url.clone();
+        cleanup_map.clone().lock().insert(entity, Box::new(move || {
+            let renderer = renderer.clone();
+            let skin_url = skin_url.clone();
+            let model = model.clone();
+            let mut model = model.lock();
+            if let Some(model) = model.take() {
+                renderer.clone().write().model.remove_model(&model);
+                if let Some(url) = skin_url.lock().as_ref() {
+                    renderer.read().get_textures_ref().read().release_skin(url);
+                }
+            }
+        }));
     }
 }
 
-fn player_removed(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedComponents<PlayerModel>, mut query: Query<(Entity, &mut PlayerModel)>) {
-    for (_entity, mut player_model) in query.iter_mut() {
-        remove_player(renderer.clone(), &mut *player_model);
+// TODO: Use Arc<DashMap<Entity, Fn>> as a workaround
+pub fn player_removed(cleanup_manager: Res<CleanupManager>, mut removed: RemovedComponents<PlayerModel>) {
+    /*if removed.iter().size_hint().1.unwrap() != 0 {
+        println!("removed smth! {}", removed.iter().size_hint().1.unwrap());
+        for (entity, mut player_model) in query.iter_mut() {
+            if removed.iter().any(|x| x == entity) {
+                println!("remove player!");
+                remove_player(renderer.clone(), &mut player_model);
+            }
+        }
+    }*/
+    let cleanup_map = cleanup_manager.cleanup_map.clone();
+    for entity in removed.iter() {
+        println!("trying to cleanup player model... : {:?}", entity);
+        if let Some(cleanup_fn) = cleanup_map.lock().remove(&entity) {
+            println!("cleaned up player model!");
+            cleanup_fn();
+        }
+    }
+    if removed.iter().size_hint().1.unwrap() > 0 {
+        println!("cleaned up player model!");
     }
 }
 
@@ -294,7 +341,7 @@ fn player_removed(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedCompone
 fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
     player_model.dirty = false;
 
-    let skin = if let Some(url) = player_model.skin_url.as_ref() {
+    let skin = if let Some(url) = player_model.skin_url.lock().as_ref() {
         let renderer = renderer.read();
         renderer.get_skin(renderer.get_textures_ref(), url)
     } else {
@@ -448,7 +495,8 @@ fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
         name_verts.extend_from_slice(&state.text);
     }
 
-    player_model.model = Some(renderer.model.create_model(
+    println!("create player model!");
+    player_model.model.lock().replace(renderer.model.create_model(
         model::DEFAULT,
         vec![
             head_verts,
@@ -463,9 +511,9 @@ fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
 }
 
 fn remove_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
-    if let Some(model) = player_model.model.take() {
-        renderer.clone().write().model.remove_model(model);
-        if let Some(url) = player_model.skin_url.as_ref() {
+    if let Some(model) = player_model.model.lock().take() {
+        renderer.clone().write().model.remove_model(&model);
+        if let Some(url) = player_model.skin_url.lock().as_ref() {
             renderer.read().get_textures_ref().read().release_skin(url);
         }
     }
