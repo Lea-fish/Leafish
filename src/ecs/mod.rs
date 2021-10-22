@@ -26,10 +26,19 @@ use crate::world;
 use std::sync::Arc;
 use bevy_ecs::prelude::*;
 use parking_lot::RwLock;
+use std::slice::Iter;
+use bevy_ecs::world::WorldId;
+use bevy_ecs::entity::Entities;
+use bevy_ecs::component::{Components, ComponentId};
+use bevy_ecs::archetype::{Archetypes, ArchetypeComponentId};
+use bevy_ecs::storage::{Storages, SparseSet};
+use bevy_ecs::bundle::Bundles;
+use std::sync::atomic::AtomicU32;
 
 // System labels to enforce a run order of our systems
 #[derive(SystemLabel, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SystemExecStage {
+    PreNormal,
     Normal,
     Render,
     RemoveHandling,
@@ -52,6 +61,63 @@ impl Manager {
     }
 
 }
+
+/*
+pub trait RemovedComponentsEntityCollector {
+
+    fn collect_removed(&self) -> Vec<Entity>;
+
+}
+
+impl RemovedComponentsEntityCollector for World {
+    fn collect_removed(&self) -> Vec<Entity> {
+        // TODO: Verify this pointer fiddling isn't UB and verify that it is faster than mem::transmute:copy!
+        /*let ptr: *const World = self;
+        let ptr_tmp: *const World = ptr::null();
+        let ptr_offset = unsafe { ptr_tmp.offset_from(ptr) }.abs();
+        let mut ptr_tmp: *mut WorldClone = ptr::null_mut();
+        let mut ptr: *mut WorldClone = unsafe { ptr_tmp.offset(ptr_offset) };
+        let accessable_world = unsafe { &mut *ptr };*/
+        // SAFETY: World and WorldClone both have the same size, so this is as safe as it can be to access removed_components
+        // although the field is private.
+        println!("sizes: {}, {}, {}", mem::size_of::<World>(), mem::size_of::<WorldClone>(), mem::size_of_val(self));
+        println!("alignments: {}, {}", mem::align_of::<World>(), mem::align_of::<WorldClone>());
+        let accessable_world: WorldClone = unsafe { mem::transmute_copy::<World, WorldClone>(self) }; // TODO: If the approach above is UB, use this one, as it *seems* safer!
+        let removed_components = &self.removed_components;
+        let mut result = vec![];
+        for entities in removed_components.values() {
+            for entity in entities {
+                result.push(entity.clone());
+            }
+        }
+        result
+    }
+}
+
+#[repr(C)]
+struct WorldClone {
+    id: WorldId,
+    pub(crate) entities: Entities,
+    pub(crate) components: Components,
+    pub(crate) archetypes: Archetypes,
+    pub(crate) storages: Storages,
+    pub(crate) bundles: Bundles,
+    pub(crate) removed_components: SparseSet<ComponentId, Vec<Entity>>,
+    /// Access cache used by [WorldCell].
+    pub(crate) archetype_component_access: ArchetypeComponentAccessClone,
+    main_thread_validator: MainThreadValidatorClone,
+    pub(crate) change_tick: AtomicU32,
+    pub(crate) last_change_tick: u32,
+}
+
+struct ArchetypeComponentAccessClone {
+    access: SparseSet<ArchetypeComponentId, usize>,
+}
+
+struct MainThreadValidatorClone {
+    main_thread: std::thread::ThreadId,
+}*/
+
 /*
 
 /// Used to reference an entity.

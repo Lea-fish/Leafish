@@ -23,9 +23,12 @@ use crate::render::Renderer;
 use crate::screen::ScreenSystem;
 use crate::entity::slime::{update_slime, added_slime, removed_slime};
 use crate::entity::zombie::{update_zombie, added_zombie, removed_zombie};
+use bevy_ecs::system::Command;
 
 pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) { // TODO: Check sync/async usage!
-    sync.add_system(update_render_players.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+    sync
+        .add_system(clear_removed.system().label(SystemExecStage::PreNormal).before(SystemExecStage::Normal))
+        .add_system(update_render_players.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(player_added.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(player_removed.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
         .add_system(update_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
@@ -37,6 +40,28 @@ pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut Syste
         .add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render));
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
+}
+
+pub fn clear_removed(mut commands: Commands) {
+    commands.clear_removed_entities();
+}
+
+struct ClearRemovedEntities {}
+
+impl Command for ClearRemovedEntities {
+    fn write(self: Box<Self>, world: &mut World) {
+        world.clear_trackers();
+    }
+}
+
+trait RemovedEntityClearing {
+    fn clear_removed_entities(&mut self);
+}
+
+impl<'a> RemovedEntityClearing for Commands<'a> {
+    fn clear_removed_entities(&mut self) {
+        self.add(ClearRemovedEntities {})
+    }
 }
 
 pub fn create_local(m: &mut Manager) -> Entity {
@@ -332,8 +357,8 @@ pub fn player_removed(mut cleanup_manager: ResMut<CleanupManager>, mut removed: 
     }*/
     let cleanup_map = cleanup_manager.cleanup_map.clone();
     let removed_count = removed.iter().size_hint().1.unwrap();
-    if (removed_count - cleanup_manager.last_player_cleanup_idx) > 0 {
-        for entity in removed.iter().skip(cleanup_manager.last_player_cleanup_idx) {
+    if (removed_count /*- cleanup_manager.last_player_cleanup_idx*/) > 0 {
+        for entity in removed.iter().skip(0/*cleanup_manager.last_player_cleanup_idx*/) {
             println!("trying to cleanup player model... : {:?}", entity);
             if let Some(cleanup_fn) = cleanup_map.lock().remove(&entity) {
                 println!("cleaned up player model!");

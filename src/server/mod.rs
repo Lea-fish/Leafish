@@ -1068,6 +1068,20 @@ impl Server {
                 .write()
                 .render_tick(&world, renderer, focused, dead);*/
             // TODO: Make render systems run only once!
+            /*{
+                let cleanup_manager = entities.world.get_resource::<CleanupManager>().unwrap();
+                let cleanup_map = cleanup_manager.cleanup_map.clone();
+                let mut cleanup_map = cleanup_map.lock();
+                println!("attempting to start cleaning up models!");
+                for removed in entities.world.collect_removed() {
+                    println!("trying to cleanup model... : {:?}", removed);
+                    if let Some(cleanup_fn) = cleanup_map.remove(&removed) {
+                        println!("cleaned up model!");
+                        cleanup_fn();
+                    }
+                }
+            }
+            entities.world.clear_trackers();*/
         }
     }
 
