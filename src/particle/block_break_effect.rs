@@ -10,6 +10,7 @@ use bevy_ecs::prelude::*;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
+#[derive(Component)]
 pub struct BlockBreakEffect {
     status: i8, // 0 - 9(textures) | -1 - 10(actual values sent)(-1,0,1,...,9,10,-1)
     dirty: bool,
@@ -102,6 +103,7 @@ fn readd_model(renderer: &mut Renderer, effect: &mut BlockBreakEffect) {
     }
 }
 
+#[derive(Component)]
 pub struct BlockEffectData {
     pub(crate) position: Vector3<f64>,
     pub(crate) status: i8,

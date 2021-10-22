@@ -10,7 +10,10 @@ use bevy_ecs::prelude::*;
 
 pub mod block_break_effect;
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Component, Copy, Clone)]
+pub struct EntityMetadata(pub Entity);
+
+#[derive(Component, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum ParticleType {
 
     BlockBreak,
@@ -22,7 +25,7 @@ impl ParticleType {
     pub fn create_particle(
         &self,
         m: &mut Manager,
-        metadata: Entity,
+        metadata: EntityMetadata,
     ) -> Option<Entity> {
         if self.supported() {
             let ret = self.create_particle_internally(m, metadata);
@@ -35,7 +38,7 @@ impl ParticleType {
     pub fn create_particle_custom_model(
         &self,
         m: &mut Manager,
-        metadata: Entity,
+        metadata: EntityMetadata,
     ) -> Option<Entity> {
         if self.supported() {
             return Some(self.create_particle_internally(m, metadata));
@@ -46,7 +49,7 @@ impl ParticleType {
     fn create_particle_internally(
         &self,
         m: &mut Manager,
-        metadata: Entity
+        metadata: EntityMetadata
     ) -> Entity {
         let mut entity = m.world.spawn();
         entity.insert(metadata)
@@ -54,7 +57,7 @@ impl ParticleType {
         entity.id()
     }
 
-    fn create_model(&self, m: &mut Manager, entity: Entity, metadata: Entity) {
+    fn create_model(&self, m: &mut Manager, entity: Entity, metadata: EntityMetadata) {
         match self {
             ParticleType::BlockBreak => {
                 /*let effect = BlockBreakEffect::new(m, metadata);

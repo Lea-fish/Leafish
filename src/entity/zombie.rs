@@ -12,6 +12,7 @@ use crate::ecs::Manager;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
+#[derive(Component)]
 pub struct ZombieModel {
     model: Option<model::ModelKey>,
     name: Option<String>,
@@ -35,7 +36,7 @@ impl ZombieModel {
     }
 }
 
-pub fn added_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut commands: Commands, mut query: Query<(Entity, &mut ZombieModel)>) {
+pub fn added_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut commands: Commands, mut query: Query<(Entity, &mut ZombieModel), (Added<ZombieModel>)>) {
     for (entity, mut zombie_model) in query.iter_mut() {
         commands.entity(entity).insert(Bounds::new(Aabb3::new(
             Point3::new(-0.3, 0.0, -0.3),
@@ -52,11 +53,11 @@ pub fn added_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut commands: Commands
 }
 
 pub fn removed_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut ZombieModel)>) {
-    for (mut zombie_model) in query.iter_mut() {
+    /*for (mut zombie_model) in query.iter_mut() {
         if let Some(model) = zombie_model.model.take() {
             renderer.clone().write().model.remove_model(&model);
         }
-    }
+    }*/
 }
 
 pub fn update_zombie(game_info: Res<GameInfo>, renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut ZombieModel, &Position, &Rotation, &Light)>) {

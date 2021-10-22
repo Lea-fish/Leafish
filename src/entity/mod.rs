@@ -83,7 +83,7 @@ pub struct Cleanup {
 }
 
 /// Location of an entity in the world.
-#[derive(Debug)]
+#[derive(Component, Debug)]
 pub struct Position {
     pub position: Vector3<f64>,
     pub last_position: Vector3<f64>,
@@ -104,7 +104,7 @@ impl Position {
     }
 }
 
-#[derive(Debug)]
+#[derive(Component, Debug)]
 pub struct TargetPosition {
     pub position: Vector3<f64>,
     pub lerp_amount: f64,
@@ -124,7 +124,7 @@ impl TargetPosition {
 }
 
 /// Velocity of an entity in the world.
-#[derive(Debug)]
+#[derive(Component, Debug)]
 pub struct Velocity {
     pub velocity: Vector3<f64>,
 }
@@ -142,7 +142,7 @@ impl Velocity {
 }
 
 /// Rotation of an entity in the world
-#[derive(Debug)]
+#[derive(Component, Debug)]
 pub struct Rotation {
     pub yaw: f64,
     pub pitch: f64,
@@ -157,7 +157,7 @@ impl Rotation {
         Rotation::new(0.0, 0.0)
     }
 }
-#[derive(Debug)]
+#[derive(Component, Debug)]
 pub struct TargetRotation {
     pub yaw: f64,
     pub pitch: f64,
@@ -173,7 +173,7 @@ impl TargetRotation {
     }
 }
 
-#[derive(Default)]
+#[derive(Component, Default)]
 pub struct Gravity {
     pub on_ground: bool,
 }
@@ -184,6 +184,7 @@ impl Gravity {
     }
 }
 
+#[derive(Component)]
 pub struct Bounds {
     pub bounds: Aabb3<f64>,
 }
@@ -205,7 +206,7 @@ impl GameInfo {
     }
 }
 
-#[derive(Default)]
+#[derive(Component, Default)]
 pub struct Light {
     pub block_light: f32,
     pub sky_light: f32,
@@ -217,7 +218,7 @@ impl Light {
     }
 }
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[derive(Component, Copy, Clone, Eq, PartialEq, Hash, Debug)]
 pub enum EntityType {
     DroppedItem,
     ExperienceOrb,

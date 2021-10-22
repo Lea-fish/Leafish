@@ -60,10 +60,10 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 use dashmap::DashMap;
 use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
-use crate::particle::ParticleType;
+use crate::particle::{ParticleType, EntityMetadata};
 use cgmath::Vector3;
 use bevy_ecs::prelude::{Entity, SystemStage, Stage};
-use crate::ecs::{Manager, SystemExecStage};
+use crate::ecs::{Manager, SystemExecStage, RemovedComponentsEntityCollector};
 use bevy_ecs::schedule::{StageLabel, DynHash, DynEq};
 
 pub mod plugin_messages;
@@ -751,7 +751,7 @@ impl Server {
                                     status: block_break.stage,
                                 });
                                 let entity = entity.id();
-                                let particle = ParticleType::BlockBreak.create_particle(&mut entities, entity);
+                                let particle = ParticleType::BlockBreak.create_particle(&mut entities, EntityMetadata(entity));
                                 server.active_block_break_anims.clone().insert(block_break.entity_id, particle.unwrap());
                             }
                         }
@@ -1060,6 +1060,19 @@ impl Server {
             // println!("pre run!");
             let schedule = entities.schedule.clone();
             // println!("run!");
+            {
+                let cleanup_manager = entities.world.get_resource::<CleanupManager>().unwrap();
+                let cleanup_map = cleanup_manager.cleanup_map.clone();
+                let mut cleanup_map = cleanup_map.lock();
+                for removed in entities.world.collect_removed() {
+                    println!("trying to cleanup model... : {:?}", removed);
+                    if let Some(cleanup_fn) = cleanup_map.remove(&removed) {
+                        println!("cleaned up model!");
+                        cleanup_fn();
+                    }
+                }
+            }
+            entities.world.clear_trackers();
             schedule.write().run(&mut entities.world);
             // println!("finished run!");
             // let world = self.world.clone();
@@ -1072,7 +1085,6 @@ impl Server {
                 let cleanup_manager = entities.world.get_resource::<CleanupManager>().unwrap();
                 let cleanup_map = cleanup_manager.cleanup_map.clone();
                 let mut cleanup_map = cleanup_map.lock();
-                println!("attempting to start cleaning up models!");
                 for removed in entities.world.collect_removed() {
                     println!("trying to cleanup model... : {:?}", removed);
                     if let Some(cleanup_fn) = cleanup_map.remove(&removed) {

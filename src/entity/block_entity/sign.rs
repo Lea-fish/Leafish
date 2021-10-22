@@ -7,19 +7,21 @@ use crate::world;
 use crate::world::block::Block;
 use bevy_ecs::prelude::*;
 use crate::render::Renderer;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use std::sync::Arc;
 use crate::ecs::SystemExecStage;
+use crate::entity::player::CleanupManager;
 
 pub fn add_systems(m: &mut ecs::Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
     sync.add_system(render_sign.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(on_add_sign.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(on_sign_remove.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render));
+        .add_system(on_sign_remove.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
+        .add_system(on_sign_remove.system().label(SystemExecStage::PreClearRemoveHandling).before(SystemExecStage::PreNormal));
 }
 
 pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
     m.world.get_entity_mut(e).unwrap().insert(SignInfo {
-        model: None,
+        model: Arc::new(Mutex::new(None)),
         lines: [
             Component::Text(format::TextComponent::new("")),
             Component::Text(format::TextComponent::new("")),
@@ -35,8 +37,9 @@ pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
     });
 }
 
+#[derive(Component)]
 pub struct SignInfo {
-    model: Option<model::ModelKey>,
+    model: Arc<Mutex<Option<model::ModelKey>>>,
 
     pub lines: [format::Component; 4],
     pub dirty: bool,
@@ -54,7 +57,7 @@ pub fn render_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::w
             remove_sign(renderer.clone(), &mut *info);
             add_sign(renderer.clone(), world.clone(), &mut *info, position);
         }
-        if let Some(model) = info.model {
+        if let Some(model) = *info.model.lock() {
             let renderer = renderer.clone();
             let mut renderer = renderer.write();
             let mdl = renderer.model.get_model(model).unwrap();
@@ -64,17 +67,35 @@ pub fn render_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::w
     }
 }
 
-pub fn on_add_sign(renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position), (Added<SignInfo>)>) {
-   for (mut info, position) in query.iter_mut() {
+pub fn on_add_sign(cleanup_manager: Res<CleanupManager>, renderer: Res<Arc<RwLock<Renderer>>>, world: Res<Arc<crate::world::World>>, mut query: Query<(Entity, &mut SignInfo, &Position), (Added<SignInfo>)>) {
+    let cleanup_map = cleanup_manager.cleanup_map.clone();
+    for (entity, mut info, position) in query.iter_mut() {
        add_sign(renderer.clone(), world.clone(), &mut *info, position);
+        let model = info.model.clone();
+        let renderer = renderer.clone();
+        cleanup_map.clone().lock().insert(entity, Box::new(move || {
+            let renderer = renderer.clone();
+            let model = model.clone();
+            let mut model = model.lock();
+            if let Some(model) = model.take() {
+                renderer.clone().write().model.remove_model(&model);
+            }
+        }));
    }
 }
 
-pub fn on_sign_remove(renderer: Res<Arc<RwLock<Renderer>>>, _removed: RemovedComponents<SignInfo>, mut query: Query<(&mut SignInfo)>) {
-    // TODO: Fix this!
-    /*for (mut info) in query.iter_mut() {
-        remove_sign(renderer.clone(), &mut *info);
-    }*/
+pub fn on_sign_remove(mut cleanup_manager: ResMut<CleanupManager>, removed: RemovedComponents<SignInfo>) {
+    let cleanup_map = cleanup_manager.cleanup_map.clone();
+    let removed_count = removed.iter().size_hint().1.unwrap();
+    if removed_count> 0 {
+        for entity in removed.iter() {
+            if let Some(cleanup_fn) = cleanup_map.lock().remove(&entity) {
+                cleanup_fn();
+            } else {
+                println!("Failed to cleanup sign model!");
+            }
+        }
+    }
 }
 
 fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, info: &mut SignInfo, position: &Position) {
@@ -171,7 +192,6 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
 
     let renderer = renderer.clone();
     let mut renderer = renderer.write();
-    println!("create sign model!");
     let model = renderer.model.create_model(model::DEFAULT, vec![verts]);
 
     let mdl = renderer.model.get_model(model).unwrap();
@@ -193,12 +213,11 @@ fn add_sign(renderer: Arc<RwLock<Renderer>>, world: Arc<crate::world::World>, in
         info.offset_z as f32,
     ));
 
-    info.model = Some(model);
+    info.model.lock().replace(model);
 }
 
 fn remove_sign(renderer: Arc<RwLock<Renderer>>, info: &mut SignInfo) {
-    if let Some(model) = info.model {
+    if let Some(model) = info.model.clone().lock().take() {
         renderer.clone().write().model.remove_model(&model);
     }
-    info.model = None;
 }

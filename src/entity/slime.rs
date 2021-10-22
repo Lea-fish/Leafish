@@ -11,6 +11,7 @@ use bevy_ecs::prelude::*;
 use std::sync::Arc;
 use parking_lot::RwLock;
 
+#[derive(Component)]
 pub struct SlimeModel {
     model: Option<model::ModelKey>,
     _name: String,

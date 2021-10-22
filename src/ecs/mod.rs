@@ -38,6 +38,7 @@ use std::sync::atomic::AtomicU32;
 // System labels to enforce a run order of our systems
 #[derive(SystemLabel, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SystemExecStage {
+    PreClearRemoveHandling, // TODO: This is a mess, clean it up as soon as bevy fixed the various remove detection issues!
     PreNormal,
     Normal,
     Render,
@@ -62,7 +63,7 @@ impl Manager {
 
 }
 
-/*
+
 pub trait RemovedComponentsEntityCollector {
 
     fn collect_removed(&self) -> Vec<Entity>;
@@ -80,20 +81,23 @@ impl RemovedComponentsEntityCollector for World {
         let accessable_world = unsafe { &mut *ptr };*/
         // SAFETY: World and WorldClone both have the same size, so this is as safe as it can be to access removed_components
         // although the field is private.
-        println!("sizes: {}, {}, {}", mem::size_of::<World>(), mem::size_of::<WorldClone>(), mem::size_of_val(self));
-        println!("alignments: {}, {}", mem::align_of::<World>(), mem::align_of::<WorldClone>());
-        let accessable_world: WorldClone = unsafe { mem::transmute_copy::<World, WorldClone>(self) }; // TODO: If the approach above is UB, use this one, as it *seems* safer!
+        // println!("sizes: {}, {}, {}", mem::size_of::<World>(), mem::size_of::<WorldClone>(), mem::size_of_val(self));
+        // println!("alignments: {}, {}", mem::align_of::<World>(), mem::align_of::<WorldClone>());
+        // let accessable_world: WorldClone = unsafe { mem::transmute_copy::<World, WorldClone>(self) }; // TODO: If the approach above is UB, use this one, as it *seems* safer!
         let removed_components = &self.removed_components;
         let mut result = vec![];
         for entities in removed_components.values() {
             for entity in entities {
-                result.push(entity.clone());
+                if !result.contains(entity) {
+                    result.push(entity.clone());
+                }
             }
         }
         result
     }
 }
 
+/*
 #[repr(C)]
 struct WorldClone {
     id: WorldId,

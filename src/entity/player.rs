@@ -27,41 +27,15 @@ use bevy_ecs::system::Command;
 
 pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) { // TODO: Check sync/async usage!
     sync
-        .add_system(clear_removed.system().label(SystemExecStage::PreNormal).before(SystemExecStage::Normal))
         .add_system(update_render_players.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(player_added.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(player_removed.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
         .add_system(update_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(added_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(removed_slime.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
         .add_system(update_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(added_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(removed_zombie.system().label(SystemExecStage::RemoveHandling).after(SystemExecStage::Render))
         .add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render));
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
-}
-
-pub fn clear_removed(mut commands: Commands) {
-    commands.clear_removed_entities();
-}
-
-struct ClearRemovedEntities {}
-
-impl Command for ClearRemovedEntities {
-    fn write(self: Box<Self>, world: &mut World) {
-        world.clear_trackers();
-    }
-}
-
-trait RemovedEntityClearing {
-    fn clear_removed_entities(&mut self);
-}
-
-impl<'a> RemovedEntityClearing for Commands<'a> {
-    fn clear_removed_entities(&mut self) {
-        self.add(ClearRemovedEntities {})
-    }
 }
 
 pub fn create_local(m: &mut Manager) -> Entity {
@@ -103,6 +77,7 @@ pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
     entity.id()
 }
 
+#[derive(Component)]
 pub struct PlayerModel {
     model: Arc<Mutex<Option<model::ModelKey>>>,
     skin_url: Arc<Mutex<Option<String>>>,
@@ -162,7 +137,6 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
         use std::f64::consts::PI as PI64;
 
         if player_model.dirty {
-            println!("rerender!!!");
             remove_player(renderer.clone(), &mut *player_model);
             add_player(renderer.clone(), &mut *player_model);
         }
@@ -317,20 +291,17 @@ fn update_render_players(renderer: Res<Arc<RwLock<Renderer>>>, game_info: Res<Ga
 pub struct CleanupManager { // This thing's purpose is to workaround some missing features and bugs in bevy
 
     pub cleanup_map: Arc<Mutex<HashMap<Entity, Box<dyn Fn() + Send>>>>,
-    pub last_player_cleanup_idx: usize,
 
 }
 
 pub fn player_added(cleanup_manager: Res<CleanupManager>, renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(Entity, &mut PlayerModel), (Added<PlayerModel>)>) {
     let cleanup_map = cleanup_manager.cleanup_map.clone();
     for (entity, mut player_model) in query.iter_mut() {
-        println!("add player!");
-        add_player(renderer.clone(), &mut *player_model);
-        let renderer = renderer.clone();
+        let tmp_renderer = renderer.clone();
         let model = player_model.model.clone();
         let skin_url = player_model.skin_url.clone();
         cleanup_map.clone().lock().insert(entity, Box::new(move || {
-            let renderer = renderer.clone();
+            let renderer = tmp_renderer.clone();
             let skin_url = skin_url.clone();
             let model = model.clone();
             let mut model = model.lock();
@@ -341,32 +312,23 @@ pub fn player_added(cleanup_manager: Res<CleanupManager>, renderer: Res<Arc<RwLo
                 }
             }
         }));
+        add_player(renderer.clone(), &mut *player_model);
     }
 }
 
 // TODO: Use Arc<DashMap<Entity, Fn>> as a workaround
 pub fn player_removed(mut cleanup_manager: ResMut<CleanupManager>, mut removed: RemovedComponents<PlayerModel>) {
-    /*if removed.iter().size_hint().1.unwrap() != 0 {
-        println!("removed smth! {}", removed.iter().size_hint().1.unwrap());
-        for (entity, mut player_model) in query.iter_mut() {
-            if removed.iter().any(|x| x == entity) {
-                println!("remove player!");
-                remove_player(renderer.clone(), &mut player_model);
-            }
-        }
-    }*/
     let cleanup_map = cleanup_manager.cleanup_map.clone();
     let removed_count = removed.iter().size_hint().1.unwrap();
-    if (removed_count /*- cleanup_manager.last_player_cleanup_idx*/) > 0 {
-        for entity in removed.iter().skip(0/*cleanup_manager.last_player_cleanup_idx*/) {
-            println!("trying to cleanup player model... : {:?}", entity);
+    if removed_count > 0 {
+        for entity in removed.iter() {
             if let Some(cleanup_fn) = cleanup_map.lock().remove(&entity) {
-                println!("cleaned up player model!");
                 cleanup_fn();
+                println!("Cleaned up player model {:?}", entity);
+            } else {
+                println!("Failed to cleanup player model {:?}", entity);
             }
         }
-        cleanup_manager.last_player_cleanup_idx = removed_count;
-        println!("cleaned up player model!");
     }
 }
 
@@ -528,7 +490,6 @@ fn add_player(renderer: Arc<RwLock<Renderer>>, player_model: &mut PlayerModel) {
         name_verts.extend_from_slice(&state.text);
     }
 
-    println!("create player model!");
     player_model.model.lock().replace(renderer.model.create_model(
         model::DEFAULT,
         vec![
@@ -563,7 +524,7 @@ enum PlayerModelPart {
     // Cape = 7, // TODO
 }
 
-#[derive(Default)]
+#[derive(Component, Default)]
 pub struct PlayerMovement {
     pub flying: bool,
     pub want_to_fly: bool,
