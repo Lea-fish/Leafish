@@ -116,7 +116,7 @@ impl ServerList {
 
     fn reload_server_list(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
         let elements = self.elements.as_mut().unwrap();
@@ -384,7 +384,7 @@ impl ServerList {
         serde_json::to_writer_pretty(&mut out, &servers_info).unwrap();
     }
 
-    fn init_list(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn init_list(&mut self, renderer: Arc<render::Renderer>, ui_container: &mut ui::Container) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         // Refresh the server list
@@ -465,12 +465,12 @@ impl ServerList {
         // If we are kicked from a server display the reason
         let disconnected = if let Some(ref disconnect_reason) = self.disconnect_reason {
             let (width, height) =
-                ui::Formatted::compute_size(renderer, disconnect_reason, 600.0, 1.0, 1.0, 1.0);
+                ui::Formatted::compute_size(renderer.clone(), disconnect_reason, 600.0, 1.0, 1.0, 1.0);
             let background = ui::ImageBuilder::new()
                 .texture("leafish:solid")
                 .position(0.0, 3.0)
                 .size(
-                    width.max(renderer.ui.size_of_string("Disconnected")) + 4.0,
+                    width.max(renderer.ui.lock().size_of_string("Disconnected")) + 4.0,
                     height + 4.0 + 16.0,
                 )
                 .colour((0, 0, 0, 100))
@@ -512,7 +512,7 @@ impl super::Screen for ServerList {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
         self.init_list(renderer, ui_container);
@@ -522,7 +522,7 @@ impl super::Screen for ServerList {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         // Clean up
@@ -541,16 +541,16 @@ impl super::Screen for ServerList {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
         delta: f64,
     ) {
         if *self.needs_reload.borrow() {
-            self.reload_server_list(renderer, ui_container);
+            self.reload_server_list(renderer.clone(), ui_container);
         }
         let elements = self.elements.as_mut().unwrap();
 
-        elements.logo.tick(renderer);
+        elements.logo.tick(renderer.clone());
 
         for s in &mut elements.servers {
             // Animate the entries
@@ -672,11 +672,11 @@ impl super::Screen for ServerList {
     fn on_resize(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
         // TODO: Don't ping the servers on resize!
-        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_deactive(screen_sys, renderer.clone(), ui_container);
         self.on_active(screen_sys, renderer, ui_container);
     }
 

@@ -18,6 +18,7 @@ use crate::Game;
 
 use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct ConfirmBox {
     elements: Option<UIElements>,
@@ -64,7 +65,7 @@ impl super::Screen for ConfirmBox {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
@@ -127,7 +128,7 @@ impl super::Screen for ConfirmBox {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         // Clean up
@@ -137,7 +138,7 @@ impl super::Screen for ConfirmBox {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
         _delta: f64,
     ) {

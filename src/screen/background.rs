@@ -38,7 +38,7 @@ impl Screen for Background {
     fn init(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
         let path = self.vars.get(BACKGROUND_IMAGE);
@@ -51,7 +51,7 @@ impl Screen for Background {
                     ui::ImageBuilder::new()
                         .draw_index(i16::MIN as isize)
                         .texture(&*format!("#{}", self.vars.get(BACKGROUND_IMAGE)))
-                        .size(renderer.safe_width as f64, renderer.safe_height as f64)
+                        .size(renderer.screen_data.read().safe_width as f64, renderer.screen_data.read().safe_height as f64)
                         .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                         .create(ui_container),
                 )
@@ -65,7 +65,7 @@ impl Screen for Background {
     fn deinit(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
         self.background.take();
@@ -74,7 +74,7 @@ impl Screen for Background {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
     }
@@ -82,7 +82,7 @@ impl Screen for Background {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
     }
@@ -90,7 +90,7 @@ impl Screen for Background {
     fn tick(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         delta: f64,
     ) {
@@ -111,7 +111,7 @@ impl Screen for Background {
             let curr_path = (*self.vars.get(BACKGROUND_IMAGE)).clone();
             if !self.last_path.eq(&curr_path) {
                 self.last_path = curr_path;
-                self.deinit(screen_sys, renderer, ui_container);
+                self.deinit(screen_sys, renderer.clone(), ui_container);
                 self.init(screen_sys, renderer, ui_container);
             }
         }
@@ -120,10 +120,10 @@ impl Screen for Background {
     fn on_resize(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        self.deinit(screen_sys, renderer, ui_container);
+        self.deinit(screen_sys, renderer.clone(), ui_container);
         self.init(screen_sys, renderer, ui_container);
     }
 

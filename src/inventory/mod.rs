@@ -30,14 +30,14 @@ pub trait Inventory {
 
     fn init(
         &mut self,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     );
 
     fn tick(
         &mut self,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     );
@@ -50,7 +50,7 @@ pub trait Inventory {
         &mut self,
         width: u32,
         height: u32,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     );
@@ -61,7 +61,7 @@ pub trait Inventory {
 pub fn inventory_from_type(
     ty: InventoryType,
     title: Component,
-    renderer: Arc<RwLock<Renderer>>,
+    renderer: Arc<Renderer>,
     hud_context: Arc<RwLock<HudContext>>,
     inv_below: Arc<RwLock<BaseInventory>>,
     id: i32,
@@ -70,8 +70,6 @@ pub fn inventory_from_type(
         /*InventoryType::Internal => {}
         InventoryType::Main => {}*/
         InventoryType::Chest(rows) => {
-            let renderer = renderer.read();
-            let renderer = &*renderer;
             Some(Arc::new(RwLock::new(ChestInventory::new(
                 renderer,
                 hud_context,
@@ -142,12 +140,12 @@ pub struct InventoryContext {
 impl InventoryContext {
     pub fn new(
         version: Version,
-        renderer: &Renderer,
+        renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
     ) -> Self {
         let player_inventory = Arc::new(RwLock::new(PlayerInventory::new(
             version,
-            renderer,
+            renderer.clone(),
             hud_context.clone(),
         )));
         Self {

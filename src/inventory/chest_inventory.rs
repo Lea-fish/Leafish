@@ -22,14 +22,14 @@ pub struct ChestInventory {
 
 impl ChestInventory {
     pub fn new(
-        renderer: &Renderer,
+        renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
         inv_below: Arc<RwLock<BaseInventory>>,
         slot_count: u16,
         name: String,
         id: i32,
     ) -> Self {
-        let scale = Hud::icon_scale(renderer);
+        let scale = Hud::icon_scale(renderer.clone());
         let size = scale * 16.0;
         let slot_offset = size + size * 1.0 / 8.0;
         let x_offset = -(size * 4.5);
@@ -37,7 +37,7 @@ impl ChestInventory {
         let rows = slot_count / 9;
         let y_size = y + rows * 18;
         let y_offset =
-            (renderer.safe_height as f64 / scale - y_size as f64) / 2.0 + slot_offset / 2.0;
+            (renderer.screen_data.read().safe_height as f64 / scale - y_size as f64) / 2.0 + slot_offset / 2.0;
         let hot_bar_offset = scale * 4.0;
         let mut slots = vec![];
         let rows = (slot_count / 9) as usize;
@@ -63,16 +63,16 @@ impl ChestInventory {
         }
     }
 
-    fn update_icons(&mut self, renderer: &Renderer) {
-        let scale = Hud::icon_scale(renderer);
+    fn update_icons(&mut self, renderer: Arc<Renderer>) {
+        let scale = Hud::icon_scale(renderer.clone());
         let size = scale * 16.0;
         let slot_offset = size + size * 1.0 / 8.0;
         let x_offset = -(size * 4.5);
-        let icon_scale = Hud::icon_scale(renderer);
+        let icon_scale = Hud::icon_scale(renderer.clone());
         let y = 114;
         let rows = self.slot_count / 9;
         let y_size = y + rows * 18;
-        let y_offset = (renderer.safe_height as f64 / icon_scale - y_size as f64) / 2.0;
+        let y_offset = (renderer.screen_data.read().safe_height as f64 / icon_scale - y_size as f64) / 2.0;
         let rows = (self.slot_count / 9) as usize;
         for y in (0..rows).rev() {
             for x in 0..9 {
@@ -131,17 +131,17 @@ impl Inventory for ChestInventory {
 
     fn init(
         &mut self,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
         inventory_window.elements.push(vec![]);
         let basic_elements = inventory_window.elements.get_mut(1).unwrap();
-        let icon_scale = Hud::icon_scale(renderer);
+        let icon_scale = Hud::icon_scale(renderer.clone());
         let y = 114;
         let rows = self.slot_count / 9;
         let y_size = y + rows * 18;
-        let y = (renderer.safe_height as f64 / icon_scale - y_size as f64) / 2.0;
+        let y = (renderer.screen_data.read().safe_height as f64 / icon_scale - y_size as f64) / 2.0;
         let player_inv_img = ui::ImageBuilder::new()
             .texture_coords((0.0 / 256.0, 126.0 / 256.0, 176.0 / 256.0, 96.0 / 256.0))
             .position(0.0, icon_scale * (y + (rows * 18 + 17) as f64))
@@ -172,7 +172,7 @@ impl Inventory for ChestInventory {
             .scale_y(scale)
             .position(
                 icon_scale
-                    * -(176.0 / 2.0 - 8.0 - renderer.ui.size_of_string(self.name().unwrap()) / 4.0),
+                    * -(176.0 / 2.0 - 8.0 - renderer.ui.lock().size_of_string(self.name().unwrap()) / 4.0),
                 icon_scale * (6.0 + y),
             )
             .text(self.name().unwrap())
@@ -185,7 +185,7 @@ impl Inventory for ChestInventory {
             .scale_x(scale)
             .scale_y(scale)
             .position(
-                icon_scale * -(176.0 / 2.0 - 8.0 - renderer.ui.size_of_string("Inventory") / 4.0),
+                icon_scale * -(176.0 / 2.0 - 8.0 - renderer.ui.lock().size_of_string("Inventory") / 4.0),
                 icon_scale * (6.0 + y + (rows * 18 + 13) as f64),
             )
             .text("Inventory")
@@ -204,7 +204,7 @@ impl Inventory for ChestInventory {
 
     fn tick(
         &mut self,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -219,7 +219,7 @@ impl Inventory for ChestInventory {
                         slot.y,
                         2,
                         ui_container,
-                        renderer,
+                        renderer.clone(),
                         VAttach::Top,
                     );
                 }
@@ -239,7 +239,7 @@ impl Inventory for ChestInventory {
         &mut self,
         _width: u32,
         _height: u32,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {

@@ -40,6 +40,7 @@ use std::sync::Arc;
 pub use self::{chunk::*, lighting::*};
 use bevy_ecs::prelude::Mut;
 use crate::entity::block_entity::sign::SignInfo;
+use std::sync::atomic::Ordering;
 
 pub mod biome;
 mod chunk;
@@ -332,7 +333,7 @@ impl World {
         dirty
     }
 
-    pub fn compute_render_list(&self, renderer: Arc<RwLock<render::Renderer>>) {
+    pub fn compute_render_list(&self, renderer: Arc<render::Renderer>) {
         let start_rec = Instant::now();
         // self.render_list.clone().write().clear(); // TODO: Sync with the main thread somehow!
         // renderer.clone().read()
@@ -341,13 +342,13 @@ impl World {
         for dir in Direction::all() {
             let (ox, oy, oz) = dir.get_offset();
             let dir_vec = cgmath::Vector3::new(ox as f32, oy as f32, oz as f32);
-            valid_dirs[dir.index()] = renderer.clone().read().view_vector.dot(dir_vec) > -0.9;
+            valid_dirs[dir.index()] = renderer.clone().view_vector.lock().dot(dir_vec) > -0.9;
         }
 
         let start = (
-            ((renderer.read().camera.pos.x as i32) >> 4),
-            ((renderer.read().camera.pos.y as i32) >> 4),
-            ((renderer.read().camera.pos.z as i32) >> 4),
+            ((renderer.camera.lock().pos.x as i32) >> 4),
+            ((renderer.camera.lock().pos.y as i32) >> 4),
+            ((renderer.camera.lock().pos.z as i32) >> 4),
         );
 
         let render_queue = Arc::new(RwLock::new(Vec::new()));
@@ -355,8 +356,8 @@ impl World {
         // debug!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
         let _diff = Instant::now().duration_since(start_rec);
-        let frustum = renderer.read().frustum;
-        let frame_id = renderer.read().frame_id;
+        let frustum = *renderer.frustum.lock();
+        let frame_id = renderer.frame_id.load(Ordering::Acquire);
         self.do_render_queue(
             Arc::new(RwLock::new(process_queue)),
             frustum,

@@ -2,6 +2,7 @@ use crate::entity::resolve_textures;
 use crate::format;
 use crate::render::model::{self, FormatState, Vertex};
 use crate::render::{Renderer, Texture};
+use std::sync::Arc;
 
 pub enum PlayerLikeModelPart {
     Head = 0,
@@ -171,7 +172,7 @@ fn update(
 pub fn compute_player_model_components(
     tex: &Texture,
     name: &Option<String>,
-    renderer: &mut Renderer,
+    renderer: Arc<Renderer>,
 ) -> Vec<Vec<Vertex>> {
     // TODO: Replace this shit entirely!
     macro_rules! srel {
@@ -284,7 +285,7 @@ pub fn compute_player_model_components(
             width: 0.0,
             offset: 0.0,
             text: Vec::new(),
-            renderer,
+            renderer: renderer,
             y_scale: 0.16,
             x_scale: 0.01,
         };

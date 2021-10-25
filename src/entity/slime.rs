@@ -9,11 +9,12 @@ use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vect
 use collision::Aabb3;
 use bevy_ecs::prelude::*;
 use std::sync::Arc;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
+use crate::entity::player::CleanupManager;
 
 #[derive(Component)]
 pub struct SlimeModel {
-    model: Option<model::ModelKey>,
+    model: Arc<Mutex<Option<model::ModelHandle>>>,
     _name: String,
 
     _dir: i32,
@@ -25,7 +26,7 @@ pub struct SlimeModel {
 impl SlimeModel {
     pub fn new(name: &str) -> SlimeModel {
         SlimeModel {
-            model: None,
+            model: Arc::new(Mutex::new(None)),
             _name: name.to_owned(),
 
             _dir: 0,
@@ -53,7 +54,7 @@ pub fn create_slime(m: &mut Manager) -> Entity {
 
 
 
-pub fn update_slime(game_info: Res<GameInfo>, renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut SlimeModel, &Position, &Rotation, &Light)>) {
+pub fn update_slime(game_info: Res<GameInfo>, renderer: Res<Arc<Renderer>>, mut query: Query<(&mut SlimeModel, &Position, &Rotation, &Light)>) {
    for (mut slime_model, position, rotation, light) in query.iter_mut() {
        use std::f32::consts::PI;
        use std::f64::consts::PI as PI64;
@@ -65,10 +66,10 @@ pub fn update_slime(game_info: Res<GameInfo>, renderer: Res<Arc<RwLock<Renderer>
            self.entity_added(m, e, world, renderer);
        }*/
 
-       if let Some(pmodel) = slime_model.model {
+       if let Some(pmodel) = &*slime_model.model.clone().lock() {
            let renderer = renderer.clone();
-           let mut renderer = renderer.write();
-           let mdl = renderer.model.get_model(pmodel).unwrap();
+           let mut models = renderer.models.lock();
+           let mdl = models.get_model(&pmodel).unwrap();
 
            mdl.block_light = light.block_light;
            mdl.sky_light = light.sky_light;
@@ -120,10 +121,10 @@ pub fn update_slime(game_info: Res<GameInfo>, renderer: Res<Arc<RwLock<Renderer>
    }
 }
 
-pub fn added_slime(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut SlimeModel)>) {
+pub fn added_slime(renderer: Res<Arc<Renderer>>, mut query: Query<(&mut SlimeModel)>) {
     for (mut slime_model) in query.iter_mut() {
         let tex =
-            Renderer::get_texture(renderer.read().get_textures_ref(), "minecraft:entity/slime/slime");
+            Renderer::get_texture(renderer.get_textures_ref(), "minecraft:entity/slime/slime");
         let mut body_verts = vec![];
         model::append_box(
             &mut body_verts,
@@ -205,21 +206,14 @@ pub fn added_slime(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut 
             name_verts.extend_from_slice(&state.text);
         }*/
 
-        slime_model.model = Some(renderer.clone().write().model.create_model(
+        slime_model.model.lock().replace(renderer.clone().models.lock().create_model(
             model::DEFAULT,
             vec![
                 body_verts, eye_verts,
                 // name_verts,
             ],
+            renderer.clone(),
         ));
-    }
-}
-
-pub fn removed_slime(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut SlimeModel)>) {
-    for (mut slime_model) in query.iter_mut() {
-        if let Some(model) = slime_model.model.take() {
-            renderer.clone().write().model.remove_model(&model);
-        }
     }
 }
 

@@ -79,7 +79,7 @@ const CL_BRAND: console::CVar<String> = console::CVar {
 };
 
 pub struct Game {
-    renderer: Arc<RwLock<render::Renderer>>,
+    renderer: Arc<render::Renderer>,
     screen_sys: Arc<screen::ScreenSystem>,
     resource_manager: Arc<RwLock<resources::Manager>>,
     clipboard_provider: Arc<RwLock<Box<dyn copypasta::ClipboardProvider>>>,
@@ -335,7 +335,7 @@ fn main() {
     let game = Game {
         server: None,
         focused: false,
-        renderer: Arc::new(RwLock::new(renderer)),
+        renderer: Arc::new(renderer),
         screen_sys,
         resource_manager: resource_manager.clone(),
         console: con,
@@ -355,7 +355,7 @@ fn main() {
         clipboard_provider: Arc::new(RwLock::new(clipboard)),
         current_account: active_account,
     };
-    game.renderer.write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
+    game.renderer.camera.lock().pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {
         protocol::enable_network_debug();
     }
@@ -450,7 +450,7 @@ fn tick_all(
                 .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
             // TODO: Handle remove of all entities if necessary!
             game.server = None;
-            game.renderer.clone().write().reset();
+            game.renderer.clone().reset();
         }
     } else {
         game.chunk_builder.reset();
@@ -502,18 +502,17 @@ fn tick_all(
     if game.server.is_some() {
         game.renderer
             .clone()
-            .write()
             .update_camera(physical_width, physical_height);
         game.chunk_builder.tick(
             game.server.as_ref().unwrap().world.clone(),
             game.renderer.clone(),
             version,
         );
-    } else if game.renderer.clone().read().safe_width != physical_width
-        || game.renderer.clone().read().safe_height != physical_height
+    } else if game.renderer.clone().screen_data.read().safe_width != physical_width
+        || game.renderer.clone().screen_data.read().safe_height != physical_height
     {
-        game.renderer.clone().write().safe_width = physical_width;
-        game.renderer.clone().write().safe_height = physical_height;
+        game.renderer.clone().screen_data.write().safe_width = physical_width;
+        game.renderer.clone().screen_data.write().safe_height = physical_height;
         gl::viewport(0, 0, physical_width as i32, physical_height as i32);
     }
 
@@ -538,7 +537,7 @@ fn tick_all(
     );
     ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
     let world = game.server.as_ref().map(|server| server.world.clone());
-    game.renderer.clone().write().tick(
+    game.renderer.clone().tick(
         world,
         delta,
         width as u32,

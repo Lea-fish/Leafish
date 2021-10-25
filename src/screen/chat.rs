@@ -112,7 +112,7 @@ impl super::Screen for Chat {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut ui::Container,
     ) {
         /*let scale = Hud::icon_scale(renderer);
@@ -184,7 +184,7 @@ impl super::Screen for Chat {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         self.rendered_messages.clear();
@@ -195,11 +195,11 @@ impl super::Screen for Chat {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut ui::Container,
         _delta: f64,
     ) {
-        let scale = Hud::icon_scale(renderer);
+        let scale = Hud::icon_scale(renderer.clone());
         if self.animation == 0 {
             self.animation = 20;
             self.animated_tex = Some(
@@ -207,7 +207,7 @@ impl super::Screen for Chat {
                     .text("_")
                     .alignment(VAttach::Bottom, HAttach::Left)
                     .position(
-                        renderer.ui.size_of_string(&*self.written) + 2.0 * scale,
+                        renderer.ui.lock().size_of_string(&*self.written) + 2.0 * scale,
                         2.0 * scale,
                     )
                     .create(ui_container),
@@ -226,7 +226,7 @@ impl super::Screen for Chat {
                         .text("_")
                         .alignment(VAttach::Bottom, HAttach::Left)
                         .position(
-                            renderer.ui.size_of_string(&*self.written) + 2.0 * scale,
+                            renderer.ui.lock().size_of_string(&*self.written) + 2.0 * scale,
                             2.0 * scale,
                         )
                         .create(ui_container),
@@ -251,10 +251,10 @@ impl super::Screen for Chat {
     fn on_resize(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_deactive(screen_sys, renderer.clone(), ui_container);
         self.on_active(screen_sys, renderer, ui_container);
     }
 
@@ -350,14 +350,14 @@ impl super::Screen for Chat {
 }
 
 impl Chat {
-    fn render_chat(&mut self, renderer: &Renderer, ui_container: &mut Container) {
-        let scale = Hud::icon_scale(renderer);
+    fn render_chat(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+        let scale = Hud::icon_scale(renderer.clone());
         let history_size = self.context.messages.clone().read().len();
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
             let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+            let lines = (renderer.ui.lock().size_of_string(&*message.1.to_string())
                 / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
             component_lines += lines;
@@ -386,7 +386,7 @@ impl Chat {
                 .alignment(VAttach::Bottom, HAttach::Left)
                 .position(1.0 * scale, 1.0 * scale)
                 .size(
-                    renderer.safe_width as f64 - 2.0 * scale,
+                    renderer.screen_data.read().safe_width as f64 - 2.0 * scale,
                     (5.0 * scale + 0.4 * scale) * 1.5,
                 )
                 .colour((0, 0, 0, 100))
@@ -396,7 +396,7 @@ impl Chat {
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
             let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
-            let lines = (renderer.ui.size_of_string(&*message.1.to_string())
+            let lines = (renderer.ui.lock().size_of_string(&*message.1.to_string())
                 / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
             let text = ui::FormattedBuilder::new()

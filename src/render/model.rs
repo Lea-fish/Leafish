@@ -12,6 +12,7 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::sync::Arc;
+use crate::render::Renderer;
 
 pub struct Manager {
     collections: Vec<Collection>,
@@ -28,7 +29,38 @@ pub const SUN: CollectionKey = CollectionKey(1);
 pub struct CollectionKey(usize);
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ModelKey(CollectionKey, usize);
+struct ModelKey(CollectionKey, usize);
+
+#[derive(Clone)]
+pub struct ModelHandle(ModelKey, Arc<Renderer>, pub Option<Arc<dyn Fn(Arc<Renderer>) + Send + Sync>>); // fn can be used to implement custom drop behavior
+
+impl ModelHandle {
+
+    pub fn cleanup_manually(&self) {
+        self.1.clone().models.lock().remove_model(&self);
+        if let Some(cleanup_fn) = self.2.as_ref() { // TODO: Do we actually want to call this on manual cleanup?
+            cleanup_fn(self.1.clone());
+        }
+    }
+
+}
+
+impl PartialEq for ModelHandle {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl Eq for ModelHandle {}
+
+impl Drop for ModelHandle {
+    fn drop(&mut self) {
+        self.1.clone().models.lock().remove_model(&self);
+        if let Some(cleanup_fn) = self.2.as_ref() {
+            cleanup_fn(self.1.clone());
+        }
+    }
+}
 
 /*
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -86,12 +118,12 @@ impl Manager {
         CollectionKey(self.collections.len())
     }
 
-    pub fn get_model(&mut self, key: ModelKey) -> Option<&mut Model> {
-        let collection = &mut self.collections[(key.0).0];
-        collection.models.get_mut(&key)
+    pub fn get_model(&mut self, key: &ModelHandle) -> Option<&mut Model> {
+        let collection = &mut self.collections[(key.0.0).0];
+        collection.models.get_mut(&key.0)
     }
 
-    pub fn create_model(&mut self, ckey: CollectionKey, parts: Vec<Vec<Vertex>>) -> ModelKey {
+    pub fn create_model(&mut self, ckey: CollectionKey, parts: Vec<Vec<Vertex>>, renderer: Arc<Renderer>) -> ModelHandle {
         let array = gl::VertexArray::new();
         array.bind();
         self.index_buffer.bind(gl::ELEMENT_ARRAY_BUFFER);
@@ -178,12 +210,12 @@ impl Manager {
         collection.next_id += 1;
         collection.models.insert(key, model);
 
-        key
+        ModelHandle(key, renderer.clone(), None)
     }
 
-    pub fn remove_model(&mut self, key: &ModelKey) {
-        let collection = &mut self.collections[(key.0).0];
-        collection.models.remove(key);
+    fn remove_model(&mut self, key: &ModelHandle) {
+        let collection = &mut self.collections[(key.0.0).0];
+        collection.models.remove(&key.0);
     }
 
     fn rebuild_model(model: &mut Model) {
@@ -450,16 +482,16 @@ pub fn append_box_texture_scale(
     }
 }
 
-pub struct FormatState<'a> {
+pub struct FormatState {
     pub offset: f32,
     pub width: f32,
     pub text: Vec<Vertex>,
-    pub renderer: &'a mut super::Renderer,
+    pub renderer: Arc<super::Renderer>,
     pub y_scale: f32,
     pub x_scale: f32,
 }
 
-impl<'a> FormatState<'a> {
+impl FormatState {
     pub fn build(&mut self, c: &Component, color: format::Color) {
         match *c {
             format::Component::Text(ref txt) => {
@@ -482,8 +514,8 @@ impl<'a> FormatState<'a> {
                 self.offset += 6.0 * self.x_scale;
                 continue;
             }
-            let texture = self.renderer.ui.character_texture(ch);
-            let w = self.renderer.ui.size_of_char(ch) as f32;
+            let texture = self.renderer.ui.lock().character_texture(ch);
+            let w = self.renderer.ui.lock().size_of_char(ch) as f32;
 
             for vert in crate::model::BlockVertex::face_by_direction(Direction::North) {
                 self.text.push(Vertex {

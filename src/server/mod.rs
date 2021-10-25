@@ -134,7 +134,7 @@ pub struct Server {
     pub chat_open: AtomicBool,
     pub chat_ctx: Arc<ChatContext>,
     screen_sys: Arc<ScreenSystem>,
-    renderer: Arc<RwLock<Renderer>>,
+    renderer: Arc<Renderer>,
     active_block_break_anims: Arc<DashMap<i32, Entity>>,
 }
 
@@ -168,7 +168,7 @@ impl Server {
         protocol_version: i32,
         forge_mods: Vec<forge::ForgeMod>,
         fml_network_version: Option<i64>,
-        renderer: Arc<RwLock<Renderer>>,
+        renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
         screen_sys: Arc<ScreenSystem>,
     ) -> Result<Arc<Server>, protocol::Error> {
@@ -390,7 +390,7 @@ impl Server {
         forge_mods: Vec<forge::ForgeMod>,
         uuid: protocol::UUID,
         resources: Arc<RwLock<resources::Manager>>,
-        renderer: Arc<RwLock<Renderer>>,
+        renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
         screen_sys: Arc<ScreenSystem>,
     ) -> Arc<Server> {
@@ -816,7 +816,7 @@ impl Server {
 
     fn spawn_render_list_computer(
         server: Arc<Mutex<Option<Arc<Server>>>>,
-        renderer: Arc<RwLock<Renderer>>,
+        renderer: Arc<Renderer>,
     ) -> (Sender<bool>, Receiver<bool>) {
         let (tx, rx) = unbounded();
         let (etx, erx) = unbounded();
@@ -843,7 +843,7 @@ impl Server {
         render_list_computer_notify: Receiver<bool>,
         hud_context: Arc<RwLock<HudContext>>,
         screen_sys: Arc<ScreenSystem>,
-        renderer: Arc<RwLock<Renderer>>,
+        renderer: Arc<Renderer>,
     ) -> Server {
         let world = Arc::new(world::World::new(protocol_version, light_updater));
         let mut entities = Manager::new();
@@ -860,7 +860,7 @@ impl Server {
         let version = Version::from_id(protocol_version as u32);
         let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
             version,
-            &renderer.read(),
+            renderer.clone(),
             hud_context.clone(),
         )));
         hud_context.write().player_inventory =
@@ -935,7 +935,7 @@ impl Server {
         return self.conn.clone().read().is_some();
     }
 
-    pub fn tick(&self, renderer: Arc<RwLock<render::Renderer>>, delta: f64, game: &mut Game) {
+    pub fn tick(&self, renderer: Arc<render::Renderer>, delta: f64, game: &mut Game) {
         let start = SystemTime::now();
         let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis();
         if *self.fps_start.read() + 1000 < time {
@@ -965,10 +965,9 @@ impl Server {
             self.world.clone().flag_dirty_all();
         }
         {
-            let renderer = &mut renderer.write();
             // TODO: Check if the world type actually needs a sun
             if self.sun_model.read().is_none() {
-                self.sun_model.write().replace(sun::SunModel::new(renderer));
+                self.sun_model.write().replace(sun::SunModel::new(renderer.clone()));
             }
 
             // Copy to camera
@@ -984,26 +983,25 @@ impl Server {
                     .get_entity(player)
                     .unwrap().get::<crate::entity::Rotation>()
                     .unwrap();
-                renderer.camera.pos = cgmath::Point3::from_vec(
+                renderer.clone().camera.lock().pos = cgmath::Point3::from_vec(
                     position.position + cgmath::Vector3::new(0.0, 1.62, 0.0),
                 );
-                renderer.camera.yaw = rotation.yaw;
-                renderer.camera.pitch = rotation.pitch;
+                renderer.clone().camera.lock().yaw = rotation.yaw;
+                renderer.clone().camera.lock().pitch = rotation.pitch;
             }
         }
-        self.entity_tick(/*renderer, */delta, game.focused, *self.dead.read());
+        self.entity_tick(delta, game.focused, *self.dead.read());
 
         *self.tick_timer.write() += delta;
         while *self.tick_timer.read() >= 3.0 && self.is_connected() {
             self.minecraft_tick(game);
             *self.tick_timer.write() -= 3.0;
         }
-        let renderer = &mut renderer.write();
 
-        self.update_time(renderer, delta);
+        self.update_time(renderer.clone(), delta);
         if let Some(sun_model) = self.sun_model.write().as_mut() {
             sun_model.tick(
-                renderer,
+                renderer.clone(),
                 self.world_data.clone().read().world_time,
                 self.world_data.clone().read().world_age,
             );
@@ -1023,16 +1021,16 @@ impl Server {
             if let Some((pos, bl, _, _)) = target::trace_ray(
                 &world,
                 4.0,
-                renderer.camera.pos.to_vec(),
-                renderer.view_vector.cast().unwrap(),
+                renderer.camera.lock().pos.to_vec(),
+                renderer.view_vector.lock().cast().unwrap(),
                 target::test_block,
             ) {
-                self.target_info.clone().write().update(renderer, pos, bl);
+                self.target_info.clone().write().update(renderer.clone(), pos, bl);
             } else {
-                self.target_info.clone().write().clear(renderer);
+                self.target_info.clone().write().clear(renderer.clone());
             }
         } else {
-            self.target_info.clone().write().clear(renderer);
+            self.target_info.clone().write().clear(renderer.clone());
         }
     }
 
@@ -1097,16 +1095,19 @@ impl Server {
         }
     }
 
+    /*
     pub fn remove(&mut self, renderer: &mut render::Renderer) {
         let world = self.world.clone();
-        // TODO: Handle remove of all entities if necessary!
+        let entities = self.entities.read();
+        let cleanup_manager = entities.world.get_resource::<CleanupManager>().unwrap();
+        cleanup_manager.cleanup_all();
         if let Some(sun_model) = self.sun_model.write().as_mut() {
             sun_model.remove(renderer);
         }
         self.target_info.clone().write().clear(renderer);
-    }
+    }*/
 
-    fn update_time(&self, renderer: &mut render::Renderer, delta: f64) {
+    fn update_time(&self, renderer: Arc<render::Renderer>, delta: f64) {
         if self.world_data.clone().read().tick_time {
             self.world_data.clone().write().world_time_target += delta / 3.0;
             let time = self.world_data.clone().read().world_time_target;
@@ -1125,7 +1126,7 @@ impl Server {
             let time = self.world_data.clone().read().world_time_target;
             self.world_data.clone().write().world_time = time;
         }
-        renderer.sky_offset = self.calculate_sky_offset();
+        renderer.light_data.lock().sky_offset = self.calculate_sky_offset();
     }
 
     fn calculate_sky_offset(&self) -> f32 {
@@ -1317,8 +1318,8 @@ impl Server {
                 if let Some((pos, _, face, _)) = target::trace_ray(
                     &world,
                     4.0,
-                    self.renderer.read().camera.pos.to_vec(),
-                    self.renderer.read().view_vector.cast().unwrap(),
+                    self.renderer.camera.lock().pos.to_vec(),
+                    self.renderer.view_vector.lock().cast().unwrap(),
                     target::test_block,
                 ) {
                     packet::send_digging(
@@ -1378,8 +1379,8 @@ impl Server {
                 if let Some((pos, _, face, at)) = target::trace_ray(
                     &world,
                     4.0,
-                    self.renderer.read().camera.pos.to_vec(),
-                    self.renderer.read().view_vector.cast().unwrap(),
+                    self.renderer.camera.lock().pos.to_vec(),
+                    self.renderer.view_vector.lock().cast().unwrap(),
                     target::test_block,
                 ) {
                     let hud_context = self.hud_context.clone();
@@ -1566,12 +1567,12 @@ impl Server {
     }
 
     fn on_set_slot(&self, inventory_id: i16, slot: i16, item: Option<Stack>) {
-        println!(
+        /*println!(
             "set item {:?} to slot {} to inv {}",
             item.as_ref(),
             slot,
             inventory_id
-        );
+        );*/
         let top_inventory = self.inventory_context.clone();
         let inventory = if inventory_id == -1 || inventory_id == 0 {
             top_inventory.read().player_inventory.clone() // TODO: This caused a race condition, check why!
@@ -1657,6 +1658,12 @@ impl Server {
     }
 
     fn on_respawn(&self, respawn: mapped_packet::play::clientbound::Respawn) {
+        {
+            let entities = self.entities.read();
+            let cleanup_manager = entities.world.get_resource::<CleanupManager>().unwrap();
+            cleanup_manager.cleanup_all();
+        }
+
         let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
@@ -1676,7 +1683,6 @@ impl Server {
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
-        // TODO: Handle remove of all entities (gracefully) if necessary!
         *self.player.clone().write() = Some(create_local(&mut *self.entities.clone().write()));
         if *self.dead.read() {
             *self.dead.write() = false;

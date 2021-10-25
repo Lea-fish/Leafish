@@ -9,12 +9,13 @@ use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vect
 use collision::Aabb3;
 use bevy_ecs::prelude::*;
 use crate::ecs::Manager;
-use parking_lot::RwLock;
+use parking_lot::{RwLock, Mutex};
 use std::sync::Arc;
+use crate::entity::player::CleanupManager;
 
 #[derive(Component)]
 pub struct ZombieModel {
-    model: Option<model::ModelKey>,
+    model: Arc<Mutex<Option<model::ModelHandle>>>,
     name: Option<String>,
 
     dir: i32,
@@ -26,7 +27,7 @@ pub struct ZombieModel {
 impl ZombieModel {
     pub fn new(name: Option<String>) -> ZombieModel {
         ZombieModel {
-            model: None,
+            model: Arc::new(Mutex::new(None)),
             name,
             dir: 0,
             time: 0.0,
@@ -36,23 +37,23 @@ impl ZombieModel {
     }
 }
 
-pub fn added_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut commands: Commands, mut query: Query<(Entity, &mut ZombieModel), (Added<ZombieModel>)>) {
+pub fn added_zombie(renderer: Res<Arc<Renderer>>, mut commands: Commands, mut query: Query<(Entity, &mut ZombieModel), (Added<ZombieModel>)>) {
     for (entity, mut zombie_model) in query.iter_mut() {
         commands.entity(entity).insert(Bounds::new(Aabb3::new(
             Point3::new(-0.3, 0.0, -0.3),
             Point3::new(0.3, 1.8, 0.3),
         )));
         let tex = Renderer::get_texture(
-            renderer.read().get_textures_ref(),
+            renderer.get_textures_ref(),
             "minecraft:entity/zombie/zombie",
         );
-        let components = compute_player_model_components(&tex, &zombie_model.name, &mut *renderer.clone().write());
+        let components = compute_player_model_components(&tex, &zombie_model.name, renderer.clone());
 
-        zombie_model.model = Some(renderer.clone().write().model.create_model(model::DEFAULT, components));
+        zombie_model.model.lock().replace(renderer.clone().models.lock().create_model(model::DEFAULT, components, renderer.clone()));
     }
 }
 
-pub fn removed_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut ZombieModel)>) {
+pub fn removed_zombie(renderer: Res<Arc<Renderer>>, mut query: Query<(&mut ZombieModel)>) {
     /*for (mut zombie_model) in query.iter_mut() {
         if let Some(model) = zombie_model.model.take() {
             renderer.clone().write().model.remove_model(&model);
@@ -60,17 +61,17 @@ pub fn removed_zombie(renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&m
     }*/
 }
 
-pub fn update_zombie(game_info: Res<GameInfo>, renderer: Res<Arc<RwLock<Renderer>>>, mut query: Query<(&mut ZombieModel, &Position, &Rotation, &Light)>) {
+pub fn update_zombie(game_info: Res<GameInfo>, renderer: Res<Arc<Renderer>>, mut query: Query<(&mut ZombieModel, &Position, &Rotation, &Light)>) {
     for (mut zombie_model, position, rotation, light) in query.iter_mut() {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
         let delta = game_info
             .delta;
 
-        if let Some(zmodel) = zombie_model.model {
+        if let Some(zmodel) = &*zombie_model.model.clone().lock() {
             let renderer = renderer.clone();
-            let mut renderer = renderer.write();
-            let mdl = renderer.model.get_model(zmodel).unwrap();
+            let mut models = renderer.models.lock();
+            let mdl = models.get_model(&zmodel).unwrap();
 
             mdl.block_light = light.block_light;
             mdl.sky_light = light.sky_light;

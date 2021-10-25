@@ -5,6 +5,7 @@ use crate::ui;
 
 use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct UIElements {
     background: ui::ImageRef,
@@ -41,7 +42,7 @@ impl super::Screen for SettingsMenu {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
         let background = ui::ImageBuilder::new()
@@ -201,7 +202,7 @@ impl super::Screen for SettingsMenu {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         self.elements = None;
@@ -211,7 +212,7 @@ impl super::Screen for SettingsMenu {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
         _delta: f64,
     ) {
@@ -221,11 +222,11 @@ impl super::Screen for SettingsMenu {
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
             };
         }
     }
@@ -269,7 +270,7 @@ impl super::Screen for VideoSettingsMenu {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
         let background = ui::ImageBuilder::new()
@@ -384,7 +385,7 @@ impl super::Screen for VideoSettingsMenu {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         self.elements = None;
@@ -394,7 +395,7 @@ impl super::Screen for VideoSettingsMenu {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
         _delta: f64,
     ) {
@@ -404,11 +405,11 @@ impl super::Screen for VideoSettingsMenu {
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
             };
         }
     }
@@ -452,7 +453,7 @@ impl super::Screen for AudioSettingsMenu {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
         let background = ui::ImageBuilder::new()
@@ -493,7 +494,7 @@ impl super::Screen for AudioSettingsMenu {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         self.elements = None;
@@ -503,7 +504,7 @@ impl super::Screen for AudioSettingsMenu {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
         _delta: f64,
     ) {
@@ -513,11 +514,11 @@ impl super::Screen for AudioSettingsMenu {
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
             };
         }
     }
@@ -561,7 +562,7 @@ impl super::Screen for SkinSettingsMenu {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
         let background = ui::ImageBuilder::new()
@@ -692,7 +693,7 @@ impl super::Screen for SkinSettingsMenu {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         self.elements = None;
@@ -702,7 +703,7 @@ impl super::Screen for SkinSettingsMenu {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
         _delta: f64,
     ) {
@@ -712,11 +713,11 @@ impl super::Screen for SkinSettingsMenu {
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
             };
         }
     }

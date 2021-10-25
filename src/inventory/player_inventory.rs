@@ -20,7 +20,7 @@ pub struct PlayerInventory {
 impl PlayerInventory {
     pub fn new(
         version: Version,
-        renderer: &Renderer,
+        renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
     ) -> Self {
         let scale = Hud::icon_scale(renderer);
@@ -126,9 +126,9 @@ impl PlayerInventory {
     }
 
     #[allow(clippy::eq_op)]
-    fn update_icons(&mut self, renderer: &Renderer) {
-        let scale = Hud::icon_scale(renderer);
-        let base = scale * ((renderer.safe_height as f64 / scale - 166.0) / 2.0);
+    fn update_icons(&mut self, renderer: Arc<Renderer>) {
+        let scale = Hud::icon_scale(renderer.clone());
+        let base = scale * ((renderer.screen_data.read().safe_height as f64 / scale - 166.0) / 2.0);
         let middle = base + scale * 166.0 / 2.0;
         let size = scale * 16.0;
         let x_offset = -(size * 4.5);
@@ -251,16 +251,16 @@ impl Inventory for PlayerInventory {
     #[allow(clippy::eq_op)]
     fn init(
         &mut self,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
         inventory_window.elements.push(vec![]);
         let basic_elements = inventory_window.elements.get_mut(1).unwrap();
-        let icon_scale = Hud::icon_scale(renderer);
+        let icon_scale = Hud::icon_scale(renderer.clone());
         let size = icon_scale * 16.0;
         let slot_offset = size + size * 1.0 / 8.0;
-        let base = icon_scale * ((renderer.safe_height as f64 / icon_scale - 166.0) / 2.0);
+        let base = icon_scale * ((renderer.screen_data.read().safe_height as f64 / icon_scale - 166.0) / 2.0);
         let middle = base + icon_scale * 166.0 / 2.0;
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, 166.0 / 256.0))
@@ -319,7 +319,7 @@ impl Inventory for PlayerInventory {
 
     fn tick(
         &mut self,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -335,7 +335,7 @@ impl Inventory for PlayerInventory {
                         slot.y,
                         2,
                         ui_container,
-                        renderer,
+                        renderer.clone(),
                         VAttach::Top,
                     );
                 }
@@ -349,7 +349,7 @@ impl Inventory for PlayerInventory {
                         slot.y,
                         2,
                         ui_container,
-                        renderer,
+                        renderer.clone(),
                         VAttach::Top,
                     );
                 }
@@ -369,7 +369,7 @@ impl Inventory for PlayerInventory {
         &mut self,
         _width: u32,
         _height: u32,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {

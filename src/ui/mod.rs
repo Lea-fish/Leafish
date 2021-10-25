@@ -88,7 +88,7 @@ macro_rules! define_elements {
                 }
             }
 
-            fn tick(&self, renderer: &mut render::Renderer) {
+            fn tick(&self, renderer: Arc<render::Renderer>) {
                 match *self {
                     $(
                         Element::$name(ref inner) => {
@@ -99,7 +99,7 @@ macro_rules! define_elements {
                 }
             }
 
-            fn draw(&self, renderer: &mut render::Renderer, r: &Region, sw: f64, sh: f64, width: f64, height: f64, delta: f64) -> RefMut<[u8]> {
+            fn draw(&self, renderer: Arc<render::Renderer>, r: &Region, sw: f64, sh: f64, width: f64, height: f64, delta: f64) -> RefMut<[u8]> {
                 match *self {
                     $(
                         Element::$name(ref inner) => {
@@ -307,7 +307,7 @@ impl Container {
 
     pub fn tick(
         &mut self,
-        renderer: Arc<RwLock<render::Renderer>>,
+        renderer: Arc<render::Renderer>,
         delta: f64,
         width: f64,
         height: f64,
@@ -316,13 +316,12 @@ impl Container {
             Mode::Scaled => (SCALED_WIDTH / width, SCALED_HEIGHT / height),
             Mode::Unscaled(scale) => (scale, scale),
         };
-        let renderer = &mut renderer.write();
 
         if self.last_sw != sw
             || self.last_sh != sh
             || self.last_width != width
             || self.last_height != height
-            || self.version != renderer.ui.version
+            || self.version != renderer.ui.lock().version
             || self.last_mode != self.mode
         {
             self.last_sw = sw;
@@ -333,7 +332,7 @@ impl Container {
             for e in &self.elements {
                 e.force_rebuild();
             }
-            self.version = renderer.ui.version;
+            self.version = renderer.ui.lock().version;
         }
 
         // Drop elements with no refs
@@ -353,13 +352,13 @@ impl Container {
         }
 
         for e in &self.elements {
-            e.tick(renderer);
+            e.tick(renderer.clone());
         }
         for e in &self.elements {
             let r = Self::compute_draw_region(e, sw, sh, &SCREEN);
             if r.intersects(&SCREEN) {
-                let data = e.draw(renderer, &r, sw, sh, width, height, delta);
-                renderer.ui.add_bytes(&data);
+                let data = e.draw(renderer.clone(), &r, sw, sh, width, height, delta);
+                renderer.ui.lock().add_bytes(&data);
             }
         }
     }
@@ -507,7 +506,7 @@ impl ElementHolder for Container {
 trait UIElement {
     fn draw(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         r: &Region,
         sw: f64,
         sh: f64,
@@ -527,7 +526,7 @@ trait UIElement {
     ) {
     }
     fn key_type(&mut self, _game: &mut crate::Game, _c: char) {}
-    fn tick(&mut self, renderer: &mut render::Renderer);
+    fn tick(&mut self, renderer: Arc<render::Renderer>);
 }
 
 macro_rules! element {
@@ -606,7 +605,7 @@ macro_rules! element {
                 false
             }
 
-            fn super_draw(&mut self, renderer: &mut render::Renderer, super_region: &Region, sw: f64, sh: f64, width: f64, height: f64, delta: f64) {
+            fn super_draw(&mut self, renderer: Arc<render::Renderer>, super_region: &Region, sw: f64, sh: f64, width: f64, height: f64, delta: f64) {
                 if !self.needs_rebuild {
                     let (w, h) = self.get_size();
                     self.needs_rebuild = self.last_x != self.x || self.last_y != self.y
@@ -619,7 +618,7 @@ macro_rules! element {
                         e.force_rebuild();
                     }
                     let r = Container::compute_draw_region(e, sw, sh, &super_region);
-                    let data = e.draw(renderer, &r, sw, sh, width, height, delta);
+                    let data = e.draw(renderer.clone(), &r, sw, sh, width, height, delta);
                     self.data.extend_from_slice(&data);
                 }
                 self.needs_rebuild = false;
@@ -632,9 +631,9 @@ macro_rules! element {
                 self.last_h_attach = self.h_attach;
             }
 
-            fn super_tick(&mut self, renderer: &mut render::Renderer) {
+            fn super_tick(&mut self, renderer: Arc<render::Renderer>) {
                 for &(_, ref e) in &self.elements {
-                    e.tick(renderer);
+                    e.tick(renderer.clone());
                 }
             }
 
@@ -865,7 +864,7 @@ impl ImageBuilder {
 impl UIElement for Image {
     fn draw(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         r: &Region,
         sw: f64,
         sh: f64,
@@ -910,7 +909,7 @@ impl UIElement for Image {
             || self.last_texture_coords != self.texture_coords
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
+    fn tick(&mut self, renderer: Arc<render::Renderer>) {
         self.super_tick(renderer);
     }
 }
@@ -938,7 +937,7 @@ impl BatchBuilder {
 impl UIElement for Batch {
     fn draw(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         r: &Region,
         sw: f64,
         sh: f64,
@@ -961,7 +960,7 @@ impl UIElement for Batch {
         false
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
+    fn tick(&mut self, renderer: Arc<render::Renderer>) {
         self.super_tick(renderer);
     }
 }
@@ -1003,7 +1002,7 @@ element! {
 impl UIElement for Text {
     fn draw(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         r: &Region,
         sw: f64,
         sh: f64,
@@ -1015,7 +1014,7 @@ impl UIElement for Text {
             self.data.clear();
 
             let mut text = if self.rotation == 0.0 {
-                renderer.ui.new_text_scaled(
+                renderer.ui.lock().new_text_scaled(
                     &self.text,
                     r.x,
                     r.y,
@@ -1033,7 +1032,7 @@ impl UIElement for Text {
                 let tmpy = r.h / 2.0;
                 let w = (tmpx * c - tmpy * s).abs();
                 let h = (tmpy * c + tmpx * s).abs();
-                renderer.ui.new_text_rotated(
+                renderer.ui.lock().new_text_rotated(
                     &self.text,
                     r.x + w - (r.w / 2.0),
                     r.y + h - (r.h / 2.0),
@@ -1076,10 +1075,10 @@ impl UIElement for Text {
             || self.last_rotation != self.rotation
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
-        self.super_tick(renderer);
+    fn tick(&mut self, renderer: Arc<render::Renderer>) {
+        self.super_tick(renderer.clone());
         if self.is_dirty() {
-            self.width = renderer.ui.size_of_string(&self.text);
+            self.width = renderer.ui.lock().size_of_string(&self.text);
         }
     }
 }
@@ -1121,7 +1120,7 @@ element! {
 impl UIElement for Formatted {
     fn draw(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         r: &Region,
         sw: f64,
         sh: f64,
@@ -1140,7 +1139,7 @@ impl UIElement for Formatted {
                     offset: 0.0,
                     text: Vec::new(),
                     max_width: self.max_width,
-                    renderer,
+                    renderer: renderer.clone(),
                     transparency: self.transparency,
                     scale_x: self.scale_x,
                     scale_y: self.scale_y,
@@ -1154,10 +1153,10 @@ impl UIElement for Formatted {
                     e.force_rebuild();
                 }
                 let r = Container::compute_draw_region(e, sw, sh, r);
-                let data = e.draw(renderer, &r, sw, sh, width, height, delta);
+                let data = e.draw(renderer.clone(), &r, sw, sh, width, height, delta);
                 self.data.extend_from_slice(&data);
             }
-            self.super_draw(renderer, r, sw, sh, width, height, delta);
+            self.super_draw(renderer.clone(), r, sw, sh, width, height, delta);
 
             self.last_text = self.text.clone();
             self.last_scale_x = self.scale_x;
@@ -1182,8 +1181,8 @@ impl UIElement for Formatted {
             || self.last_max_width != self.max_width
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
-        self.super_tick(renderer);
+    fn tick(&mut self, renderer: Arc<render::Renderer>) {
+        self.super_tick(renderer.clone());
         if self.is_dirty() {
             let (w, h) = Self::compute_size(
                 renderer,
@@ -1206,7 +1205,7 @@ impl Formatted {
     }
 
     pub fn compute_size(
-        renderer: &render::Renderer,
+        renderer: Arc<render::Renderer>,
         text: &format::Component,
         max_width: f64,
         transparency: f64,
@@ -1229,7 +1228,7 @@ impl Formatted {
     }
 }
 
-struct FormatState<'a> {
+struct FormatState {
     max_width: f64,
     lines: usize,
     offset: f64,
@@ -1238,16 +1237,16 @@ struct FormatState<'a> {
     scale_x: f64,
     scale_y: f64,
     text: Vec<Element>,
-    renderer: &'a render::Renderer,
+    renderer: Arc<render::Renderer>,
 }
 
-impl<'a> ElementHolder for FormatState<'a> {
+impl ElementHolder for FormatState {
     fn add(&mut self, el: Element, _: bool) {
         self.text.push(el);
     }
 }
 
-impl<'a> FormatState<'a> {
+impl FormatState {
     fn build(&mut self, c: &format::Component, color: format::Color) {
         match *c {
             format::Component::Text(ref txt) => {
@@ -1267,7 +1266,7 @@ impl<'a> FormatState<'a> {
         let mut width = 0.0;
         let mut last = 0;
         for (i, c) in txt.char_indices() {
-            let size = self.renderer.ui.size_of_char(c) + 2.0;
+            let size = self.renderer.ui.lock().size_of_char(c) + 2.0;
             if (self.max_width > 0.0 && self.offset + width + size > self.max_width) || c == '\n' {
                 let (rr, gg, bb) = color.to_rgb();
                 TextBuilder::new()
@@ -1300,7 +1299,7 @@ impl<'a> FormatState<'a> {
                 .scale_x(scale_x)
                 .scale_y(scale_y)
                 .create(self);
-            self.offset += self.renderer.ui.size_of_string(&txt[last..]) + 2.0;
+            self.offset += self.renderer.ui.lock().size_of_string(&txt[last..]) + 2.0;
             if self.offset > self.width {
                 self.width = self.offset;
             }
@@ -1345,7 +1344,7 @@ impl ButtonBuilder {
 impl UIElement for Button {
     fn draw(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         r: &Region,
         sw: f64,
         sh: f64,
@@ -1519,7 +1518,7 @@ impl UIElement for Button {
         })
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
+    fn tick(&mut self, renderer: Arc<render::Renderer>) {
         self.super_tick(renderer);
     }
 }
@@ -1567,7 +1566,7 @@ impl TextBoxBuilder {
 impl UIElement for TextBox {
     fn draw(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         r: &Region,
         sw: f64,
         sh: f64,
@@ -1663,7 +1662,7 @@ impl UIElement for TextBox {
         self.input.push(c);
     }
 
-    fn tick(&mut self, renderer: &mut render::Renderer) {
+    fn tick(&mut self, renderer: Arc<render::Renderer>) {
         self.super_tick(renderer);
     }
 }

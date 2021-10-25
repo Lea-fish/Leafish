@@ -83,7 +83,7 @@ impl super::Screen for Launcher {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<Renderer>,
         ui_container: &mut ui::Container,
     ) {
         // Options menu
@@ -405,7 +405,7 @@ impl super::Screen for Launcher {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         // Clean up
@@ -419,7 +419,7 @@ impl super::Screen for Launcher {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut ui::Container,
         _: f64,
     ) {
@@ -428,10 +428,10 @@ impl super::Screen for Launcher {
     fn on_resize(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_deactive(screen_sys, renderer.clone(), ui_container);
         self.on_active(screen_sys, renderer, ui_container);
     }
 

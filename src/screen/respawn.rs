@@ -5,6 +5,7 @@ use crate::ui;
 use crate::ui::{Container, ImageRef};
 use leafish_protocol::protocol::packet::play::serverbound::ClientStatus;
 use leafish_protocol::protocol::{VarInt, Version};
+use std::sync::Arc;
 
 pub struct Respawn {
     elements: Option<UIElements>,
@@ -42,14 +43,14 @@ impl super::Screen for Respawn {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        let icon_scale = Hud::icon_scale(renderer);
+        let icon_scale = Hud::icon_scale(renderer.clone());
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
-            .size(renderer.width as f64, renderer.height as f64)
+            .size(renderer.screen_data.read().width as f64, renderer.screen_data.read().height as f64)
             .colour((104, 0, 0, 100))
             .create(ui_container);
         let text = ui::TextBuilder::new()
@@ -131,7 +132,7 @@ impl super::Screen for Respawn {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
         self.elements = None;
@@ -140,7 +141,7 @@ impl super::Screen for Respawn {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
         _delta: f64,
     ) {
@@ -150,10 +151,10 @@ impl super::Screen for Respawn {
     fn on_resize(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        self.on_deactive(screen_sys, renderer, ui_container);
+        self.on_deactive(screen_sys, renderer.clone(), ui_container);
         self.on_active(screen_sys, renderer, ui_container);
     }
 
