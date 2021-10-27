@@ -345,11 +345,13 @@ impl World {
             valid_dirs[dir.index()] = renderer.clone().view_vector.lock().dot(dir_vec) > -0.9;
         }
 
+        let camera = renderer.camera.lock();
         let start = (
-            ((renderer.camera.lock().pos.x as i32) >> 4),
-            ((renderer.camera.lock().pos.y as i32) >> 4),
-            ((renderer.camera.lock().pos.z as i32) >> 4),
+            ((camera.pos.x as i32) >> 4),
+            ((camera.pos.y as i32) >> 4),
+            ((camera.pos.z as i32) >> 4),
         );
+        drop(camera);
 
         let render_queue = Arc::new(RwLock::new(Vec::new()));
         let mut process_queue = VecDeque::with_capacity(self.chunks.clone().len() * 16);

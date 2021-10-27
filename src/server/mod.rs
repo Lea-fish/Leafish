@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::entity;
-use crate::entity::player::{create_local, PlayerMovement, PlayerModel, CleanupManager};
+use crate::entity::player::{create_local, PlayerMovement, PlayerModel};
 use crate::entity::{EntityType, TargetRotation, GameInfo, Gravity, TargetPosition};
 use crate::format;
 use crate::inventory::material::versions::to_material;
@@ -853,7 +853,6 @@ impl Server {
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
-        entities.world.insert_resource(CleanupManager::default());
         entity::add_systems(&mut entities, &mut parallel, &mut sync);
         entities.schedule.clone().write().add_stage("parallel", parallel).add_stage_after("parallel", "sync", sync);
 
@@ -1055,43 +1054,10 @@ impl Server {
                 schedule.write().run(&mut entities.world);*/
                 *self.entity_tick_timer.write() -= 3.0;
             }
-            // println!("pre run!");
             let schedule = entities.schedule.clone();
-            // println!("run!");
-            {
-                let cleanup_manager = entities.world.get_resource::<CleanupManager>().unwrap();
-                let cleanup_map = cleanup_manager.cleanup_map.clone();
-                let mut cleanup_map = cleanup_map.lock();
-                for removed in entities.world.collect_removed() {
-                    println!("trying to cleanup model... : {:?}", removed);
-                    if let Some(cleanup_fn) = cleanup_map.remove(&removed) {
-                        println!("cleaned up model!");
-                        cleanup_fn();
-                    }
-                }
-            }
             entities.world.clear_trackers();
             schedule.write().run(&mut entities.world);
-            // println!("finished run!");
-            // let world = self.world.clone();
-            /*self.entities
-                .clone()
-                .write()
-                .render_tick(&world, renderer, focused, dead);*/
             // TODO: Make render systems run only once!
-            /*{
-                let cleanup_manager = entities.world.get_resource::<CleanupManager>().unwrap();
-                let cleanup_map = cleanup_manager.cleanup_map.clone();
-                let mut cleanup_map = cleanup_map.lock();
-                for removed in entities.world.collect_removed() {
-                    println!("trying to cleanup model... : {:?}", removed);
-                    if let Some(cleanup_fn) = cleanup_map.remove(&removed) {
-                        println!("cleaned up model!");
-                        cleanup_fn();
-                    }
-                }
-            }
-            entities.world.clear_trackers();*/
         }
     }
 
@@ -1658,11 +1624,7 @@ impl Server {
     }
 
     fn on_respawn(&self, respawn: mapped_packet::play::clientbound::Respawn) {
-        {
-            let entities = self.entities.read();
-            let cleanup_manager = entities.world.get_resource::<CleanupManager>().unwrap();
-            cleanup_manager.cleanup_all();
-        }
+        // TODO: Despawn all entities
 
         let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
 

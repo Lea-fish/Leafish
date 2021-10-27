@@ -11,7 +11,6 @@ use bevy_ecs::prelude::*;
 use crate::ecs::Manager;
 use parking_lot::{RwLock, Mutex};
 use std::sync::Arc;
-use crate::entity::player::CleanupManager;
 
 #[derive(Component)]
 pub struct ZombieModel {

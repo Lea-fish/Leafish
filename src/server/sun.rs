@@ -32,30 +32,31 @@ impl SunModel {
         let ox = (time * PI).cos() * 300.0;
         let oy = (time * PI).sin() * 300.0;
 
+        let mut models = renderer.models.lock();
         {
-            let mut models = renderer.models.lock();
             let sun = models.get_model(&self.sun).unwrap();
+            let camera = renderer.camera.lock();
             sun.matrix[0] = Matrix4::from(Decomposed {
                 scale: 1.0,
                 rot: Quaternion::from_angle_z(Rad(-(time * PI) as f32)),
                 disp: Vector3::new(
-                    (renderer.camera.lock().pos.x + ox) as f32,
-                    -(renderer.camera.lock().pos.y + oy) as f32,
-                    renderer.camera.lock().pos.z as f32,
+                    (camera.pos.x + ox) as f32,
+                    -(camera.pos.y + oy) as f32,
+                    camera.pos.z as f32,
                 ),
             });
         }
 
         {
-            let mut models = renderer.models.lock();
             let moon = models.get_model(&self.moon).unwrap();
+            let camera = renderer.camera.lock();
             moon.matrix[0] = Matrix4::from(Decomposed {
                 scale: 1.0,
                 rot: Quaternion::from_angle_z(Rad((PI - (time * PI)) as f32)),
                 disp: Vector3::new(
-                    (renderer.camera.lock().pos.x - ox) as f32,
-                    -(renderer.camera.lock().pos.y - oy) as f32,
-                    renderer.camera.lock().pos.z as f32,
+                    (camera.pos.x - ox) as f32,
+                    -(camera.pos.y - oy) as f32,
+                    camera.pos.z as f32,
                 ),
             });
         }

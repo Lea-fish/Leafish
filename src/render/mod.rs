@@ -81,7 +81,7 @@ struct ChunkRenderData {
 
     chunk_shader: ChunkShader,
     chunk_shader_alpha: ChunkShaderAlpha,
-    trans_shader: TransShader,
+    trans_shader: Arc<TransShader>,
     trans: Option<TransInfo>,
 
 }
@@ -250,7 +250,7 @@ impl Renderer {
             chunk_render_data: Mutex::new(ChunkRenderData {
                 chunk_shader,
                 chunk_shader_alpha,
-                trans_shader,
+                trans_shader: Arc::new(trans_shader),
                 trans: None,
             }),
             camera: Mutex::new(Camera {
@@ -323,23 +323,26 @@ impl Renderer {
             self.init_trans(width, height);
         }
 
+        let tmp_cam = self.camera.lock();
         *self.view_vector.lock() = cgmath::Vector3::new(
-            ((self.camera.lock().yaw - PI64 / 2.0).cos() * -self.camera.lock().pitch.cos()) as f32,
-            (-self.camera.lock().pitch.sin()) as f32,
-            (-(self.camera.lock().yaw - PI64 / 2.0).sin() * -self.camera.lock().pitch.cos()) as f32,
+            ((tmp_cam.yaw - PI64 / 2.0).cos() * -tmp_cam.pitch.cos()) as f32,
+            (-tmp_cam.pitch.sin()) as f32,
+            (-(tmp_cam.yaw - PI64 / 2.0).sin() * -tmp_cam.pitch.cos()) as f32,
         );
         let camera = cgmath::Point3::new(
-            -self.camera.lock().pos.x as f32,
-            -self.camera.lock().pos.y as f32,
-            self.camera.lock().pos.z as f32,
+            -tmp_cam.pos.x as f32,
+            -tmp_cam.pos.y as f32,
+            tmp_cam.pos.z as f32,
         );
+        let view_vec = self.view_vector.lock();
         let camera_matrix = cgmath::Matrix4::look_at(
             camera,
             camera
-                + cgmath::Point3::new(-self.view_vector.lock().x, -self.view_vector.lock().y, self.view_vector.lock().z)
+                + cgmath::Point3::new(-view_vec.x, -view_vec.y, view_vec.z)
                     .to_vec(),
             cgmath::Vector3::new(0.0, -1.0, 0.0),
         );
+        drop(view_vec);
         *self.camera_matrix.lock() = camera_matrix * cgmath::Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
         *self.frustum.lock() = collision::Frustum::from_matrix4(*self.perspective_matrix.lock() * *self.camera_matrix.lock()).unwrap();
     }
@@ -409,12 +412,13 @@ impl Renderer {
 
             // Line rendering
             // Model rendering
+            let light_data = self.light_data.lock();
             self.models.lock().draw(
                 *self.frustum.lock(), /*&self.frustum*/
                 &self.perspective_matrix.lock(),
                 &self.camera_matrix.lock(),
-                self.light_data.lock().light_level,
-                self.light_data.lock().sky_offset,
+                light_data.light_level,
+                light_data.sky_offset,
             );
             let tmp_world = world.as_ref().unwrap().clone();
 
@@ -426,8 +430,8 @@ impl Renderer {
                     &self.camera.lock().pos,
                     &self.perspective_matrix.lock(),
                     &self.camera_matrix.lock(),
-                    self.light_data.lock().light_level,
-                    self.light_data.lock().sky_offset,
+                    light_data.light_level,
+                    light_data.sky_offset,
                     delta,
                 );
             }
@@ -444,10 +448,10 @@ impl Renderer {
                 self.chunk_render_data.lock().chunk_shader_alpha.texture.set_int(0);
                 self.chunk_render_data.lock().chunk_shader_alpha
                     .light_level
-                    .set_float(self.light_data.lock().light_level);
+                    .set_float(light_data.light_level);
                 self.chunk_render_data.lock().chunk_shader_alpha
                     .sky_offset
-                    .set_float(self.light_data.lock().sky_offset);
+                    .set_float(light_data.sky_offset);
 
                 // Copy the depth buffer
                 let chunk_data = self.chunk_render_data.lock();
@@ -514,8 +518,9 @@ impl Renderer {
         gl::disable(gl::BLEND);
         if world.is_some() && self.chunk_render_data.lock().trans.is_some() {
             let mut chunk_data = self.chunk_render_data.lock();
+            let shader = chunk_data.trans_shader.clone();
             let trans = chunk_data.trans.as_mut().unwrap();
-            trans.draw(&self.chunk_render_data.lock().trans_shader);
+            trans.draw(&shader);
         }
 
         gl::enable(gl::DEPTH_TEST);
@@ -773,11 +778,12 @@ impl Renderer {
 
     fn init_trans(&self, width: u32, height: u32) {
         self.chunk_render_data.lock().trans = None;
-        self.chunk_render_data.lock().trans = Some(TransInfo::new(
+        let mut chunk_render_data = self.chunk_render_data.lock();
+        chunk_render_data.trans = Some(TransInfo::new(
             width,
             height,
-            &self.chunk_render_data.lock().chunk_shader_alpha,
-            &self.chunk_render_data.lock().trans_shader,
+            &chunk_render_data.chunk_shader_alpha,
+            &chunk_render_data.trans_shader,
         ));
     }
 

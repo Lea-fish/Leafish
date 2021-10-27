@@ -284,48 +284,12 @@ fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>,
             }
             player_model.time = time;
             player_model.dir = dir;
-           // println!("end tick player!");
         }
     }
-    println!("current player models {}", player_count);
 }
 
-#[derive(Default)]
-pub struct CleanupManager { // This thing's purpose is to workaround some missing features and bugs in bevy
-
-    pub cleanup_map: Arc<Mutex<HashMap<Entity, Box<dyn Fn() + Send>>>>,
-
-}
-
-impl CleanupManager {
-
-    pub fn cleanup_all(&self) {
-        let cleanup_map = self.cleanup_map.clone();
-        let mut cleanup_map = cleanup_map.lock();
-        for cleanup_element in cleanup_map.drain() {
-            cleanup_element.1();
-        }
-    }
-
-}
-
-pub fn player_added(cleanup_manager: Res<CleanupManager>, renderer: Res<Arc<Renderer>>, mut query: Query<(Entity, &mut PlayerModel), (Added<PlayerModel>)>) {
-    let cleanup_map = cleanup_manager.cleanup_map.clone();
-    for (entity, mut player_model) in query.iter_mut() {
-        let tmp_renderer = renderer.clone();
-        let model = player_model.model.clone();
-        let skin_url = player_model.skin_url.clone();
-        cleanup_map.clone().lock().insert(entity, Box::new(move || {
-            let renderer = tmp_renderer.clone();
-            let skin_url = skin_url.clone();
-            let model = model.clone();
-            let mut model = model.lock();
-            if let Some(model) = model.take() {
-                if let Some(url) = skin_url.lock().as_ref() {
-                    renderer.get_textures_ref().read().release_skin(url);
-                }
-            }
-        }));
+pub fn player_added(renderer: Res<Arc<Renderer>>, mut query: Query<(&mut PlayerModel), (Added<PlayerModel>)>) {
+    for (mut player_model) in query.iter_mut() {
         add_player(renderer.clone(), &mut *player_model);
     }
 }

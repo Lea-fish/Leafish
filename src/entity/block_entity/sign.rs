@@ -10,7 +10,6 @@ use crate::render::Renderer;
 use parking_lot::{RwLock, Mutex};
 use std::sync::Arc;
 use crate::ecs::SystemExecStage;
-use crate::entity::player::CleanupManager;
 
 pub fn add_systems(m: &mut ecs::Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
     sync.add_system(render_sign.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
@@ -65,17 +64,8 @@ pub fn render_sign(renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::Wo
     }
 }
 
-pub fn on_add_sign(cleanup_manager: Res<CleanupManager>, renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::World>>, mut query: Query<(Entity, &mut SignInfo, &Position), (Added<SignInfo>)>) {
-    let cleanup_map = cleanup_manager.cleanup_map.clone();
-    for (entity, mut info, position) in query.iter_mut() {
-        let model = info.model.clone();
-        let tmp_renderer = renderer.clone();
-        cleanup_map.clone().lock().insert(entity, Box::new(move || {
-            let renderer = tmp_renderer.clone();
-            let model = model.clone();
-            let mut model = model.lock();
-            model.take();
-        }));
+pub fn on_add_sign(renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position), (Added<SignInfo>)>) {
+    for (mut info, position) in query.iter_mut() {
        add_sign(renderer.clone(), world.clone(), &mut *info, position);
    }
 }

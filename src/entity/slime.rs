@@ -10,7 +10,6 @@ use collision::Aabb3;
 use bevy_ecs::prelude::*;
 use std::sync::Arc;
 use parking_lot::{RwLock, Mutex};
-use crate::entity::player::CleanupManager;
 
 #[derive(Component)]
 pub struct SlimeModel {
