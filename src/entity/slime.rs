@@ -13,7 +13,7 @@ use parking_lot::{RwLock, Mutex};
 
 #[derive(Component)]
 pub struct SlimeModel {
-    model: Arc<Mutex<Option<model::ModelHandle>>>,
+    model: Option<model::ModelHandle>,
     _name: String,
 
     _dir: i32,
@@ -25,7 +25,7 @@ pub struct SlimeModel {
 impl SlimeModel {
     pub fn new(name: &str) -> SlimeModel {
         SlimeModel {
-            model: Arc::new(Mutex::new(None)),
+            model: None,
             _name: name.to_owned(),
 
             _dir: 0,
@@ -65,7 +65,7 @@ pub fn update_slime(game_info: Res<GameInfo>, renderer: Res<Arc<Renderer>>, mut 
            self.entity_added(m, e, world, renderer);
        }*/
 
-       if let Some(pmodel) = &*slime_model.model.clone().lock() {
+       if let Some(pmodel) = &slime_model.model.clone() {
            let renderer = renderer.clone();
            let mut models = renderer.models.lock();
            let mdl = models.get_model(&pmodel).unwrap();
@@ -204,15 +204,16 @@ pub fn added_slime(renderer: Res<Arc<Renderer>>, mut query: Query<(&mut SlimeMod
             }
             name_verts.extend_from_slice(&state.text);
         }*/
-
-        slime_model.model.lock().replace(renderer.clone().models.lock().create_model(
+        let model = renderer.clone().models.lock().create_model(
             model::DEFAULT,
             vec![
                 body_verts, eye_verts,
                 // name_verts,
             ],
             renderer.clone(),
-        ));
+        );
+
+        slime_model.model.replace(model);
     }
 }
 

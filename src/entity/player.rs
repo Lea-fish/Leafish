@@ -79,7 +79,7 @@ pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
 
 #[derive(Component)]
 pub struct PlayerModel {
-    model: Arc<Mutex<Option<model::ModelHandle>>>,
+    model: Option<model::ModelHandle>,
     skin_url: Arc<Mutex<Option<String>>>,
     dirty: bool,
     name: String,
@@ -98,7 +98,7 @@ pub struct PlayerModel {
 impl PlayerModel {
     pub fn new(name: &str, has_head: bool, has_name_tag: bool, first_person: bool) -> Self {
         Self {
-            model: Arc::new(Mutex::new(None)),
+            model: None,
             skin_url: Arc::new(Mutex::new(None)),
             dirty: false,
             name: name.to_owned(),
@@ -117,7 +117,6 @@ impl PlayerModel {
 
     pub fn set_skin(&mut self, skin: Option<String>) {
         if *self.skin_url.lock() != skin {
-            println!("update skin!");
             if let Some(skin) = skin {
                 self.skin_url.lock().replace(skin);
             } else {
@@ -143,7 +142,7 @@ fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>,
             add_player(renderer.clone(), &mut *player_model);
         }
 
-        if let Some(pmodel) = &*player_model.model.clone().lock() {
+        if let Some(pmodel) = &player_model.model {
             let renderer = renderer.clone();
             let cam_x = renderer.camera.lock().pos.x;
             let cam_z = renderer.camera.lock().pos.z;
@@ -449,8 +448,7 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
         }
         name_verts.extend_from_slice(&state.text);
     }
-
-    player_model.model.lock().replace(renderer.clone().models.lock().create_model(
+    let model = renderer.clone().models.lock().create_model(
         model::DEFAULT,
         vec![
             head_verts,
@@ -462,11 +460,13 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
             name_verts,
         ],
         renderer.clone(),
-    ));
+    );
+
+    player_model.model.replace(model);
 }
 
 fn remove_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
-    if let Some(model) = player_model.model.lock().take() {
+    if let Some(model) = player_model.model.take() {
         if let Some(url) = player_model.skin_url.lock().as_ref() {
             renderer.get_textures_ref().read().release_skin(url); // TODO: Move this into the custom drop handling fn!
         }

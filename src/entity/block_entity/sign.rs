@@ -18,7 +18,7 @@ pub fn add_systems(m: &mut ecs::Manager, parallel: &mut SystemStage, sync: &mut 
 
 pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
     m.world.get_entity_mut(e).unwrap().insert(SignInfo {
-        model: Arc::new(Mutex::new(None)),
+        model: None,
         lines: [
             Component::Text(format::TextComponent::new("")),
             Component::Text(format::TextComponent::new("")),
@@ -36,7 +36,7 @@ pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
 
 #[derive(Component)]
 pub struct SignInfo {
-    model: Arc<Mutex<Option<model::ModelHandle>>>,
+    model: Option<model::ModelHandle>,
 
     pub lines: [format::Component; 4],
     pub dirty: bool,
@@ -54,7 +54,7 @@ pub fn render_sign(renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::Wo
             remove_sign(&mut *info);
             add_sign(renderer.clone(), world.clone(), &mut *info, position);
         }
-        if let Some(model) = &*info.model.lock() {
+        if let Some(model) = &info.model {
             let renderer = renderer.clone();
             let mut models = renderer.models.lock();
             let mdl = models.get_model(&model).unwrap();
@@ -66,7 +66,7 @@ pub fn render_sign(renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::Wo
 
 pub fn on_add_sign(renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position), (Added<SignInfo>)>) {
     for (mut info, position) in query.iter_mut() {
-       add_sign(renderer.clone(), world.clone(), &mut *info, position);
+        add_sign(renderer.clone(), world.clone(), &mut *info, position);
    }
 }
 
@@ -142,7 +142,6 @@ fn add_sign(renderer: Arc<Renderer>, world: Arc<crate::world::World>, info: &mut
     for (i, line) in info.lines.iter().enumerate() {
         const Y_SCALE: f32 = (6.0 / 16.0) / 4.0;
         const X_SCALE: f32 = Y_SCALE / 16.0;
-        let renderer = renderer.clone();
         let mut state = FormatState {
             width: 0.0,
             offset: 0.0,
@@ -160,8 +159,6 @@ fn add_sign(renderer: Arc<Renderer>, world: Arc<crate::world::World>, info: &mut
         }
         verts.extend_from_slice(&state.text);
     }
-
-    let renderer = renderer.clone();
     let mut models = renderer.models.lock();
     let model = models.create_model(model::DEFAULT, vec![verts], renderer.clone());
 
@@ -183,10 +180,12 @@ fn add_sign(renderer: Arc<Renderer>, world: Arc<crate::world::World>, info: &mut
         -info.offset_y as f32,
         info.offset_z as f32,
     ));
+    drop(models); // if we don't do this, we would get a deadlock
+    // FIXME: Cleanup all the manual drops with seperate spans
 
-    info.model.lock().replace(model);
+    info.model.replace(model); // TODO: This can cause a deadlock, check why!
 }
 
 fn remove_sign(info: &mut SignInfo) {
-    info.model.clone().lock().take();
+    info.model.take();
 }
