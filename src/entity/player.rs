@@ -25,17 +25,17 @@ use crate::entity::slime::{update_slime, added_slime};
 use crate::entity::zombie::{update_zombie, added_zombie, removed_zombie};
 use bevy_ecs::system::Command;
 
-pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) { // TODO: Check sync/async usage!
-    sync
-        .add_system(update_render_players.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
+pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage, entity_sched: &mut SystemStage) { // TODO: Check sync/async usage!
+    entity_sched
+        .add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render));
+    // let sys = ParticleRenderer::new(m);
+    // m.add_render_system(sys);
+    sync.add_system(update_render_players.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(player_added.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(update_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(added_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(update_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(added_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render));
-    // let sys = ParticleRenderer::new(m);
-    // m.add_render_system(sys);
+        .add_system(added_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
 }
 
 pub fn create_local(m: &mut Manager) -> Entity {
@@ -138,7 +138,6 @@ fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>,
         use std::f64::consts::PI as PI64;
 
         if player_model.dirty {
-            remove_player(renderer.clone(), &mut *player_model);
             add_player(renderer.clone(), &mut *player_model);
         }
 
@@ -448,7 +447,7 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
         }
         name_verts.extend_from_slice(&state.text);
     }
-    let model = renderer.clone().models.lock().create_model(
+    let mut model = renderer.clone().models.lock().create_model(
         model::DEFAULT,
         vec![
             head_verts,
@@ -461,16 +460,15 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
         ],
         renderer.clone(),
     );
+    let skin_url = player_model.skin_url.clone();
+    model.2 = player_model.model.as_ref().map_or(Some(Arc::new(move |renderer: Arc<Renderer>| {
+        let skin_url = skin_url.clone();
+        if let Some(url) = skin_url.lock().as_ref() {
+            renderer.get_textures_ref().read().release_skin(url); // TODO: Move this into the custom drop handling fn!
+        };
+    })), |x| x.2.clone());
 
     player_model.model.replace(model);
-}
-
-fn remove_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
-    if let Some(model) = player_model.model.take() {
-        if let Some(url) = player_model.skin_url.lock().as_ref() {
-            renderer.get_textures_ref().read().release_skin(url); // TODO: Move this into the custom drop handling fn!
-        }
-    }
 }
 
 enum PlayerModelPart {

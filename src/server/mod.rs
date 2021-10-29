@@ -63,7 +63,7 @@ use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::particle::{ParticleType, EntityMetadata};
 use cgmath::Vector3;
 use bevy_ecs::prelude::{Entity, SystemStage, Stage};
-use crate::ecs::{Manager, SystemExecStage, RemovedComponentsEntityCollector};
+use crate::ecs::{Manager, SystemExecStage};
 use bevy_ecs::schedule::{StageLabel, DynHash, DynEq};
 
 pub mod plugin_messages;
@@ -849,12 +849,14 @@ impl Server {
         let mut entities = Manager::new();
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
+        let mut entity_sched = SystemStage::single_threaded();
         entities.world.insert_resource(entity::GameInfo::new());
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
-        entity::add_systems(&mut entities, &mut parallel, &mut sync);
+        entity::add_systems(&mut entities, &mut parallel, &mut sync, &mut entity_sched);
         entities.schedule.clone().write().add_stage("parallel", parallel).add_stage_after("parallel", "sync", sync);
+        entities.entity_schedule.clone().write().add_stage("entity", entity_sched);
 
         let version = Version::from_id(protocol_version as u32);
         let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
@@ -1047,15 +1049,13 @@ impl Server {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().just_disconnected = false;
             *self.entity_tick_timer.write() += delta;
+            entities.world.clear_trackers();
+            let entity_schedule = entities.entity_schedule.clone();
             while *self.entity_tick_timer.read() >= 3.0 {
-                /*println!("pre run!");
-                let schedule = entities.schedule.clone();
-                println!("run!");
-                schedule.write().run(&mut entities.world);*/
+                entity_schedule.clone().write().run(&mut entities.world);
                 *self.entity_tick_timer.write() -= 3.0;
             }
             let schedule = entities.schedule.clone();
-            entities.world.clear_trackers();
             schedule.write().run(&mut entities.world);
             // TODO: Make render systems run only once!
         }
@@ -1625,11 +1625,15 @@ impl Server {
 
     fn on_respawn(&self, respawn: mapped_packet::play::clientbound::Respawn) {
         // TODO: Despawn all entities
+        
 
         let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
-            self.hud_context.clone().write().update_game_mode(gamemode);
+            self.hud_context.clone().write().update_game_mode(gamemode);{
+
+        }
+
             *self
                 .entities
                 .clone()

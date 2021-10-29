@@ -58,28 +58,19 @@ srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
     [0.0, 0.0, 0.0, 1.0],
 */
 
-pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
-    // parallel.add_system(systems::update_last_position.system());
+pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage, entity_sched: &mut SystemStage) {
+    entity_sched.add_system(systems::update_last_position.system().label(SystemExecStage::Normal));
 
-    player::add_systems(m, parallel, sync);
-
-    // TODO: Enforce more exec ordering for velocity impl (velocity and gravity application order etc)
-    sync.add_system(systems::apply_velocity.system().label(SystemExecStage::Normal))
-        .add_system(systems::apply_gravity.system().label(SystemExecStage::Normal))
+    player::add_systems(m, parallel, sync, entity_sched);
+    entity_sched
+        .add_system(systems::apply_velocity.system().label(SystemExecStage::Normal))
+        .add_system(systems::apply_gravity.system().label(SystemExecStage::Normal));
+    sync
         .add_system(systems::lerp_position.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
         .add_system(systems::lerp_rotation.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-
-        .add_system(systems::update_last_position.system().label(SystemExecStage::Normal))
         .add_system(systems::light_entity.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
-    // parallel.add_system(systems::light_entity.system());
-    println!("added systems!");
 
     block_entity::add_systems(m, parallel, sync);
-}
-
-// TODO: Try to use this universally in ecs to handle cleanup!
-pub struct Cleanup {
-
 }
 
 /// Location of an entity in the world.
