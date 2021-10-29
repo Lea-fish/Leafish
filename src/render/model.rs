@@ -62,20 +62,6 @@ impl Drop for ModelHandle {
     }
 }
 
-/*
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ModelHandle {
-
-    key: Option<ModelKey>,
-
-
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DynamicTextureHandle {
-
-}*/
-
 impl Manager {
     pub fn new(greg: &glsl::Registry) -> Manager {
         let mut m = Manager {
