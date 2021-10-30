@@ -1766,8 +1766,10 @@ impl Server {
         for entity in &*self.entity_map.clone().write() {
             if self.entities.read().world.get_entity(*entity.1).is_some() {
                 self.entities.clone().write().world.despawn(*entity.1);
-                if p_data.1 == *entity.1 {
-                    println!("despawned local player!");
+                if let Some(p_data) = *self.player.read() {
+                    if p_data.1 == *entity.1 {
+                        println!("despawned local player!");
+                    }
                 }
             } else {
                 println!("no data for entity found :(");
