@@ -78,7 +78,6 @@ pub fn add_systems(
 }
 
 pub fn create_local(m: &mut Manager) -> Entity {
-    println!("created local player!");
     let mut entity = m.world.spawn();
     let mut tpos = TargetPosition::new(0.0, 0.0, 0.0);
     tpos.lerp_amount = 1.0 / 3.0;
@@ -781,7 +780,6 @@ pub fn handle_movement(
             }
         }
     }
-    println!("handle movement for {}", players);
 }
 
 fn calculate_looking_vector(yaw: f64, pitch: f64) -> (f64, f64) {

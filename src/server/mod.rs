@@ -1766,24 +1766,13 @@ impl Server {
         for entity in &*self.entity_map.clone().write() {
             if self.entities.read().world.get_entity(*entity.1).is_some() {
                 self.entities.clone().write().world.despawn(*entity.1);
-                if let Some(p_data) = *self.player.read() {
-                    if p_data.1 == *entity.1 {
-                        println!("despawned local player!");
-                    }
-                }
-            } else {
-                println!("no data for entity found :(");
-                if let Some(p_data) = *self.player.read() {
-                    if p_data.1 == *entity.1 {
-                        println!("Local player data not found for {:?}", p_data);
-                    }
-                }
             }
         }
 
         let entity_id = self.player.read().unwrap().0;
+        let local_player = create_local(&mut *self.entities.clone().write());
         *self.player.clone().write() =
-            Some((entity_id, create_local(&mut *self.entities.clone().write())));
+            Some((entity_id, local_player));
         let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
@@ -1820,6 +1809,7 @@ impl Server {
             // self.hud_context.clone().write().update_breath(-1); // TODO: Fix this!
             self.screen_sys.pop_screen();
         }
+        self.entity_map.clone().write().insert(entity_id, local_player);
     }
 
     // TODO: make use of "on_disconnect"
