@@ -1768,6 +1768,9 @@ impl Server {
                 self.entities.clone().write().world.despawn(*entity.1);
             } else {
                 println!("no data for entity found :(");
+                if let Some(p_data) = *self.player.read() {
+                    println!("Local player data not found for {:?}", p_data);
+                }
             }
         }
 
