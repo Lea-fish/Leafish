@@ -597,6 +597,7 @@ pub fn handle_movement(
         Option<&mut Gravity>,
     )>,
 ) {
+    let mut players = 0;
     for (
         entity,
         mut movement,
@@ -608,6 +609,7 @@ pub fn handle_movement(
         mut gravity,
     ) in query.iter_mut()
     {
+        players += 1;
         if movement.flying && gravity.is_some() {
             commands.entity(entity).remove::<Gravity>();
         } else if !movement.flying && gravity.is_none() {
@@ -778,6 +780,7 @@ pub fn handle_movement(
             }
         }
     }
+    println!("handle movement for {}", players);
 }
 
 fn calculate_looking_vector(yaw: f64, pitch: f64) -> (f64, f64) {

@@ -1164,7 +1164,7 @@ impl Server {
     }
 
     pub fn minecraft_tick(&self, game: &mut Game) {
-        if let Some(player) = *self.player.clone().write() {
+        if let Some(player) = *self.player.read() {
             let on_ground = {
                 let entities = self.entities.clone();
                 let mut entities = entities.write();
@@ -1763,20 +1763,15 @@ impl Server {
     }
 
     fn on_respawn(&self, respawn: mapped_packet::play::clientbound::Respawn) {
-        // TODO: Despawn all entities
-        if let Some(player) = *self.player.read() {
-            self.entity_map.clone().write().remove(&player.0);
-        }
         for entity in &*self.entity_map.clone().write() {
             if self.entities.read().world.get_entity(*entity.1).is_some() {
                 self.entities.clone().write().world.despawn(*entity.1);
             }
         }
-        let player = *self.player.read();
-        if let Some(player) = player {
-            self.entity_map.clone().write().insert(player.0, player.1);
-        }
 
+        let entity_id = self.player.read().unwrap().0;
+        *self.player.clone().write() =
+            Some((entity_id, create_local(&mut *self.entities.clone().write())));
         let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
@@ -1799,9 +1794,6 @@ impl Server {
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
-        let entity_id = self.player.read().unwrap().0;
-        *self.player.clone().write() =
-            Some((entity_id, create_local(&mut *self.entities.clone().write())));
         if *self.dead.read() {
             *self.dead.write() = false;
             *self.just_died.write() = false;
