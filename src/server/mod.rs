@@ -1766,6 +1766,8 @@ impl Server {
         for entity in &*self.entity_map.clone().write() {
             if self.entities.read().world.get_entity(*entity.1).is_some() {
                 self.entities.clone().write().world.despawn(*entity.1);
+            } else {
+                println!("no data for entity found :(");
             }
         }
 
