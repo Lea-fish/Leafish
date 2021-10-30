@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::render;
 use crate::{ui, Game};
 
+use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct EditAccountEntry {
     elements: Option<UIElements>,
@@ -60,7 +61,7 @@ impl super::Screen for EditAccountEntry {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut ui::Container,
     ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
@@ -150,7 +151,7 @@ impl super::Screen for EditAccountEntry {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut ui::Container,
     ) {
         // Clean up
@@ -160,7 +161,7 @@ impl super::Screen for EditAccountEntry {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<Renderer>,
         _ui_container: &mut ui::Container,
         _delta: f64,
     ) {

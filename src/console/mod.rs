@@ -27,7 +27,6 @@ use crate::format::{Color, Component, TextComponent};
 use crate::render;
 use crate::ui;
 use parking_lot::Mutex;
-use parking_lot::RwLock;
 
 const FILTERED_CRATES: &[&str] = &[
     //"reqwest", // TODO: needed?
@@ -303,7 +302,7 @@ impl Console {
     pub fn tick(
         &mut self,
         ui_container: &mut ui::Container,
-        renderer: Arc<RwLock<render::Renderer>>,
+        renderer: Arc<render::Renderer>,
         delta: f64,
         width: f64,
     ) {
@@ -351,13 +350,12 @@ impl Console {
             elements.lines.clear();
 
             let mut offset = 0.0;
-            let renderer = &*renderer.read();
             for line in self.history.iter().rev() {
                 if offset >= 210.0 {
                     break;
                 }
                 let (_, height) =
-                    ui::Formatted::compute_size(renderer, line, w - 10.0, 1.0, 1.0, 1.0);
+                    ui::Formatted::compute_size(renderer.clone(), line, w - 10.0, 1.0, 1.0, 1.0);
                 elements.lines.push(
                     ui::FormattedBuilder::new()
                         .text(line.clone())

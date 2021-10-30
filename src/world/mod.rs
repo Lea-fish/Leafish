@@ -38,6 +38,8 @@ use std::io::{Cursor, Read};
 use std::sync::Arc;
 
 pub use self::{chunk::*, lighting::*};
+use crate::entity::block_entity::sign::SignInfo;
+use std::sync::atomic::Ordering;
 
 pub mod biome;
 mod chunk;
@@ -212,7 +214,6 @@ impl World {
 
     #[allow(clippy::verbose_bit_mask)] // "llvm generates better code" for updates_performed & 0xFFF "on x86"
     pub fn tick(&self, m: &mut ecs::Manager) {
-        let sign_info: ecs::Key<block_entity::sign::SignInfo> = m.get_key();
         while let Ok(action) = self.block_entity_actions.1.try_recv() {
             match action {
                 BlockEntityAction::Remove(pos) => {
@@ -220,7 +221,7 @@ impl World {
                         self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
                     {
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            m.remove_entity(entity);
+                            m.world.despawn(entity);
                         }
                     }
                 }
@@ -230,7 +231,7 @@ impl World {
                     {
                         // Remove existing entity
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            m.remove_entity(entity);
+                            m.world.despawn(entity);
                         }
                         let block = chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF);
                         if let Some(entity_type) =
@@ -245,7 +246,12 @@ impl World {
                     let (pos, line1, line2, line3, line4) = *bx;
                     if let Some(chunk) = self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
                         if let Some(entity) = chunk.block_entities.get(&pos) {
-                            if let Some(sign) = m.get_component_mut(*entity, sign_info) {
+                            if let Some(mut sign) = m
+                                .world
+                                .get_entity_mut(*entity)
+                                .unwrap()
+                                .get_mut::<SignInfo>()
+                            {
                                 sign.lines = [line1, line2, line3, line4];
                                 sign.dirty = true;
                             }
@@ -331,7 +337,7 @@ impl World {
         dirty
     }
 
-    pub fn compute_render_list(&self, renderer: Arc<RwLock<render::Renderer>>) {
+    pub fn compute_render_list(&self, renderer: Arc<render::Renderer>) {
         let start_rec = Instant::now();
         // self.render_list.clone().write().clear(); // TODO: Sync with the main thread somehow!
         // renderer.clone().read()
@@ -340,22 +346,24 @@ impl World {
         for dir in Direction::all() {
             let (ox, oy, oz) = dir.get_offset();
             let dir_vec = cgmath::Vector3::new(ox as f32, oy as f32, oz as f32);
-            valid_dirs[dir.index()] = renderer.clone().read().view_vector.dot(dir_vec) > -0.9;
+            valid_dirs[dir.index()] = renderer.clone().view_vector.lock().dot(dir_vec) > -0.9;
         }
 
+        let camera = renderer.camera.lock();
         let start = (
-            ((renderer.read().camera.pos.x as i32) >> 4),
-            ((renderer.read().camera.pos.y as i32) >> 4),
-            ((renderer.read().camera.pos.z as i32) >> 4),
+            ((camera.pos.x as i32) >> 4),
+            ((camera.pos.y as i32) >> 4),
+            ((camera.pos.z as i32) >> 4),
         );
+        drop(camera);
 
         let render_queue = Arc::new(RwLock::new(Vec::new()));
         let mut process_queue = VecDeque::with_capacity(self.chunks.clone().len() * 16);
         // debug!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
         let _diff = Instant::now().duration_since(start_rec);
-        let frustum = renderer.read().frustum;
-        let frame_id = renderer.read().frame_id;
+        let frustum = *renderer.frustum.lock();
+        let frame_id = renderer.frame_id.load(Ordering::Acquire);
         self.do_render_queue(
             Arc::new(RwLock::new(process_queue)),
             frustum,
@@ -789,7 +797,7 @@ impl World {
     pub fn unload_chunk(&self, x: i32, z: i32, m: &mut ecs::Manager) {
         if let Some(chunk) = self.chunks.clone().remove(&CPos(x, z)) {
             for entity in chunk.1.block_entities.values() {
-                m.remove_entity(*entity);
+                m.world.despawn(*entity);
             }
         }
     }

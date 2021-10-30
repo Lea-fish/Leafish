@@ -22,7 +22,7 @@ impl Screen for InventoryWindow {
     fn init(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
         self.inventory_context
@@ -33,7 +33,7 @@ impl Screen for InventoryWindow {
         self.base_inventory
             .clone()
             .write()
-            .init(renderer, ui_container, self);
+            .init(renderer.clone(), ui_container, self);
         self.inventory
             .clone()
             .write()
@@ -43,7 +43,7 @@ impl Screen for InventoryWindow {
     fn deinit(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
         self.inventory_context.clone().write().inventory = None;
@@ -55,7 +55,7 @@ impl Screen for InventoryWindow {
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
     }
@@ -63,7 +63,7 @@ impl Screen for InventoryWindow {
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
     }
@@ -71,14 +71,14 @@ impl Screen for InventoryWindow {
     fn tick(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         _delta: f64,
     ) {
         self.base_inventory
             .clone()
             .write()
-            .tick(renderer, ui_container, self);
+            .tick(renderer.clone(), ui_container, self);
         self.inventory
             .clone()
             .write()
@@ -88,21 +88,21 @@ impl Screen for InventoryWindow {
     fn on_resize(
         &mut self,
         _screen_sys: &ScreenSystem,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
         self.clear_elements();
         self.base_inventory.clone().write().resize(
-            renderer.safe_width,
-            renderer.safe_height,
-            renderer,
+            renderer.screen_data.read().safe_width,
+            renderer.screen_data.read().safe_height,
+            renderer.clone(),
             ui_container,
             self,
         );
         self.inventory.clone().write().resize(
-            renderer.safe_width,
-            renderer.safe_height,
-            renderer,
+            renderer.screen_data.read().safe_width,
+            renderer.screen_data.read().safe_height,
+            renderer.clone(),
             ui_container,
             self,
         );
@@ -149,10 +149,10 @@ impl InventoryWindow {
         y: f64,
         elements: &mut Vec<ImageRef>,
         ui_container: &mut Container,
-        renderer: &Renderer,
+        renderer: Arc<Renderer>,
         v_attach: VAttach,
     ) {
-        let icon_scale = Hud::icon_scale(renderer);
+        let icon_scale = Hud::icon_scale(renderer.clone());
         let textures = item.material.texture_locations();
         let texture =
             if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &*textures.0) {
@@ -181,7 +181,7 @@ impl InventoryWindow {
         y: f64,
         elements_idx: usize,
         ui_container: &mut Container,
-        renderer: &Renderer,
+        renderer: Arc<Renderer>,
         v_attach: VAttach,
     ) {
         Self::draw_item(

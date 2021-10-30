@@ -22,16 +22,16 @@ impl BaseInventory {
     pub fn new(
         hud_context: Arc<RwLock<HudContext>>,
         player_inventory: Arc<RwLock<PlayerInventory>>,
-        renderer: &Renderer,
+        renderer: Arc<Renderer>,
     ) -> Self {
-        let icon_scale = Hud::icon_scale(renderer);
+        let icon_scale = Hud::icon_scale(renderer.clone());
         let size = 16.0;
         let hot_bar_offset = 6.0;
         let slot_offset = size + size * 1.0 / 8.0;
         Self {
             dirty: false,
             x_offset: -4.5,
-            y_offset: ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0
+            y_offset: ((renderer.screen_data.read().safe_height as f64 / icon_scale + 166.0) / 2.0
                 - slot_offset
                 - hot_bar_offset)
                 / 16.0,
@@ -41,7 +41,7 @@ impl BaseInventory {
         }
     }
 
-    fn update_icons(&mut self, renderer: &Renderer) {
+    fn update_icons(&mut self, renderer: Arc<Renderer>) {
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
         let x_offset = size * self.x_offset;
@@ -75,7 +75,7 @@ impl BaseInventory {
         self.dirty = true;
     }
 
-    pub fn update_offset(&mut self, x_offset: f64, y_offset: f64, renderer: &Renderer) {
+    pub fn update_offset(&mut self, x_offset: f64, y_offset: f64, renderer: Arc<Renderer>) {
         self.x_offset = x_offset;
         self.y_offset = y_offset;
         self.custom_offset = true;
@@ -115,17 +115,18 @@ impl Inventory for BaseInventory {
 
     fn init(
         &mut self,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         _ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
         inventory_window.elements.push(vec![]);
         if !self.custom_offset {
-            let icon_scale = Hud::icon_scale(renderer);
+            let icon_scale = Hud::icon_scale(renderer.clone());
             let size = 16.0;
             let hot_bar_offset = 6.0;
             let slot_offset = size + size * 1.0 / 8.0;
-            self.y_offset = ((renderer.safe_height as f64 / icon_scale + 166.0) / 2.0
+            self.y_offset = ((renderer.screen_data.read().safe_height as f64 / icon_scale + 166.0)
+                / 2.0
                 - slot_offset
                 - hot_bar_offset)
                 / 16.0;
@@ -140,7 +141,7 @@ impl Inventory for BaseInventory {
 
     fn tick(
         &mut self,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -158,7 +159,7 @@ impl Inventory for BaseInventory {
                         slot.y,
                         0,
                         ui_container,
-                        renderer,
+                        renderer.clone(),
                         VAttach::Top,
                     );
                 }
@@ -178,7 +179,7 @@ impl Inventory for BaseInventory {
         &mut self,
         _width: u32,
         _height: u32,
-        renderer: &mut Renderer,
+        renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {

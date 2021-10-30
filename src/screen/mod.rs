@@ -47,14 +47,14 @@ pub trait Screen {
     fn init(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
     ) {
     }
     fn deinit(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut render::Renderer,
+        _renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
     ) {
     }
@@ -63,13 +63,13 @@ pub trait Screen {
     fn on_active(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     );
     fn on_deactive(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     );
 
@@ -77,7 +77,7 @@ pub trait Screen {
     fn tick(
         &mut self,
         screen_sys: &ScreenSystem,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
         delta: f64,
     );
@@ -88,7 +88,7 @@ pub trait Screen {
     fn on_resize(
         &mut self,
         _screen_sys: &ScreenSystem,
-        _renderer: &mut Renderer,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
     } // TODO: make non-optional!
@@ -231,11 +231,10 @@ impl ScreenSystem {
     pub fn tick(
         &self,
         delta: f64,
-        renderer: Arc<RwLock<render::Renderer>>,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
         window: &Window,
     ) -> bool {
-        let renderer = &mut renderer.write();
         let lowest = self.lowest_offset.load(Ordering::Acquire);
         if lowest != -1 {
             let screens_len = self.screens.read().len();
@@ -255,17 +254,17 @@ impl ScreenSystem {
                 for _ in 0..(screens_len as isize - lowest) {
                     let screen = self.screens.clone().write().pop().unwrap();
                     if screen.active {
-                        screen
-                            .screen
-                            .clone()
-                            .lock()
-                            .on_deactive(self, renderer, ui_container);
+                        screen.screen.clone().lock().on_deactive(
+                            self,
+                            renderer.clone(),
+                            ui_container,
+                        );
                     }
                     screen
                         .screen
                         .clone()
                         .lock()
-                        .deinit(self, renderer, ui_container);
+                        .deinit(self, renderer.clone(), ui_container);
                 }
             }
             for screen in self
@@ -286,10 +285,11 @@ impl ScreenSystem {
                 if let Some(last) = last {
                     if last.active {
                         last.active = false;
-                        last.screen
-                            .clone()
-                            .lock()
-                            .on_deactive(self, renderer, ui_container);
+                        last.screen.clone().lock().on_deactive(
+                            self,
+                            renderer.clone(),
+                            ui_container,
+                        );
                     }
                 }
                 let mut current = screens.last_mut().unwrap();
@@ -297,19 +297,19 @@ impl ScreenSystem {
                     .screen
                     .clone()
                     .lock()
-                    .init(self, renderer, ui_container);
+                    .init(self, renderer.clone(), ui_container);
                 current.active = true;
                 current
                     .screen
                     .clone()
                     .lock()
-                    .on_active(self, renderer, ui_container);
+                    .on_active(self, renderer.clone(), ui_container);
             }
             self.lowest_offset.store(-1, Ordering::Release);
             if !was_closable {
                 window.set_cursor_position(Position::Physical(PhysicalPosition::new(
-                    (renderer.safe_width / 2) as i32,
-                    (renderer.safe_height / 2) as i32,
+                    (renderer.screen_data.read().safe_width / 2) as i32,
+                    (renderer.screen_data.read().safe_height / 2) as i32,
                 )));
             }
         }
@@ -329,37 +329,36 @@ impl ScreenSystem {
                     .screen
                     .clone()
                     .lock()
-                    .on_active(self, renderer, ui_container);
+                    .on_active(self, renderer.clone(), ui_container);
             }
-            if current.last_width != renderer.safe_width as i32
-                || current.last_height != renderer.safe_height as i32
+            if current.last_width != renderer.screen_data.read().safe_width as i32
+                || current.last_height != renderer.screen_data.read().safe_height as i32
             {
                 if current.last_width != -1 && current.last_height != -1 {
                     for screen in tmp.iter_mut().enumerate() {
                         if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
-                            screen
-                                .1
-                                .screen
-                                .clone()
-                                .lock()
-                                .on_resize(self, renderer, ui_container);
-                            screen.1.last_width = renderer.safe_width as i32;
-                            screen.1.last_height = renderer.safe_height as i32;
+                            screen.1.screen.clone().lock().on_resize(
+                                self,
+                                renderer.clone(),
+                                ui_container,
+                            );
+                            screen.1.last_width = renderer.screen_data.read().safe_width as i32;
+                            screen.1.last_height = renderer.screen_data.read().safe_height as i32;
                         }
                     }
                 } else {
-                    current.last_width = renderer.safe_width as i32;
-                    current.last_height = renderer.safe_height as i32;
+                    current.last_width = renderer.screen_data.read().safe_width as i32;
+                    current.last_height = renderer.screen_data.read().safe_height as i32;
                 }
             }
             for screen in tmp.iter_mut().enumerate() {
                 if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
-                    screen
-                        .1
-                        .screen
-                        .clone()
-                        .lock()
-                        .tick(self, renderer, ui_container, delta);
+                    screen.1.screen.clone().lock().tick(
+                        self,
+                        renderer.clone(),
+                        ui_container,
+                        delta,
+                    );
                 }
             }
         }

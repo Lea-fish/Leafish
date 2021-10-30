@@ -22,6 +22,8 @@ pub mod inventory;
 pub mod model;
 pub mod ui;
 
+// TODO: Fix skin misassignment - happens even if this client joins only one server and stays there
+// TODO: But only one person gets a random skin from another person, but if the first person rejoins, their skin gets normal again.
 use crate::gl;
 use crate::paths;
 use crate::resources;
@@ -38,9 +40,9 @@ use crate::world::World;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use image::imageops::FilterType;
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::hash::BuildHasherDefault;
-use std::sync::atomic::{AtomicIsize, Ordering};
+use std::sync::atomic::{AtomicIsize, AtomicU32, AtomicUsize, Ordering};
 use std::thread;
 
 const ATLAS_SIZE: usize = 2048;
@@ -52,44 +54,63 @@ pub struct Camera {
 }
 
 pub struct Renderer {
-    resource_version: usize,
+    resource_version: AtomicUsize,
     pub resources: Arc<RwLock<resources::Manager>>,
     textures: Arc<RwLock<TextureManager>>,
-    pub ui: ui::UIState,
-    pub model: model::Manager,
-    pub clouds: Option<clouds::Clouds>,
+    pub ui: Mutex<ui::UIState>,
+    pub models: Arc<Mutex<model::Manager>>,
+    pub clouds: Mutex<Option<clouds::Clouds>>,
+    texture_data: Mutex<TextureData>,
+    chunk_render_data: Mutex<ChunkRenderData>,
+    element_buffer_data: Mutex<ElementBufferData>,
 
-    gl_texture: gl::Texture,
-    texture_layers: usize,
+    pub camera: Mutex<Camera>,
+    perspective_matrix: Mutex<cgmath::Matrix4<f32>>,
+    camera_matrix: Mutex<cgmath::Matrix4<f32>>,
+    pub frustum: Mutex<collision::Frustum<f32>>,
+    pub view_vector: Mutex<cgmath::Vector3<f32>>,
 
+    pub frame_id: AtomicU32,
+    pub screen_data: RwLock<ScreenData>,
+    pub light_data: Mutex<LightData>,
+    skin_exchange_data: Mutex<SkinExchangeData>,
+}
+
+struct ChunkRenderData {
     chunk_shader: ChunkShader,
     chunk_shader_alpha: ChunkShaderAlpha,
-    trans_shader: TransShader,
+    trans_shader: Arc<TransShader>,
+    trans: Option<TransInfo>,
+}
 
+struct ElementBufferData {
     element_buffer: gl::Buffer,
     element_buffer_size: usize,
     element_buffer_type: gl::Type,
+}
 
-    pub camera: Camera,
-    perspective_matrix: cgmath::Matrix4<f32>,
-    camera_matrix: cgmath::Matrix4<f32>,
-    pub frustum: collision::Frustum<f32>,
-    pub view_vector: cgmath::Vector3<f32>,
+struct SkinExchangeData {
+    skin_request: Sender<String>,
+    skin_reply: Receiver<(String, Option<image::DynamicImage>)>,
+}
 
-    pub frame_id: u32,
+struct TextureData {
+    gl_texture: gl::Texture,
+    texture_layers: usize,
+}
 
-    trans: Option<TransInfo>,
+pub struct LightData {
+    // Light renderering
+    pub light_level: f32,
+    pub sky_offset: f32,
+}
 
+#[derive(Copy, Clone)]
+pub struct ScreenData {
     pub width: u32,
     pub height: u32,
     pub safe_width: u32,
     pub safe_height: u32,
-
-    // Light renderering
-    pub light_level: f32,
-    pub sky_offset: f32,
-    skin_request: Sender<String>,
-    skin_reply: Receiver<(String, Option<image::DynamicImage>)>,
 }
 
 #[derive(Default)]
@@ -202,79 +223,90 @@ impl Renderer {
         let clouds = Some(clouds::Clouds::new(&greg, textures.clone()));
         // TODO: setting to disable clouds on native, too, if desired
 
-        Renderer {
-            resource_version: version,
-            model: model::Manager::new(&greg),
-            clouds,
+        Self {
+            resource_version: AtomicUsize::from(version),
+            models: Arc::new(Mutex::new(model::Manager::new(&greg))),
+            clouds: Mutex::new(clouds),
             textures,
-            ui,
+            ui: Mutex::new(ui),
             resources: res,
-            gl_texture: tex,
-            texture_layers: 1,
-
-            chunk_shader,
-            chunk_shader_alpha,
-            trans_shader,
-
-            element_buffer: gl::Buffer::new(),
-            element_buffer_size: 0,
-            element_buffer_type: gl::UNSIGNED_BYTE,
-
-            width: 0,
-            height: 0,
-
-            safe_width: 0,
-            safe_height: 0,
-            camera: Camera {
+            texture_data: Mutex::new(TextureData {
+                gl_texture: tex,
+                texture_layers: 1,
+            }),
+            chunk_render_data: Mutex::new(ChunkRenderData {
+                chunk_shader,
+                chunk_shader_alpha,
+                trans_shader: Arc::new(trans_shader),
+                trans: None,
+            }),
+            camera: Mutex::new(Camera {
                 pos: cgmath::Point3::new(0.0, 0.0, 0.0),
                 yaw: 0.0,
                 pitch: ::std::f64::consts::PI,
-            },
-            perspective_matrix: cgmath::Matrix4::identity(),
-            camera_matrix: cgmath::Matrix4::identity(),
-            frustum: collision::Frustum::from_matrix4(cgmath::Matrix4::identity()).unwrap(),
-            view_vector: cgmath::Vector3::zero(),
-
-            frame_id: 1,
-
-            trans: None,
-
-            light_level: 0.8,
-            sky_offset: 1.0,
-            skin_request: skin_req,
-            skin_reply,
+            }),
+            perspective_matrix: Mutex::new(cgmath::Matrix4::identity()),
+            camera_matrix: Mutex::new(cgmath::Matrix4::identity()),
+            frustum: Mutex::new(
+                collision::Frustum::from_matrix4(cgmath::Matrix4::identity()).unwrap(),
+            ),
+            view_vector: Mutex::new(cgmath::Vector3::zero()),
+            frame_id: AtomicU32::new(1),
+            screen_data: RwLock::new(ScreenData {
+                width: 0,
+                height: 0,
+                safe_width: 0,
+                safe_height: 0,
+            }),
+            light_data: Mutex::new(LightData {
+                light_level: 0.8,
+                sky_offset: 1.0,
+            }),
+            element_buffer_data: Mutex::new(ElementBufferData {
+                element_buffer: gl::Buffer::new(),
+                element_buffer_size: 0,
+                element_buffer_type: gl::UNSIGNED_BYTE,
+            }),
+            skin_exchange_data: Mutex::new(SkinExchangeData {
+                skin_request: skin_req,
+                skin_reply,
+            }),
         }
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&self) {
         self.textures.clone().write().reset();
     }
 
-    pub fn update_camera(&mut self, width: u32, height: u32) {
+    pub fn update_camera(&self, width: u32, height: u32) {
         use std::f64::consts::PI as PI64;
         // Not a sane place to put this but it works
         {
             let version = self.resources.read().version();
-            if version != self.resource_version {
-                self.resource_version = version;
-                self.textures.write().update_textures(self.resource_version);
+            if version != self.resource_version.load(Ordering::Acquire) {
+                self.resource_version.store(version, Ordering::Release);
+                self.textures
+                    .write()
+                    .update_textures(self.resource_version.load(Ordering::Acquire));
 
-                self.model
-                    .rebuild_models(self.resource_version, &self.textures);
+                self.models.lock().rebuild_models(
+                    self.resource_version.load(Ordering::Acquire),
+                    &self.textures,
+                );
             }
         }
 
-        if self.height != height || self.width != width {
-            self.width = width;
-            self.height = height;
-            self.safe_width = width;
-            self.safe_height = height;
+        if self.screen_data.read().height != height || self.screen_data.read().width != width {
+            self.screen_data.write().width = width;
+            self.screen_data.write().height = height;
+            self.screen_data.write().safe_width = width;
+            self.screen_data.write().safe_height = height;
             gl::viewport(0, 0, width as i32, height as i32);
 
             let fovy = cgmath::Rad::from(cgmath::Deg(90.0_f32));
             let aspect = (width as f32 / height as f32).max(1.0);
 
-            self.perspective_matrix = cgmath::Matrix4::from(cgmath::PerspectiveFov {
+            *self.perspective_matrix.lock() = cgmath::Matrix4::from(cgmath::PerspectiveFov {
                 fovy,
                 aspect,
                 near: 0.1f32,
@@ -284,30 +316,34 @@ impl Renderer {
             self.init_trans(width, height);
         }
 
-        self.view_vector = cgmath::Vector3::new(
-            ((self.camera.yaw - PI64 / 2.0).cos() * -self.camera.pitch.cos()) as f32,
-            (-self.camera.pitch.sin()) as f32,
-            (-(self.camera.yaw - PI64 / 2.0).sin() * -self.camera.pitch.cos()) as f32,
+        let tmp_cam = self.camera.lock();
+        *self.view_vector.lock() = cgmath::Vector3::new(
+            ((tmp_cam.yaw - PI64 / 2.0).cos() * -tmp_cam.pitch.cos()) as f32,
+            (-tmp_cam.pitch.sin()) as f32,
+            (-(tmp_cam.yaw - PI64 / 2.0).sin() * -tmp_cam.pitch.cos()) as f32,
         );
         let camera = cgmath::Point3::new(
-            -self.camera.pos.x as f32,
-            -self.camera.pos.y as f32,
-            self.camera.pos.z as f32,
+            -tmp_cam.pos.x as f32,
+            -tmp_cam.pos.y as f32,
+            tmp_cam.pos.z as f32,
         );
+        let view_vec = self.view_vector.lock();
         let camera_matrix = cgmath::Matrix4::look_at(
             camera,
-            camera
-                + cgmath::Point3::new(-self.view_vector.x, -self.view_vector.y, self.view_vector.z)
-                    .to_vec(),
+            camera + cgmath::Point3::new(-view_vec.x, -view_vec.y, view_vec.z).to_vec(),
             cgmath::Vector3::new(0.0, -1.0, 0.0),
         );
-        self.camera_matrix = camera_matrix * cgmath::Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
-        self.frustum =
-            collision::Frustum::from_matrix4(self.perspective_matrix * self.camera_matrix).unwrap();
+        drop(view_vec);
+        *self.camera_matrix.lock() =
+            camera_matrix * cgmath::Matrix4::from_nonuniform_scale(-1.0, 1.0, 1.0);
+        *self.frustum.lock() = collision::Frustum::from_matrix4(
+            *self.perspective_matrix.lock() * *self.camera_matrix.lock(),
+        )
+        .unwrap();
     }
 
     pub fn tick(
-        &mut self,
+        &self,
         world: Option<Arc<World>>,
         delta: f64,
         width: u32,
@@ -318,17 +354,21 @@ impl Renderer {
         self.update_textures(delta);
 
         if world.is_some() {
-            if self.trans.is_some() {
-                let trans = self.trans.as_ref().unwrap();
+            if self.chunk_render_data.lock().trans.is_some() {
+                let chunk_data = self.chunk_render_data.lock();
+                let trans = chunk_data.trans.as_ref().unwrap();
                 trans.main.bind();
             }
 
             gl::active_texture(0);
-            self.gl_texture.bind(gl::TEXTURE_2D_ARRAY);
+            self.texture_data
+                .lock()
+                .gl_texture
+                .bind(gl::TEXTURE_2D_ARRAY);
 
             gl::enable(gl::MULTISAMPLE);
 
-            let time_offset = self.sky_offset * 0.9;
+            let time_offset = self.light_data.lock().sky_offset * 0.9;
             gl::clear_color(
                 (122.0 / 255.0) * time_offset,
                 (165.0 / 255.0) * time_offset,
@@ -337,31 +377,53 @@ impl Renderer {
             );
             gl::clear(gl::ClearFlags::Color | gl::ClearFlags::Depth);
             // Chunk rendering
-            self.chunk_shader.program.use_program();
+            self.chunk_render_data
+                .lock()
+                .chunk_shader
+                .program
+                .use_program();
 
-            self.chunk_shader
+            self.chunk_render_data
+                .lock()
+                .chunk_shader
                 .perspective_matrix
-                .set_matrix4(&self.perspective_matrix);
-            self.chunk_shader
+                .set_matrix4(&self.perspective_matrix.lock());
+            self.chunk_render_data
+                .lock()
+                .chunk_shader
                 .camera_matrix
-                .set_matrix4(&self.camera_matrix);
-            self.chunk_shader.texture.set_int(0);
-            self.chunk_shader.light_level.set_float(self.light_level);
-            self.chunk_shader.sky_offset.set_float(self.sky_offset);
+                .set_matrix4(&self.camera_matrix.lock());
+            self.chunk_render_data
+                .lock()
+                .chunk_shader
+                .texture
+                .set_int(0);
+            self.chunk_render_data
+                .lock()
+                .chunk_shader
+                .light_level
+                .set_float(self.light_data.lock().light_level);
+            self.chunk_render_data
+                .lock()
+                .chunk_shader
+                .sky_offset
+                .set_float(self.light_data.lock().sky_offset);
 
             let tmp_world = world.as_ref().unwrap().clone();
 
             for (pos, info) in tmp_world.get_render_list() {
                 if let Some(solid) = info.clone().read().solid.as_ref() {
                     if solid.count > 0 {
-                        self.chunk_shader
-                            .offset
-                            .set_int3(pos.0, pos.1 * 4096, pos.2);
+                        self.chunk_render_data.lock().chunk_shader.offset.set_int3(
+                            pos.0,
+                            pos.1 * 4096,
+                            pos.2,
+                        );
                         solid.array.bind();
                         gl::draw_elements(
                             gl::TRIANGLES,
                             solid.count as i32,
-                            self.element_buffer_type,
+                            self.element_buffer_data.lock().element_buffer_type,
                             0,
                         );
                     }
@@ -370,48 +432,66 @@ impl Renderer {
 
             // Line rendering
             // Model rendering
-            self.model.draw(
-                self.frustum, /*&self.frustum*/
-                &self.perspective_matrix,
-                &self.camera_matrix,
-                self.light_level,
-                self.sky_offset,
+            let light_data = self.light_data.lock();
+            self.models.lock().draw(
+                *self.frustum.lock(), /*&self.frustum*/
+                &self.perspective_matrix.lock(),
+                &self.camera_matrix.lock(),
+                light_data.light_level,
+                light_data.sky_offset,
             );
             let tmp_world = world.as_ref().unwrap().clone();
 
-            if let Some(clouds) = &mut self.clouds {
+            if let Some(clouds) = &mut *self.clouds.lock() {
                 if tmp_world.copy_cloud_heightmap(&mut clouds.heightmap_data) {
                     clouds.dirty = true;
                 }
                 clouds.draw(
-                    &self.camera.pos,
-                    &self.perspective_matrix,
-                    &self.camera_matrix,
-                    self.light_level,
-                    self.sky_offset,
+                    &self.camera.lock().pos,
+                    &self.perspective_matrix.lock(),
+                    &self.camera_matrix.lock(),
+                    light_data.light_level,
+                    light_data.sky_offset,
                     delta,
                 );
             }
 
-            if self.trans.is_some() {
+            if self.chunk_render_data.lock().trans.is_some() {
                 // Trans chunk rendering
-                self.chunk_shader_alpha.program.use_program();
-                self.chunk_shader_alpha
+                self.chunk_render_data
+                    .lock()
+                    .chunk_shader_alpha
+                    .program
+                    .use_program();
+                self.chunk_render_data
+                    .lock()
+                    .chunk_shader_alpha
                     .perspective_matrix
-                    .set_matrix4(&self.perspective_matrix);
-                self.chunk_shader_alpha
+                    .set_matrix4(&self.perspective_matrix.lock());
+                self.chunk_render_data
+                    .lock()
+                    .chunk_shader_alpha
                     .camera_matrix
-                    .set_matrix4(&self.camera_matrix);
-                self.chunk_shader_alpha.texture.set_int(0);
-                self.chunk_shader_alpha
+                    .set_matrix4(&self.camera_matrix.lock());
+                self.chunk_render_data
+                    .lock()
+                    .chunk_shader_alpha
+                    .texture
+                    .set_int(0);
+                self.chunk_render_data
+                    .lock()
+                    .chunk_shader_alpha
                     .light_level
-                    .set_float(self.light_level);
-                self.chunk_shader_alpha
+                    .set_float(light_data.light_level);
+                self.chunk_render_data
+                    .lock()
+                    .chunk_shader_alpha
                     .sky_offset
-                    .set_float(self.sky_offset);
+                    .set_float(light_data.sky_offset);
 
                 // Copy the depth buffer
-                let trans = self.trans.as_ref().unwrap();
+                let chunk_data = self.chunk_render_data.lock();
+                let trans = chunk_data.trans.as_ref().unwrap();
                 trans.main.bind_read();
                 trans.trans.bind_draw();
             }
@@ -431,8 +511,9 @@ impl Renderer {
 
         gl::enable(gl::BLEND);
         gl::depth_mask(false);
-        if world.is_some() && self.trans.is_some() {
-            let trans = self.trans.as_ref().unwrap();
+        if world.is_some() && self.chunk_render_data.lock().trans.is_some() {
+            let chunk_data = self.chunk_render_data.lock();
+            let trans = chunk_data.trans.as_ref().unwrap();
             trans.trans.bind();
         }
         gl::clear_color(0.0, 0.0, 0.0, 1.0); // clear color
@@ -451,14 +532,16 @@ impl Renderer {
             for (pos, info) in tmp_world.get_render_list().iter().rev() {
                 if let Some(trans) = info.clone().read().trans.as_ref() {
                     if trans.count > 0 {
-                        self.chunk_shader_alpha
+                        self.chunk_render_data
+                            .lock()
+                            .chunk_shader_alpha
                             .offset
                             .set_int3(pos.0, pos.1 * 4096, pos.2);
                         trans.array.bind();
                         gl::draw_elements(
                             gl::TRIANGLES,
                             trans.count as i32,
-                            self.element_buffer_type,
+                            self.element_buffer_data.lock().element_buffer_type,
                             0,
                         );
                     }
@@ -471,9 +554,11 @@ impl Renderer {
         gl::disable(gl::DEPTH_TEST);
         gl::clear(gl::ClearFlags::Color);
         gl::disable(gl::BLEND);
-        if world.is_some() && self.trans.is_some() {
-            let trans = self.trans.as_mut().unwrap();
-            trans.draw(&self.trans_shader);
+        if world.is_some() && self.chunk_render_data.lock().trans.is_some() {
+            let mut chunk_data = self.chunk_render_data.lock();
+            let shader = chunk_data.trans_shader.clone();
+            let trans = chunk_data.trans.as_mut().unwrap();
+            trans.draw(&shader);
         }
 
         gl::enable(gl::DEPTH_TEST);
@@ -481,30 +566,35 @@ impl Renderer {
 
         gl::disable(gl::MULTISAMPLE);
 
-        self.ui.tick(width, height);
+        self.ui.lock().tick(width, height);
 
         gl::check_gl_error();
 
-        self.frame_id = self.frame_id.wrapping_add(1);
+        self.frame_id
+            .fetch_update(Ordering::Release, Ordering::Relaxed, |x| {
+                Some(x.wrapping_add(1))
+            })
+            .unwrap();
     }
 
-    fn ensure_element_buffer(&mut self, size: usize) {
-        if self.element_buffer_size < size {
+    fn ensure_element_buffer(&self, size: usize) {
+        if self.element_buffer_data.lock().element_buffer_size < size {
             let (data, ty) = self::generate_element_buffer(size);
-            self.element_buffer_type = ty;
-            self.element_buffer.bind(gl::ELEMENT_ARRAY_BUFFER);
-            self.element_buffer
-                .set_data(gl::ELEMENT_ARRAY_BUFFER, &data, gl::DYNAMIC_DRAW);
-            self.element_buffer_size = size;
+            self.element_buffer_data.lock().element_buffer_type = ty;
+            self.element_buffer_data
+                .lock()
+                .element_buffer
+                .bind(gl::ELEMENT_ARRAY_BUFFER);
+            self.element_buffer_data.lock().element_buffer.set_data(
+                gl::ELEMENT_ARRAY_BUFFER,
+                &data,
+                gl::DYNAMIC_DRAW,
+            );
+            self.element_buffer_data.lock().element_buffer_size = size;
         }
     }
 
-    pub fn update_chunk_solid(
-        &mut self,
-        buffer: Arc<RwLock<ChunkBuffer>>,
-        data: &[u8],
-        count: usize,
-    ) {
+    pub fn update_chunk_solid(&self, buffer: Arc<RwLock<ChunkBuffer>>, data: &[u8], count: usize) {
         self.ensure_element_buffer(count);
         if count == 0 {
             if buffer.read().solid.is_some() {
@@ -526,13 +616,24 @@ impl Renderer {
         let info = info.solid.as_mut().unwrap();
 
         info.array.bind();
-        self.chunk_shader.position.enable();
-        self.chunk_shader.texture_info.enable();
-        self.chunk_shader.texture_offset.enable();
-        self.chunk_shader.color.enable();
-        self.chunk_shader.lighting.enable();
+        self.chunk_render_data.lock().chunk_shader.position.enable();
+        self.chunk_render_data
+            .lock()
+            .chunk_shader
+            .texture_info
+            .enable();
+        self.chunk_render_data
+            .lock()
+            .chunk_shader
+            .texture_offset
+            .enable();
+        self.chunk_render_data.lock().chunk_shader.color.enable();
+        self.chunk_render_data.lock().chunk_shader.lighting.enable();
 
-        self.element_buffer.bind(gl::ELEMENT_ARRAY_BUFFER);
+        self.element_buffer_data
+            .lock()
+            .element_buffer
+            .bind(gl::ELEMENT_ARRAY_BUFFER);
 
         info.buffer.bind(gl::ARRAY_BUFFER);
         if new || info.buffer_size < data.len() {
@@ -543,31 +644,36 @@ impl Renderer {
             info.buffer.re_set_data(gl::ARRAY_BUFFER, data);
         }
 
-        self.chunk_shader
+        self.chunk_render_data
+            .lock()
+            .chunk_shader
             .position
             .vertex_pointer(3, gl::FLOAT, false, 40, 0);
-        self.chunk_shader
+        self.chunk_render_data
+            .lock()
+            .chunk_shader
             .texture_info
             .vertex_pointer(4, gl::UNSIGNED_SHORT, false, 40, 12);
-        self.chunk_shader
+        self.chunk_render_data
+            .lock()
+            .chunk_shader
             .texture_offset
             .vertex_pointer(3, gl::SHORT, false, 40, 20);
-        self.chunk_shader
+        self.chunk_render_data
+            .lock()
+            .chunk_shader
             .color
             .vertex_pointer(3, gl::UNSIGNED_BYTE, true, 40, 28);
-        self.chunk_shader
+        self.chunk_render_data
+            .lock()
+            .chunk_shader
             .lighting
             .vertex_pointer(2, gl::UNSIGNED_SHORT, false, 40, 32);
 
         info.count = count;
     }
 
-    pub fn update_chunk_trans(
-        &mut self,
-        buffer: Arc<RwLock<ChunkBuffer>>,
-        data: &[u8],
-        count: usize,
-    ) {
+    pub fn update_chunk_trans(&self, buffer: Arc<RwLock<ChunkBuffer>>, data: &[u8], count: usize) {
         self.ensure_element_buffer(count);
         if count == 0 {
             if buffer.read().trans.is_some() {
@@ -589,13 +695,36 @@ impl Renderer {
         let info = info.trans.as_mut().unwrap();
 
         info.array.bind();
-        self.chunk_shader_alpha.position.enable();
-        self.chunk_shader_alpha.texture_info.enable();
-        self.chunk_shader_alpha.texture_offset.enable();
-        self.chunk_shader_alpha.color.enable();
-        self.chunk_shader_alpha.lighting.enable();
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
+            .position
+            .enable();
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
+            .texture_info
+            .enable();
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
+            .texture_offset
+            .enable();
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
+            .color
+            .enable();
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
+            .lighting
+            .enable();
 
-        self.element_buffer.bind(gl::ELEMENT_ARRAY_BUFFER);
+        self.element_buffer_data
+            .lock()
+            .element_buffer
+            .bind(gl::ELEMENT_ARRAY_BUFFER);
 
         info.buffer.bind(gl::ARRAY_BUFFER);
         if new || info.buffer_size < data.len() {
@@ -606,43 +735,53 @@ impl Renderer {
             info.buffer.re_set_data(gl::ARRAY_BUFFER, data);
         }
 
-        self.chunk_shader_alpha
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
             .position
             .vertex_pointer(3, gl::FLOAT, false, 40, 0);
-        self.chunk_shader_alpha
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
             .texture_info
             .vertex_pointer(4, gl::UNSIGNED_SHORT, false, 40, 12);
-        self.chunk_shader_alpha
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
             .texture_offset
             .vertex_pointer(3, gl::SHORT, false, 40, 20);
-        self.chunk_shader_alpha
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
             .color
             .vertex_pointer(3, gl::UNSIGNED_BYTE, true, 40, 28);
-        self.chunk_shader_alpha
+        self.chunk_render_data
+            .lock()
+            .chunk_shader_alpha
             .lighting
             .vertex_pointer(2, gl::UNSIGNED_SHORT, false, 40, 32);
 
         info.count = count;
     }
 
-    fn do_pending_textures(&mut self) {
+    fn do_pending_textures(&self) {
         let len = {
             let tex = self.textures.read();
             // Rebuild the texture if it needs resizing
-            if self.texture_layers != tex.atlases.len() {
+            if self.texture_data.lock().texture_layers != tex.atlases.len() {
                 let len = ATLAS_SIZE * ATLAS_SIZE * 4 * tex.atlases.len();
                 let mut data = Vec::with_capacity(len);
                 unsafe {
                     data.set_len(len);
                 }
-                self.gl_texture.get_pixels(
+                self.texture_data.lock().gl_texture.get_pixels(
                     gl::TEXTURE_2D_ARRAY,
                     0,
                     gl::RGBA,
                     gl::UNSIGNED_BYTE,
                     &mut data[..],
                 );
-                self.gl_texture.image_3d(
+                self.texture_data.lock().gl_texture.image_3d(
                     gl::TEXTURE_2D_ARRAY,
                     0,
                     ATLAS_SIZE as u32,
@@ -652,7 +791,7 @@ impl Renderer {
                     gl::UNSIGNED_BYTE,
                     &data[..],
                 );
-                self.texture_layers = tex.atlases.len();
+                self.texture_data.lock().texture_layers = tex.atlases.len();
             }
             tex.pending_uploads.len()
         };
@@ -663,7 +802,7 @@ impl Renderer {
                 let atlas = upload.0;
                 let rect = upload.1;
                 let img = &upload.2;
-                self.gl_texture.sub_image_3d(
+                self.texture_data.lock().gl_texture.sub_image_3d(
                     gl::TEXTURE_2D_ARRAY,
                     0,
                     rect.x as u32,
@@ -681,17 +820,17 @@ impl Renderer {
         }
     }
 
-    fn update_textures(&mut self, delta: f64) {
+    fn update_textures(&self, delta: f64) {
         {
             let mut tex = self.textures.write();
-            while let Ok((hash, img)) = self.skin_reply.try_recv() {
+            while let Ok((hash, img)) = self.skin_exchange_data.lock().skin_reply.try_recv() {
                 if let Some(img) = img {
                     tex.update_skin(hash, img);
                 }
             }
             let mut old_skins = vec![];
             for (skin, refcount) in &tex.skins {
-                if refcount.load(Ordering::Relaxed) == 0 {
+                if refcount.load(Ordering::Relaxed) <= 0 {
                     old_skins.push(skin.clone());
                 }
             }
@@ -700,7 +839,10 @@ impl Renderer {
                 tex.remove_dynamic(&format!("skin-{}", skin));
             }
         }
-        self.gl_texture.bind(gl::TEXTURE_2D_ARRAY);
+        self.texture_data
+            .lock()
+            .gl_texture
+            .bind(gl::TEXTURE_2D_ARRAY);
         self.do_pending_textures();
 
         for ani in &mut self.textures.write().animated_textures {
@@ -710,7 +852,7 @@ impl Renderer {
                 let offset =
                     ani.texture.width * ani.texture.width * ani.frames[ani.current_frame].index * 4;
                 let offset2 = offset + ani.texture.width * ani.texture.width * 4;
-                self.gl_texture.sub_image_3d(
+                self.texture_data.lock().gl_texture.sub_image_3d(
                     gl::TEXTURE_2D_ARRAY,
                     0,
                     ani.texture.get_x() as u32,
@@ -729,13 +871,14 @@ impl Renderer {
         }
     }
 
-    fn init_trans(&mut self, width: u32, height: u32) {
-        self.trans = None;
-        self.trans = Some(TransInfo::new(
+    fn init_trans(&self, width: u32, height: u32) {
+        self.chunk_render_data.lock().trans = None;
+        let mut chunk_render_data = self.chunk_render_data.lock();
+        chunk_render_data.trans = Some(TransInfo::new(
             width,
             height,
-            &self.chunk_shader_alpha,
-            &self.trans_shader,
+            &chunk_render_data.chunk_shader_alpha,
+            &chunk_render_data.trans_shader,
         ));
     }
 
@@ -748,7 +891,7 @@ impl Renderer {
     }
 
     pub fn check_texture(&self, tex: Texture) -> Texture {
-        if tex.version == self.resource_version {
+        if tex.version == self.resource_version.load(Ordering::Acquire) {
             tex
         } else {
             let mut new = Renderer::get_texture(&self.textures, &tex.name);
@@ -1057,6 +1200,9 @@ impl TextureManager {
         self.skins
             .iter_mut()
             .for_each(|skin| skin.1.store(0, Ordering::Relaxed));
+        /*for skin in self.skins.drain() {
+            self.unload_skin(skin.0.as_str())
+        }*/
     }
 
     fn add_defaults(&mut self) {
@@ -1249,7 +1395,12 @@ impl TextureManager {
         };
         self.put_dynamic(&format!("skin-{}", hash), img);
         self.skins.insert(hash.to_owned(), AtomicIsize::new(0));
-        renderer.skin_request.send(hash.to_owned()).unwrap();
+        renderer
+            .skin_exchange_data
+            .lock()
+            .skin_request
+            .send(hash.to_owned())
+            .unwrap();
     }
 
     // TODO: make use of "unload_skin"
