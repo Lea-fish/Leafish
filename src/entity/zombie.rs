@@ -71,7 +71,7 @@ pub fn update_zombie(
         if let Some(zmodel) = &zombie_model.model {
             let renderer = renderer.clone();
             let mut models = renderer.models.lock();
-            let mdl = models.get_model(&zmodel).unwrap();
+            let mdl = models.get_model(zmodel).unwrap();
 
             mdl.block_light = light.block_light;
             mdl.sky_light = light.sky_light;

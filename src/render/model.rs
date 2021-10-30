@@ -41,7 +41,7 @@ pub struct ModelHandle(
 impl ModelHandle {
     #[allow(unused)] // we might want to use this in the future
     pub fn cleanup_manually(&self) {
-        self.1.clone().models.lock().remove_model(&self);
+        self.1.clone().models.lock().remove_model(self);
         if let Some(cleanup_fn) = self.2.as_ref() {
             // TODO: Do we actually want to call this on manual cleanup?
             cleanup_fn(self.1.clone());
@@ -59,7 +59,7 @@ impl Eq for ModelHandle {}
 
 impl Drop for ModelHandle {
     fn drop(&mut self) {
-        self.1.clone().models.lock().remove_model(&self);
+        self.1.clone().models.lock().remove_model(self);
         if let Some(cleanup_fn) = self.2.as_ref() {
             cleanup_fn(self.1.clone());
         }
@@ -205,7 +205,7 @@ impl Manager {
         collection.next_id += 1;
         collection.models.insert(key, model);
 
-        ModelHandle(key, renderer.clone(), None)
+        ModelHandle(key, renderer, None)
     }
 
     fn remove_model(&mut self, key: &ModelHandle) {

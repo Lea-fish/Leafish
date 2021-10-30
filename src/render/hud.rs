@@ -268,7 +268,7 @@ impl Screen for Hud {
                 self.render_armor(renderer.clone(), ui_container);
                 self.render_exp(renderer.clone(), ui_container);
                 self.render_food(renderer.clone(), ui_container);
-                self.render_breath(renderer.clone(), ui_container);
+                self.render_breath(renderer, ui_container);
             }
         }
     }
@@ -324,7 +324,7 @@ impl Screen for Hud {
             return;
         }
         if self.hud_context.clone().read().enabled && !self.last_enabled {
-            self.on_active(screen_sys, renderer.clone(), ui_container);
+            self.on_active(screen_sys, renderer, ui_container);
             self.last_enabled = true;
             return;
         }

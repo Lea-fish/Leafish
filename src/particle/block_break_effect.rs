@@ -79,7 +79,7 @@ pub fn effect_updated(renderer: Res<Arc<Renderer>>, mut query: Query<&mut BlockB
         if let Some(model) = &effect.model {
             let renderer = renderer.clone();
             let mut models = renderer.models.lock();
-            let mdl = models.get_model(&model);
+            let mdl = models.get_model(model);
             if let Some(mdl) = mdl {
                 let offset = Vector3::new(
                     effect.position.x as f32,
@@ -119,7 +119,7 @@ fn readd_model(renderer: Arc<Renderer>, effect: &mut BlockBreakEffect) {
                 Some(tex.clone()),
                 Some(tex.clone()),
                 Some(tex.clone()),
-                Some(tex.clone()),
+                Some(tex),
             ],
         );
         effect

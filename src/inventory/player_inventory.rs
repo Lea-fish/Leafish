@@ -350,7 +350,7 @@ impl Inventory for PlayerInventory {
                         slot.y,
                         2,
                         ui_container,
-                        renderer.clone(),
+                        renderer,
                         VAttach::Top,
                     );
                 }

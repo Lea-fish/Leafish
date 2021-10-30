@@ -30,6 +30,7 @@ impl ParticleType {
     }
 
     #[allow(unreachable_patterns)] // this pattern will be reachable in the future, so just ignore the warning for now
+    #[allow(clippy::single_match)]
     fn create_model(&self, _m: &mut Manager, _entity: Entity) {
         match self {
             ParticleType::BlockBreak => {

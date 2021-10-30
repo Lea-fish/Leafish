@@ -187,7 +187,7 @@ fn update_render_players(
             let cam_x = renderer.camera.lock().pos.x;
             let cam_z = renderer.camera.lock().pos.z;
             let mut models = renderer.models.lock();
-            let mdl = models.get_model(&pmodel).unwrap();
+            let mdl = models.get_model(pmodel).unwrap();
 
             mdl.block_light = light.block_light;
             mdl.sky_light = light.sky_light;
@@ -455,7 +455,6 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
         );
     }
 
-    let renderer = renderer.clone();
     let mut name_verts = vec![];
     if player_model.has_name_tag {
         let mut state = FormatState {
@@ -500,7 +499,7 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
             part_verts[3].clone(),
             name_verts,
         ],
-        renderer.clone(),
+        renderer,
     );
     let skin_url = player_model.skin_url.clone();
     model.2 = player_model.model.as_ref().map_or(
@@ -581,6 +580,7 @@ impl PlayerMovement {
     }
 }
 
+#[allow(clippy::type_complexity)]
 #[allow(unused_mut)] // we ignore this warning, as this case seems to be a clippy bug
 pub fn handle_movement(
     world: Res<Arc<crate::world::World>>,

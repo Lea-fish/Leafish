@@ -1149,7 +1149,7 @@ impl UIElement for Formatted {
                 let data = e.draw(renderer.clone(), &r, sw, sh, width, height, delta);
                 self.data.extend_from_slice(&data);
             }
-            self.super_draw(renderer.clone(), r, sw, sh, width, height, delta);
+            self.super_draw(renderer, r, sw, sh, width, height, delta);
 
             self.last_text = self.text.clone();
             self.last_scale_x = self.scale_x;

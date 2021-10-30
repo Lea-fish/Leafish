@@ -26,18 +26,9 @@ pub enum SystemExecStage {
     RemoveHandling,
 }
 
+#[derive(Default)]
 pub struct Manager {
     pub world: World,
     pub schedule: Arc<RwLock<Schedule>>,
     pub entity_schedule: Arc<RwLock<Schedule>>,
-}
-
-impl Manager {
-    pub fn new() -> Self {
-        Self {
-            world: Default::default(),
-            schedule: Default::default(),
-            entity_schedule: Default::default(),
-        }
-    }
 }

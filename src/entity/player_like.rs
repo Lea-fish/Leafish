@@ -285,7 +285,7 @@ pub fn compute_player_model_components(
             width: 0.0,
             offset: 0.0,
             text: Vec::new(),
-            renderer: renderer,
+            renderer,
             y_scale: 0.16,
             x_scale: 0.01,
         };

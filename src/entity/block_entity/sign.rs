@@ -69,7 +69,7 @@ pub fn render_sign(
         if let Some(model) = &info.model {
             let renderer = renderer.clone();
             let mut models = renderer.models.lock();
-            let mdl = models.get_model(&model).unwrap();
+            let mdl = models.get_model(model).unwrap();
             mdl.block_light = world.get_block_light(*position) as f32;
             mdl.sky_light = world.get_sky_light(*position) as f32;
         }
@@ -113,7 +113,7 @@ fn add_sign(
         }
         _ => return,
     }
-    let tex = render::Renderer::get_texture(renderer.clone().get_textures_ref(), "entity/sign");
+    let tex = render::Renderer::get_texture(renderer.get_textures_ref(), "entity/sign");
 
     macro_rules! rel {
         ($x:expr, $y:expr, $w:expr, $h:expr) => {

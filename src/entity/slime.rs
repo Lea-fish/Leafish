@@ -67,7 +67,7 @@ pub fn update_slime(
         if let Some(pmodel) = &slime_model.model.clone() {
             let renderer = renderer.clone();
             let mut models = renderer.models.lock();
-            let mdl = models.get_model(&pmodel).unwrap();
+            let mdl = models.get_model(pmodel).unwrap();
 
             mdl.block_light = light.block_light;
             mdl.sky_light = light.sky_light;
@@ -119,6 +119,7 @@ pub fn update_slime(
     }
 }
 
+#[allow(clippy::eq_op)] // we allow this because we want to allow 16.0 / 16.0
 pub fn added_slime(renderer: Res<Arc<Renderer>>, mut query: Query<&mut SlimeModel>) {
     for mut slime_model in query.iter_mut() {
         let tex =

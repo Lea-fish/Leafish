@@ -755,8 +755,8 @@ impl Server {
                                 let mut anim =
                                     entities.world.get_entity_mut(*anim_ent.value()).unwrap();
                                 let effect = anim.get_mut::<BlockBreakEffect>();
-                                if effect.is_some() {
-                                    effect.unwrap().update(block_break.stage);
+                                if let Some(mut effect) = effect {
+                                    effect.update(block_break.stage);
                                 }
                             } else {
                                 let entities = server.entities.clone();
@@ -869,7 +869,7 @@ impl Server {
         renderer: Arc<Renderer>,
     ) -> Server {
         let world = Arc::new(world::World::new(protocol_version, light_updater));
-        let mut entities = Manager::new();
+        let mut entities = Manager::default();
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
         let mut entity_sched = SystemStage::single_threaded();
@@ -908,7 +908,7 @@ impl Server {
             forge_mods,
             disconnect_data: Arc::new(RwLock::new(DisconnectData::default())),
 
-            world: world.clone(),
+            world,
             world_data: Arc::new(RwLock::new(WorldData::default())),
             version: AtomicUsize::new(version),
             resources,
@@ -1027,11 +1027,11 @@ impl Server {
                     .unwrap()
                     .get::<crate::entity::Rotation>()
                     .unwrap();
-                renderer.clone().camera.lock().pos = cgmath::Point3::from_vec(
+                renderer.camera.lock().pos = cgmath::Point3::from_vec(
                     position.position + cgmath::Vector3::new(0.0, 1.62, 0.0),
                 );
-                renderer.clone().camera.lock().yaw = rotation.yaw;
-                renderer.clone().camera.lock().pitch = rotation.pitch;
+                renderer.camera.lock().yaw = rotation.yaw;
+                renderer.camera.lock().pitch = rotation.pitch;
             }
         }
         self.entity_tick(delta, game.focused, *self.dead.read());
@@ -1257,10 +1257,8 @@ impl Server {
                     let mut entities = entities.write();
                     let mut anim = entities.world.get_entity_mut(anim_ent).unwrap();
                     let effect = anim.get_mut::<BlockBreakEffect>();
-                    if effect.is_some() {
-                        effect
-                            .unwrap()
-                            .update_ratio(self.block_break_info.lock().progress);
+                    if let Some(mut effect) = effect {
+                        effect.update_ratio(self.block_break_info.lock().progress);
                     }
                 }
             }
