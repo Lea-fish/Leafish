@@ -43,7 +43,7 @@ use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use dashmap::DashMap;
 use instant::{Duration, Instant};
-use leafish_protocol::format::{Component, TextComponent};
+use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
@@ -795,10 +795,10 @@ impl Server {
                                 .clone()
                                 .write()
                                 .disconnect_reason
-                                .replace(Component::Text(TextComponent::new(&*format!(
-                                    "An error occurred while reading a packet: {}",
-                                    err
-                                ))));
+                                .replace(Component::new(format::ComponentType::new(
+                                    &*format!("An error occurred while reading a packet: {}", err),
+                                    None,
+                                )));
                         }
                     }
                 }
@@ -1527,8 +1527,7 @@ impl Server {
                 return;
             }
         }
-        self.disconnect(Some(Component::Text(TextComponent {
-            // TODO: Test this!
+        self.disconnect(Some(Component::new(format::ComponentType::Text {
             text: "Already disconnected!".to_string(),
             modifier: Default::default(),
         })));
@@ -2165,16 +2164,16 @@ impl Server {
                     //8 => // Gateway
                     9 => {
                         // Sign
-                        let line1 = format::Component::from_string(
+                        let line1 = format::Component::from_str(
                             nbt.1.get("Text1").unwrap().as_str().unwrap(),
                         );
-                        let line2 = format::Component::from_string(
+                        let line2 = format::Component::from_str(
                             nbt.1.get("Text2").unwrap().as_str().unwrap(),
                         );
-                        let line3 = format::Component::from_string(
+                        let line3 = format::Component::from_str(
                             nbt.1.get("Text3").unwrap().as_str().unwrap(),
                         );
-                        let line4 = format::Component::from_string(
+                        let line4 = format::Component::from_str(
                             nbt.1.get("Text4").unwrap().as_str().unwrap(),
                         );
                         self.world.clone().add_block_entity_action(
@@ -2207,10 +2206,10 @@ impl Server {
     }*/
 
     fn on_sign_update(&self, mut update_sign: mapped_packet::play::clientbound::UpdateSign) {
-        format::convert_legacy(&mut update_sign.line1);
-        format::convert_legacy(&mut update_sign.line2);
-        format::convert_legacy(&mut update_sign.line3);
-        format::convert_legacy(&mut update_sign.line4);
+        update_sign.line1 = update_sign.line1.try_update_with_legacy();
+        update_sign.line2 = update_sign.line2.try_update_with_legacy();
+        update_sign.line3 = update_sign.line3.try_update_with_legacy();
+        update_sign.line4 = update_sign.line4.try_update_with_legacy();
         self.world
             .clone()
             .add_block_entity_action(world::BlockEntityAction::UpdateSignText(Box::new((

@@ -1,6 +1,6 @@
 use super::glsl;
 use super::shaders;
-use crate::format::{self, Component};
+use crate::format;
 use crate::gl;
 use crate::model::BlockVertex;
 use crate::render::Renderer;
@@ -487,18 +487,16 @@ pub struct FormatState {
 }
 
 impl FormatState {
-    pub fn build(&mut self, c: &Component, color: format::Color) {
-        match *c {
-            format::Component::Text(ref txt) => {
-                let col = FormatState::get_color(&txt.modifier, color);
-                self.append_text(&txt.text, col);
-                let modi = &txt.modifier;
-                if let Some(ref extra) = modi.extra {
-                    for e in extra {
-                        self.build(e, col);
-                    }
-                }
-            }
+    pub fn build(&mut self, components: &format::Component, color: Option<format::Color>) {
+        for component in components.list.iter() {
+            self.append_text(
+                component.get_text(),
+                if let Some(color) = color {
+                    component.get_modifier().color.use_or_def(color)
+                } else {
+                    component.get_modifier().color
+                },
+            )
         }
     }
 
@@ -532,9 +530,5 @@ impl FormatState {
         if self.offset > self.width {
             self.width = self.offset;
         }
-    }
-
-    fn get_color(modi: &format::Modifier, color: format::Color) -> format::Color {
-        modi.color.unwrap_or(color)
     }
 }

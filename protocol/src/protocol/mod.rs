@@ -411,7 +411,7 @@ impl Serializable for format::Component {
         let mut bytes = Vec::<u8>::new();
         buf.take(len as u64).read_to_end(&mut bytes)?;
         let ret = String::from_utf8(bytes).unwrap();
-        Ok(Self::from_string(&ret[..]))
+        Ok(Self::from_str(&ret[..]))
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         let val = serde_json::to_string(&self.to_value()).unwrap();
@@ -1580,7 +1580,7 @@ impl Conn {
                         .ok_or_else(invalid_status)? as i32,
                     sample: Vec::new(), /* TODO */
                 },
-                description: format::Component::from_value(
+                description: format::Component::from_json(
                     val.get("description").ok_or_else(invalid_status)?,
                 ),
                 favicon: val

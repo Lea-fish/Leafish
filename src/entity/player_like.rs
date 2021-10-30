@@ -289,9 +289,11 @@ pub fn compute_player_model_components(
             y_scale: 0.16,
             x_scale: 0.01,
         };
-        let mut name = format::Component::Text(format::TextComponent::new(name.as_ref().unwrap()));
-        format::convert_legacy(&mut name);
-        state.build(&name, format::Color::Black);
+        let name = format::Component::new(format::ComponentType::new(
+            name.as_ref().unwrap(),
+            Some(format::Color::Black),
+        ));
+        state.build(&name, None);
         // TODO: Remove black shadow and add dark, transparent box around name
         let width = state.width;
         // Center align text

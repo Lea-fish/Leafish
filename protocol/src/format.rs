@@ -12,88 +12,237 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::fmt;
-use std::mem;
+use std::{fmt, str::FromStr};
+
+use crate::translate;
+use crate::translate::*;
+
+use serde::Deserialize;
+
+pub use crate::format::color::*;
+
+const LEGACY_CHAR: char = '§';
 
 #[derive(Debug, Clone)]
-pub enum Component {
-    Text(TextComponent),
+pub struct Component {
+    pub list: Vec<ComponentType>,
 }
 
 impl Component {
-    pub fn from_string(str: &str) -> Self {
-        // TODO: Support: §l, §k, §m, §o, §n, §r
-        let mut component;
-        match serde_json::from_str::<serde_json::Value>(str) {
-            Ok(value) => component = Component::from_value(&value),
-            // Sometimes mojang sends a literal string, so we should interpret it literally
-            Err(_) => {
-                component = Component::Text(TextComponent::new(str));
-                convert_legacy(&mut component);
-            }
+    pub fn new(component: ComponentType) -> Self {
+        Self {
+            list: vec![component],
         }
-        component
     }
 
-    pub fn from_value(v: &serde_json::Value) -> Self {
-        let mut modifier = Modifier::from_value(v);
-        if let Some(val) = v.as_str() {
-            Component::Text(TextComponent {
-                text: val.to_owned(),
-                modifier,
-            })
-        } else if v.get("text").is_some() {
-            let mut component = Component::Text(TextComponent::from_value(v, modifier));
-            convert_legacy(&mut component);
-            component
-        } else if let Some(translate) = v.get("translate") {
-            let translate_key = translate.as_str().unwrap_or_default();
-            if let Some(serde_json::Value::Array(args)) = v.get("with") {
-                // TODO: recursively build components, avoid throwing away all but "text"
-                let text_args: Vec<&str> = args
-                    .iter()
-                    .map(|v| {
-                        if let serde_json::Value::Object(obj) = v {
-                            // Usernames might be in "extra":["text":"foo"] and "text":"" empty for
-                            // some reason; use extra instead if present TODO: use both
-                            if let Some(serde_json::Value::Array(extra)) = obj.get("extra") {
-                                if let Some(item) = extra.get(0) {
-                                    if let Some(text) = item.get("text") {
-                                        return text.as_str().unwrap_or_default();
-                                    }
-                                }
-                            }
+    // TODO: this should not be need, but on place. I am not even sure it needs it.
+    pub fn try_update_with_legacy(&self) -> Self {
+        Self {
+            list: self
+                .list
+                .iter()
+                .map(|comp| Component::from_legacy_str(&comp.get_text(), comp.get_modifier()).list)
+                .flatten()
+                .collect(),
+        }
+    }
 
-                            if let Some(text) = obj.get("text") {
-                                text.as_str().unwrap_or_default()
-                            } else {
-                                Default::default()
-                            }
-                        } else {
-                            v.as_str().unwrap_or_default()
-                        }
-                    })
-                    .collect();
-                // TODO: translations, https://wiki.vg/Chat#Translation_component
-                Component::Text(TextComponent::new(
-                    match translate_key {
-                        "chat.type.text" => format!("<{}> {}", text_args[0], text_args[1]),
-                        "chat.type.announcement" => format!("[{}] {}", text_args[0], text_args[1]),
-                        "chat.type.admin" => format!("You were opped by {}", text_args[0]), // TODO: Check if this is only happening when you get opped!
-                        _ => format!("unhandled: {}", translate_key), // "De-opped %s", "Opped %s"
+    pub fn from_legacy_str(str: &str, modifier: &Modifier) -> Self {
+        let mut components = Vec::new();
+        if str.contains(LEGACY_CHAR) {
+            let mut last = 0;
+            let mut current_modifiers = modifier.clone();
+            let mut iter = str.char_indices();
+
+            while let Some((i, c)) = iter.next() {
+                if c != LEGACY_CHAR {
+                    continue;
+                }
+                let next_char = match iter.next() {
+                    Some(next_char) => next_char,
+                    None => break,
+                };
+                let color_char = next_char.1.to_lowercase().next().unwrap();
+                let text = str[last..i].to_owned();
+                last = next_char.0 + 1;
+
+                components.push(ComponentType::Text {
+                    text,
+                    modifier: current_modifiers.clone(),
+                });
+
+                match color_char {
+                    '0' => current_modifiers.color = Color::Black,
+                    '1' => current_modifiers.color = Color::DarkBlue,
+                    '2' => current_modifiers.color = Color::DarkGreen,
+                    '3' => current_modifiers.color = Color::DarkAqua,
+                    '4' => current_modifiers.color = Color::DarkRed,
+                    '5' => current_modifiers.color = Color::DarkPurple,
+                    '6' => current_modifiers.color = Color::Gold,
+                    '7' => current_modifiers.color = Color::Gray,
+                    '8' => current_modifiers.color = Color::DarkGray,
+                    '9' => current_modifiers.color = Color::Blue,
+                    'a' => current_modifiers.color = Color::Green,
+                    'b' => current_modifiers.color = Color::Aqua,
+                    'c' => current_modifiers.color = Color::Red,
+                    'd' => current_modifiers.color = Color::LightPurple,
+                    'e' => current_modifiers.color = Color::Yellow,
+                    'f' => current_modifiers.color = Color::White,
+                    'k' => current_modifiers.obfuscated = true,
+                    'l' => current_modifiers.bold = true,
+                    'm' => current_modifiers.strikethrough = true,
+                    'n' => current_modifiers.underlined = true,
+                    'o' => current_modifiers.italic = true,
+                    'r' => {
+                        current_modifiers = Modifier {
+                            color: Color::White,
+                            bold: false,
+                            italic: false,
+                            underlined: false,
+                            strikethrough: false,
+                            obfuscated: false,
+                        };
                     }
-                    .as_str(),
-                ))
-            } else {
-                // TODO
-                Component::Text(TextComponent::new(translate_key))
+                    _ => {}
+                };
             }
+            components.push(ComponentType::Text {
+                text: str[last..].to_owned(),
+                modifier: current_modifiers,
+            });
         } else {
-            modifier.color = Some(Color::RGB(255, 0, 0));
-            Component::Text(TextComponent {
-                text: "UNHANDLED".to_owned(),
-                modifier,
-            })
+            components.push(ComponentType::Text {
+                text: str.to_string(),
+                modifier: modifier.clone(),
+            });
+        }
+
+        Self { list: components }
+    }
+
+    pub fn from_str(str: &str) -> Self {
+        log::trace!("Raw: {}", str);
+        match serde_json::from_str::<Chat>(str) {
+            Ok(chat) => Component::from_chat(&chat, &Modifier::default()),
+            // Sometimes mojang sends a literal string, so we should interpret it literally
+            Err(error) => {
+                log::trace!("Failed error: {}", error);
+                Component::from_legacy_str(str, &Modifier::default())
+            }
+        }
+    }
+
+    fn get_text(with: &With, modifier: &Modifier) -> Self {
+        match with {
+            With::Chat(chat) => {
+                Component::from_chat(&chat, &modifier.over_write(&chat.get_modifier()))
+            }
+
+            With::Str(str) => Self {
+                list: vec![ComponentType::Text {
+                    text: str.to_string(),
+                    modifier: modifier.clone(),
+                }],
+            },
+        }
+    }
+
+    fn get_string_from_extra(extra: &[translate::Chat], modifier: &Modifier) -> Self {
+        Self {
+            list: extra
+                .iter()
+                .map(|extra| {
+                    Component::from_chat(extra, &modifier.over_write(&extra.get_modifier())).list
+                })
+                .flatten()
+                .collect::<_>(),
+        }
+    }
+
+    fn from_chat(chat: &Chat, modifier: &Modifier) -> Self {
+        let modifier = modifier.over_write(&chat.get_modifier());
+        let text_components: Vec<ComponentType> = match (&chat.translate, &chat.text, &chat.extra) {
+            (None, None, None) => chat
+                .with
+                .iter()
+                .map(|with| Component::get_text(with, &modifier).list)
+                .flatten()
+                .collect(),
+
+            (Some(translate), None, None) => {
+                let mut list = chat
+                    .with
+                    .iter()
+                    .map(|inner_chat| Component::get_text(inner_chat, &modifier))
+                    .collect::<Vec<Component>>();
+
+                let mut iter_component = list.iter_mut();
+
+                let mut components = Vec::new();
+                let translated = translate::translate(translate);
+                let mut index = 0;
+                for (i, char) in translated.char_indices() {
+                    match char {
+                        '{' => {
+                            components.push(ComponentType::Text {
+                                text: translated[index..i].to_string(),
+                                modifier: modifier.clone(),
+                            });
+                            match iter_component.next() {
+                                Some(component) => components.append(&mut component.list),
+                                None => {}
+                            };
+                        }
+                        '}' => index = i + 1,
+                        _ => {}
+                    }
+                }
+                components.push(ComponentType::Text {
+                    text: translated[index..].to_string(),
+                    modifier: modifier.clone(),
+                });
+                components
+            }
+            (Some(translate), Some(text), None) => {
+                format!("ERR trans: {}, text: {}", translate, text);
+                todo!()
+            }
+            (Some(translate), Some(text), Some(extra)) => {
+                format!(
+                    "ERR trans: {}, text: {}, extra{:?}, ",
+                    translate, text, extra
+                );
+                todo!()
+            }
+            (Some(text), None, Some(extra)) => {
+                format!("ERR trans: {}, extra: {:?}", text, extra);
+                todo!()
+            }
+            (None, None, Some(extra)) => {
+                format!("ERR extra: {:?}", extra);
+                todo!()
+            }
+            (None, Some(text), Some(extra)) => {
+                let mut component = Component::from_legacy_str(text, &modifier).list;
+                component.append(&mut Component::get_string_from_extra(extra, &modifier).list);
+                component
+            }
+            (None, Some(text), None) => Component::from_legacy_str(text, &modifier).list,
+        };
+        // chat.build_component_from_string(return_type);
+        Component {
+            list: text_components,
+        }
+    }
+
+    pub fn from_json(v: &serde_json::Value) -> Self {
+        match serde_json::from_value::<Chat>(v.clone()) {
+            Ok(chat) => return Component::from_chat(&chat, &Modifier::default()),
+            // Sometimes mojang sends a literal string, so we should interpret it literally
+            Err(error) => {
+                log::trace!("Failed error: {}", error);
+                Component::from_legacy_str(v.as_str().expect("valid string"), &Modifier::default())
+            }
         }
     }
 
@@ -104,85 +253,157 @@ impl Component {
 
 impl fmt::Display for Component {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            Component::Text(ref txt) => write!(f, "{}", txt),
-        }
+        write!(
+            f,
+            "{}",
+            self.list
+                .iter()
+                .map(|comp| comp.get_text())
+                .collect::<String>()
+        )
     }
 }
 
 impl Default for Component {
     fn default() -> Self {
-        Component::Text(TextComponent {
+        Component::new(ComponentType::Text {
             text: "".to_owned(),
             modifier: Default::default(),
         })
     }
 }
 
-#[derive(Debug, Default, Clone)]
+#[derive(Default, Clone)]
+// TODO: Use all of the modifiers for rendering
 pub struct Modifier {
-    pub extra: Option<Vec<Component>>,
-    pub bold: Option<bool>,
-    pub italic: Option<bool>,
-    pub underlined: Option<bool>,
-    pub strikethrough: Option<bool>,
-    pub obfuscated: Option<bool>,
-    pub color: Option<Color>,
+    pub bold: bool,
+    pub italic: bool,
+    pub underlined: bool,
+    pub strikethrough: bool,
+    pub obfuscated: bool,
+    pub color: Color,
+}
+
+impl fmt::Debug for Modifier {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut dbg = f.debug_struct("Modifier");
+        if self.color != Color::None {
+            dbg.field("color", &self.color);
+        }
+        if self.bold {
+            dbg.field("bold", &self.bold);
+        }
+        if self.italic {
+            dbg.field("italic", &self.italic);
+        }
+        if self.underlined {
+            dbg.field("underlined", &self.underlined);
+        }
+        if self.strikethrough {
+            dbg.field("strikethrough", &self.strikethrough);
+        }
+        if self.obfuscated {
+            dbg.field("obfuscated", &self.obfuscated);
+        }
+        dbg.finish_non_exhaustive()
+    }
 }
 
 // TODO: Missing events click/hover/insert
 
 impl Modifier {
-    pub fn from_value(v: &serde_json::Value) -> Self {
-        let mut m = Modifier {
-            bold: v.get("bold").and_then(|v| v.as_bool()),
-            italic: v.get("italic").and_then(|v| v.as_bool()),
-            underlined: v.get("underlined").and_then(|v| v.as_bool()),
-            strikethrough: v.get("strikethrough").and_then(|v| v.as_bool()),
-            obfuscated: v.get("obfuscated").and_then(|v| v.as_bool()),
-            color: v
-                .get("color")
-                .and_then(|v| v.as_str())
-                .map(|v| Color::from_string(&v.to_owned())),
-            extra: Option::None,
-        };
-        if let Some(extra) = v.get("extra") {
-            if let Some(data) = extra.as_array() {
-                let mut ex = Vec::new();
-                for e in data {
-                    ex.push(Component::from_value(e));
-                }
-                m.extra = Some(ex);
-            }
-        }
-        m
-    }
-
     pub fn to_value(&self) -> serde_json::Value {
         unimplemented!()
+    }
+
+    pub fn over_write(&self, modifier: &Self) -> Self {
+        Self {
+            bold: if modifier.bold { true } else { self.bold },
+            italic: if modifier.italic { true } else { self.italic },
+            underlined: if modifier.underlined {
+                true
+            } else {
+                self.underlined
+            },
+            strikethrough: if modifier.strikethrough {
+                true
+            } else {
+                self.strikethrough
+            },
+            obfuscated: if modifier.obfuscated {
+                true
+            } else {
+                self.obfuscated
+            },
+            color: if modifier.color != Color::None {
+                modifier.color
+            } else {
+                self.color
+            },
+        }
+    }
+}
+
+impl fmt::Display for ComponentType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        Ok(write!(
+            f,
+            "{}",
+            match self {
+                ComponentType::Text { text, .. } => text,
+                ComponentType::Hover { text, .. } => text,
+                ComponentType::Click { text, .. } => text,
+                ComponentType::ClickAndHover { text, .. } => text,
+            }
+        )?)
     }
 }
 
 #[derive(Debug, Clone)]
-pub struct TextComponent {
-    pub text: String,
-    pub modifier: Modifier,
+pub enum ComponentType {
+    Text { text: String, modifier: Modifier },
+    // TODO: Implment the rest!
+    Hover { text: String, modifier: Modifier },
+    Click { text: String, modifier: Modifier },
+    ClickAndHover { text: String, modifier: Modifier },
 }
 
-impl TextComponent {
-    pub fn new(val: &str) -> TextComponent {
-        TextComponent {
-            text: val.to_owned(),
-            modifier: Modifier {
-                ..Default::default()
+impl ComponentType {
+    pub fn new(val: &str, color: Option<Color>) -> Self {
+        Self::Text {
+            text: val.to_string(),
+            modifier: match color {
+                Some(color) => Modifier {
+                    color,
+                    ..Modifier::default()
+                },
+                None => Modifier::default(),
             },
         }
     }
 
     pub fn from_value(v: &serde_json::Value, modifier: Modifier) -> Self {
-        TextComponent {
-            text: v.get("text").unwrap().as_str().unwrap_or("").to_owned(),
+        Self::Text {
+            text: v.as_str().unwrap_or("").to_owned(),
             modifier,
+        }
+    }
+
+    pub fn get_text(&self) -> &str {
+        match self {
+            ComponentType::Text { text, .. } => text.as_str(),
+            ComponentType::Hover { text, .. } => text.as_str(),
+            ComponentType::Click { text, .. } => text.as_str(),
+            ComponentType::ClickAndHover { text, .. } => text.as_str(),
+        }
+    }
+
+    pub fn get_modifier(&self) -> &Modifier {
+        match self {
+            ComponentType::Text { modifier, .. } => &modifier,
+            ComponentType::Hover { modifier, .. } => &modifier,
+            ComponentType::Click { modifier, .. } => &modifier,
+            ComponentType::ClickAndHover { modifier, .. } => &modifier,
         }
     }
 
@@ -191,235 +412,281 @@ impl TextComponent {
     }
 }
 
-impl fmt::Display for TextComponent {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.text)?;
-        if let Some(ref extra) = self.modifier.extra {
-            for c in extra {
-                write!(f, "{}", c)?;
-            }
-        }
-        Result::Ok(())
-    }
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum Color {
-    Black,
-    DarkBlue,
-    DarkGreen,
-    DarkAqua,
-    DarkRed,
-    DarkPurple,
-    Gold,
-    Gray,
-    DarkGray,
-    Blue,
-    Green,
-    Aqua,
-    Red,
-    LightPurple,
-    Yellow,
-    White,
-    RGB(u8, u8, u8),
-}
-
-impl fmt::Display for Color {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            match *self {
-                Color::Black => "black".to_owned(),
-                Color::DarkBlue => "dark_blue".to_owned(),
-                Color::DarkGreen => "dark_green".to_owned(),
-                Color::DarkAqua => "dark_aqua".to_owned(),
-                Color::DarkRed => "dark_red".to_owned(),
-                Color::DarkPurple => "dark_purple".to_owned(),
-                Color::Gold => "gold".to_owned(),
-                Color::Gray => "gray".to_owned(),
-                Color::DarkGray => "dark_gray".to_owned(),
-                Color::Blue => "blue".to_owned(),
-                Color::Green => "green".to_owned(),
-                Color::Aqua => "aqua".to_owned(),
-                Color::Red => "red".to_owned(),
-                Color::LightPurple => "light_purple".to_owned(),
-                Color::Yellow => "yellow".to_owned(),
-                Color::White => "white".to_owned(),
-                Color::RGB(r, g, b) => format!("#{:02X}{:02X}{:02X}", r, g, b),
-            }
-        )
-    }
-}
-
-impl Color {
-    fn from_string(val: &str) -> Self {
-        match val {
-            "black" => Color::Black,
-            "dark_blue" => Color::DarkBlue,
-            "dark_green" => Color::DarkGreen,
-            "dark_aqua" => Color::DarkAqua,
-            "dark_red" => Color::DarkRed,
-            "dark_purple" => Color::DarkPurple,
-            "gold" => Color::Gold,
-            "gray" => Color::Gray,
-            "dark_gray" => Color::DarkGray,
-            "blue" => Color::Blue,
-            "green" => Color::Green,
-            "aqua" => Color::Aqua,
-            "red" => Color::Red,
-            "light_purple" => Color::LightPurple,
-            "yellow" => Color::Yellow,
-            val if val.len() == 7 && val.as_bytes()[0] == b'#' => {
-                let r = match u8::from_str_radix(&val[1..3], 16) {
-                    Ok(r) => r,
-                    Err(_) => return Color::White,
-                };
-                let g = match u8::from_str_radix(&val[3..5], 16) {
-                    Ok(g) => g,
-                    Err(_) => return Color::White,
-                };
-                let b = match u8::from_str_radix(&val[5..7], 16) {
-                    Ok(b) => b,
-                    Err(_) => return Color::White,
-                };
-                Color::RGB(r, g, b)
-            }
-            "white" => Color::White,
-            _ => Color::White,
+impl Chat {
+    fn get_modifier(&self) -> Modifier {
+        Modifier {
+            bold: self.bold.unwrap_or_default(),
+            italic: self.italic.unwrap_or_default(),
+            underlined: self.underlined.unwrap_or_default(),
+            strikethrough: self.strikethrough.unwrap_or_default(),
+            obfuscated: self.obfuscated.unwrap_or_default(),
+            color: self.color.unwrap_or_default(),
         }
     }
 
-    pub fn to_rgb(&self) -> (u8, u8, u8) {
-        match *self {
-            Color::Black => (0, 0, 0),
-            Color::DarkBlue => (0, 0, 170),
-            Color::DarkGreen => (0, 170, 0),
-            Color::DarkAqua => (0, 170, 170),
-            Color::DarkRed => (170, 0, 0),
-            Color::DarkPurple => (170, 0, 170),
-            Color::Gold => (255, 170, 0),
-            Color::Gray => (170, 170, 170),
-            Color::DarkGray => (85, 85, 85),
-            Color::Blue => (85, 85, 255),
-            Color::Green => (85, 255, 85),
-            Color::Aqua => (85, 255, 255),
-            Color::Red => (255, 85, 85),
-            Color::LightPurple => (255, 85, 255),
-            Color::Yellow => (255, 255, 85),
-            Color::White => (255, 255, 255),
-            Color::RGB(r, g, b) => (r, g, b),
+    pub fn build_component_from_string(&self, str_format: String) -> Component {
+        Component::new(ComponentType::Text {
+            text: str_format,
+            modifier: self.get_modifier(),
+        })
+    }
+}
+
+pub mod color {
+    use crate::format::*;
+
+    #[derive(PartialEq, Debug)]
+    pub enum ParseColorError {
+        InvalidLenError(usize),
+        ParseIntError(std::num::ParseIntError),
+    }
+    impl fmt::Display for ParseColorError {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            match self {
+                ParseColorError::InvalidLenError(len) => {
+                    format!(
+                        "Parse error str to long or to short, Len: {}, must be at 6",
+                        len
+                    )
+                }
+                ParseColorError::ParseIntError(e) => format!("Color parse int error: {}", e),
+            }
+            .fmt(f)
+        }
+    }
+
+    impl From<std::num::ParseIntError> for ParseColorError {
+        fn from(e: std::num::ParseIntError) -> Self {
+            ParseColorError::ParseIntError(e)
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub enum Color {
+        Black,
+        DarkBlue,
+        DarkGreen,
+        DarkAqua,
+        DarkRed,
+        DarkPurple,
+        Gold,
+        Gray,
+        DarkGray,
+        Blue,
+        Green,
+        Aqua,
+        Red,
+        LightPurple,
+        Yellow,
+        White,
+        Reset,
+        RGB(RGB),
+        None,
+    }
+
+    impl Default for Color {
+        fn default() -> Self {
+            Color::None
+        }
+    }
+
+    impl<'de> Deserialize<'de> for Color {
+        fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+        where
+            D: serde::Deserializer<'de>,
+        {
+            let color: String = Deserialize::deserialize(deserializer)?;
+            match Color::from_str(&color) {
+                Ok(color) => Ok(color),
+                Err(e) => Err(serde::de::Error::custom(format!(
+                    "Failed to deserialize color: {}",
+                    e
+                ))),
+            }
+        }
+    }
+
+    impl fmt::Display for Color {
+        fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+            write!(
+                f,
+                "{}",
+                match self {
+                    Color::Black => "black".to_owned(),
+                    Color::DarkBlue => "dark_blue".to_owned(),
+                    Color::DarkGreen => "dark_green".to_owned(),
+                    Color::DarkAqua => "dark_aqua".to_owned(),
+                    Color::DarkRed => "dark_red".to_owned(),
+                    Color::DarkPurple => "dark_purple".to_owned(),
+                    Color::Gold => "gold".to_owned(),
+                    Color::Gray => "gray".to_owned(),
+                    Color::DarkGray => "dark_gray".to_owned(),
+                    Color::Blue => "blue".to_owned(),
+                    Color::Green => "green".to_owned(),
+                    Color::Aqua => "aqua".to_owned(),
+                    Color::Red => "red".to_owned(),
+                    Color::LightPurple => "light_purple".to_owned(),
+                    Color::Yellow => "yellow".to_owned(),
+                    Color::White => "white".to_owned(),
+                    Color::Reset => "white".to_owned(),
+                    Color::None => "white".to_owned(),
+                    Color::RGB(rgb) => format!("#{:02X}{:02X}{:02X}", rgb.red, rgb.green, rgb.blue),
+                }
+            )
+        }
+    }
+
+    impl FromStr for Color {
+        type Err = ParseColorError;
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            match s.to_lowercase().as_str() {
+                "black" => Ok(Color::Black),
+                "dark_blue" => Ok(Color::DarkBlue),
+                "dark_green" => Ok(Color::DarkGreen),
+                "dark_aqua" => Ok(Color::DarkAqua),
+                "dark_red" => Ok(Color::DarkRed),
+                "dark_purple" => Ok(Color::DarkPurple),
+                "gold" => Ok(Color::Gold),
+                "gray" => Ok(Color::Gray),
+                "dark_gray" => Ok(Color::DarkGray),
+                "blue" => Ok(Color::Blue),
+                "green" => Ok(Color::Green),
+                "aqua" => Ok(Color::Aqua),
+                "red" => Ok(Color::Red),
+                "light_purple" => Ok(Color::LightPurple),
+                "yellow" => Ok(Color::Yellow),
+                "white" => Ok(Color::White),
+                "reset" => Ok(Color::White),
+                s => Ok(Color::RGB(RGB::from_str(s)?)),
+            }
+        }
+    }
+
+    impl Color {
+        pub fn to_rgb(&self) -> (u8, u8, u8) {
+            match self {
+                Color::Black => (0, 0, 0),
+                Color::DarkBlue => (0, 0, 170),
+                Color::DarkGreen => (0, 170, 0),
+                Color::DarkAqua => (0, 170, 170),
+                Color::DarkRed => (170, 0, 0),
+                Color::DarkPurple => (170, 0, 170),
+                Color::Gold => (255, 170, 0),
+                Color::Gray => (170, 170, 170),
+                Color::DarkGray => (85, 85, 85),
+                Color::Blue => (85, 85, 255),
+                Color::Green => (85, 255, 85),
+                Color::Aqua => (85, 255, 255),
+                Color::Red => (255, 85, 85),
+                Color::LightPurple => (255, 85, 255),
+                Color::Yellow => (255, 255, 85),
+                Color::White => (255, 255, 255),
+                Color::Reset => (255, 255, 255),
+                Color::None => (0, 255, 255),
+                Color::RGB(c) => (c.red, c.green, c.blue),
+            }
+        }
+
+        pub fn use_or_def(self, color: Color) -> Self {
+            if self == Color::None {
+                color
+            } else {
+                self
+            }
+        }
+    }
+
+    #[derive(Debug, Clone, Copy, Eq, PartialEq)]
+    pub struct RGB {
+        pub red: u8,
+        pub green: u8,
+        pub blue: u8,
+    }
+
+    impl RGB {
+        pub fn new(red: u8, green: u8, blue: u8) -> Self {
+            RGB { red, green, blue }
+        }
+    }
+
+    impl FromStr for RGB {
+        type Err = ParseColorError;
+
+        fn from_str(s: &str) -> Result<Self, Self::Err> {
+            let without_prefix = s.trim_start_matches("#");
+            if without_prefix.len() != 6 {
+                return Err(ParseColorError::InvalidLenError(without_prefix.len()));
+            }
+
+            let red = u8::from_str_radix(&without_prefix[0..2], 16)?;
+            let green = u8::from_str_radix(&without_prefix[2..4], 16)?;
+            let blue = u8::from_str_radix(&without_prefix[4..6], 16)?;
+            Ok(RGB { red, green, blue })
         }
     }
 }
 
-#[test]
-fn test_color_from() {
-    let test = Color::from_string(&"#FF0000".to_owned());
-    match test {
-        Color::RGB(r, g, b) => assert!(r == 255 && g == 0 && b == 0),
-        _ => panic!("Wrong type"),
-    }
-    let test = Color::from_string(&"#123456".to_owned());
-    match test {
-        Color::RGB(r, g, b) => assert!(r == 0x12 && g == 0x34 && b == 0x56),
-        _ => panic!("Wrong type"),
-    }
-    let test = Color::from_string(&"red".to_owned());
-    match test {
-        Color::Red => {}
-        _ => panic!("Wrong type"),
-    }
-    let test = Color::from_string(&"dark_blue".to_owned());
-    match test {
-        Color::DarkBlue => {}
-        _ => panic!("Wrong type"),
-    }
-}
-
-const LEGACY_CHAR: char = '§';
-
-pub fn convert_legacy(c: &mut Component) {
-    match *c {
-        Component::Text(ref mut txt) => {
-            if let Some(ref mut extra) = txt.modifier.extra.as_mut() {
-                for e in extra.iter_mut() {
-                    convert_legacy(e);
+#[cfg(test)]
+mod test {
+    #[test]
+    fn test_color_from() {
+        match Color::from_str("FF0000").expect("could not parse FF0000") {
+            Color::RGB(rgb) => assert_eq!(
+                rgb,
+                RGB {
+                    red: 255,
+                    green: 0,
+                    blue: 0
                 }
-            }
-            if txt.text.contains(LEGACY_CHAR) {
-                let mut parts = Vec::new();
-                let mut last = 0;
-                let mut current = TextComponent::new("");
-                {
-                    let mut iter = txt.text.char_indices();
-                    while let Some((i, c)) = iter.next() {
-                        if c == LEGACY_CHAR {
-                            let next = match iter.next() {
-                                Some(val) => val,
-                                None => break,
-                            };
-                            let color_char = next.1.to_lowercase().next().unwrap();
-                            current.text = txt.text[last..i].to_owned();
-                            last = next.0 + 1;
-
-                            let mut modifier = if ('a'..='f').contains(&color_char)
-                                || ('0'..='9').contains(&color_char)
-                            {
-                                Default::default()
-                            } else {
-                                current.modifier.clone()
-                            };
-
-                            let new = TextComponent::new("");
-                            parts.push(Component::Text(mem::replace(&mut current, new)));
-
-                            match color_char {
-                                '0' => modifier.color = Some(Color::Black),
-                                '1' => modifier.color = Some(Color::DarkBlue),
-                                '2' => modifier.color = Some(Color::DarkGreen),
-                                '3' => modifier.color = Some(Color::DarkAqua),
-                                '4' => modifier.color = Some(Color::DarkRed),
-                                '5' => modifier.color = Some(Color::DarkPurple),
-                                '6' => modifier.color = Some(Color::Gold),
-                                '7' => modifier.color = Some(Color::Gray),
-                                '8' => modifier.color = Some(Color::DarkGray),
-                                '9' => modifier.color = Some(Color::Blue),
-                                'a' => modifier.color = Some(Color::Green),
-                                'b' => modifier.color = Some(Color::Aqua),
-                                'c' => modifier.color = Some(Color::Red),
-                                'd' => modifier.color = Some(Color::LightPurple),
-                                'e' => modifier.color = Some(Color::Yellow),
-                                'f' => modifier.color = Some(Color::White),
-                                'k' => modifier.obfuscated = Some(true),
-                                'l' => modifier.bold = Some(true),
-                                'm' => modifier.strikethrough = Some(true),
-                                'n' => modifier.underlined = Some(true),
-                                'o' => modifier.italic = Some(true),
-                                'r' => {}
-                                _ => println!(
-                                    "warning: unsupported color code {:?} in text '{}'",
-                                    color_char, txt
-                                ),
-                            }
-
-                            current.modifier = modifier;
-                        }
-                    }
+            ),
+            _ => panic!("Could not parse hex color correct"),
+        }
+        match Color::from_str("#00FF00").expect("could not parse #00FF00") {
+            Color::RGB(rgb) => assert_eq!(
+                rgb,
+                RGB {
+                    red: 0,
+                    green: 255,
+                    blue: 0
                 }
-                if last < txt.text.len() {
-                    current.text = txt.text[last..].to_owned();
-                    parts.push(Component::Text(current));
+            ),
+            _ => panic!("Could not parse hex color correct"),
+        }
+        match Color::from_str("") {
+            Ok(_) => {}
+            Err(e) => assert_eq!(ParseColorError::InvalidLenError(0), e),
+        }
+        match Color::from_str("4343433") {
+            Ok(_) => {}
+            Err(e) => assert_eq!(ParseColorError::InvalidLenError(7), e),
+        }
+        match Color::from_str("#4343433") {
+            Ok(_) => {}
+            Err(e) => assert_eq!(ParseColorError::InvalidLenError(7), e),
+        }
+        match Color::from_str("#123456").expect("could not parse #123456") {
+            Color::RGB(rgb) => assert_eq!(
+                rgb,
+                RGB {
+                    red: 0x12,
+                    green: 0x34,
+                    blue: 0x56,
                 }
+            ),
+            _ => panic!("Could not parse hex color correct"),
+        }
 
-                let old = mem::replace(&mut txt.modifier.extra, Some(parts));
-                if let Some(old_extra) = old {
-                    if let Some(ref mut extra) = txt.modifier.extra.as_mut() {
-                        extra.extend(old_extra);
-                    }
-                }
-                txt.text = "".to_owned();
-            }
+        match Color::from_str("red") {
+            Ok(Color::Red) => {}
+            _ => panic!("Wrong type"),
+        }
+        match Color::from_str("BLUE") {
+            Ok(Color::Blue) => {}
+            _ => panic!("Wrong type"),
+        }
+        match Color::from_str("dark_blue") {
+            Ok(Color::DarkBlue) => {}
+            _ => panic!("Wrong type"),
         }
     }
 }
