@@ -1240,7 +1240,7 @@ impl ElementHolder for FormatState {
 }
 
 impl FormatState {
-    pub fn build(&mut self, components: &format::Component, color: Option<format::Color>) {
+    fn build(&mut self, components: &format::Component, color: Option<format::Color>) {
         for component in components.list.iter() {
             self.append_text(
                 self.scale_x,
