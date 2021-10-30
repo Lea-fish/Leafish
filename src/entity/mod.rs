@@ -71,6 +71,7 @@ pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut Syste
         .add_system(systems::light_entity.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
 
     block_entity::add_systems(m, parallel, sync);
+    crate::particle::block_break_effect::add_systems(m, parallel, sync, entity_sched);
 }
 
 /// Location of an entity in the world.

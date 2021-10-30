@@ -25,39 +25,33 @@ impl ParticleType {
     pub fn create_particle(
         &self,
         m: &mut Manager,
-        metadata: EntityMetadata,
-    ) -> Option<Entity> {
+        entity: Entity,
+    ) {
         if self.supported() {
-            let ret = self.create_particle_internally(m, metadata);
-            self.create_model(m, ret, metadata);
-            return Some(ret);
+            self.create_particle_internally(m, entity);
+            self.create_model(m, entity);
         }
-        None
     }
 
     pub fn create_particle_custom_model(
         &self,
         m: &mut Manager,
-        metadata: EntityMetadata,
-    ) -> Option<Entity> {
+        entity: Entity,
+    ) {
         if self.supported() {
-            return Some(self.create_particle_internally(m, metadata));
+            self.create_particle_internally(m, entity);
         }
-        None
     }
 
     fn create_particle_internally(
         &self,
         m: &mut Manager,
-        metadata: EntityMetadata
-    ) -> Entity {
-        let mut entity = m.world.spawn();
-        entity.insert(metadata)
-            .insert(*self);
-        entity.id()
+        entity: Entity,
+    ) {
+        m.world.entity_mut(entity).insert(*self);
     }
 
-    fn create_model(&self, m: &mut Manager, entity: Entity, metadata: EntityMetadata) {
+    fn create_model(&self, m: &mut Manager, entity: Entity) {
         match self {
             ParticleType::BlockBreak => {
                 /*let effect = BlockBreakEffect::new(m, metadata);

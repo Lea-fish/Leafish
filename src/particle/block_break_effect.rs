@@ -4,15 +4,21 @@ use cgmath::{Vector3, Decomposed, Rad, Quaternion, Rotation3, Matrix4};
 use std::f32::consts::PI;
 use crate::render;
 use crate::world::World;
-use crate::ecs::Manager;
+use crate::ecs::{Manager, SystemExecStage};
 use bevy_ecs::prelude::*;
 use parking_lot::RwLock;
 use std::sync::Arc;
 use crate::render::model::ModelHandle;
 
+pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage, entity_sched: &mut SystemStage) { // TODO: Check sync/async usage!
+    sync
+        .add_system(effect_added.label(SystemExecStage::Render).after(SystemExecStage::Normal))
+        .add_system(effect_updated.label(SystemExecStage::Render).after(SystemExecStage::Normal));
+}
+
 #[derive(Component)]
 pub struct BlockBreakEffect {
-    status: i8, // 0 - 9(textures) | -1 - 10(actual values sent)(-1,0,1,...,9,10,-1)
+    status: i8, // 0 - 9(textures) | 1 - 10, -1(actual values sent)(1,...,9,10,-1)
     dirty: bool,
     position: Vector3<f64>,
     model: Option<ModelHandle>,
@@ -32,14 +38,18 @@ impl BlockBreakEffect {
         self.status = status;
         self.dirty = true;
     }
+
+    pub fn update_ratio(&mut self, ratio: f32) { // 0.0 - 1.0
+        let anim_id = ((ratio * 10.0) as i8 - 1).max(0);
+        self.update(anim_id);
+    }
 }
 
 pub fn effect_added(renderer: Res<Arc<Renderer>>, mut commands: Commands, query: Query<(Entity, &BlockEffectData)>) {
     for (entity, data) in query.iter() {
         let mut effect = BlockBreakEffect::new(data);
-        commands.entity(entity).remove::<BlockEffectData>();
         readd_model(renderer.clone(), &mut effect);
-        commands.entity(entity).insert(effect);
+        commands.entity(entity).remove::<BlockEffectData>().insert(effect);
     }
 }
 
@@ -72,16 +82,16 @@ pub fn effect_updated(renderer: Res<Arc<Renderer>>, mut query: Query<(&mut Block
 
 fn readd_model(renderer: Arc<Renderer>, effect: &mut BlockBreakEffect) {
     effect.model.take();
-    if effect.status > -1 {
+    if effect.status > 0 {
         let mut model = vec![];
-        let tex = render::Renderer::get_texture(renderer.get_textures_ref(), &*format!("block/destroy_stage_{}", effect.status));
-        model::append_box(&mut model, 0.0, 0.0, 0.0, 1.01, 1.01, 1.01, [
+        let tex = render::Renderer::get_texture(renderer.get_textures_ref(), &*format!("blocks/destroy_stage_{}", effect.status - 1));
+        model::append_box(&mut model, -0.01, -0.01, -0.01, 1.02, 1.02, 1.02, [
             Some(tex.clone()),
             Some(tex.clone()),
             Some(tex.clone()),
             Some(tex.clone()),
             Some(tex.clone()),
-            Some(tex),
+            Some(tex.clone()),
         ]);
         effect.model.replace(renderer.clone().models.lock().create_model(
             model::DEFAULT,
