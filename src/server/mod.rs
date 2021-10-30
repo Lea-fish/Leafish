@@ -1771,8 +1771,7 @@ impl Server {
 
         let entity_id = self.player.read().unwrap().0;
         let local_player = create_local(&mut *self.entities.clone().write());
-        *self.player.clone().write() =
-            Some((entity_id, local_player));
+        *self.player.clone().write() = Some((entity_id, local_player));
         let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
@@ -1809,7 +1808,10 @@ impl Server {
             // self.hud_context.clone().write().update_breath(-1); // TODO: Fix this!
             self.screen_sys.pop_screen();
         }
-        self.entity_map.clone().write().insert(entity_id, local_player);
+        self.entity_map
+            .clone()
+            .write()
+            .insert(entity_id, local_player);
     }
 
     // TODO: make use of "on_disconnect"
