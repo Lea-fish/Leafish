@@ -1181,49 +1181,106 @@ impl Server {
         }
         if !game.focused {
             if self.block_break_info.lock().pressed {
-                self.abort_breaking();
+                self.abort_breaking(true);
             }
             return;
         }
         let break_delay = self.block_break_info.lock().delay;
         if break_delay > 0 {
-            self.block_break_info.lock().delay -= 1;
+            if !self.reeval_target_block() {
+                self.block_break_info.lock().delay -= 1;
+            }
         } else if self.block_break_info.lock().active {
-            if self.block_break_info.lock().progress >= 1.0 {
-                let face_idx = self.block_break_info.lock().break_face.index() as u8;
-                packet::send_digging(
-                    self.conn.clone().write().as_mut().unwrap(),
-                    self.mapped_protocol_version,
-                    DigType::StopDestroyBlock,
-                    self.block_break_info.lock().break_position,
-                    face_idx,
-                )
-                .unwrap();
-                self.block_break_info.lock().active = false;
-                self.block_break_info.lock().delay = 5;
-                if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
-                    self.entities.clone().write().world.despawn(break_id);
-                }
-            } else {
-                packet::send_arm_swing(
-                    self.conn.clone().write().as_mut().unwrap(),
-                    self.mapped_protocol_version,
-                    Hand::MainHand,
-                )
-                .unwrap();
-                self.block_break_info.lock().progress += 0.1; // TODO: Make this value meaningful
-                let anim_ent = self.block_break_info.lock().effect_id.unwrap();
-                let entities = self.entities.clone();
-                let mut entities = entities.write();
-                let mut anim = entities.world.get_entity_mut(anim_ent).unwrap();
-                let effect = anim.get_mut::<BlockBreakEffect>();
-                if effect.is_some() {
-                    effect.unwrap().update_ratio(self.block_break_info.lock().progress);
+            if !self.reeval_target_block() {
+                if self.block_break_info.lock().progress >= 1.0 {
+                    let face_idx = self.block_break_info.lock().break_face.index() as u8;
+                    packet::send_digging(
+                        self.conn.clone().write().as_mut().unwrap(),
+                        self.mapped_protocol_version,
+                        DigType::StopDestroyBlock,
+                        self.block_break_info.lock().break_position,
+                        face_idx,
+                    )
+                        .unwrap();
+                    self.block_break_info.lock().active = false;
+                    self.block_break_info.lock().delay = 5;
+                    if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
+                        self.entities.clone().write().world.despawn(break_id);
+                    }
+                } else {
+                    packet::send_arm_swing(
+                        self.conn.clone().write().as_mut().unwrap(),
+                        self.mapped_protocol_version,
+                        Hand::MainHand,
+                    )
+                        .unwrap();
+                    self.block_break_info.lock().progress += 0.1; // TODO: Make this value meaningful
+                    let anim_ent = self.block_break_info.lock().effect_id.unwrap();
+                    let entities = self.entities.clone();
+                    let mut entities = entities.write();
+                    let mut anim = entities.world.get_entity_mut(anim_ent).unwrap();
+                    let effect = anim.get_mut::<BlockBreakEffect>();
+                    if effect.is_some() {
+                        effect.unwrap().update_ratio(self.block_break_info.lock().progress);
+                    }
                 }
             }
         } else if self.block_break_info.lock().pressed {
             self.on_left_click();
         }
+    }
+
+    fn reeval_target_block(&self) -> bool {
+        if let Some((pos, _, face, _)) = target::trace_ray(
+            &self.world.clone(),
+            4.0,
+            self.renderer.camera.lock().pos.to_vec(),
+            self.renderer.view_vector.lock().cast().unwrap(),
+            target::test_block,
+        ) {
+            let break_pos = self.block_break_info.lock().break_position;
+            let break_face = self.block_break_info.lock().break_face;
+            if pos != break_pos || face != break_face {
+                packet::send_digging(
+                    self.conn.clone().write().as_mut().unwrap(),
+                    self.mapped_protocol_version,
+                    DigType::AbortDestroyBlock,
+                    break_pos,
+                    break_face.index() as u8,
+                )
+                    .unwrap();
+                packet::send_digging(
+                    self.conn.clone().write().as_mut().unwrap(),
+                    self.mapped_protocol_version,
+                    DigType::StartDestroyBlock,
+                    pos,
+                    face.index() as u8,
+                )
+                    .unwrap();
+                self.block_break_info.lock().break_position = pos;
+                self.block_break_info.lock().break_face = face;
+                self.block_break_info.lock().progress = 0.0;
+                self.block_break_info.lock().hardness = 1.0; // TODO: Get actual hardness values depending on blocktype and version and tool in hands
+                if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
+                    self.entities.clone().write().world.despawn(break_id);
+                }
+
+                let entities = self.entities.clone();
+                let mut entities = entities.write();
+                let mut entity = entities.world.spawn();
+                entity.insert(BlockEffectData {
+                    position: Vector3::new(pos.x as f64, pos.y as f64, pos.z as f64),
+                    status: -1,
+                });
+                let entity = entity.id();
+                ParticleType::BlockBreak.create_particle(&mut entities, entity);
+                self.block_break_info.lock().effect_id.replace(entity);
+                return true;
+            }
+            return false;
+        }
+        self.abort_breaking(false);
+        true
     }
 
     pub fn key_press(&self, down: bool, key: Actionkey, focused: &mut bool) -> bool {
@@ -1342,11 +1399,11 @@ impl Server {
     }
 
     pub fn on_release_left_click(&self) {
-        self.abort_breaking();
+        self.abort_breaking(true);
     }
 
-    pub fn abort_breaking(&self) {
-        if self.block_break_info.lock().pressed {
+    pub fn abort_breaking(&self, unpress: bool) {
+        if unpress && self.block_break_info.lock().pressed {
             self.block_break_info.lock().pressed = false;
         }
         if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
