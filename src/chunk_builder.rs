@@ -53,12 +53,7 @@ impl ChunkBuilder {
         }
     }
 
-    pub fn tick(
-        &mut self,
-        world: Arc<World>,
-        renderer: Arc<render::Renderer>,
-        version: usize,
-    ) {
+    pub fn tick(&mut self, world: Arc<World>, renderer: Arc<render::Renderer>, version: usize) {
         if version != self.resource_version {
             self.resource_version = version;
             self.models.write().version_change();

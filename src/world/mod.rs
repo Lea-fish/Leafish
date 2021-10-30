@@ -38,7 +38,6 @@ use std::io::{Cursor, Read};
 use std::sync::Arc;
 
 pub use self::{chunk::*, lighting::*};
-use bevy_ecs::prelude::Mut;
 use crate::entity::block_entity::sign::SignInfo;
 use std::sync::atomic::Ordering;
 
@@ -247,7 +246,12 @@ impl World {
                     let (pos, line1, line2, line3, line4) = *bx;
                     if let Some(chunk) = self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
                         if let Some(entity) = chunk.block_entities.get(&pos) {
-                            if let Some(mut sign) = m.world.get_entity_mut(*entity).unwrap().get_mut::<SignInfo>() {
+                            if let Some(mut sign) = m
+                                .world
+                                .get_entity_mut(*entity)
+                                .unwrap()
+                                .get_mut::<SignInfo>()
+                            {
                                 sign.lines = [line1, line2, line3, line4];
                                 sign.dirty = true;
                             }

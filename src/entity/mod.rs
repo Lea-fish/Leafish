@@ -1,19 +1,15 @@
 pub mod block_entity;
 pub mod player;
 
-use crate::entity::zombie::{ZombieModel};
-use crate::render::{Renderer, Texture};
-use crate::world::World;
-use cgmath::{Point3, Vector3};
-use collision::Aabb3;
-use dashmap::DashMap;
-use lazy_static::lazy_static;
-use std::sync::Arc;
-use bevy_ecs::prelude::*;
-use crate::ecs::{SystemExecStage, Manager};
+use crate::ecs::{Manager, SystemExecStage};
 use crate::entity::slime::SlimeModel;
-use bevy_ecs::system::SystemParam;
+use crate::entity::zombie::ZombieModel;
+use crate::render::Texture;
 use bevy_ecs::component::Component;
+use bevy_ecs::prelude::*;
+use cgmath::Vector3;
+use collision::Aabb3;
+use std::sync::Arc;
 
 pub mod player_like;
 pub mod slime;
@@ -58,17 +54,48 @@ srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
     [0.0, 0.0, 0.0, 1.0],
 */
 
-pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage, entity_sched: &mut SystemStage) {
-    entity_sched.add_system(systems::update_last_position.system().label(SystemExecStage::Normal));
+pub fn add_systems(
+    m: &mut Manager,
+    parallel: &mut SystemStage,
+    sync: &mut SystemStage,
+    entity_sched: &mut SystemStage,
+) {
+    entity_sched.add_system(
+        systems::update_last_position
+            .system()
+            .label(SystemExecStage::Normal),
+    );
 
     player::add_systems(m, parallel, sync, entity_sched);
     entity_sched
-        .add_system(systems::apply_velocity.system().label(SystemExecStage::Normal))
-        .add_system(systems::apply_gravity.system().label(SystemExecStage::Normal));
-    sync
-        .add_system(systems::lerp_position.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(systems::lerp_rotation.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(systems::light_entity.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
+        .add_system(
+            systems::apply_velocity
+                .system()
+                .label(SystemExecStage::Normal),
+        )
+        .add_system(
+            systems::apply_gravity
+                .system()
+                .label(SystemExecStage::Normal),
+        );
+    sync.add_system(
+        systems::lerp_position
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        systems::lerp_rotation
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        systems::light_entity
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    );
 
     block_entity::add_systems(m, parallel, sync);
     crate::particle::block_break_effect::add_systems(m, parallel, sync, entity_sched);
@@ -329,7 +356,6 @@ pub enum EntityType {
 }
 
 impl EntityType {
-
     pub fn create_entity(
         &self,
         m: &mut Manager,
@@ -372,7 +398,8 @@ impl EntityType {
         pitch: f64,
     ) -> Entity {
         let mut entity = m.world.spawn();
-        entity.insert(Position::new(x, y, z))
+        entity
+            .insert(Position::new(x, y, z))
             .insert(Rotation::new(yaw, pitch))
             .insert(Velocity::new(0.0, 0.0, 0.0))
             .insert(TargetPosition::new(x, y, z))
@@ -385,11 +412,13 @@ impl EntityType {
     fn create_model(&self, m: &mut Manager, entity: Entity) {
         match self {
             EntityType::Zombie => {
-                m.world.entity_mut(entity).insert(ZombieModel::new(Some(String::from("test"))));
-            },
+                m.world
+                    .entity_mut(entity)
+                    .insert(ZombieModel::new(Some(String::from("test"))));
+            }
             EntityType::Slime => {
                 m.world.entity_mut(entity).insert(SlimeModel::new("test"));
-            },
+            }
             _ => {}
         };
     }

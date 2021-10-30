@@ -69,16 +69,14 @@ pub fn inventory_from_type(
     match ty {
         /*InventoryType::Internal => {}
         InventoryType::Main => {}*/
-        InventoryType::Chest(rows) => {
-            Some(Arc::new(RwLock::new(ChestInventory::new(
-                renderer,
-                hud_context,
-                inv_below,
-                rows as u16 * 9,
-                title.to_string(),
-                id,
-            ))))
-        }
+        InventoryType::Chest(rows) => Some(Arc::new(RwLock::new(ChestInventory::new(
+            renderer,
+            hud_context,
+            inv_below,
+            rows as u16 * 9,
+            title.to_string(),
+            id,
+        )))),
         /*InventoryType::Dropper => {}
         InventoryType::Anvil => {}
         InventoryType::Beacon => {}

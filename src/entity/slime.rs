@@ -1,15 +1,12 @@
 use super::{Bounds, GameInfo, Light, Position, Rotation, Velocity};
 use crate::ecs::Manager;
 use crate::entity::{resolve_textures, EntityType};
-use crate::render;
 use crate::render::model;
 use crate::render::Renderer;
-use crate::world;
+use bevy_ecs::prelude::*;
 use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::Aabb3;
-use bevy_ecs::prelude::*;
 use std::sync::Arc;
-use parking_lot::{RwLock, Mutex};
 
 #[derive(Component)]
 pub struct SlimeModel {
@@ -38,7 +35,8 @@ impl SlimeModel {
 
 pub fn create_slime(m: &mut Manager) -> Entity {
     let mut entity = m.world.spawn();
-    entity.insert(Position::new(1478.5, 44.0, -474.5))
+    entity
+        .insert(Position::new(1478.5, 44.0, -474.5))
         .insert(Rotation::new(0.0, 0.0))
         .insert(Velocity::new(0.0, 0.0, 0.0))
         .insert(Bounds::new(Aabb3::new(
@@ -51,77 +49,78 @@ pub fn create_slime(m: &mut Manager) -> Entity {
     entity.id()
 }
 
+pub fn update_slime(
+    game_info: Res<GameInfo>,
+    renderer: Res<Arc<Renderer>>,
+    mut query: Query<(&mut SlimeModel, &Position, &Rotation, &Light)>,
+) {
+    for (mut slime_model, position, rotation, light) in query.iter_mut() {
+        use std::f32::consts::PI;
+        use std::f64::consts::PI as PI64;
+        let delta = game_info.delta;
 
+        /*if slime_model.dirty {
+            self.entity_removed(m, e, world, renderer);
+            self.entity_added(m, e, world, renderer);
+        }*/
 
-pub fn update_slime(game_info: Res<GameInfo>, renderer: Res<Arc<Renderer>>, mut query: Query<(&mut SlimeModel, &Position, &Rotation, &Light)>) {
-   for (mut slime_model, position, rotation, light) in query.iter_mut() {
-       use std::f32::consts::PI;
-       use std::f64::consts::PI as PI64;
-       let delta = game_info
-           .delta;
+        if let Some(pmodel) = &slime_model.model.clone() {
+            let renderer = renderer.clone();
+            let mut models = renderer.models.lock();
+            let mdl = models.get_model(&pmodel).unwrap();
 
-       /*if slime_model.dirty {
-           self.entity_removed(m, e, world, renderer);
-           self.entity_added(m, e, world, renderer);
-       }*/
+            mdl.block_light = light.block_light;
+            mdl.sky_light = light.sky_light;
 
-       if let Some(pmodel) = &slime_model.model.clone() {
-           let renderer = renderer.clone();
-           let mut models = renderer.models.lock();
-           let mdl = models.get_model(&pmodel).unwrap();
+            let offset = Vector3::new(
+                position.position.x as f32,
+                -position.position.y as f32,
+                position.position.z as f32,
+            );
+            let offset_matrix = Matrix4::from(Decomposed {
+                scale: 1.0,
+                rot: Quaternion::from_angle_y(Rad(PI + rotation.yaw as f32)),
+                disp: offset,
+            });
 
-           mdl.block_light = light.block_light;
-           mdl.sky_light = light.sky_light;
+            mdl.matrix[SlimeModelPart::Body as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(0.0)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+                });
 
-           let offset = Vector3::new(
-               position.position.x as f32,
-               -position.position.y as f32,
-               position.position.z as f32,
-           );
-           let offset_matrix = Matrix4::from(Decomposed {
-               scale: 1.0,
-               rot: Quaternion::from_angle_y(Rad(PI + rotation.yaw as f32)),
-               disp: offset,
-           });
+            mdl.matrix[SlimeModelPart::Eyes as usize] = offset_matrix
+                * Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(0.0)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+                });
 
-           mdl.matrix[SlimeModelPart::Body as usize] = offset_matrix
-               * Matrix4::from(Decomposed {
-               scale: 1.0,
-               rot: Quaternion::from_angle_x(Rad(0.0)),
-               disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-           });
+            // TODO This sucks
+            /*if slime_model.has_name_tag {
+                let ang = (position.position.x - renderer.camera.pos.x)
+                    .atan2(position.position.z - renderer.camera.pos.z)
+                    as f32;
+                mdl.matrix[SlimeModelPart::NameTag as usize] = Matrix4::from(Decomposed {
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_y(Rad(ang)),
+                    disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
+                });
+            }*/
 
-           mdl.matrix[SlimeModelPart::Eyes as usize] = offset_matrix
-               * Matrix4::from(Decomposed {
-               scale: 1.0,
-               rot: Quaternion::from_angle_x(Rad(0.0)),
-               disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-           });
-
-           // TODO This sucks
-           /*if slime_model.has_name_tag {
-               let ang = (position.position.x - renderer.camera.pos.x)
-                   .atan2(position.position.z - renderer.camera.pos.z)
-                   as f32;
-               mdl.matrix[SlimeModelPart::NameTag as usize] = Matrix4::from(Decomposed {
-                   scale: 1.0,
-                   rot: Quaternion::from_angle_y(Rad(ang)),
-                   disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
-               });
-           }*/
-
-           let mut i_time = slime_model.idle_time;
-           i_time += delta * 0.02;
-           if i_time > PI64 * 2.0 {
-               i_time -= PI64 * 2.0;
-           }
-           slime_model.idle_time = i_time;
-       }
-   }
+            let mut i_time = slime_model.idle_time;
+            i_time += delta * 0.02;
+            if i_time > PI64 * 2.0 {
+                i_time -= PI64 * 2.0;
+            }
+            slime_model.idle_time = i_time;
+        }
+    }
 }
 
-pub fn added_slime(renderer: Res<Arc<Renderer>>, mut query: Query<(&mut SlimeModel)>) {
-    for (mut slime_model) in query.iter_mut() {
+pub fn added_slime(renderer: Res<Arc<Renderer>>, mut query: Query<&mut SlimeModel>) {
+    for mut slime_model in query.iter_mut() {
         let tex =
             Renderer::get_texture(renderer.get_textures_ref(), "minecraft:entity/slime/slime");
         let mut body_verts = vec![];

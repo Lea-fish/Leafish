@@ -51,7 +51,10 @@ impl Screen for Background {
                     ui::ImageBuilder::new()
                         .draw_index(i16::MIN as isize)
                         .texture(&*format!("#{}", self.vars.get(BACKGROUND_IMAGE)))
-                        .size(renderer.screen_data.read().safe_width as f64, renderer.screen_data.read().safe_height as f64)
+                        .size(
+                            renderer.screen_data.read().safe_width as f64,
+                            renderer.screen_data.read().safe_height as f64,
+                        )
                         .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                         .create(ui_container),
                 )

@@ -125,7 +125,8 @@ impl Inventory for BaseInventory {
             let size = 16.0;
             let hot_bar_offset = 6.0;
             let slot_offset = size + size * 1.0 / 8.0;
-            self.y_offset = ((renderer.screen_data.read().safe_height as f64 / icon_scale + 166.0) / 2.0
+            self.y_offset = ((renderer.screen_data.read().safe_height as f64 / icon_scale + 166.0)
+                / 2.0
                 - slot_offset
                 - hot_bar_offset)
                 / 16.0;

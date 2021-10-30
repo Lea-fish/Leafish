@@ -27,7 +27,7 @@ impl Info {
         }
     }
 
-    pub fn clear(&mut self, renderer: Arc<render::Renderer>) {
+    pub fn clear(&mut self) {
         self.last_block = block::Air {};
         self.model.take();
     }
@@ -128,7 +128,11 @@ impl Info {
             part.b = 0;
         }
 
-        self.model = Some(renderer.models.lock().create_model(model::DEFAULT, vec![parts], renderer.clone()));
+        self.model = Some(renderer.models.lock().create_model(
+            model::DEFAULT,
+            vec![parts],
+            renderer.clone(),
+        ));
     }
 }
 

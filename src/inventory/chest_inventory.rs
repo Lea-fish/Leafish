@@ -36,8 +36,9 @@ impl ChestInventory {
         let y = 114;
         let rows = slot_count / 9;
         let y_size = y + rows * 18;
-        let y_offset =
-            (renderer.screen_data.read().safe_height as f64 / scale - y_size as f64) / 2.0 + slot_offset / 2.0;
+        let y_offset = (renderer.screen_data.read().safe_height as f64 / scale - y_size as f64)
+            / 2.0
+            + slot_offset / 2.0;
         let hot_bar_offset = scale * 4.0;
         let mut slots = vec![];
         let rows = (slot_count / 9) as usize;
@@ -72,7 +73,8 @@ impl ChestInventory {
         let y = 114;
         let rows = self.slot_count / 9;
         let y_size = y + rows * 18;
-        let y_offset = (renderer.screen_data.read().safe_height as f64 / icon_scale - y_size as f64) / 2.0;
+        let y_offset =
+            (renderer.screen_data.read().safe_height as f64 / icon_scale - y_size as f64) / 2.0;
         let rows = (self.slot_count / 9) as usize;
         for y in (0..rows).rev() {
             for x in 0..9 {
@@ -172,7 +174,9 @@ impl Inventory for ChestInventory {
             .scale_y(scale)
             .position(
                 icon_scale
-                    * -(176.0 / 2.0 - 8.0 - renderer.ui.lock().size_of_string(self.name().unwrap()) / 4.0),
+                    * -(176.0 / 2.0
+                        - 8.0
+                        - renderer.ui.lock().size_of_string(self.name().unwrap()) / 4.0),
                 icon_scale * (6.0 + y),
             )
             .text(self.name().unwrap())
@@ -185,7 +189,8 @@ impl Inventory for ChestInventory {
             .scale_x(scale)
             .scale_y(scale)
             .position(
-                icon_scale * -(176.0 / 2.0 - 8.0 - renderer.ui.lock().size_of_string("Inventory") / 4.0),
+                icon_scale
+                    * -(176.0 / 2.0 - 8.0 - renderer.ui.lock().size_of_string("Inventory") / 4.0),
                 icon_scale * (6.0 + y + (rows * 18 + 13) as f64),
             )
             .text("Inventory")

@@ -43,6 +43,7 @@ pub mod console;
 pub mod entity;
 mod inventory;
 pub mod model;
+pub mod particle;
 pub mod paths;
 pub mod render;
 pub mod resources;
@@ -51,8 +52,8 @@ pub mod server;
 pub mod settings;
 pub mod ui;
 pub mod world;
-pub mod particle;
 
+use crate::entity::Rotation;
 use crate::render::hud::HudContext;
 use leafish_protocol::protocol::login::{Account, AccountType};
 use leafish_protocol::protocol::mojang::MojangAccount;
@@ -64,7 +65,6 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
-use crate::entity::Rotation;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -606,15 +606,14 @@ fn handle_window_event<T>(
                 window.set_cursor_visible(false);
                 if game.server.is_some() && !*game.server.as_ref().unwrap().clone().dead.read() {
                     if let Some(player) = *game.server.as_ref().unwrap().player.clone().write() {
-                        let server = game
-                            .server
-                            .as_ref()
-                            .unwrap();
+                        let server = game.server.as_ref().unwrap();
                         let entities = server.entities.clone();
                         let mut entities = entities.write();
-                        let mut rotation =
-                        entities
-                            .world.entity_mut(player.1).get_mut::<Rotation>().unwrap(); // TODO: This panicked because of unwrap, check why!
+                        let mut rotation = entities
+                            .world
+                            .entity_mut(player.1)
+                            .get_mut::<Rotation>()
+                            .unwrap(); // TODO: This panicked because of unwrap, check why!
                         rotation.yaw -= rx;
                         rotation.pitch -= ry;
                         if rotation.pitch < (PI / 2.0) + 0.01 {

@@ -20,7 +20,7 @@ use crate::render::{hud, Renderer};
 use crate::screen::{Screen, ScreenSystem, ScreenType};
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
-use crate::{render, Game};
+use crate::Game;
 use core::cmp;
 use glutin::event::VirtualKeyCode;
 use leafish_protocol::format::Component;

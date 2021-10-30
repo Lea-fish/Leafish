@@ -18,7 +18,6 @@ use std::sync::Arc;
 use crate::auth;
 use crate::paths;
 use crate::protocol;
-use crate::render;
 use crate::ui;
 
 use crate::render::Renderer;

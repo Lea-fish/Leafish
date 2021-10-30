@@ -62,11 +62,6 @@ impl SunModel {
         }
     }
 
-    pub fn remove(&mut self) {
-        self.sun.cleanup_manually();
-        self.moon.cleanup_manually();
-    }
-
     pub fn generate_sun(renderer: Arc<render::Renderer>) -> model::ModelHandle {
         let tex = render::Renderer::get_texture(renderer.get_textures_ref(), "environment/sun");
         renderer.models.lock().create_model(

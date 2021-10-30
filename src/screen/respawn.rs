@@ -50,7 +50,10 @@ impl super::Screen for Respawn {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
-            .size(renderer.screen_data.read().width as f64, renderer.screen_data.read().height as f64)
+            .size(
+                renderer.screen_data.read().width as f64,
+                renderer.screen_data.read().height as f64,
+            )
             .colour((104, 0, 0, 100))
             .create(ui_container);
         let text = ui::TextBuilder::new()

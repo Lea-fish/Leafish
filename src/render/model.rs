@@ -3,6 +3,7 @@ use super::shaders;
 use crate::format::{self, Component};
 use crate::gl;
 use crate::model::BlockVertex;
+use crate::render::Renderer;
 use crate::shared::Direction;
 use crate::types::hash::FNVHash;
 use byteorder::{NativeEndian, WriteBytesExt};
@@ -12,7 +13,6 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::sync::Arc;
-use crate::render::Renderer;
 
 pub struct Manager {
     collections: Vec<Collection>,
@@ -32,17 +32,21 @@ pub struct CollectionKey(usize);
 struct ModelKey(CollectionKey, usize);
 
 #[derive(Clone)]
-pub struct ModelHandle(ModelKey, Arc<Renderer>, pub Option<Arc<dyn Fn(Arc<Renderer>) + Send + Sync>>); // fn can be used to implement custom drop behavior
+pub struct ModelHandle(
+    ModelKey,
+    Arc<Renderer>,
+    pub Option<Arc<dyn Fn(Arc<Renderer>) + Send + Sync>>,
+); // fn can be used to implement custom drop behavior
 
 impl ModelHandle {
-
+    #[allow(unused)] // we might want to use this in the future
     pub fn cleanup_manually(&self) {
         self.1.clone().models.lock().remove_model(&self);
-        if let Some(cleanup_fn) = self.2.as_ref() { // TODO: Do we actually want to call this on manual cleanup?
+        if let Some(cleanup_fn) = self.2.as_ref() {
+            // TODO: Do we actually want to call this on manual cleanup?
             cleanup_fn(self.1.clone());
         }
     }
-
 }
 
 impl PartialEq for ModelHandle {
@@ -105,11 +109,16 @@ impl Manager {
     }
 
     pub fn get_model(&mut self, key: &ModelHandle) -> Option<&mut Model> {
-        let collection = &mut self.collections[(key.0.0).0];
+        let collection = &mut self.collections[(key.0 .0).0];
         collection.models.get_mut(&key.0)
     }
 
-    pub fn create_model(&mut self, ckey: CollectionKey, parts: Vec<Vec<Vertex>>, renderer: Arc<Renderer>) -> ModelHandle {
+    pub fn create_model(
+        &mut self,
+        ckey: CollectionKey,
+        parts: Vec<Vec<Vertex>>,
+        renderer: Arc<Renderer>,
+    ) -> ModelHandle {
         let array = gl::VertexArray::new();
         array.bind();
         self.index_buffer.bind(gl::ELEMENT_ARRAY_BUFFER);
@@ -200,7 +209,7 @@ impl Manager {
     }
 
     fn remove_model(&mut self, key: &ModelHandle) {
-        let collection = &mut self.collections[(key.0.0).0];
+        let collection = &mut self.collections[(key.0 .0).0];
         collection.models.remove(&key.0);
     }
 

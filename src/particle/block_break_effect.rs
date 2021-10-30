@@ -1,19 +1,28 @@
-use crate::render::{Renderer, model};
-use crate::entity::Position;
-use cgmath::{Vector3, Decomposed, Rad, Quaternion, Rotation3, Matrix4};
-use std::f32::consts::PI;
-use crate::render;
-use crate::world::World;
 use crate::ecs::{Manager, SystemExecStage};
-use bevy_ecs::prelude::*;
-use parking_lot::RwLock;
-use std::sync::Arc;
+use crate::render;
 use crate::render::model::ModelHandle;
+use crate::render::{model, Renderer};
+use bevy_ecs::prelude::*;
+use cgmath::{Decomposed, Matrix4, Quaternion, Rad, Rotation3, Vector3};
+use std::sync::Arc;
 
-pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage, entity_sched: &mut SystemStage) { // TODO: Check sync/async usage!
-    sync
-        .add_system(effect_added.label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(effect_updated.label(SystemExecStage::Render).after(SystemExecStage::Normal));
+pub fn add_systems(
+    _m: &mut Manager,
+    _parallel: &mut SystemStage,
+    sync: &mut SystemStage,
+    _entity_sched: &mut SystemStage,
+) {
+    // TODO: Check sync/async usage!
+    sync.add_system(
+        effect_added
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        effect_updated
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    );
 }
 
 #[derive(Component)]
@@ -39,22 +48,30 @@ impl BlockBreakEffect {
         self.dirty = true;
     }
 
-    pub fn update_ratio(&mut self, ratio: f32) { // 0.0 - 1.0
+    pub fn update_ratio(&mut self, ratio: f32) {
+        // 0.0 - 1.0
         let anim_id = ((ratio * 10.0) as i8 - 1).max(0);
         self.update(anim_id);
     }
 }
 
-pub fn effect_added(renderer: Res<Arc<Renderer>>, mut commands: Commands, query: Query<(Entity, &BlockEffectData)>) {
+pub fn effect_added(
+    renderer: Res<Arc<Renderer>>,
+    mut commands: Commands,
+    query: Query<(Entity, &BlockEffectData)>,
+) {
     for (entity, data) in query.iter() {
         let mut effect = BlockBreakEffect::new(data);
         readd_model(renderer.clone(), &mut effect);
-        commands.entity(entity).remove::<BlockEffectData>().insert(effect);
+        commands
+            .entity(entity)
+            .remove::<BlockEffectData>()
+            .insert(effect);
     }
 }
 
-pub fn effect_updated(renderer: Res<Arc<Renderer>>, mut query: Query<(&mut BlockBreakEffect)>) {
-    for (mut effect) in query.iter_mut() {
+pub fn effect_updated(renderer: Res<Arc<Renderer>>, mut query: Query<&mut BlockBreakEffect>) {
+    for mut effect in query.iter_mut() {
         if effect.dirty {
             readd_model(renderer.clone(), &mut *effect);
             effect.dirty = false;
@@ -84,22 +101,34 @@ fn readd_model(renderer: Arc<Renderer>, effect: &mut BlockBreakEffect) {
     effect.model.take();
     if effect.status > 0 {
         let mut model = vec![];
-        let tex = render::Renderer::get_texture(renderer.get_textures_ref(), &*format!("blocks/destroy_stage_{}", effect.status - 1));
-        model::append_box(&mut model, -0.01, -0.01, -0.01, 1.02, 1.02, 1.02, [
-            Some(tex.clone()),
-            Some(tex.clone()),
-            Some(tex.clone()),
-            Some(tex.clone()),
-            Some(tex.clone()),
-            Some(tex.clone()),
-        ]);
-        effect.model.replace(renderer.clone().models.lock().create_model(
-            model::DEFAULT,
-            vec![
-                model
+        let tex = render::Renderer::get_texture(
+            renderer.get_textures_ref(),
+            &*format!("blocks/destroy_stage_{}", effect.status - 1),
+        );
+        model::append_box(
+            &mut model,
+            -0.01,
+            -0.01,
+            -0.01,
+            1.02,
+            1.02,
+            1.02,
+            [
+                Some(tex.clone()),
+                Some(tex.clone()),
+                Some(tex.clone()),
+                Some(tex.clone()),
+                Some(tex.clone()),
+                Some(tex.clone()),
             ],
-            renderer
-        ));
+        );
+        effect
+            .model
+            .replace(renderer.clone().models.lock().create_model(
+                model::DEFAULT,
+                vec![model],
+                renderer,
+            ));
     }
 }
 

@@ -12,13 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::render;
 use crate::{ui, Game};
 
+use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
 use std::sync::Arc;
-use crate::render::Renderer;
 
 pub struct EditAccountEntry {
     elements: Option<UIElements>,

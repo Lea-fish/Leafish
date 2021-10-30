@@ -1,48 +1,88 @@
 use super::{
     Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity,
 };
+use crate::ecs::{Manager, SystemExecStage};
+use crate::entity::slime::{added_slime, update_slime};
+use crate::entity::zombie::{added_zombie, update_zombie};
 use crate::entity::{resolve_textures, EntityType};
 use crate::format;
 use crate::render;
 use crate::render::model::{self, FormatState};
+use crate::render::Renderer;
+use crate::screen::ScreenSystem;
 use crate::settings::Actionkey;
 use crate::shared::Position as BPosition;
 use crate::types::hash::FNVHash;
 use crate::types::GameMode;
 use crate::world;
+use bevy_ecs::prelude::*;
 use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::{Aabb, Aabb3};
 use instant::Instant;
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
-use bevy_ecs::prelude::*;
-use crate::ecs::{Manager, SystemExecStage};
 use std::sync::Arc;
-use parking_lot::{RwLock, Mutex};
-use crate::render::Renderer;
-use crate::screen::ScreenSystem;
-use crate::entity::slime::{update_slime, added_slime};
-use crate::entity::zombie::{update_zombie, added_zombie, removed_zombie};
-use bevy_ecs::system::Command;
 
-pub fn add_systems(m: &mut Manager, parallel: &mut SystemStage, sync: &mut SystemStage, entity_sched: &mut SystemStage) { // TODO: Check sync/async usage!
-    entity_sched
-        .add_system(handle_movement.system().label(SystemExecStage::Normal).before(SystemExecStage::Render));
+pub fn add_systems(
+    _m: &mut Manager,
+    _parallel: &mut SystemStage,
+    sync: &mut SystemStage,
+    entity_sched: &mut SystemStage,
+) {
+    // TODO: Check sync/async usage!
+    entity_sched.add_system(
+        handle_movement
+            .system()
+            .label(SystemExecStage::Normal)
+            .before(SystemExecStage::Render),
+    );
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
-    sync.add_system(update_render_players.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(player_added.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(update_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(added_slime.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(update_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(added_zombie.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
+    sync.add_system(
+        update_render_players
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        player_added
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        update_slime
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        added_slime
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        update_zombie
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        added_zombie
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    );
 }
 
 pub fn create_local(m: &mut Manager) -> Entity {
     let mut entity = m.world.spawn();
     let mut tpos = TargetPosition::new(0.0, 0.0, 0.0);
     tpos.lerp_amount = 1.0 / 3.0;
-    entity.insert(Position::new(0.0, 0.0, 0.0))
+    entity
+        .insert(Position::new(0.0, 0.0, 0.0))
         .insert(tpos)
         .insert(Rotation::new(0.0, 0.0))
         .insert(Velocity::new(0.0, 0.0, 0.0))
@@ -52,7 +92,8 @@ pub fn create_local(m: &mut Manager) -> Entity {
         .insert(Bounds::new(Aabb3::new(
             Point3::new(-0.3, 0.0, -0.3),
             Point3::new(0.3, 1.8, 0.3),
-        ))).insert(PlayerModel::new("", false, false, true))
+        )))
+        .insert(PlayerModel::new("", false, false, true))
         .insert(Light::new())
         .insert(EntityType::Player);
     entity.id()
@@ -60,20 +101,19 @@ pub fn create_local(m: &mut Manager) -> Entity {
 
 pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
     let mut entity = m.world.spawn();
-    entity.insert(Position::new(0.0, 0.0, 0.0))
-    .insert(TargetPosition::new(0.0, 0.0, 0.0))
-    .insert(Rotation::new(0.0, 0.0))
-    .insert(TargetRotation::new(0.0, 0.0))
-    .insert(Velocity::new(0.0, 0.0, 0.0))
-    .insert(
-        Bounds::new(Aabb3::new(
+    entity
+        .insert(Position::new(0.0, 0.0, 0.0))
+        .insert(TargetPosition::new(0.0, 0.0, 0.0))
+        .insert(Rotation::new(0.0, 0.0))
+        .insert(TargetRotation::new(0.0, 0.0))
+        .insert(Velocity::new(0.0, 0.0, 0.0))
+        .insert(Bounds::new(Aabb3::new(
             Point3::new(-0.3, 0.0, -0.3),
             Point3::new(0.3, 1.8, 0.3),
-        )),
-    )
-    .insert(PlayerModel::new(name, true, true, false))
-    .insert(Light::new())
-    .insert(EntityType::Player);
+        )))
+        .insert(PlayerModel::new(name, true, true, false))
+        .insert(Light::new())
+        .insert(EntityType::Player);
     entity.id()
 }
 
@@ -127,12 +167,13 @@ impl PlayerModel {
     }
 }
 
-fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>, mut query: Query<(&mut PlayerModel, &Position, &Rotation, &Light)>) {
-    let delta = game_info
-        .delta;
-    let mut player_count = 0;
+fn update_render_players(
+    renderer: Res<Arc<Renderer>>,
+    game_info: Res<GameInfo>,
+    mut query: Query<(&mut PlayerModel, &Position, &Rotation, &Light)>,
+) {
+    let delta = game_info.delta;
     for (mut player_model, position, rotation, light) in query.iter_mut() {
-        player_count += 1;
         // println!("render player!");
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
@@ -174,9 +215,7 @@ fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>,
 
             // TODO This sucks
             if player_model.has_name_tag {
-                let ang = (position.position.x - cam_x)
-                    .atan2(position.position.z - cam_z)
-                    as f32;
+                let ang = (position.position.x - cam_x).atan2(position.position.z - cam_z) as f32;
                 mdl.matrix[PlayerModelPart::NameTag as usize] = Matrix4::from(Decomposed {
                     scale: 1.0,
                     rot: Quaternion::from_angle_y(Rad(ang)),
@@ -186,16 +225,16 @@ fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>,
 
             mdl.matrix[PlayerModelPart::Head as usize] = offset_matrix
                 * Matrix4::from(Decomposed {
-                scale: 1.0,
-                rot: Quaternion::from_angle_x(Rad(-rotation.pitch as f32)),
-                disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
-            });
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(-rotation.pitch as f32)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 12.0 / 16.0, 0.0),
+                });
             mdl.matrix[PlayerModelPart::Body as usize] = offset_matrix
                 * Matrix4::from(Decomposed {
-                scale: 1.0,
-                rot: Quaternion::from_angle_x(Rad(0.0)),
-                disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
-            });
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(0.0)),
+                    disp: Vector3::new(0.0, -12.0 / 16.0 - 6.0 / 16.0, 0.0),
+                });
 
             let mut time = player_model.time;
             let mut dir = player_model.dir;
@@ -207,16 +246,16 @@ fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>,
 
             mdl.matrix[PlayerModelPart::LegRight as usize] = offset_matrix
                 * Matrix4::from(Decomposed {
-                scale: 1.0,
-                rot: Quaternion::from_angle_x(Rad(ang as f32)),
-                disp: Vector3::new(2.0 / 16.0, -12.0 / 16.0, 0.0),
-            });
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(ang as f32)),
+                    disp: Vector3::new(2.0 / 16.0, -12.0 / 16.0, 0.0),
+                });
             mdl.matrix[PlayerModelPart::LegLeft as usize] = offset_matrix
                 * Matrix4::from(Decomposed {
-                scale: 1.0,
-                rot: Quaternion::from_angle_x(Rad(-ang as f32)),
-                disp: Vector3::new(-2.0 / 16.0, -12.0 / 16.0, 0.0),
-            });
+                    scale: 1.0,
+                    rot: Quaternion::from_angle_x(Rad(-ang as f32)),
+                    disp: Vector3::new(-2.0 / 16.0, -12.0 / 16.0, 0.0),
+                });
 
             let mut i_time = player_model.idle_time;
             i_time += delta * 0.02;
@@ -233,28 +272,28 @@ fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>,
 
             mdl.matrix[PlayerModelPart::ArmRight as usize] = offset_matrix
                 * Matrix4::from_translation(Vector3::new(
-                6.0 / 16.0,
-                -12.0 / 16.0 - 12.0 / 16.0,
-                0.0,
-            ))
+                    6.0 / 16.0,
+                    -12.0 / 16.0 - 12.0 / 16.0,
+                    0.0,
+                ))
                 * Matrix4::from(Quaternion::from_angle_x(Rad(-(ang * 0.75) as f32)))
                 * Matrix4::from(Quaternion::from_angle_z(Rad(
-                (i_time.cos() * 0.06 - 0.06) as f32
-            )))
+                    (i_time.cos() * 0.06 - 0.06) as f32
+                )))
                 * Matrix4::from(Quaternion::from_angle_x(Rad((i_time.sin() * 0.06
-                - ((7.5 - (player_model.arm_time - 7.5).abs()) / 7.5))
-                as f32)));
+                    - ((7.5 - (player_model.arm_time - 7.5).abs()) / 7.5))
+                    as f32)));
 
             mdl.matrix[PlayerModelPart::ArmLeft as usize] = offset_matrix
                 * Matrix4::from_translation(Vector3::new(
-                -6.0 / 16.0,
-                -12.0 / 16.0 - 12.0 / 16.0,
-                0.0,
-            ))
+                    -6.0 / 16.0,
+                    -12.0 / 16.0 - 12.0 / 16.0,
+                    0.0,
+                ))
                 * Matrix4::from(Quaternion::from_angle_x(Rad((ang * 0.75) as f32)))
                 * Matrix4::from(Quaternion::from_angle_z(Rad(
-                -(i_time.cos() * 0.06 - 0.06) as f32
-            )))
+                    -(i_time.cos() * 0.06 - 0.06) as f32
+                )))
                 * Matrix4::from(Quaternion::from_angle_x(Rad(-(i_time.sin() * 0.06) as f32)));
 
             let mut update = true;
@@ -286,8 +325,11 @@ fn update_render_players(renderer: Res<Arc<Renderer>>, game_info: Res<GameInfo>,
     }
 }
 
-pub fn player_added(renderer: Res<Arc<Renderer>>, mut query: Query<(&mut PlayerModel), (Added<PlayerModel>)>) {
-    for (mut player_model) in query.iter_mut() {
+pub fn player_added(
+    renderer: Res<Arc<Renderer>>,
+    mut query: Query<&mut PlayerModel, Added<PlayerModel>>,
+) {
+    for mut player_model in query.iter_mut() {
         add_player(renderer.clone(), &mut *player_model);
     }
 }
@@ -304,10 +346,10 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
 
     // TODO: Replace this shit entirely!
     macro_rules! srel {
-            ($x:expr, $y:expr, $w:expr, $h:expr) => {
-                Some(skin.relative(($x) / 64.0, ($y) / 64.0, ($w) / 64.0, ($h) / 64.0))
-            };
-        }
+        ($x:expr, $y:expr, $w:expr, $h:expr) => {
+            Some(skin.relative(($x) / 64.0, ($y) / 64.0, ($w) / 64.0, ($h) / 64.0))
+        };
+    }
 
     let mut head_verts = vec![];
     if player_model.has_head {
@@ -364,8 +406,8 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
         [32.0, 48.0, 48.0, 48.0], // Left arm
         [40.0, 16.0, 40.0, 32.0], // Right arm
     ]
-        .iter()
-        .enumerate()
+    .iter()
+    .enumerate()
     {
         // TODO: Fix alex (slim) skins
         let alex = i > 1;
@@ -461,12 +503,15 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
         renderer.clone(),
     );
     let skin_url = player_model.skin_url.clone();
-    model.2 = player_model.model.as_ref().map_or(Some(Arc::new(move |renderer: Arc<Renderer>| {
-        let skin_url = skin_url.clone();
-        if let Some(url) = skin_url.lock().as_ref() {
-            renderer.get_textures_ref().read().release_skin(url); // TODO: Move this into the custom drop handling fn!
-        };
-    })), |x| x.2.clone());
+    model.2 = player_model.model.as_ref().map_or(
+        Some(Arc::new(move |renderer: Arc<Renderer>| {
+            let skin_url = skin_url.clone();
+            if let Some(url) = skin_url.lock().as_ref() {
+                renderer.get_textures_ref().read().release_skin(url); // TODO: Move this into the custom drop handling fn!
+            };
+        })),
+        |x| x.2.clone(),
+    );
 
     player_model.model.replace(model);
 }
@@ -536,8 +581,33 @@ impl PlayerMovement {
     }
 }
 
-pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc<ScreenSystem>>, mut commands: Commands, mut query: Query<(Entity, &mut PlayerMovement, &mut TargetPosition, &mut Velocity, &Bounds, &Rotation, &GameMode, Option<&mut Gravity>)/*, (Without<PlayerMovement>, With<Gravity>)*/>) {
-    for (entity, mut movement, mut position, mut velocity, bounds, rotation, gamemode, mut gravity) in query.iter_mut() {
+#[allow(unused_mut)] // we ignore this warning, as this case seems to be a clippy bug
+pub fn handle_movement(
+    world: Res<Arc<crate::world::World>>,
+    screen_sys: Res<Arc<ScreenSystem>>,
+    mut commands: Commands,
+    mut query: Query<(
+        Entity,
+        &mut PlayerMovement,
+        &mut TargetPosition,
+        &mut Velocity,
+        &Bounds,
+        &Rotation,
+        &GameMode,
+        Option<&mut Gravity>,
+    )>,
+) {
+    for (
+        entity,
+        mut movement,
+        mut position,
+        mut velocity,
+        bounds,
+        rotation,
+        gamemode,
+        mut gravity,
+    ) in query.iter_mut()
+    {
         if movement.flying && gravity.is_some() {
             commands.entity(entity).remove::<Gravity>();
         } else if !movement.flying && gravity.is_none() {
@@ -546,8 +616,8 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
         movement.flying |= gamemode.always_fly();
         if !screen_sys.is_current_ingame()
             && (movement.pressed_keys.len() > 1
-            || (!movement.pressed_keys.is_empty()
-            && !movement.is_key_pressed(Actionkey::OpenInv)))
+                || (!movement.pressed_keys.is_empty()
+                    && !movement.is_key_pressed(Actionkey::OpenInv)))
         {
             movement.pressed_keys.insert(Actionkey::Backward, false);
             movement.pressed_keys.insert(Actionkey::Forward, false);
@@ -565,9 +635,7 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
                 if movement.when_last_jump_released.is_some() {
                     let dt = movement.when_last_jump_pressed.unwrap()
                         - movement.when_last_jump_released.unwrap();
-                    if dt.as_secs() == 0
-                        && dt.subsec_millis() <= crate::settings::DOUBLE_JUMP_MS
-                    {
+                    if dt.as_secs() == 0 && dt.subsec_millis() <= crate::settings::DOUBLE_JUMP_MS {
                         movement.want_to_fly = !movement.want_to_fly;
                         //info!("double jump! dt={:?} toggle want_to_fly = {}", dt, movement.want_to_fly);
 
@@ -592,12 +660,11 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
         ) {
             let (forward, yaw, is_forward) = movement.calculate_movement(rotation.yaw);
             let mut speed = 0.21585;
-            let mut additional_speed =
-                if movement.is_key_pressed(Actionkey::Sprint) && is_forward {
-                    0.2806 - 0.21585
-                } else {
-                    0.0
-                };
+            let mut additional_speed = if movement.is_key_pressed(Actionkey::Sprint) && is_forward {
+                0.2806 - 0.21585
+            } else {
+                0.0
+            };
             let looking_vec = calculate_looking_vector(rotation.yaw, rotation.pitch);
             if movement.flying {
                 speed *= 2.5;
@@ -610,8 +677,7 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
                     position.position.y -= speed + additional_speed;
                 }
             } else if gravity.as_ref().map_or(false, |v| v.on_ground) {
-                if movement.is_key_pressed(Actionkey::Jump) && velocity.velocity.y.abs() < 0.001
-                {
+                if movement.is_key_pressed(Actionkey::Jump) && velocity.velocity.y.abs() < 0.001 {
                     velocity.velocity.y = 0.42;
                 }
             } else {
@@ -625,10 +691,8 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
             velocity.velocity.z *= 0.98;
             // position.position.x += look_vec.0 * speed;
             // position.position.z -= look_vec.1 * speed;
-            position.position.x +=
-                forward * yaw.cos() * (speed + looking_vec.0 * additional_speed); // TODO: Multiply with speed only for walking forwards
-            position.position.z -=
-                forward * yaw.sin() * (speed + looking_vec.1 * additional_speed);
+            position.position.x += forward * yaw.cos() * (speed + looking_vec.0 * additional_speed); // TODO: Multiply with speed only for walking forwards
+            position.position.z -= forward * yaw.sin() * (speed + looking_vec.1 * additional_speed);
             position.position.y += velocity.velocity.y;
             if (velocity.velocity.x.abs() * 0.2) < 0.005 {
                 velocity.velocity.x = 0.0;
@@ -678,7 +742,8 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
                             offset as f64 / 16.0,
                             0.0,
                         ));
-                        let (_, hit) = check_collisions(&**world, &mut position, &last_position, mini);
+                        let (_, hit) =
+                            check_collisions(&**world, &mut position, &last_position, mini);
                         if !hit {
                             target.y += offset as f64 / 16.0;
                             ox = target.x;
@@ -703,7 +768,8 @@ pub fn handle_movement(world: Res<Arc<crate::world::World>>, screen_sys: Res<Arc
                     let ground =
                         Aabb3::new(Point3::new(-0.3, -0.005, -0.3), Point3::new(0.3, 0.0, 0.3));
                     let prev = gravity.on_ground;
-                    let (_, hit) = check_collisions(&**world, &mut position, &last_position, ground);
+                    let (_, hit) =
+                        check_collisions(&**world, &mut position, &last_position, ground);
                     gravity.on_ground = hit;
                     if !prev && gravity.on_ground {
                         movement.did_touch_ground = true;

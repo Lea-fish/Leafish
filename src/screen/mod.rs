@@ -254,11 +254,11 @@ impl ScreenSystem {
                 for _ in 0..(screens_len as isize - lowest) {
                     let screen = self.screens.clone().write().pop().unwrap();
                     if screen.active {
-                        screen
-                            .screen
-                            .clone()
-                            .lock()
-                            .on_deactive(self, renderer.clone(), ui_container);
+                        screen.screen.clone().lock().on_deactive(
+                            self,
+                            renderer.clone(),
+                            ui_container,
+                        );
                     }
                     screen
                         .screen
@@ -285,10 +285,11 @@ impl ScreenSystem {
                 if let Some(last) = last {
                     if last.active {
                         last.active = false;
-                        last.screen
-                            .clone()
-                            .lock()
-                            .on_deactive(self, renderer.clone(), ui_container);
+                        last.screen.clone().lock().on_deactive(
+                            self,
+                            renderer.clone(),
+                            ui_container,
+                        );
                     }
                 }
                 let mut current = screens.last_mut().unwrap();
@@ -336,12 +337,11 @@ impl ScreenSystem {
                 if current.last_width != -1 && current.last_height != -1 {
                     for screen in tmp.iter_mut().enumerate() {
                         if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
-                            screen
-                                .1
-                                .screen
-                                .clone()
-                                .lock()
-                                .on_resize(self, renderer.clone(), ui_container);
+                            screen.1.screen.clone().lock().on_resize(
+                                self,
+                                renderer.clone(),
+                                ui_container,
+                            );
                             screen.1.last_width = renderer.screen_data.read().safe_width as i32;
                             screen.1.last_height = renderer.screen_data.read().safe_height as i32;
                         }
@@ -353,12 +353,12 @@ impl ScreenSystem {
             }
             for screen in tmp.iter_mut().enumerate() {
                 if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
-                    screen
-                        .1
-                        .screen
-                        .clone()
-                        .lock()
-                        .tick(self, renderer.clone(), ui_container, delta);
+                    screen.1.screen.clone().lock().tick(
+                        self,
+                        renderer.clone(),
+                        ui_container,
+                        delta,
+                    );
                 }
             }
         }

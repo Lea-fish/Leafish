@@ -1,7 +1,7 @@
 use crate::direction::Direction;
+use bevy_ecs::prelude::*;
 use std::fmt;
 use std::ops;
-use bevy_ecs::prelude::*;
 
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {

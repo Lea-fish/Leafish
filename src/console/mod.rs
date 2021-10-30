@@ -27,7 +27,6 @@ use crate::format::{Color, Component, TextComponent};
 use crate::render;
 use crate::ui;
 use parking_lot::Mutex;
-use parking_lot::RwLock;
 
 const FILTERED_CRATES: &[&str] = &[
     //"reqwest", // TODO: needed?

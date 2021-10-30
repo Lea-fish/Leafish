@@ -464,8 +464,14 @@ impl ServerList {
 
         // If we are kicked from a server display the reason
         let disconnected = if let Some(ref disconnect_reason) = self.disconnect_reason {
-            let (width, height) =
-                ui::Formatted::compute_size(renderer.clone(), disconnect_reason, 600.0, 1.0, 1.0, 1.0);
+            let (width, height) = ui::Formatted::compute_size(
+                renderer.clone(),
+                disconnect_reason,
+                600.0,
+                1.0,
+                1.0,
+                1.0,
+            );
             let background = ui::ImageBuilder::new()
                 .texture("leafish:solid")
                 .position(0.0, 3.0)

@@ -1,20 +1,18 @@
 use super::*;
-use crate::ecs;
-use crate::render;
-use crate::shared::Position as BPos;
-use crate::world;
-use cgmath::InnerSpace;
-use bevy_ecs::prelude::*;
 use crate::entity::player::PlayerMovement;
+use crate::shared::Position as BPos;
+use cgmath::InnerSpace;
 
-pub fn apply_velocity(mut query: Query<(&mut Position, &Velocity), (Without<PlayerMovement>)>) { // Player's handle their own physics
+pub fn apply_velocity(mut query: Query<(&mut Position, &Velocity), Without<PlayerMovement>>) {
+    // Player's handle their own physics
     for (mut pos, vel) in query.iter_mut() {
         pos.position += vel.velocity;
     }
 }
 
-pub fn apply_gravity(mut query: Query<(&mut Velocity), (Without<PlayerMovement>, With<Gravity>)>) { // Player's handle their own physics
-    for (mut vel) in query.iter_mut() {
+pub fn apply_gravity(mut query: Query<&mut Velocity, (Without<PlayerMovement>, With<Gravity>)>) {
+    // Player's handle their own physics
+    for mut vel in query.iter_mut() {
         vel.velocity.y -= 0.03;
         if vel.velocity.y < -0.3 {
             vel.velocity.y = -0.3;
@@ -22,20 +20,18 @@ pub fn apply_gravity(mut query: Query<(&mut Velocity), (Without<PlayerMovement>,
     }
 }
 
-pub fn update_last_position(mut query: Query<(&mut Position)>) {
-    for (mut pos) in query.iter_mut() {
+pub fn update_last_position(mut query: Query<&mut Position>) {
+    for mut pos in query.iter_mut() {
         pos.moved = (pos.position - pos.last_position).magnitude2() > 0.01;
         pos.last_position = pos.position;
     }
 }
 
-pub fn lerp_position(mut game_info: ResMut<GameInfo>, mut query: Query<(&mut Position, &TargetPosition)>) {
-    let delta = game_info
-        .delta
-        .min(5.0);
+pub fn lerp_position(game_info: Res<GameInfo>, mut query: Query<(&mut Position, &TargetPosition)>) {
+    let delta = game_info.delta.min(5.0);
     for (mut pos, target_pos) in query.iter_mut() {
-        pos.position = pos.position
-            + (target_pos.position - pos.position) * delta * target_pos.lerp_amount;
+        pos.position =
+            pos.position + (target_pos.position - pos.position) * delta * target_pos.lerp_amount;
         let len = (pos.position - target_pos.position).magnitude2();
         if !(0.001..=100.0 * 100.0).contains(&len) {
             pos.position = target_pos.position;
@@ -43,11 +39,12 @@ pub fn lerp_position(mut game_info: ResMut<GameInfo>, mut query: Query<(&mut Pos
     }
 }
 
-pub fn lerp_rotation(mut game_info: ResMut<GameInfo>, mut query: Query<(&mut Rotation, &mut TargetRotation)>) {
+pub fn lerp_rotation(
+    game_info: Res<GameInfo>,
+    mut query: Query<(&mut Rotation, &mut TargetRotation)>,
+) {
     use std::f64::consts::PI;
-    let delta = game_info
-        .delta
-        .min(5.0);
+    let delta = game_info.delta.min(5.0);
     for (mut rot, mut target_rot) in query.iter_mut() {
         target_rot.yaw = (PI * 2.0 + target_rot.yaw) % (PI * 2.0);
         target_rot.pitch = (PI * 2.0 + target_rot.pitch) % (PI * 2.0);
@@ -69,7 +66,10 @@ pub fn lerp_rotation(mut game_info: ResMut<GameInfo>, mut query: Query<(&mut Rot
     }
 }
 
-pub fn light_entity(world: Res<Arc<crate::world::World>>, mut query: Query<(&Position, &Bounds, &mut Light)>) {
+pub fn light_entity(
+    world: Res<Arc<crate::world::World>>,
+    mut query: Query<(&Position, &Bounds, &mut Light)>,
+) {
     for (pos, bounds, mut light) in query.iter_mut() {
         let mut count = 0.0;
         let mut block_light = 0.0;
@@ -89,8 +89,8 @@ pub fn light_entity(world: Res<Arc<crate::world::World>>, mut query: Query<(&Pos
                 for x in min_x..max_x {
                     let dist = length
                         - (((x as f32 + 0.5) - pos.position.x as f32).powi(2)
-                        + ((y as f32 + 0.5) - pos.position.y as f32).powi(2)
-                        + ((z as f32 + 0.5) - pos.position.z as f32).powi(2))
+                            + ((y as f32 + 0.5) - pos.position.y as f32).powi(2)
+                            + ((z as f32 + 0.5) - pos.position.z as f32).powi(2))
                         .sqrt()
                         .min(length);
                     let dist = dist / length;

@@ -12,12 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::ecs::Manager;
 use crate::entity;
-use crate::entity::player::{create_local, PlayerMovement, PlayerModel};
-use crate::entity::{EntityType, TargetRotation, GameInfo, Gravity, TargetPosition};
+use crate::entity::player::{create_local, PlayerModel, PlayerMovement};
+use crate::entity::{EntityType, GameInfo, Gravity, TargetPosition, TargetRotation};
 use crate::format;
 use crate::inventory::material::versions::to_material;
 use crate::inventory::{inventory_from_type, Inventory, InventoryContext, InventoryType, Item};
+use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
+use crate::particle::ParticleType;
 use crate::protocol::{self, forge, mapped_packet, packet};
 use crate::render;
 use crate::render::hud::HudContext;
@@ -33,9 +36,12 @@ use crate::types::GameMode;
 use crate::world;
 use crate::world::{CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
+use bevy_ecs::prelude::{Entity, Stage, SystemStage};
 use cgmath::prelude::*;
+use cgmath::Vector3;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
+use dashmap::DashMap;
 use instant::{Duration, Instant};
 use leafish_protocol::format::{Component, TextComponent};
 use leafish_protocol::item::Stack;
@@ -51,20 +57,13 @@ use parking_lot::RwLock;
 use rand::{self, Rng};
 use rayon::ThreadPoolBuilder;
 use std::collections::HashMap;
-use std::hash::{BuildHasherDefault, Hasher};
+use std::hash::BuildHasherDefault;
 use std::io::Cursor;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
-use dashmap::DashMap;
-use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
-use crate::particle::{ParticleType, EntityMetadata};
-use cgmath::Vector3;
-use bevy_ecs::prelude::{Entity, SystemStage, Stage};
-use crate::ecs::{Manager, SystemExecStage};
-use bevy_ecs::schedule::{StageLabel, DynHash, DynEq};
 
 pub mod plugin_messages;
 mod sun;
@@ -518,7 +517,11 @@ impl Server {
                                 let entities = server.entities.clone();
                                 let mut entities = entities.write();
                                 let mut rotation = entities
-                                    .world.get_entity_mut(*entity).unwrap().get_mut::<TargetRotation>().unwrap();
+                                    .world
+                                    .get_entity_mut(*entity)
+                                    .unwrap()
+                                    .get_mut::<TargetRotation>()
+                                    .unwrap();
                                 rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
                             }
                         }
@@ -736,13 +739,21 @@ impl Server {
                         }
                         MappedPacket::BlockBreakAnimation(block_break) => {
                             if block_break.stage >= 10 || block_break.stage < 1 {
-                                if let Some(break_impl) = server.active_block_break_anims.remove(&block_break.entity_id) {
+                                if let Some(break_impl) = server
+                                    .active_block_break_anims
+                                    .remove(&block_break.entity_id)
+                                {
                                     server.entities.clone().write().world.despawn(break_impl.1);
                                 }
-                            } else if let Some(anim_ent) = server.active_block_break_anims.clone().get(&block_break.entity_id) {
+                            } else if let Some(anim_ent) = server
+                                .active_block_break_anims
+                                .clone()
+                                .get(&block_break.entity_id)
+                            {
                                 let entities = server.entities.clone();
                                 let mut entities = entities.write();
-                                let mut anim = entities.world.get_entity_mut(*anim_ent.value()).unwrap();
+                                let mut anim =
+                                    entities.world.get_entity_mut(*anim_ent.value()).unwrap();
                                 let effect = anim.get_mut::<BlockBreakEffect>();
                                 if effect.is_some() {
                                     effect.unwrap().update(block_break.stage);
@@ -752,12 +763,19 @@ impl Server {
                                 let mut entities = entities.write();
                                 let mut entity = entities.world.spawn();
                                 entity.insert(BlockEffectData {
-                                    position: Vector3::new(block_break.location.x as f64, block_break.location.y as f64, block_break.location.z as f64),
+                                    position: Vector3::new(
+                                        block_break.location.x as f64,
+                                        block_break.location.y as f64,
+                                        block_break.location.z as f64,
+                                    ),
                                     status: block_break.stage,
                                 });
                                 let entity = entity.id();
                                 ParticleType::BlockBreak.create_particle(&mut entities, entity);
-                                server.active_block_break_anims.clone().insert(block_break.entity_id, entity);
+                                server
+                                    .active_block_break_anims
+                                    .clone()
+                                    .insert(block_break.entity_id, entity);
                             }
                         }
                         _ => {
@@ -826,7 +844,7 @@ impl Server {
         let (tx, rx) = unbounded();
         let (etx, erx) = unbounded();
         thread::spawn(move || loop {
-           // println!("doing render list thingy!");
+            // println!("doing render list thingy!");
             let _: bool = rx.recv().unwrap();
             let server = server.clone().lock().as_ref().unwrap().clone();
             let world = server.world.clone();
@@ -860,8 +878,17 @@ impl Server {
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
         entity::add_systems(&mut entities, &mut parallel, &mut sync, &mut entity_sched);
-        entities.schedule.clone().write().add_stage("parallel", parallel).add_stage_after("parallel", "sync", sync);
-        entities.entity_schedule.clone().write().add_stage("entity", entity_sched);
+        entities
+            .schedule
+            .clone()
+            .write()
+            .add_stage("parallel", parallel)
+            .add_stage_after("parallel", "sync", sync);
+        entities
+            .entity_schedule
+            .clone()
+            .write()
+            .add_stage("entity", entity_sched);
 
         let version = Version::from_id(protocol_version as u32);
         let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
@@ -932,7 +959,8 @@ impl Server {
     pub fn disconnect(&self, reason: Option<format::Component>) {
         self.conn.clone().write().take().unwrap().close();
         self.disconnect_data.clone().write().disconnect_reason = reason;
-        if let Some(player) = self.player.clone().write().take() { // TODO: Is this even required if we have the despawn code below?
+        if let Some(player) = self.player.clone().write().take() {
+            // TODO: Is this even required if we have the despawn code below?
             self.entities.clone().write().world.despawn(player.1);
         }
         for entity in &*self.entity_map.clone().write() {
@@ -979,7 +1007,9 @@ impl Server {
         {
             // TODO: Check if the world type actually needs a sun
             if self.sun_model.read().is_none() {
-                self.sun_model.write().replace(sun::SunModel::new(renderer.clone()));
+                self.sun_model
+                    .write()
+                    .replace(sun::SunModel::new(renderer.clone()));
             }
 
             // Copy to camera
@@ -988,12 +1018,14 @@ impl Server {
                 let position = entities
                     .world
                     .get_entity(player.1)
-                    .unwrap().get::<crate::entity::Position>()
+                    .unwrap()
+                    .get::<crate::entity::Position>()
                     .unwrap();
                 let rotation = entities
                     .world
                     .get_entity(player.1)
-                    .unwrap().get::<crate::entity::Rotation>()
+                    .unwrap()
+                    .get::<crate::entity::Rotation>()
                     .unwrap();
                 renderer.clone().camera.lock().pos = cgmath::Point3::from_vec(
                     position.position + cgmath::Vector3::new(0.0, 1.62, 0.0),
@@ -1037,23 +1069,25 @@ impl Server {
                 renderer.view_vector.lock().cast().unwrap(),
                 target::test_block,
             ) {
-                self.target_info.clone().write().update(renderer.clone(), pos, bl);
+                self.target_info
+                    .clone()
+                    .write()
+                    .update(renderer.clone(), pos, bl);
             } else {
-                self.target_info.clone().write().clear(renderer.clone());
+                self.target_info.clone().write().clear();
             }
         } else {
-            self.target_info.clone().write().clear(renderer.clone());
+            self.target_info.clone().write().clear();
         }
     }
 
-    fn entity_tick(&self, delta: f64, focused: bool, dead: bool) {
+    fn entity_tick(&self, delta: f64, _focused: bool, _dead: bool) {
         let entities = self.entities.clone();
         let mut entities = entities.write();
         {
             let mut game_info = entities.world.get_resource_mut::<GameInfo>().unwrap();
             // Update the game's state for entities to read
-            game_info
-                .delta = delta;
+            game_info.delta = delta;
         }
 
         if self.is_connected() || self.disconnect_data.clone().read().just_disconnected {
@@ -1135,8 +1169,10 @@ impl Server {
                 let entities = self.entities.clone();
                 let mut entities = entities.write();
                 let mut movement = entities
-                    .world.entity_mut(player.1)
-                    .get_mut::<PlayerMovement>().unwrap();
+                    .world
+                    .entity_mut(player.1)
+                    .get_mut::<PlayerMovement>()
+                    .unwrap();
                 // Force the server to know when touched the ground
                 // otherwise if it happens between ticks the server
                 // will think we are flying.
@@ -1146,26 +1182,27 @@ impl Server {
                 } else {
                     None
                 }
-            }.unwrap_or_else(|| {
-                self
-                    .entities
+            }
+            .unwrap_or_else(|| {
+                self.entities
                     .read()
-                    .world.entity(player.1)
+                    .world
+                    .entity(player.1)
                     .get::<Gravity>()
                     .map_or(false, |v| v.on_ground)
             });
             let entities = self.entities.read();
 
             let position = entities
-                .world.entity(player.1)
+                .world
+                .entity(player.1)
                 .get::<TargetPosition>()
                 .unwrap();
             let rotation = entities
-                .world.entity(player.1)
+                .world
+                .entity(player.1)
                 .get::<crate::entity::Rotation>()
                 .unwrap();
-
-
 
             // Sync our position to the server
             // Use the smaller packets when possible
@@ -1201,7 +1238,7 @@ impl Server {
                         self.block_break_info.lock().break_position,
                         face_idx,
                     )
-                        .unwrap();
+                    .unwrap();
                     self.block_break_info.lock().active = false;
                     self.block_break_info.lock().delay = 5;
                     if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
@@ -1213,7 +1250,7 @@ impl Server {
                         self.mapped_protocol_version,
                         Hand::MainHand,
                     )
-                        .unwrap();
+                    .unwrap();
                     self.block_break_info.lock().progress += 0.1; // TODO: Make this value meaningful
                     let anim_ent = self.block_break_info.lock().effect_id.unwrap();
                     let entities = self.entities.clone();
@@ -1221,7 +1258,9 @@ impl Server {
                     let mut anim = entities.world.get_entity_mut(anim_ent).unwrap();
                     let effect = anim.get_mut::<BlockBreakEffect>();
                     if effect.is_some() {
-                        effect.unwrap().update_ratio(self.block_break_info.lock().progress);
+                        effect
+                            .unwrap()
+                            .update_ratio(self.block_break_info.lock().progress);
                     }
                 }
             }
@@ -1248,7 +1287,7 @@ impl Server {
                     break_pos,
                     break_face.index() as u8,
                 )
-                    .unwrap();
+                .unwrap();
                 packet::send_digging(
                     self.conn.clone().write().as_mut().unwrap(),
                     self.mapped_protocol_version,
@@ -1256,7 +1295,7 @@ impl Server {
                     pos,
                     face.index() as u8,
                 )
-                    .unwrap();
+                .unwrap();
                 self.block_break_info.lock().break_position = pos;
                 self.block_break_info.lock().break_face = face;
                 self.block_break_info.lock().progress = 0.0;
@@ -1291,7 +1330,8 @@ impl Server {
                     .entities
                     .clone()
                     .write()
-                    .world.entity_mut(player.1)
+                    .world
+                    .entity_mut(player.1)
                     .get_mut::<PlayerMovement>()
                 {
                     state_changed = movement.pressed_keys.get(&key).map_or(false, |v| *v) != down;
@@ -1353,7 +1393,8 @@ impl Server {
             let gamemode = *self
                 .entities
                 .read()
-                .world.entity(self.player.clone().read().as_ref().unwrap().1)
+                .world
+                .entity(self.player.clone().read().as_ref().unwrap().1)
                 .get::<GameMode>()
                 .unwrap();
             if gamemode.can_interact_with_world() && self.block_break_info.lock().delay == 0 {
@@ -1432,7 +1473,8 @@ impl Server {
             let gamemode = *self
                 .entities
                 .read()
-                .world.entity(self.player.clone().read().as_ref().unwrap().1)
+                .world
+                .entity(self.player.clone().read().as_ref().unwrap().1)
                 .get::<GameMode>()
                 .unwrap();
             if gamemode.can_interact_with_world() {
@@ -1676,7 +1718,8 @@ impl Server {
             let entities = self.entities.clone();
             let mut entities = entities.write();
             let mut model = entities
-                .world.entity_mut(player)
+                .world
+                .entity_mut(player)
                 .get_mut::<PlayerModel>()
                 .unwrap();
             model.set_skin(info.skin_url.clone());
@@ -1686,13 +1729,16 @@ impl Server {
             .entities
             .clone()
             .write()
-            .world.entity_mut(player)
+            .world
+            .entity_mut(player)
             .get_mut::<GameMode>()
             .unwrap() = gamemode;
         self.entities
             .clone()
             .write()
-            .world.entity_mut(player).get_mut::<PlayerMovement>()
+            .world
+            .entity_mut(player)
+            .get_mut::<PlayerMovement>()
             .unwrap()
             .flying = gamemode.can_fly();
 
@@ -1742,19 +1788,22 @@ impl Server {
                 .entities
                 .clone()
                 .write()
-                .world.entity_mut(player.1)
+                .world
+                .entity_mut(player.1)
                 .get_mut::<GameMode>()
                 .unwrap() = gamemode;
             self.entities
                 .clone()
                 .write()
-                .world.entity_mut(player.1)
+                .world
+                .entity_mut(player.1)
                 .get_mut::<PlayerMovement>()
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
         let entity_id = self.player.read().unwrap().0;
-        *self.player.clone().write() = Some((entity_id, create_local(&mut *self.entities.clone().write())));
+        *self.player.clone().write() =
+            Some((entity_id, create_local(&mut *self.entities.clone().write())));
         if *self.dead.read() {
             *self.dead.write() = false;
             *self.just_died.write() = false;
@@ -1798,13 +1847,15 @@ impl Server {
                     .entities
                     .clone()
                     .write()
-                    .world.entity_mut(player.1)
+                    .world
+                    .entity_mut(player.1)
                     .get_mut::<GameMode>()
                     .unwrap() = gamemode;
                 self.entities
                     .clone()
                     .write()
-                    .world.entity_mut(player.1)
+                    .world
+                    .entity_mut(player.1)
                     .get_mut::<PlayerMovement>()
                     .unwrap()
                     .flying = gamemode.can_fly();
@@ -1857,7 +1908,8 @@ impl Server {
                 let entities = self.entities.clone();
                 let mut entities = entities.write();
                 let mut target_position = entities
-                    .world.entity_mut(*entity)
+                    .world
+                    .entity_mut(*entity)
                     .get_mut::<TargetPosition>()
                     .unwrap();
                 target_position.position.x = x;
@@ -1867,7 +1919,8 @@ impl Server {
             let entities = self.entities.clone();
             let mut entities = entities.write();
             let mut target_rotation = entities
-                .world.entity_mut(*entity)
+                .world
+                .entity_mut(*entity)
                 .get_mut::<TargetRotation>()
                 .unwrap();
             target_rotation.yaw = -(yaw / 256.0) * PI * 2.0;
@@ -1880,7 +1933,8 @@ impl Server {
             let entities = self.entities.clone();
             let mut entities = entities.write();
             let mut position = entities
-                .world.entity_mut(*entity)
+                .world
+                .entity_mut(*entity)
                 .get_mut::<TargetPosition>()
                 .unwrap();
             position.position.x += entity_move.delta_x;
@@ -1895,7 +1949,8 @@ impl Server {
             let entities = self.entities.clone();
             let mut entities = entities.write();
             let mut rotation = entities
-                .world.entity_mut(*entity)
+                .world
+                .entity_mut(*entity)
                 .get_mut::<TargetRotation>()
                 .unwrap();
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
@@ -1917,10 +1972,11 @@ impl Server {
             {
                 let entities = self.entities.clone();
                 let mut entities = entities.write();
-            let mut position = entities
-                .world.entity_mut(*entity)
-                .get_mut::<TargetPosition>()
-                .unwrap();
+                let mut position = entities
+                    .world
+                    .entity_mut(*entity)
+                    .get_mut::<TargetPosition>()
+                    .unwrap();
                 position.position.x += delta_x;
                 position.position.y += delta_y;
                 position.position.z += delta_z;
@@ -1928,7 +1984,8 @@ impl Server {
             let entities = self.entities.clone();
             let mut entities = entities.write();
             let mut rotation = entities
-                .world.entity_mut(*entity)
+                .world
+                .entity_mut(*entity)
                 .get_mut::<TargetRotation>()
                 .unwrap();
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
@@ -1962,7 +2019,8 @@ impl Server {
         let mut entities = entities.write();
         {
             let mut position = entities
-                .world.entity_mut(entity)
+                .world
+                .entity_mut(entity)
                 .get_mut::<crate::entity::Position>()
                 .unwrap();
             position.position.x = x;
@@ -1971,7 +2029,8 @@ impl Server {
         }
         {
             let mut target_position = entities
-                .world.entity_mut(entity)
+                .world
+                .entity_mut(entity)
                 .get_mut::<TargetPosition>()
                 .unwrap();
             target_position.position.x = x;
@@ -1980,7 +2039,8 @@ impl Server {
         }
         let (yaw, pitch) = {
             let mut rotation = entities
-                .world.entity_mut(entity)
+                .world
+                .entity_mut(entity)
                 .get_mut::<crate::entity::Rotation>()
                 .unwrap();
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
@@ -1988,16 +2048,18 @@ impl Server {
             (rotation.yaw, rotation.pitch)
         };
         {
-        let mut target_rotation = entities
-            .world.entity_mut(entity)
-            .get_mut::<TargetRotation>()
-            .unwrap();
-        target_rotation.yaw = yaw;
-        target_rotation.pitch = pitch;
+            let mut target_rotation = entities
+                .world
+                .entity_mut(entity)
+                .get_mut::<TargetRotation>()
+                .unwrap();
+            target_rotation.yaw = yaw;
+            target_rotation.pitch = pitch;
         }
         if let Some(info) = self.players.clone().read().get(&uuid) {
             let mut model = entities
-                .world.entity_mut(entity)
+                .world
+                .entity_mut(entity)
                 .get_mut::<PlayerModel>()
                 .unwrap();
             model.set_skin(info.skin_url.clone());
@@ -2014,7 +2076,8 @@ impl Server {
 
             {
                 let mut position = entities
-                    .world.entity_mut(player.1)
+                    .world
+                    .entity_mut(player.1)
                     .get_mut::<TargetPosition>()
                     .unwrap();
                 position.position.x = calculate_relative_teleport(
@@ -2037,28 +2100,30 @@ impl Server {
                 );
             }
             {
-            let mut rotation = entities
-                .world.entity_mut(player.1)
-                .get_mut::<crate::entity::Rotation>()
-                .unwrap();
-            rotation.yaw = calculate_relative_teleport(
-                TeleportFlag::RelYaw,
-                flags,
-                rotation.yaw,
-                -teleport.yaw as f64 * (PI / 180.0),
-            );
+                let mut rotation = entities
+                    .world
+                    .entity_mut(player.1)
+                    .get_mut::<crate::entity::Rotation>()
+                    .unwrap();
+                rotation.yaw = calculate_relative_teleport(
+                    TeleportFlag::RelYaw,
+                    flags,
+                    rotation.yaw,
+                    -teleport.yaw as f64 * (PI / 180.0),
+                );
 
-            rotation.pitch = -((calculate_relative_teleport(
-                TeleportFlag::RelPitch,
-                flags,
-                (-rotation.pitch) * (180.0 / PI) + 180.0,
-                teleport.pitch as f64,
-            ) - 180.0)
-                * (PI / 180.0));
+                rotation.pitch = -((calculate_relative_teleport(
+                    TeleportFlag::RelPitch,
+                    flags,
+                    (-rotation.pitch) * (180.0 / PI) + 180.0,
+                    teleport.pitch as f64,
+                ) - 180.0)
+                    * (PI / 180.0));
             }
 
             let mut velocity = entities
-                .world.entity_mut(player.1)
+                .world
+                .entity_mut(player.1)
                 .get_mut::<crate::entity::Velocity>()
                 .unwrap();
 
@@ -2256,7 +2321,8 @@ impl Server {
                         let entities = self.entities.clone();
                         let mut entities = entities.write();
                         let mut model = entities
-                            .world.entity_mut(self.player.clone().write().unwrap().1)
+                            .world
+                            .entity_mut(self.player.clone().write().unwrap().1)
                             .get_mut::<entity::player::PlayerModel>()
                             .unwrap();
                         model.set_skin(info.skin_url.clone());

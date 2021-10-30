@@ -1,19 +1,27 @@
 use crate::ecs;
+use crate::ecs::SystemExecStage;
 use crate::format::{self, Component};
 use crate::render;
 use crate::render::model::{self, FormatState};
+use crate::render::Renderer;
 use crate::shared::{Direction, Position};
-use crate::world;
 use crate::world::block::Block;
 use bevy_ecs::prelude::*;
-use crate::render::Renderer;
-use parking_lot::{RwLock, Mutex};
 use std::sync::Arc;
-use crate::ecs::SystemExecStage;
 
-pub fn add_systems(m: &mut ecs::Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
-    sync.add_system(render_sign.system().label(SystemExecStage::Render).after(SystemExecStage::Normal))
-        .add_system(on_add_sign.system().label(SystemExecStage::Render).after(SystemExecStage::Normal));
+pub fn add_systems(_m: &mut ecs::Manager, _parallel: &mut SystemStage, sync: &mut SystemStage) {
+    sync.add_system(
+        render_sign
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        on_add_sign
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    );
 }
 
 pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
@@ -48,7 +56,11 @@ pub struct SignInfo {
     rotation: f64,
 }
 
-pub fn render_sign(renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position)>) {
+pub fn render_sign(
+    renderer: Res<Arc<Renderer>>,
+    world: Res<Arc<crate::world::World>>,
+    mut query: Query<(&mut SignInfo, &Position)>,
+) {
     for (mut info, position) in query.iter_mut() {
         if info.dirty {
             remove_sign(&mut *info);
@@ -64,13 +76,22 @@ pub fn render_sign(renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::Wo
     }
 }
 
-pub fn on_add_sign(renderer: Res<Arc<Renderer>>, world: Res<Arc<crate::world::World>>, mut query: Query<(&mut SignInfo, &Position), (Added<SignInfo>)>) {
+pub fn on_add_sign(
+    renderer: Res<Arc<Renderer>>,
+    world: Res<Arc<crate::world::World>>,
+    mut query: Query<(&mut SignInfo, &Position), Added<SignInfo>>,
+) {
     for (mut info, position) in query.iter_mut() {
         add_sign(renderer.clone(), world.clone(), &mut *info, position);
-   }
+    }
 }
 
-fn add_sign(renderer: Arc<Renderer>, world: Arc<crate::world::World>, info: &mut SignInfo, position: &Position) {
+fn add_sign(
+    renderer: Arc<Renderer>,
+    world: Arc<crate::world::World>,
+    info: &mut SignInfo,
+    position: &Position,
+) {
     use cgmath::{Decomposed, Matrix4, Quaternion, Rad, Rotation3, Vector3};
     use std::f64::consts::PI;
     info.dirty = false;
@@ -95,10 +116,10 @@ fn add_sign(renderer: Arc<Renderer>, world: Arc<crate::world::World>, info: &mut
     let tex = render::Renderer::get_texture(renderer.clone().get_textures_ref(), "entity/sign");
 
     macro_rules! rel {
-            ($x:expr, $y:expr, $w:expr, $h:expr) => {
-                Some(tex.relative(($x) / 64.0, ($y) / 32.0, ($w) / 64.0, ($h) / 32.0))
-            };
-        }
+        ($x:expr, $y:expr, $w:expr, $h:expr) => {
+            Some(tex.relative(($x) / 64.0, ($y) / 32.0, ($w) / 64.0, ($h) / 32.0))
+        };
+    }
 
     let mut verts = vec![];
     // Backboard
@@ -181,7 +202,7 @@ fn add_sign(renderer: Arc<Renderer>, world: Arc<crate::world::World>, info: &mut
         info.offset_z as f32,
     ));
     drop(models); // if we don't do this, we would get a deadlock
-    // FIXME: Cleanup all the manual drops with seperate spans
+                  // FIXME: Cleanup all the manual drops with seperate spans
 
     info.model.replace(model); // TODO: This can cause a deadlock, check why!
 }
