@@ -1769,7 +1769,9 @@ impl Server {
             } else {
                 println!("no data for entity found :(");
                 if let Some(p_data) = *self.player.read() {
-                    println!("Local player data not found for {:?}", p_data);
+                    if p_data.1 == entity.1 {
+                        println!("Local player data not found for {:?}", p_data);
+                    }
                 }
             }
         }
