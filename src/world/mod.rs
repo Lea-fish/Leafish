@@ -34,13 +34,13 @@ use log::warn;
 use parking_lot::RwLock;
 use std::collections::{HashMap, VecDeque};
 use std::hash::BuildHasherDefault;
-use std::io::{Cursor, Read, BufRead};
+use std::io::{BufRead, Cursor, Read};
 use std::sync::Arc;
 
 pub use self::{chunk::*, lighting::*};
 use crate::entity::block_entity::sign::SignInfo;
+use leafish_protocol::protocol::{Serializable, VarInt};
 use std::sync::atomic::Ordering;
-use leafish_protocol::protocol::{VarInt, Serializable};
 
 pub mod biome;
 mod chunk;
