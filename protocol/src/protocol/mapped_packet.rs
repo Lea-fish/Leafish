@@ -1257,9 +1257,10 @@ state_mapped_packets!(
                 field chunk_x: i32,
                 field chunk_z: i32,
                 field trust_edges: Option<bool>,
-                field sky_light_mask: i32,
-                field block_light_mask: i32,
-                field empty_sky_light_mask: i32,
+                field sky_light_mask: i64,
+                field block_light_mask: i64,
+                field empty_block_light_mask: i64,
+                field empty_sky_light_mask: i64,
                 field light_arrays: Vec<u8>,
             }
             packet TradeList {
@@ -3814,6 +3815,7 @@ impl MappablePacket for packet::Packet {
                     trust_edges: Some(light.trust_edges),
                     sky_light_mask: light.sky_light_mask.0,
                     block_light_mask: light.block_light_mask.0,
+                    empty_block_light_mask: light.empty_block_light_mask.0,
                     empty_sky_light_mask: light.empty_sky_light_mask.0,
                     light_arrays: light.light_arrays,
                 })
@@ -3825,6 +3827,7 @@ impl MappablePacket for packet::Packet {
                     trust_edges: None,
                     sky_light_mask: light.sky_light_mask.0,
                     block_light_mask: light.block_light_mask.0,
+                    empty_block_light_mask: light.empty_block_light_mask.0,
                     empty_sky_light_mask: light.empty_sky_light_mask.0,
                     light_arrays: light.light_arrays,
                 })

@@ -6,8 +6,8 @@ use crate::world::World;
 
 pub struct LightData {
     pub arrays: Cursor<Vec<u8>>,
-    pub block_light_mask: i32,
-    pub sky_light_mask: i32,
+    pub block_light_mask: i64,
+    pub sky_light_mask: i64,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

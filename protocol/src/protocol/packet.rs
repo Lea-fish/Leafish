@@ -2084,17 +2084,19 @@ state_packets!(
                 field chunk_x: VarInt =,
                 field chunk_z: VarInt =,
                 field trust_edges: bool =,
-                field sky_light_mask: VarInt =,
-                field block_light_mask: VarInt =,
-                field empty_sky_light_mask: VarInt =,
+                field sky_light_mask: VarLong =,
+                field block_light_mask: VarLong =,
+                field empty_block_light_mask: VarLong =,
+                field empty_sky_light_mask: VarLong =,
                 field light_arrays: Vec<u8> =,
             }
             packet UpdateLight_NoTrust {
                 field chunk_x: VarInt =,
                 field chunk_z: VarInt =,
-                field sky_light_mask: VarInt =,
-                field block_light_mask: VarInt =,
-                field empty_sky_light_mask: VarInt =,
+                field sky_light_mask: VarLong =,
+                field block_light_mask: VarLong =,
+                field empty_block_light_mask: VarLong =,
+                field empty_sky_light_mask: VarLong =,
                 field light_arrays: Vec<u8> =,
             }
             packet TradeList_WithoutRestock {

@@ -34,12 +34,13 @@ use log::warn;
 use parking_lot::RwLock;
 use std::collections::{HashMap, VecDeque};
 use std::hash::BuildHasherDefault;
-use std::io::{Cursor, Read};
+use std::io::{Cursor, Read, BufRead};
 use std::sync::Arc;
 
 pub use self::{chunk::*, lighting::*};
 use crate::entity::block_entity::sign::SignInfo;
 use std::sync::atomic::Ordering;
+use leafish_protocol::protocol::{VarInt, Serializable};
 
 pub mod biome;
 mod chunk;
@@ -879,7 +880,7 @@ impl World {
     }
 
     fn prep_section_19(&self, chunk: &mut Chunk, data: &mut Cursor<Vec<u8>>, section_id: usize) {
-        use crate::protocol::{LenPrefixed, Serializable, VarInt};
+        use crate::protocol::LenPrefixed;
         use leafish_protocol::types::bit;
         if self.protocol_version >= 451 {
             let _block_count = data.read_u16::<byteorder::LittleEndian>().unwrap();
@@ -1267,56 +1268,59 @@ impl World {
         self.load_chunk(x, z, new, skylight, new, mask, mask_add, data, 17)
     }
 
-    pub fn load_light_with_loc(
-        &self,
-        _x: i32,
-        _z: i32,
-        _block_light_mask: i32,
-        _sky_light: bool,
-        _sky_light_mask: i32,
-        _data: &mut Cursor<Vec<u8>>,
-    ) {
-        // debug!("x {} z {}", x, z);
-        // TODO: Insert chunks with light data only or cache them until the real data arrives!
-        /*let cpos = CPos(x, z);
-        let chunks = self.chunks.clone();
-        let mut chunks = chunks.write();
-        let chunk = chunks.get_mut(&cpos).unwrap(); // TODO: Fix this panic!
-        self.load_light(chunk, block_light_mask, sky_light, sky_light_mask, data);*/
-    }
-
+    // TODO: Fix weird outlier phantom(unreal) light sources showing up in the corners of 1.12 chunks!
     fn load_light(
         &self,
         chunk: &mut Chunk,
-        block_light_mask: i32,
+        block_light_mask: i64,
         sky_light: bool,
-        sky_light_mask: i32,
+        sky_light_mask: i64,
         data: &mut Cursor<Vec<u8>>,
     ) {
-        for i in 0..16 {
-            if block_light_mask & (1 << i) == 0 {
-                continue;
-            }
-            if chunk.sections[i as usize].as_ref().is_none() {
-                chunk.sections[i as usize].replace(ChunkSection::new(i, false));
-            }
-            let section = chunk.sections[i as usize].as_mut().unwrap();
-
-            data.read_exact(&mut section.block_light.data).unwrap();
-        }
-
         if sky_light {
-            for i in 0..16 {
+            for i in 0..17 {
                 if sky_light_mask & (1 << i) == 0 {
                     continue;
                 }
+                if i == 0 {
+                    let _size = VarInt::read_from(data);
+
+                    data.consume(16 * 16 * 16);
+                    continue;
+                }
+                let i = i - 1;
                 if chunk.sections[i as usize].as_ref().is_none() {
                     chunk.sections[i as usize].replace(ChunkSection::new(i, false));
                 }
                 let section = chunk.sections[i as usize].as_mut().unwrap();
+                let _size = VarInt::read_from(data);
 
                 data.read_exact(&mut section.sky_light.data).unwrap();
             }
+        }
+        if sky_light_mask & (1 << 63) != 0 {
+            let _size = VarInt::read_from(data);
+
+            data.consume(16 * 16 * 16);
+        }
+        for i in 0..17 {
+            if block_light_mask & (1 << i) == 0 {
+                continue;
+            }
+            if i == 0 {
+                let _size = VarInt::read_from(data);
+
+                data.consume(16 * 16 * 16);
+                continue;
+            }
+            let i = i - 1;
+            if chunk.sections[i as usize].as_ref().is_none() {
+                chunk.sections[i as usize].replace(ChunkSection::new(i, false));
+            }
+            let section = chunk.sections[i as usize].as_mut().unwrap();
+            let _size = VarInt::read_from(data);
+
+            data.read_exact(&mut section.block_light.data).unwrap();
         }
     }
 
