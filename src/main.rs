@@ -82,6 +82,7 @@ const CL_BRAND: console::CVar<String> = console::CVar {
 };
 
 pub struct Game {
+    graphics_context: Arc<GraphicsContext>,
     renderer: Arc<render::Renderer>,
     screen_sys: Arc<screen::ScreenSystem>,
     resource_manager: Arc<RwLock<resources::Manager>>,
@@ -250,6 +251,7 @@ fn main() {
         .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)) // Why are we using this particular value here?
         .with_maximized(true)
         .build(&events_loop).unwrap();
+    let dpi_factor = window.scale_factor();
     let graphics_context = Arc::new(GraphicsContext::new(
         window, wgpu::Features::empty(), Color::BLACK, true)); // TODO: Make vsync optional and populate features!
     // Load the shaders from disk
@@ -331,6 +333,7 @@ fn main() {
     let clipboard = create_clipboard();
 
     let game = Game {
+        graphics_context: graphics_context.clone(),
         server: None,
         focused: false,
         renderer: Arc::new(renderer),
@@ -397,15 +400,14 @@ fn main() {
             &mut last_frame,
             &mut resui,
             &mut last_resource_version,
-            &mut vsync,
+            &mut vsync, // TODO: Remove this and use an explicit call instead!
         );
         if DEBUG {
             let dist = Instant::now().checked_duration_since(start);
             debug!("Ticking took {}", dist.unwrap().as_millis());
         }
-        glutin_window
-            .swap_buffers()
-            .expect("Failed to swap GL buffers");
+        let frame = graphics_context.clone()
+            .get_current_texture();
 
         if game.should_close {
             *control_flow = winit::event_loop::ControlFlow::Exit;
@@ -472,8 +474,8 @@ fn tick_all(
     if *vsync != vsync_changed {
         error!("Changing vsync currently requires restarting");
         game.should_close = true;
-        // TODO: after https://github.com/tomaka/glutin/issues/693 Allow changing vsync on a Window
         //vsync = vsync_changed;
+        // TODO: Change this in the process of switching to wgpu!
     }
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 

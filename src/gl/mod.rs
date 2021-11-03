@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use glow::{HasContext, PixelPackData, PixelUnpackData};
 use log::error;
 use std::mem;
 use std::ops::BitOr;
