@@ -250,7 +250,8 @@ fn main() {
         .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)) // Why are we using this particular value here?
         .with_maximized(true)
         .build(&events_loop).unwrap();
-    let mut graphics_context = GraphicsContext::new(window, wgpu::Features::empty(), Color::BLACK, true); // TODO: Make vsync optional and populate features!
+    let graphics_context = Arc::new(GraphicsContext::new(
+        window, wgpu::Features::empty(), Color::BLACK, true)); // TODO: Make vsync optional and populate features!
     // Load the shaders from disk
     /*
     let swapchain_format = surface.get_preferred_format(&adapter).unwrap();
@@ -363,12 +364,6 @@ fn main() {
         return;
     }
 
-    /*if opt.server.is_some() { // TODO: Readd?
-        let hud_context = Arc::new(RwLock::new(HudContext::new()));
-        game.connect_to(&opt.server.unwrap(), hud_context.clone());
-        screen_sys.add_screen(Box::new(Hud::new(hud_context.clone())));
-    }*/
-
     let mut last_resource_version = 0;
 
     let game = Rc::new(RefCell::new(game));
@@ -377,7 +372,6 @@ fn main() {
     let game = Rc::clone(&game);
     let ui_container = Rc::clone(&ui_container);
     events_loop.run(move |event, _event_loop, control_flow| {
-
         let mut game = game.borrow_mut();
         let mut ui_container = ui_container.borrow_mut();
         *control_flow = winit::event_loop::ControlFlow::Poll;
@@ -388,9 +382,7 @@ fn main() {
         } = event
         {
             // Recreate the swap chain with the new size
-            if let Some(viewport) = viewports.get_mut(&window_id) {
-                viewport.resize(&device, size);
-            }
+            graphics_context.clone().resize(physical_size);
         }
 
         if !handle_window_event(&window, &mut game, &mut ui_container, event) {

@@ -19,6 +19,8 @@ use std::ops::BitOr;
 use std::ops::{Deref, DerefMut};
 use wgpu::{Device, TextureDescriptor, TextureDimension, PresentMode, Adapter, Queue, Instance, Features};
 use winit::window::Window;
+use parking_lot::{Mutex, RwLock};
+use std::sync::Arc;
 
 static mut CONTEXT: *mut glow::Context = 0 as *mut glow::Context;
 
@@ -1038,7 +1040,7 @@ pub struct GraphicsContext {
     adapter: Adapter,
     device: Device,
     queue: Queue,
-    view_port: Viewport,
+    view_port: Arc<RwLock<Viewport>>,
 }
 
 impl GraphicsContext {
@@ -1075,24 +1077,24 @@ impl GraphicsContext {
             adapter,
             device,
             queue,
-            view_port,
+            view_port: Arc::new(RwLock::new(view_port)),
         }
     }
 
-    pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
-        self.view_port.resize(&self.device, size)
+    pub fn resize(&self, size: winit::dpi::PhysicalSize<u32>) {
+        self.view_port.clone().write().resize(&self.device, size)
     }
 
-    pub fn set_vsync(&mut self, vsync: bool) {
-        self.view_port.set_vsync(&self.device, vsync)
+    pub fn set_vsync(&self, vsync: bool) {
+        self.view_port.clone().write().set_vsync(&self.device, vsync)
     }
 
     pub fn get_current_texture(&self) -> wgpu::SurfaceTexture {
-        self.view_port.get_current_texture()
+        self.view_port.read().get_current_texture()
     }
 
     pub fn window(&self) -> &Window {
-        self.view_port.window()
+        self.view_port.read().window()
     }
 
     pub fn device(&self) -> &Device {
@@ -1100,6 +1102,6 @@ impl GraphicsContext {
     }
 
     pub fn background_color(&self) -> &wgpu::Color {
-        self.view_port.background_color()
+        self.view_port.read().background_color()
     }
 }
