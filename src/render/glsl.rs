@@ -14,6 +14,7 @@
 
 use std::collections::HashMap;
 
+// TODO: Remove this in the process of switching to wgpu!
 #[derive(Default)]
 pub struct Registry {
     shaders: HashMap<String, String>,

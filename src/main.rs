@@ -65,6 +65,9 @@ use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::Arc;
 use std::thread;
+use std::borrow::Cow;
+use crate::gl::GraphicsContext;
+use wgpu::Color;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -242,50 +245,44 @@ fn main() {
 
     let events_loop = winit::event_loop::EventLoop::new();
 
-    let window_builder = winit::window::WindowBuilder::new()
+    let window = winit::window::WindowBuilder::new()
         .with_title("Leafish")
-        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0))
-        .with_maximized(true); // Why are we using this particular value here?
+        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)) // Why are we using this particular value here?
+        .with_maximized(true)
+        .build(&events_loop).unwrap();
+    let mut graphics_context = GraphicsContext::new(window, wgpu::Features::empty(), Color::BLACK, true); // TODO: Make vsync optional and populate features!
+    // Load the shaders from disk
+    /*
+    let swapchain_format = surface.get_preferred_format(&adapter).unwrap();
+    let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+        label: None,
+        source: wgpu::ShaderSource::SpirV(Cow::Borrowed(*include_bytes!("shader.wgsl").chunks(4).map(|x| i32::from_bytes(x).unwrap()))), // TODO: use correct shader name
+    });
+    let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+        label: None,
+        bind_group_layouts: &[],
+        push_constant_ranges: &[],
+    });
 
-    let (context, shader_version, dpi_factor, glutin_window) = {
-        let glutin_window = glutin::ContextBuilder::new()
-            .with_stencil_buffer(0)
-            .with_depth_buffer(24)
-            .with_gl(glutin::GlRequest::GlThenGles {
-                opengl_version: (3, 2),
-                opengles_version: (3, 0),
-            })
-            .with_gl_profile(glutin::GlProfile::Core)
-            .with_vsync(vsync)
-            .build_windowed(window_builder, &events_loop)
-            .expect("Could not create glutin window.");
-        let dpi_factor = glutin_window.window().scale_factor();
+    let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: None,
+        layout: Some(&pipeline_layout),
+        vertex: wgpu::VertexState {
+            module: &shader,
+            entry_point: "vs_main", // TODO: use correct shader name
+            buffers: &[],
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: &shader,
+            entry_point: "fs_main", // TODO: use correct shader name
+            targets: &[swapchain_format.into()],
+        }),
+        primitive: wgpu::PrimitiveState::default(),
+        depth_stencil: None,
+        multisample: wgpu::MultisampleState::default(),
+    });*/
 
-        let glutin_window = unsafe {
-            glutin_window
-                .make_current()
-                .expect("Could not set current context.")
-        };
-
-        let context = unsafe {
-            glow::Context::from_loader_function(|s| glutin_window.get_proc_address(s) as *const _)
-        };
-
-        let shader_version = match glutin_window.get_api() {
-            glutin::Api::OpenGl => "#version 150",      // OpenGL 3.2
-            glutin::Api::OpenGlEs => "#version 300 es", // OpenGL ES 3.0 (similar to WebGL 2)
-            glutin::Api::WebGl => {
-                panic!("unexpectedly received WebGl API with glutin, expected to use glow codepath")
-            }
-        };
-
-        (context, shader_version, dpi_factor, glutin_window)
-    };
-
-    gl::init(context);
-    info!("Shader version: {}", shader_version);
-
-    let renderer = render::Renderer::new(resource_manager.clone(), shader_version);
+    let renderer = render::Renderer::new(resource_manager.clone());
     let ui_container = ui::Container::new();
 
     let mut last_frame = Instant::now();
@@ -380,7 +377,6 @@ fn main() {
     let game = Rc::clone(&game);
     let ui_container = Rc::clone(&ui_container);
     events_loop.run(move |event, _event_loop, control_flow| {
-        let winit_window = glutin_window.window();
 
         let mut game = game.borrow_mut();
         let mut ui_container = ui_container.borrow_mut();
@@ -391,16 +387,19 @@ fn main() {
             ..
         } = event
         {
-            glutin_window.resize(physical_size);
+            // Recreate the swap chain with the new size
+            if let Some(viewport) = viewports.get_mut(&window_id) {
+                viewport.resize(&device, size);
+            }
         }
 
-        if !handle_window_event(winit_window, &mut game, &mut ui_container, event) {
+        if !handle_window_event(&window, &mut game, &mut ui_container, event) {
             return;
         }
 
         let start = Instant::now();
         tick_all(
-            winit_window,
+            &window,
             &mut game,
             &mut ui_container,
             &mut last_frame,

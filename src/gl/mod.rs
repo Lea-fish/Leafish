@@ -12,12 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use glow as gl;
 use glow::{HasContext, PixelPackData, PixelUnpackData};
 use log::error;
 use std::mem;
 use std::ops::BitOr;
 use std::ops::{Deref, DerefMut};
+use wgpu::{Device, TextureDescriptor, TextureDimension, PresentMode, Adapter, Queue, Instance, Features};
+use winit::window::Window;
 
 static mut CONTEXT: *mut glow::Context = 0 as *mut glow::Context;
 
@@ -260,15 +261,22 @@ pub const CLAMP_TO_EDGE: TextureValue = gl::CLAMP_TO_EDGE as TextureValue;
 
 /// `Texture` is a buffer of data used by fragment shaders.
 #[derive(Default)]
-pub struct Texture(glow::Texture);
+pub struct Texture(wgpu::Texture);
 
 impl Texture {
     // Allocates a new texture.
     pub fn new() -> Texture {
+        let texture_descriptor = TextureDescriptor {
+            label: (),
+            size: Default::default(),
+            mip_level_count: 0,
+            sample_count: 0,
+            dimension: TextureDimension::D1,
+            format: TextureFormat::R8Unorm,
+            usage: ()
+        };
         Texture(unsafe {
-            glow_context()
-                .create_texture()
-                .expect("create texture failed")
+            Device::create_texture()
         })
     }
 
@@ -711,7 +719,7 @@ pub const WRITE_ONLY: Access = gl::WRITE_ONLY;
 
 /// `Buffer` is a storage for vertex data.
 #[derive(Default)]
-pub struct Buffer(glow::Buffer);
+pub struct Buffer(wgpu::Buffer);
 
 impl Buffer {
     /// Allocates a new Buffer.
@@ -741,34 +749,6 @@ impl Buffer {
     pub fn re_set_data(&self, target: BufferTarget, data: &[u8]) {
         unsafe {
             glow_context().buffer_sub_data_u8_slice(target, 0, data);
-        }
-    }
-
-    /// Maps the memory in the buffer on the gpu to memory which the program
-    /// can access. The access flag will specify how the program plans to use the
-    /// returned data. It'll unmap itself once the returned value is dropped.
-    ///
-    /// Warning: the passed length value is not checked in anyway so it is
-    /// possible to overrun the memory. It is up to the program to ensure this
-    /// length is valid.
-    pub fn map(&self, target: BufferTarget, access: Access, length: usize) -> MappedBuffer {
-        unsafe {
-            MappedBuffer {
-                inner: Vec::from_raw_parts(
-                    glow_context().map_buffer_range(target, 0, length as i32, access) as *mut u8,
-                    0,
-                    length,
-                ),
-                target,
-            }
-        }
-    }
-}
-
-impl Drop for Buffer {
-    fn drop(&mut self) {
-        unsafe {
-            glow_context().delete_buffer(self.0);
         }
     }
 }
@@ -971,5 +951,155 @@ pub fn clear_buffer(buffer: TargetBuffer, draw_buffer: u32, values: &mut [f32]) 
     unsafe {
         // TODO: why does glow have &mut on clear buffer values, why would it change the color?
         glow_context().clear_buffer_f32_slice(buffer, draw_buffer, values);
+    }
+}
+
+// CREDIT: Viewport implementation copied (but modified) from https://github.com/gfx-rs/wgpu/blob/master/wgpu/examples/hello-windows/main.rs
+pub struct ViewportDesc {
+    window: Window,
+    background_color: wgpu::Color,
+    surface: wgpu::Surface,
+}
+
+pub struct Viewport {
+    desc: ViewportDesc,
+    config: wgpu::SurfaceConfiguration,
+}
+
+impl ViewportDesc {
+    pub fn new(window: Window, background_color: wgpu::Color, instance: &wgpu::Instance) -> Self {
+        let surface = unsafe { instance.create_surface(&window) };
+        Self {
+            window,
+            background_color,
+            surface,
+        }
+    }
+
+    pub fn build(self, adapter: &wgpu::Adapter, device: &wgpu::Device, vsync: bool) -> Viewport {
+        let size = self.window.inner_size();
+
+        let config = wgpu::SurfaceConfiguration {
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            format: self.surface.get_preferred_format(adapter).unwrap(),
+            width: size.width,
+            height: size.height,
+            present_mode: Viewport::vsync_present_mode(vsync),
+        };
+
+        self.surface.configure(device, &config);
+
+        Viewport { desc: self, config }
+    }
+}
+
+impl Viewport {
+    pub fn resize(&mut self, device: &wgpu::Device, size: winit::dpi::PhysicalSize<u32>) {
+        self.config.width = size.width;
+        self.config.height = size.height;
+        self.desc.surface.configure(device, &self.config);
+    }
+
+    pub fn get_current_texture(&self) -> wgpu::SurfaceTexture {
+        self.desc
+            .surface
+            .get_current_texture()
+            .expect("Failed to acquire next swap chain texture")
+    }
+
+    pub fn set_background_color(&mut self, background_color: wgpu::Color) {
+        self.desc.background_color = background_color;
+    }
+
+    pub fn set_vsync(&mut self, device: &wgpu::Device, vsync: bool) {
+        self.config.present_mode = Self::vsync_present_mode(vsync);
+        self.desc.surface.configure(device, &self.config);
+    }
+
+    fn vsync_present_mode(vsync: bool) -> PresentMode {
+        if vsync {
+            PresentMode::Fifo
+        } else {
+            PresentMode::Mailbox // TODO: Check if we should use PresentMode::Immediate instead!
+        }
+    }
+
+    pub fn window(&self) -> &Window {
+        &self.desc.window
+    }
+
+    pub fn background_color(&self) -> &wgpu::Color {
+        &self.desc.background_color
+    }
+}
+
+pub struct GraphicsContext {
+    instance: Instance,
+    adapter: Adapter,
+    device: Device,
+    queue: Queue,
+    view_port: Viewport,
+}
+
+impl GraphicsContext {
+
+    pub fn new(window: Window, features: Features, background_color: wgpu::Color, vsync: bool) -> Self {
+        let instance = wgpu::Instance::new(wgpu::Backends::all());
+        let view_port = ViewportDesc::new(window, background_color, &instance);
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                force_fallback_adapter: false,
+                // Request an adapter which can render to our surface
+                compatible_surface: Some(&view_port.surface),
+            })
+            .await
+            .expect("Failed to find an appropriate adapter");
+        // Create the logical device and command queue
+        let (device, queue) = adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    label: None,
+                    features,
+                    // Make sure we use the texture resolution limits from the adapter, so we can support images the size of the swapchain.
+                    limits: wgpu::Limits::default()
+                        .using_resolution(adapter.limits()),
+                },
+                None,
+            )
+            .await
+            .expect("Failed to create device");
+        let view_port = view_port.build(&adapter, &device, vsync);
+        Self {
+            instance,
+            adapter,
+            device,
+            queue,
+            view_port,
+        }
+    }
+
+    pub fn resize(&mut self, size: winit::dpi::PhysicalSize<u32>) {
+        self.view_port.resize(&self.device, size)
+    }
+
+    pub fn set_vsync(&mut self, vsync: bool) {
+        self.view_port.set_vsync(&self.device, vsync)
+    }
+
+    pub fn get_current_texture(&self) -> wgpu::SurfaceTexture {
+        self.view_port.get_current_texture()
+    }
+
+    pub fn window(&self) -> &Window {
+        self.view_port.window()
+    }
+
+    pub fn device(&self) -> &Device {
+        &self.device
+    }
+
+    pub fn background_color(&self) -> &wgpu::Color {
+        self.view_port.background_color()
     }
 }
