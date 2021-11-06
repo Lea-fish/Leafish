@@ -44,6 +44,9 @@ use parking_lot::{Mutex, RwLock};
 use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicIsize, AtomicU32, AtomicUsize, Ordering};
 use std::thread;
+use cgmath::{Point3, Matrix4};
+use crate::gl::GraphicsContext;
+use wgpu::RenderPass;
 
 const ATLAS_SIZE: usize = 2048;
 
@@ -195,6 +198,7 @@ impl Renderer {
         tex.set_parameter(gl::TEXTURE_2D_ARRAY, gl::TEXTURE_MIN_FILTER, gl::NEAREST);
         tex.set_parameter(gl::TEXTURE_2D_ARRAY, gl::TEXTURE_WRAP_S, gl::CLAMP_TO_EDGE);
         tex.set_parameter(gl::TEXTURE_2D_ARRAY, gl::TEXTURE_WRAP_T, gl::CLAMP_TO_EDGE);
+
 
         let (textures, skin_req, skin_reply) = TextureManager::new(res.clone());
         let textures = Arc::new(RwLock::new(textures));
@@ -1808,4 +1812,69 @@ pub fn generate_element_buffer(size: usize) -> (Vec<u8>, gl::Type) {
     }
 
     (data, ty)
+}
+
+pub trait DedicatedRenderer {
+
+    fn init(&mut self, graphics_ctx: Arc<GraphicsContext>);
+
+    fn render(&mut self, graphics_ctx: Arc<GraphicsContext>, render_ctx: &RenderContext, render_pass: &mut RenderPass);
+
+    fn reset(&mut self, graphics_ctx: Arc<GraphicsContext>);
+
+}
+
+pub struct RenderContext<'a> {
+
+    camera_pos: Point3<f64>,
+    perspective_matrix: Matrix4<f32>,
+    camera_matrix: Matrix4<f32>,
+    light_level: f32,
+    sky_offset: f32,
+    delta: f64,
+
+}
+
+impl RenderContext {
+
+    pub fn new(camera_pos: Point3<f64>,
+               perspective_matrix: Matrix4<f32>,
+               camera_matrix: Matrix4<f32>,
+               light_level: f32,
+               sky_offset: f32,
+               delta: f64) -> Self {
+        Self {
+            camera_pos,
+            perspective_matrix,
+            camera_matrix,
+            light_level,
+            sky_offset,
+            delta,
+        }
+    }
+
+    pub fn camera_pos(&self) -> &Point3<f64> {
+        &self.camera_pos
+    }
+
+    pub fn perspective_matrix(&self) -> &Matrix4<f32> {
+        &self.perspective_matrix
+    }
+
+    pub fn camera_matrix(&self) -> &Matrix4<f32> {
+        &self.camera_matrix
+    }
+
+    pub fn light_level(&self) -> f32 {
+        self.light_level
+    }
+
+    pub fn sky_offset(&self) -> f32 {
+        self.sky_offset
+    }
+
+    pub fn delta(&self) -> f64 {
+        self.delta
+    }
+
 }

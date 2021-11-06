@@ -6,9 +6,14 @@ use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::{Matrix4, Point3};
 use log::error;
 use parking_lot::RwLock;
+use crate::render::{DedicatedRenderer, RenderContext};
+use wgpu::{RenderPipeline, RenderPass};
+use crate::gl::{GraphicsContext, Vertex3D};
+use wgpu::util::DeviceExt;
 
 pub struct Clouds {
-    program: gl::Program,
+    render_pipeline: Option<RenderPipeline>,
+    /*program: gl::Program,
     // Shader props
     _a_position: gl::Attribute,
     u_perspective_matrix: gl::Uniform,
@@ -20,7 +25,7 @@ pub struct Clouds {
     u_atlas: gl::Uniform,
     u_textures: gl::Uniform,
     u_cloud_map: gl::Uniform,
-    u_cloud_offset: gl::Uniform,
+    u_cloud_offset: gl::Uniform,*/
 
     array: gl::VertexArray,
     _buffer: gl::Buffer,
@@ -223,5 +228,82 @@ impl Clouds {
         self.u_cloud_map.set_int(1);
         self.array.bind();
         gl::draw_arrays(gl::POINTS, 0, self.num_points);
+    }
+}
+
+impl DedicatedRenderer for Clouds {
+    fn init(&mut self, graphics_ctx: Arc<GraphicsContext>) {
+        let device = graphics_ctx.device();
+        let shader = device.create_shader_module(&wgpu::ShaderModuleDescriptor {
+            label: Some("Shader"),
+            source: wgpu::ShaderSource::Wgsl(include_str!("shader.wgsl").into()),
+        });
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[],
+                push_constant_ranges: &[],
+            });
+        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("Render Pipeline"),
+            layout: Some(&render_pipeline_layout),
+            vertex: wgpu::VertexState {
+                module: &shader,
+                entry_point: "main", // 1.
+                buffers: &[
+                    Vertex3D::desc(),
+                ], // 2.
+            },
+            fragment: Some(wgpu::FragmentState { // 3.
+                module: &shader,
+                entry_point: "main",
+                targets: &[wgpu::ColorTargetState { // 4.
+                    format: config.format,
+                    blend: Some(wgpu::BlendState::REPLACE),
+                    write_mask: wgpu::ColorWrites::ALL,
+                }],
+            }),
+            // continued ...
+            primitive: wgpu::PrimitiveState {
+                topology: wgpu::PrimitiveTopology::TriangleList, // 1.
+                strip_index_format: None,
+                front_face: wgpu::FrontFace::Ccw, // 2.
+                cull_mode: Some(wgpu::Face::Back),
+                // Setting this to anything other than Fill requires Features::NON_FILL_POLYGON_MODE
+                polygon_mode: wgpu::PolygonMode::Fill,
+                // Requires Features::DEPTH_CLAMPING
+                clamp_depth: false,
+                // Requires Features::CONSERVATIVE_RASTERIZATION
+                conservative: false,
+            },
+            // continued ...
+            depth_stencil: None, // 1.
+            multisample: wgpu::MultisampleState {
+                count: 1, // 2.
+                mask: !0, // 3.
+                alpha_to_coverage_enabled: false, // anti aliasing disabled
+            },
+        });
+        self.render_pipeline.replace(render_pipeline);
+        let vertex_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Vertex Buffer"),
+                contents: bytemuck::cast_slice(VERTICES),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+        let layout = Vertex3D::desc();
+
+    }
+
+    fn render(&mut self, graphics_ctx: Arc<GraphicsContext>, render_ctx: &RenderContext, render_pass: &mut RenderPass) {
+        render_pass.set_pipeline(self.render_pipeline.as_ref().unwrap()); // 2.
+        // render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
+        // render_pass.draw(0..3, 0..1); // 3.
+        // render_pass.draw(0..self.num_vertices, 0..1);
+    }
+
+    fn reset(&mut self, graphics_ctx: Arc<GraphicsContext>) {
+
     }
 }

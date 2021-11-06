@@ -16,22 +16,22 @@ use log::error;
 use std::mem;
 use std::ops::BitOr;
 use std::ops::{Deref, DerefMut};
-use wgpu::{Device, TextureDescriptor, TextureDimension, PresentMode, Adapter, Queue, Instance, Features};
+use wgpu::{Device, TextureDescriptor, TextureDimension, PresentMode, Adapter, Queue, Instance, Features, RenderPass, Sampler};
 use winit::window::Window;
 use parking_lot::{Mutex, RwLock};
 use std::sync::Arc;
 
-static mut CONTEXT: *mut glow::Context = 0 as *mut glow::Context;
+static mut CONTEXT: *mut Arc<GraphicsContext> = 0 as *mut Arc<GraphicsContext>;
 
 /// Inits the gl library. This should be called once a context is ready.
-pub fn init(context: glow::Context) {
+pub fn init(context: GraphicsContext) {
     unsafe {
-        CONTEXT = Box::into_raw(Box::new(context));
+        CONTEXT = Box::into_raw(Box::new(Arc::new(context)));
     }
 }
 
-fn glow_context() -> &'static glow::Context {
-    unsafe { CONTEXT.as_ref().unwrap() }
+fn graphics_context() -> Arc<GraphicsContext> {
+    unsafe { CONTEXT.as_ref().unwrap().clone() }
 }
 
 /// Dsed to specify how the vertices will be handled
@@ -50,20 +50,20 @@ pub const POINTS: DrawType = gl::POINTS;
 
 pub fn draw_arrays(ty: DrawType, offset: usize, count: usize) {
     unsafe {
-        glow_context().draw_arrays(ty, offset as i32, count as i32);
+        graphics_context().draw_arrays(ty, offset as i32, count as i32);
     }
 }
 
 pub fn draw_elements(ty: DrawType, count: i32, dty: Type, offset: usize) {
     unsafe {
-        glow_context().draw_elements(ty, count, dty, offset as i32);
+        graphics_context().draw_elements(ty, count, dty, offset as i32);
     }
 }
 
 // Sets the size of the viewport of this context.
 pub fn viewport(x: i32, y: i32, w: i32, h: i32) {
     unsafe {
-        glow_context().viewport(x, y, w, h);
+        graphics_context().viewport(x, y, w, h);
     }
 }
 
@@ -71,7 +71,7 @@ pub fn viewport(x: i32, y: i32, w: i32, h: i32) {
 /// when Clear is called with the color flag.
 pub fn clear_color(r: f32, g: f32, b: f32, a: f32) {
     unsafe {
-        glow_context().clear_color(r, g, b, a);
+        graphics_context().clear_color(r, g, b, a);
     }
 }
 
@@ -105,12 +105,12 @@ impl BitOr for ClearFlags {
 
 /// Clears the buffers specified by the passed flags.
 pub fn clear(flags: ClearFlags) {
-    unsafe { glow_context().clear(flags.internal()) }
+    unsafe { graphics_context().clear(flags.internal()) }
 }
 
 pub fn depth_mask(f: bool) {
     unsafe {
-        glow_context().depth_mask(f);
+        graphics_context().depth_mask(f);
     }
 }
 
@@ -126,7 +126,7 @@ pub const EQUAL: Func = gl::EQUAL;
 
 pub fn depth_func(f: Func) {
     unsafe {
-        glow_context().depth_func(f);
+        graphics_context().depth_func(f);
     }
 }
 
@@ -142,14 +142,14 @@ pub const MULTISAMPLE: Flag = gl::MULTISAMPLE;
 /// Enables the passed flag.
 pub fn enable(f: Flag) {
     unsafe {
-        glow_context().enable(f);
+        graphics_context().enable(f);
     }
 }
 
 /// Disables the passed flag.
 pub fn disable(f: Flag) {
     unsafe {
-        glow_context().disable(f);
+        graphics_context().disable(f);
     }
 }
 
@@ -157,7 +157,7 @@ pub fn disable(f: Flag) {
 /// currently active one.
 pub fn active_texture(id: u32) {
     unsafe {
-        glow_context().active_texture(gl::TEXTURE0 + id);
+        graphics_context().active_texture(gl::TEXTURE0 + id);
     }
 }
 
@@ -171,7 +171,7 @@ pub const ZERO_FACTOR: Factor = gl::ZERO;
 /// Sets the factors to be used when blending.
 pub fn blend_func(s_factor: Factor, d_factor: Factor) {
     unsafe {
-        glow_context().blend_func(s_factor, d_factor);
+        graphics_context().blend_func(s_factor, d_factor);
     }
 }
 
@@ -182,7 +182,7 @@ pub fn blend_func_separate(
     d_factor_a: Factor,
 ) {
     unsafe {
-        glow_context().blend_func_separate(s_factor_rgb, d_factor_rgb, s_factor_a, d_factor_a);
+        graphics_context().blend_func_separate(s_factor_rgb, d_factor_rgb, s_factor_a, d_factor_a);
     }
 }
 
@@ -194,7 +194,7 @@ pub const FRONT: Face = gl::FRONT;
 /// Sets the face to be culled by the gpu.
 pub fn cull_face(face: Face) {
     unsafe {
-        glow_context().cull_face(face);
+        graphics_context().cull_face(face);
     }
 }
 
@@ -207,7 +207,7 @@ pub const COUNTER_CLOCK_WISE: FaceDirection = gl::CCW;
 /// Sets the direction of vertices used to specify the
 /// front face (e.g. for culling).
 pub fn front_face(dir: FaceDirection) {
-    unsafe { glow_context().front_face(dir) }
+    unsafe { graphics_context().front_face(dir) }
 }
 
 /// `Type` is a type of data used by various operations.
@@ -229,7 +229,7 @@ pub const TEXTURE_3D: TextureTarget = gl::TEXTURE_3D;
 
 /// `TextureFormat` is the format of a texture either internally or
 /// to be uploaded.
-pub type TextureFormat = u32;
+pub type TextureFormat = wgpu::TextureFormat;
 
 pub const RED: TextureFormat = gl::RED;
 pub const RGB: TextureFormat = gl::RGB;
@@ -260,6 +260,8 @@ pub const NEAREST_MIPMAP_NEAREST: TextureValue = gl::NEAREST_MIPMAP_NEAREST as T
 pub const NEAREST_MIPMAP_LINEAR: TextureValue = gl::NEAREST_MIPMAP_LINEAR as TextureValue;
 pub const CLAMP_TO_EDGE: TextureValue = gl::CLAMP_TO_EDGE as TextureValue;
 
+pub struct TextureContainer(wgpu::Texture);
+
 /// `Texture` is a buffer of data used by fragment shaders.
 #[derive(Default)]
 pub struct Texture(wgpu::Texture);
@@ -277,14 +279,14 @@ impl Texture {
             usage: ()
         };
         Texture(unsafe {
-            Device::create_texture()
+            Device::create_texture(texture_descriptor)
         })
     }
 
     /// Binds the texture to the passed target.
     pub fn bind(&self, target: TextureTarget) {
         unsafe {
-            glow_context().bind_texture(target, Some(self.0));
+            graphics_context().bind_texture(target, Some(self.0));
         }
     }
 
@@ -295,10 +297,12 @@ impl Texture {
         format: TextureFormat,
         ty: Type,
         pixels: &mut [u8],
+        graphics_ctx: Arc<GraphicsContext>,
     ) {
         unsafe {
-            glow_context().get_tex_image(target, level, format, ty, PixelPackData::Slice(pixels));
+            graphics_context().get_tex_image(target, level, format, ty, PixelPackData::Slice(pixels));
         }
+        graphics_ctx.queue().
     }
 
     pub fn image_2d(
@@ -312,7 +316,7 @@ impl Texture {
         pix: Option<&[u8]>,
     ) {
         unsafe {
-            glow_context().tex_image_2d(
+            graphics_context().tex_image_2d(
                 target,
                 level,
                 format as i32,
@@ -339,7 +343,7 @@ impl Texture {
         pix: &[u8],
     ) {
         unsafe {
-            glow_context().tex_sub_image_2d(
+            graphics_context().tex_sub_image_2d(
                 target,
                 level,
                 x as i32,
@@ -365,7 +369,7 @@ impl Texture {
         pix: Option<&[u8]>,
     ) {
         unsafe {
-            glow_context().tex_image_2d(
+            graphics_context().tex_image_2d(
                 target,
                 level,
                 internal_format as i32,
@@ -381,17 +385,19 @@ impl Texture {
 
     pub fn image_3d(
         &self,
-        target: TextureTarget,
-        level: i32,
+        mut target: TextureTarget,
+        level: i32, // TODO: Implement this!
         width: u32,
         height: u32,
         depth: u32,
-        format: TextureFormat,
+        format: TextureFormat, // i.e wgpu::TextureFormat::Rgba8UnormSrgb
         ty: Type,
         pix: &[u8],
+        graphics_ctx: Arc<GraphicsContext>,
+        render_pass: &mut RenderPass,
     ) {
         unsafe {
-            glow_context().tex_image_3d(
+            graphics_context().tex_image_3d(
                 target,
                 level,
                 format as i32,
@@ -404,6 +410,48 @@ impl Texture {
                 Some(pix),
             );
         }
+        let texture_size = wgpu::Extent3d {
+            width,
+            height,
+            depth_or_array_layers: 1,
+        };
+        // Create the texture
+        let texture = graphics_ctx.device().create_texture(
+            &wgpu::TextureDescriptor {
+                // All textures are stored as 3D, we represent our 2D texture
+                // by setting depth to 1.
+                size: texture_size,
+                mip_level_count: 1, // 1 = disabled
+                sample_count: 1,
+                dimension: wgpu::TextureDimension::D3,
+                // Most images are stored using sRGB so we need to reflect that here.
+                format,
+                // TEXTURE_BINDING tells wgpu that we want to use this texture in shaders
+                // COPY_DST means that we want to copy data to this texture
+                usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
+                label: Some("3d_texture"),
+            }
+        );
+        // Set the data to the texture
+        graphics_ctx.queue().write_texture(
+            // Tells wgpu where to copy the pixel data
+            wgpu::ImageCopyTexture {
+                texture: &texture,
+                mip_level: 0,
+                origin: wgpu::Origin3d::ZERO,
+                aspect: wgpu::TextureAspect::All,
+            },
+            // The actual pixel data
+            pix,
+            // The layout of the texture
+            wgpu::ImageDataLayout {
+                offset: 0,
+                bytes_per_row: std::num::NonZeroU32::new(4 * width), // 4 means the size of each pixel is 4 bytes TODO: Verify this value!
+                rows_per_image: std::num::NonZeroU32::new(height),
+            },
+            texture_size,
+        );
+        target.0 = texture;
     }
 
     pub fn sub_image_3d(
@@ -421,7 +469,7 @@ impl Texture {
         pix: &[u8],
     ) {
         unsafe {
-            glow_context().tex_sub_image_3d(
+            graphics_context().tex_sub_image_3d(
                 target,
                 level,
                 x as i32,
@@ -444,16 +492,12 @@ impl Texture {
         value: TextureValue,
     ) {
         unsafe {
-            glow_context().tex_parameter_i32(target, param, value);
+            graphics_context().tex_parameter_i32(target, param, value);
         }
     }
-}
 
-impl Drop for Texture {
-    fn drop(&mut self) {
-        unsafe {
-            glow_context().delete_texture(self.0);
-        }
+    pub fn resize(&self, width: u32, height: u32, depth: u32, graphics_ctx: Arc<GraphicsContext>) {
+        graphics_ctx.device.
     }
 }
 
@@ -474,7 +518,7 @@ pub struct Program(glow::Program);
 impl Program {
     pub fn new() -> Program {
         Program(unsafe {
-            glow_context()
+            graphics_context()
                 .create_program()
                 .expect("program creation failed")
         })
@@ -482,29 +526,29 @@ impl Program {
 
     pub fn attach_shader(&self, shader: Shader) {
         unsafe {
-            glow_context().attach_shader(self.0, shader.0);
+            graphics_context().attach_shader(self.0, shader.0);
         }
     }
 
     pub fn link(&self) {
         unsafe {
-            glow_context().link_program(self.0);
+            graphics_context().link_program(self.0);
         }
     }
 
     pub fn use_program(&self) {
         unsafe {
-            glow_context().use_program(Some(self.0));
+            graphics_context().use_program(Some(self.0));
         }
     }
 
     pub fn uniform_location(&self, name: &str) -> Option<Uniform> {
-        let u = unsafe { glow_context().get_uniform_location(self.0, name) };
+        let u = unsafe { graphics_context().get_uniform_location(self.0, name) };
         u.map(Uniform)
     }
 
     pub fn attribute_location(&self, name: &str) -> Option<Attribute> {
-        let a = unsafe { glow_context().get_attrib_location(self.0, name) };
+        let a = unsafe { graphics_context().get_attrib_location(self.0, name) };
         a.map(|a| Attribute(a as i32))
     }
 }
@@ -512,7 +556,7 @@ impl Program {
 impl Drop for Program {
     fn drop(&mut self) {
         unsafe {
-            glow_context().delete_program(self.0);
+            graphics_context().delete_program(self.0);
         }
     }
 }
@@ -522,7 +566,7 @@ pub struct Shader(glow::Shader);
 impl Shader {
     pub fn new(ty: ShaderType) -> Shader {
         Shader(unsafe {
-            glow_context()
+            graphics_context()
                 .create_shader(ty)
                 .expect("failed to create shader")
         })
@@ -530,22 +574,22 @@ impl Shader {
 
     pub fn set_source(&self, src: &str) {
         unsafe {
-            glow_context().shader_source(self.0, src);
+            graphics_context().shader_source(self.0, src);
         }
     }
 
     pub fn compile(&self) {
         unsafe {
-            glow_context().compile_shader(self.0);
+            graphics_context().compile_shader(self.0);
         }
     }
 
     pub fn get_shader_compile_status(&self) -> bool {
-        unsafe { glow_context().get_shader_compile_status(self.0) }
+        unsafe { graphics_context().get_shader_compile_status(self.0) }
     }
 
     pub fn get_info_log(&self) -> String {
-        unsafe { glow_context().get_shader_info_log(self.0) }
+        unsafe { graphics_context().get_shader_info_log(self.0) }
     }
 }
 
@@ -555,43 +599,44 @@ pub struct Uniform(glow::UniformLocation);
 impl Uniform {
     pub fn set_int(&self, val: i32) {
         unsafe {
-            glow_context().uniform_1_i32(Some(&self.0), val);
+            graphics_context().uniform_1_i32(Some(&self.0), val);
         }
     }
 
     pub fn set_int3(&self, x: i32, y: i32, z: i32) {
         unsafe {
-            glow_context().uniform_3_i32(Some(&self.0), x, y, z);
+            graphics_context().uniform_3_i32(Some(&self.0), x, y, z);
         }
     }
 
     pub fn set_float(&self, val: f32) {
         unsafe {
-            glow_context().uniform_1_f32(Some(&self.0), val);
+            graphics_context().uniform_1_f32(Some(&self.0), val);
         }
     }
 
     pub fn set_float2(&self, x: f32, y: f32) {
         unsafe {
-            glow_context().uniform_2_f32(Some(&self.0), x, y);
+            graphics_context().uniform_2_f32(Some(&self.0), x, y);
         }
     }
 
+    /*
     pub fn set_float3(&self, x: f32, y: f32, z: f32) {
         unsafe {
-            glow_context().uniform_3_f32(Some(&self.0), x, y, z);
+            graphics_context().uniform_3_f32(Some(&self.0), x, y, z);
         }
     }
 
     pub fn set_float4(&self, x: f32, y: f32, z: f32, w: f32) {
         unsafe {
-            glow_context().uniform_4_f32(Some(&self.0), x, y, z, w);
+            graphics_context().uniform_4_f32(Some(&self.0), x, y, z, w);
         }
-    }
+    }*/
 
     pub fn set_float_multi(&self, v: &[[f32; 4]]) {
         unsafe {
-            glow_context().uniform_4_f32_slice(
+            graphics_context().uniform_4_f32_slice(
                 Some(&self.0),
                 std::slice::from_raw_parts(v.as_ptr() as *const _, v.len() * 4),
             )
@@ -600,7 +645,7 @@ impl Uniform {
 
     pub fn set_matrix4(&self, m: &::cgmath::Matrix4<f32>) {
         unsafe {
-            glow_context().uniform_matrix_4_f32_slice(
+            graphics_context().uniform_matrix_4_f32_slice(
                 Some(&self.0),
                 false,
                 &*(m as *const cgmath::Matrix4<f32> as *const [f32; 4 * 4]),
@@ -610,7 +655,7 @@ impl Uniform {
 
     pub fn set_matrix4_multi(&self, m: &[::cgmath::Matrix4<f32>]) {
         unsafe {
-            glow_context().uniform_matrix_4_f32_slice(
+            graphics_context().uniform_matrix_4_f32_slice(
                 Some(&self.0),
                 false,
                 std::slice::from_raw_parts(m.as_ptr() as *const _, m.len() * 4 * 4),
@@ -625,19 +670,20 @@ pub struct Attribute(i32);
 impl Attribute {
     pub fn enable(&self) {
         unsafe {
-            glow_context().enable_vertex_attrib_array(self.0 as u32);
+            graphics_context().enable_vertex_attrib_array(self.0 as u32);
         }
     }
 
+    /*
     pub fn disable(&self) {
         unsafe {
-            glow_context().disable_vertex_attrib_array(self.0 as u32);
+            graphics_context().disable_vertex_attrib_array(self.0 as u32);
         }
-    }
+    }*/
 
     pub fn vertex_pointer(&self, size: i32, ty: Type, normalized: bool, stride: i32, offset: i32) {
         unsafe {
-            glow_context().vertex_attrib_pointer_f32(
+            graphics_context().vertex_attrib_pointer_f32(
                 self.0 as u32,
                 size,
                 ty,
@@ -650,7 +696,7 @@ impl Attribute {
 
     pub fn vertex_pointer_int(&self, size: i32, ty: Type, stride: i32, offset: i32) {
         unsafe {
-            glow_context().vertex_attrib_pointer_i32(self.0 as u32, size, ty, stride, offset);
+            graphics_context().vertex_attrib_pointer_i32(self.0 as u32, size, ty, stride, offset);
         }
     }
 }
@@ -665,7 +711,7 @@ impl VertexArray {
     /// Allocates a new `VertexArray`.
     pub fn new() -> VertexArray {
         VertexArray(unsafe {
-            glow_context()
+            graphics_context()
                 .create_vertex_array()
                 .expect("create vertex array failed")
         })
@@ -676,7 +722,7 @@ impl VertexArray {
     /// this `VertexArray`.
     pub fn bind(&self) {
         unsafe {
-            glow_context().bind_vertex_array(Some(self.0));
+            graphics_context().bind_vertex_array(Some(self.0));
         }
     }
 }
@@ -684,7 +730,7 @@ impl VertexArray {
 impl Drop for VertexArray {
     fn drop(&mut self) {
         unsafe {
-            glow_context().delete_vertex_array(self.0);
+            graphics_context().delete_vertex_array(self.0);
         }
         self.0 = glow::VertexArray::default();
     }
@@ -726,7 +772,7 @@ impl Buffer {
     /// Allocates a new Buffer.
     pub fn new() -> Buffer {
         Buffer(unsafe {
-            glow_context()
+            graphics_context()
                 .create_buffer()
                 .expect("create buffer failed")
         })
@@ -737,19 +783,19 @@ impl Buffer {
     /// (Data, Map etc).
     pub fn bind(&self, target: BufferTarget) {
         unsafe {
-            glow_context().bind_buffer(target, Some(self.0));
+            graphics_context().bind_buffer(target, Some(self.0));
         }
     }
 
     pub fn set_data(&self, target: BufferTarget, data: &[u8], usage: BufferUsage) {
         unsafe {
-            glow_context().buffer_data_u8_slice(target, data, usage);
+            graphics_context().buffer_data_u8_slice(target, data, usage);
         }
     }
 
     pub fn re_set_data(&self, target: BufferTarget, data: &[u8]) {
         unsafe {
-            glow_context().buffer_sub_data_u8_slice(target, 0, data);
+            graphics_context().buffer_sub_data_u8_slice(target, 0, data);
         }
     }
 }
@@ -776,7 +822,7 @@ impl DerefMut for MappedBuffer {
 impl Drop for MappedBuffer {
     fn drop(&mut self) {
         unsafe {
-            glow_context().unmap_buffer(self.target);
+            graphics_context().unmap_buffer(self.target);
         }
         mem::forget(std::mem::take(&mut self.inner))
     }
@@ -795,7 +841,7 @@ pub struct Framebuffer(glow::Framebuffer);
 
 pub fn check_framebuffer_status() {
     unsafe {
-        let status = glow_context().check_framebuffer_status(gl::FRAMEBUFFER);
+        let status = graphics_context().check_framebuffer_status(gl::FRAMEBUFFER);
         let s = match status {
             gl::FRAMEBUFFER_UNDEFINED => "GL_FRAMEBUFFER_UNDEFINED",
             gl::FRAMEBUFFER_INCOMPLETE_ATTACHMENT => "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT",
@@ -825,7 +871,7 @@ pub fn check_framebuffer_status() {
 pub fn check_gl_error() {
     unsafe {
         loop {
-            let err = glow_context().get_error();
+            let err = graphics_context().get_error();
             if err == gl::NO_ERROR {
                 break;
             }
@@ -838,7 +884,7 @@ pub fn check_gl_error() {
 impl Framebuffer {
     pub fn new() -> Framebuffer {
         Framebuffer(unsafe {
-            glow_context()
+            graphics_context()
                 .create_framebuffer()
                 .expect("create framebuffer failed")
         })
@@ -846,19 +892,19 @@ impl Framebuffer {
 
     pub fn bind(&self) {
         unsafe {
-            glow_context().bind_framebuffer(gl::FRAMEBUFFER, Some(self.0));
+            graphics_context().bind_framebuffer(gl::FRAMEBUFFER, Some(self.0));
         }
     }
 
     pub fn bind_read(&self) {
         unsafe {
-            glow_context().bind_framebuffer(gl::READ_FRAMEBUFFER, Some(self.0));
+            graphics_context().bind_framebuffer(gl::READ_FRAMEBUFFER, Some(self.0));
         }
     }
 
     pub fn bind_draw(&self) {
         unsafe {
-            glow_context().bind_framebuffer(gl::DRAW_FRAMEBUFFER, Some(self.0));
+            graphics_context().bind_framebuffer(gl::DRAW_FRAMEBUFFER, Some(self.0));
         }
     }
 
@@ -870,7 +916,7 @@ impl Framebuffer {
         level: i32,
     ) {
         unsafe {
-            glow_context().framebuffer_texture_2d(
+            graphics_context().framebuffer_texture_2d(
                 gl::FRAMEBUFFER,
                 attachment,
                 target,
@@ -884,37 +930,38 @@ impl Framebuffer {
 impl Drop for Framebuffer {
     fn drop(&mut self) {
         unsafe {
-            glow_context().delete_framebuffer(self.0);
+            graphics_context().delete_framebuffer(self.0);
         }
     }
 }
 
 pub fn unbind_framebuffer() {
     unsafe {
-        glow_context().bind_framebuffer(gl::FRAMEBUFFER, None);
+        graphics_context().bind_framebuffer(gl::FRAMEBUFFER, None);
     }
 }
 
+/*
 pub fn unbind_framebuffer_read() {
     unsafe {
-        glow_context().bind_framebuffer(gl::READ_FRAMEBUFFER, None);
+        graphics_context().bind_framebuffer(gl::READ_FRAMEBUFFER, None);
     }
 }
 
 pub fn unbind_framebuffer_draw() {
     unsafe {
-        glow_context().bind_framebuffer(gl::DRAW_FRAMEBUFFER, None);
+        graphics_context().bind_framebuffer(gl::DRAW_FRAMEBUFFER, None);
     }
-}
+}*/
 
 pub fn draw_buffers(bufs: &[Attachment]) {
     unsafe {
-        glow_context().draw_buffers(bufs);
+        graphics_context().draw_buffers(bufs);
     }
 }
 
 pub fn bind_frag_data_location(p: &Program, cn: u32, name: &str) {
-    unsafe { glow_context().bind_frag_data_location(p.0, cn, name) }
+    unsafe { graphics_context().bind_frag_data_location(p.0, cn, name) }
 }
 
 pub fn blit_framebuffer(
@@ -930,7 +977,7 @@ pub fn blit_framebuffer(
     filter: TextureValue,
 ) {
     unsafe {
-        glow_context().blit_framebuffer(
+        graphics_context().blit_framebuffer(
             sx0,
             sy0,
             sx1,
@@ -951,7 +998,7 @@ pub const COLOR: TargetBuffer = gl::COLOR;
 pub fn clear_buffer(buffer: TargetBuffer, draw_buffer: u32, values: &mut [f32]) {
     unsafe {
         // TODO: why does glow have &mut on clear buffer values, why would it change the color?
-        glow_context().clear_buffer_f32_slice(buffer, draw_buffer, values);
+        graphics_context().clear_buffer_f32_slice(buffer, draw_buffer, values);
     }
 }
 
@@ -1008,6 +1055,7 @@ impl Viewport {
             .expect("Failed to acquire next swap chain texture")
     }
 
+    #[inline]
     pub fn set_background_color(&mut self, background_color: wgpu::Color) {
         self.desc.background_color = background_color;
     }
@@ -1017,6 +1065,7 @@ impl Viewport {
         self.desc.surface.configure(device, &self.config);
     }
 
+    #[inline]
     fn vsync_present_mode(vsync: bool) -> PresentMode {
         if vsync {
             PresentMode::Fifo
@@ -1025,10 +1074,12 @@ impl Viewport {
         }
     }
 
+    #[inline]
     pub fn window(&self) -> &Window {
         &self.desc.window
     }
 
+    #[inline]
     pub fn background_color(&self) -> &wgpu::Color {
         &self.desc.background_color
     }
@@ -1081,7 +1132,9 @@ impl GraphicsContext {
     }
 
     pub fn resize(&self, size: winit::dpi::PhysicalSize<u32>) {
-        self.view_port.clone().write().resize(&self.device, size)
+        if size.width != 0 && size.height != 0 {
+            self.view_port.clone().write().resize(&self.device, size);
+        }
     }
 
     pub fn set_vsync(&self, vsync: bool) {
@@ -1096,11 +1149,194 @@ impl GraphicsContext {
         self.view_port.read().window()
     }
 
+    #[inline]
     pub fn device(&self) -> &Device {
         &self.device
+    }
+
+    #[inline]
+    pub fn queue(&self) -> &Queue {
+        &self.queue
     }
 
     pub fn background_color(&self) -> &wgpu::Color {
         self.view_port.read().background_color()
     }
+}
+
+// Vertices which can be usd as the most basic components of which stuff is made of
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct Vertex2D {
+    position: [f32; 2],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct Vertex2DRGB {
+    position: [f32; 2],
+    color: [f32; 3],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct Vertex2DRGBA {
+    position: [f32; 2],
+    color: [f32; 4],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct Vertex3D {
+    position: [f32; 2],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct Vertex3DRGB {
+    position: [f32; 3],
+    color: [f32; 3],
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct Vertex3DRGBA {
+    position: [f32; 3],
+    color: [f32; 4],
+}
+
+impl Vertex2D {
+    pub fn desc() -> wgpu::VertexBufferLayout {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex2D>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x2,
+                }
+            ]
+        }
+    }
+}
+
+impl Vertex2DRGB {
+    pub fn desc() -> wgpu::VertexBufferLayout {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex2DRGB>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x3,
+                }
+            ]
+        }
+    }
+}
+
+impl Vertex2DRGBA {
+    pub fn desc() -> wgpu::VertexBufferLayout {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex2DRGBA>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x2,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 2]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x4,
+                }
+            ]
+        }
+    }
+}
+
+impl Vertex3D {
+    pub fn desc() -> wgpu::VertexBufferLayout {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex3D>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                }
+            ]
+        }
+    }
+}
+
+impl Vertex3DRGB {
+    pub fn desc() -> wgpu::VertexBufferLayout {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex3DRGB>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x3,
+                }
+            ]
+        }
+    }
+}
+
+impl Vertex3DRGBA {
+    pub fn desc() -> wgpu::VertexBufferLayout {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<Vertex3DRGBA>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float32x3,
+                },
+                wgpu::VertexAttribute {
+                    offset: std::mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float32x4,
+                }
+            ]
+        }
+    }
+}
+
+pub struct TextureContext {
+
+}
+
+impl TextureContext {
+
+    fn supply_sampler() -> Sampler {
+        graphics_context().device().create_sampler(&wgpu::SamplerDescriptor {
+            address_mode_u: wgpu::AddressMode::ClampToEdge,
+            address_mode_v: wgpu::AddressMode::ClampToEdge,
+            address_mode_w: wgpu::AddressMode::ClampToEdge,
+            mag_filter: wgpu::FilterMode::Nearest,
+            min_filter: wgpu::FilterMode::Nearest,
+            mipmap_filter: wgpu::FilterMode::Nearest,
+            ..Default::default()
+        })
+    }
+
 }

@@ -386,6 +386,13 @@ fn main() {
         {
             // Recreate the swap chain with the new size
             graphics_context.clone().resize(physical_size);
+        } else if let winit::event::Event::WindowEvent {
+            event: winit::event::WindowEvent::ScaleFactorChanged(new_inner_size, ..),
+            ..
+        } = event
+        {
+            // Recreate the swap chain with the new size
+            graphics_context.clone().resize(new_inner_size);
         }
 
         if !handle_window_event(&window, &mut game, &mut ui_container, event) {
@@ -408,6 +415,28 @@ fn main() {
         }
         let frame = graphics_context.clone()
             .get_current_texture();
+        let view = frame.texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let mut encoder = graphics_context.device().create_command_encoder(&wgpu::CommandEncoderDescriptor {
+            label: Some("Render Encoder"),
+        });
+        {
+            let render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("Render Pass"),
+                color_attachments: &[wgpu::RenderPassColorAttachment {
+                    view: &view,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(*graphics_context.background_color()),
+                        store: true,
+                    },
+                }],
+                depth_stencil_attachment: None,
+            });
+        }
+
+        // submit will accept anything that implements IntoIter
+        graphics_context.queue().submit(std::iter::once(encoder.finish()));
+        frame.present();
 
         if game.should_close {
             *control_flow = winit::event_loop::ControlFlow::Exit;
