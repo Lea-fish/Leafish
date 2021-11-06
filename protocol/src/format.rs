@@ -132,13 +132,13 @@ impl Component {
         }
     }
 
-    fn get_text(with: &With, modifier: &Modifier) -> Self {
+    fn get_text(with: &ComponentData, modifier: &Modifier) -> Self {
         match with {
-            With::Chat(chat) => {
+            ComponentData::Chat(chat) => {
                 Component::from_chat(&chat, &modifier.over_write(&chat.get_modifier()))
             }
 
-            With::Str(str) => Self {
+            ComponentData::Str(str) => Self {
                 list: vec![ComponentType::Text {
                     text: str.to_string(),
                     modifier: modifier.clone(),
@@ -147,12 +147,25 @@ impl Component {
         }
     }
 
-    fn get_string_from_extra(extra: &[translate::Chat], modifier: &Modifier) -> Self {
+    fn get_string_from_extra(extra: &[translate::ComponentData], modifier: &Modifier) -> Self {
         Self {
             list: extra
                 .iter()
-                .map(|extra| {
-                    Component::from_chat(extra, &modifier.over_write(&extra.get_modifier())).list
+                .map(|chat_or_string| match chat_or_string {
+                    ComponentData::Chat(chat) => {
+                        Component::from_chat(
+                            chat,
+                            &modifier.over_write(&chat_or_string.get_modifier()),
+                        )
+                        .list
+                    }
+                    ComponentData::Str(str) => {
+                        Component::from_legacy_str(
+                            str,
+                            &modifier.over_write(&chat_or_string.get_modifier()),
+                        )
+                        .list
+                    }
                 })
                 .flatten()
                 .collect::<_>(),
@@ -429,6 +442,15 @@ impl Chat {
             text: str_format,
             modifier: self.get_modifier(),
         })
+    }
+}
+
+impl ComponentData {
+    fn get_modifier(&self) -> Modifier {
+        match self {
+            ComponentData::Chat(chat) => chat.get_modifier(),
+            ComponentData::Str(_) => Modifier::default(),
+        }
     }
 }
 
