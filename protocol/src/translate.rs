@@ -3,7 +3,7 @@ use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
-pub enum With {
+pub enum ComponentData {
     Chat(Chat),
     Str(String),
 }
@@ -27,7 +27,7 @@ pub struct Contents {
     pub count: Option<usize>,
     pub r#type: Option<String>,
     pub text: Option<String>,
-    pub extra: Option<Vec<Chat>>,
+    pub extra: Option<Vec<ComponentData>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
@@ -55,9 +55,9 @@ pub struct Chat {
     pub insertion: Option<String>,
     pub text: Option<String>,
 
-    pub extra: Option<Vec<Chat>>,
+    pub extra: Option<Vec<ComponentData>>,
     #[serde(default)]
-    pub with: Vec<With>,
+    pub with: Vec<ComponentData>,
 }
 
 impl std::fmt::Debug for Chat {
