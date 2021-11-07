@@ -182,14 +182,6 @@ impl Game {
 #[derive(StructOpt, Debug)]
 #[structopt(name = "leafish")]
 struct Opt {
-    /// Server to connect to
-    #[structopt(short = "s", long = "server")]
-    server: Option<String>,
-
-    /// Username for offline servers
-    #[structopt(short = "u", long = "username")]
-    username: Option<String>,
-
     /// Log decoded packets received from network
     #[structopt(short = "n", long = "network-debug")]
     network_debug: bool,
@@ -292,24 +284,17 @@ fn main() {
 
     let screen_sys = Arc::new(screen::ScreenSystem::new());
     let active_account = Arc::new(Mutex::new(None));
-    if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::background::Background::new(
-            vars.clone(),
-            screen_sys.clone(),
-        )));
-        screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(
-            Arc::new(Mutex::new(
-                screen::launcher::load_accounts().unwrap_or_default(),
-            )),
-            screen_sys.clone(),
-            active_account.clone(),
-        )));
-        // screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
-    }
-
-    if let Some(username) = opt.username {
-        vars.set(auth::CL_USERNAME, username);
-    }
+    screen_sys.add_screen(Box::new(screen::background::Background::new(
+        vars.clone(),
+        screen_sys.clone(),
+    )));
+    screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(
+        Arc::new(Mutex::new(
+            screen::launcher::load_accounts().unwrap_or_default(),
+        )),
+        screen_sys.clone(),
+        active_account.clone(),
+    )));
 
     let textures = renderer.get_textures();
     let default_protocol_version = protocol::versions::protocol_name_to_protocol_version(
@@ -365,12 +350,6 @@ fn main() {
         protocol::try_parse_packet(data, default_protocol_version);
         return;
     }
-
-    /*if opt.server.is_some() { // TODO: Readd?
-        let hud_context = Arc::new(RwLock::new(HudContext::new()));
-        game.connect_to(&opt.server.unwrap(), hud_context.clone());
-        screen_sys.add_screen(Box::new(Hud::new(hud_context.clone())));
-    }*/
 
     let mut last_resource_version = 0;
 
@@ -448,7 +427,6 @@ fn tick_all(
             game.screen_sys
                 .clone()
                 .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
-            // TODO: Handle remove of all entities if necessary!
             game.server = None;
             game.renderer.clone().reset();
         }
@@ -481,7 +459,7 @@ fn tick_all(
     if *vsync != vsync_changed {
         error!("Changing vsync currently requires restarting");
         game.should_close = true;
-        // TODO: after https://github.com/tomaka/glutin/issues/693 Allow changing vsync on a Window
+        // TODO: after changing to wgpu and the new renderer, allow changing vsync on a Window
         //vsync = vsync_changed;
     }
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
@@ -613,7 +591,7 @@ fn handle_window_event<T>(
                             .world
                             .entity_mut(player.1)
                             .get_mut::<Rotation>()
-                            .unwrap(); // TODO: This panicked because of unwrap, check why!
+                            .unwrap();
                         rotation.yaw -= rx;
                         rotation.pitch -= ry;
                         if rotation.pitch < (PI / 2.0) + 0.01 {

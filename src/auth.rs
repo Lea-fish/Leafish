@@ -15,36 +15,6 @@
 use crate::console;
 use std::marker::PhantomData;
 
-pub const CL_USERNAME: console::CVar<String> = console::CVar {
-    ty: PhantomData,
-    name: "cl_username",
-    description: r#"cl_username is the username that the client will use to connect
-to servers."#,
-    mutable: false,
-    serializable: true,
-    default: &|| "".to_owned(),
-};
-
-pub const CL_UUID: console::CVar<String> = console::CVar {
-    ty: PhantomData,
-    name: "cl_uuid",
-    description: r#"cl_uuid is the uuid of the client. This is unique to a player
-unlike their username."#,
-    mutable: false,
-    serializable: true,
-    default: &|| "".to_owned(),
-};
-
-pub const AUTH_TOKEN: console::CVar<String> = console::CVar {
-    ty: PhantomData,
-    name: "auth_token",
-    description: r#"auth_token is the token used for this session to auth to servers
-or relogin to this account."#,
-    mutable: false,
-    serializable: true,
-    default: &|| "".to_owned(),
-};
-
 pub const AUTH_CLIENT_TOKEN: console::CVar<String> = console::CVar {
     ty: PhantomData,
     name: "auth_client_token",
@@ -52,12 +22,9 @@ pub const AUTH_CLIENT_TOKEN: console::CVar<String> = console::CVar {
 Used to identify this client vs others."#,
     mutable: false,
     serializable: true,
-    default: &|| "".to_owned(),
+    default: &|| String::new(),
 };
 
 pub fn register_vars(vars: &mut console::Vars) {
-    vars.register(CL_USERNAME);
-    vars.register(CL_UUID);
-    vars.register(AUTH_TOKEN);
     vars.register(AUTH_CLIENT_TOKEN);
 }

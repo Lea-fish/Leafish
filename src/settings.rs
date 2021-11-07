@@ -41,7 +41,6 @@ pub const CL_MASTER_VOLUME: console::CVar<i64> = console::CVar {
 
 // https://github.com/SpigotMC/BungeeCord/blob/bda160562792a913cba3a65ba4996de60d0d6d68/proxy/src/main/java/net/md_5/bungee/PlayerSkinConfiguration.java#L20
 pub const S_CAPE: console::CVar<bool> = console::CVar {
-    //
     ty: PhantomData,
     name: "s_cape",
     description: "Toggle your cape",
@@ -51,7 +50,6 @@ pub const S_CAPE: console::CVar<bool> = console::CVar {
 };
 
 pub const S_JACKET: console::CVar<bool> = console::CVar {
-    //
     ty: PhantomData,
     name: "s_jacket",
     description: "Toggle your jacket",
@@ -61,7 +59,6 @@ pub const S_JACKET: console::CVar<bool> = console::CVar {
 };
 
 pub const S_LEFT_SLEEVE: console::CVar<bool> = console::CVar {
-    //
     ty: PhantomData,
     name: "s_left_sleeve",
     description: "Toggle your left sleeve",
@@ -71,7 +68,6 @@ pub const S_LEFT_SLEEVE: console::CVar<bool> = console::CVar {
 };
 
 pub const S_RIGHT_SLEEVE: console::CVar<bool> = console::CVar {
-    //
     ty: PhantomData,
     name: "s_right_sleeve",
     description: "Toggle your right sleeve",
@@ -81,7 +77,6 @@ pub const S_RIGHT_SLEEVE: console::CVar<bool> = console::CVar {
 };
 
 pub const S_LEFT_PANTS: console::CVar<bool> = console::CVar {
-    //
     ty: PhantomData,
     name: "s_left_pants",
     description: "Toggle your left pants",
@@ -91,7 +86,6 @@ pub const S_LEFT_PANTS: console::CVar<bool> = console::CVar {
 };
 
 pub const S_RIGHT_PANTS: console::CVar<bool> = console::CVar {
-    //
     ty: PhantomData,
     name: "s_right_pants",
     description: "Toggle your right pants",
@@ -101,7 +95,6 @@ pub const S_RIGHT_PANTS: console::CVar<bool> = console::CVar {
 };
 
 pub const S_HAT: console::CVar<bool> = console::CVar {
-    //
     ty: PhantomData,
     name: "s_hat",
     description: "Toggle your hat",
@@ -211,26 +204,29 @@ pub enum Actionkey {
 }
 
 impl Actionkey {
-    pub fn values() -> Vec<Actionkey> {
-        vec![
-            Actionkey::Forward,
-            Actionkey::Backward,
-            Actionkey::Left,
-            Actionkey::Right,
-            Actionkey::OpenInv,
-            Actionkey::Sneak,
-            Actionkey::Sprint,
-            Actionkey::Jump,
-            Actionkey::ToggleHud,
-            Actionkey::ToggleDebug,
-            Actionkey::ToggleChat,
-        ]
+    const VALUES: [Actionkey; 11] = [
+        Actionkey::Forward,
+        Actionkey::Backward,
+        Actionkey::Left,
+        Actionkey::Right,
+        Actionkey::OpenInv,
+        Actionkey::Sneak,
+        Actionkey::Sprint,
+        Actionkey::Jump,
+        Actionkey::ToggleHud,
+        Actionkey::ToggleDebug,
+        Actionkey::ToggleChat,
+    ];
+
+    #[inline]
+    pub fn values() -> &'static [Actionkey] {
+        &Self::VALUES
     }
 
     pub fn get_by_keycode(keycode: VirtualKeyCode, vars: &console::Vars) -> Option<Actionkey> {
         for action_key in Actionkey::values() {
             if keycode as i64 == *vars.get(action_key.get_cvar()) {
-                return Some(action_key);
+                return Some(*action_key);
             }
         }
         None
