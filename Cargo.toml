@@ -48,6 +48,8 @@ dirs = "3.0.2"
 # Concurrency features
 dashmap = "4.0.2"
 parking_lot = "0.11.1"
+atomic_float = "0.1.0"
+# arc-swap = "1.4.0" # TODO: Use this!
 crossbeam-channel = "0.5.1" # check if flume would be better in terms of performance!
 # flume = "0.10.8" # replaced by crossbeam channel
 # tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
