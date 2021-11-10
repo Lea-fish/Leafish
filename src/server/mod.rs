@@ -36,6 +36,7 @@ use crate::types::GameMode;
 use crate::world;
 use crate::world::{CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
+use atomic_float::AtomicF64;
 use bevy_ecs::prelude::{Entity, Stage, SystemStage};
 use cgmath::prelude::*;
 use cgmath::Vector3;
@@ -60,11 +61,10 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering, AtomicU32};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
-use atomic_float::AtomicF64;
 
 pub mod plugin_messages;
 mod sun;
@@ -986,7 +986,9 @@ impl Server {
             *self.fps_start.write() = time;
             self.fps.store(0, Ordering::Release);
         } else {
-            self.fps.fetch_update(Ordering::Release, Ordering::Relaxed, |x| Some(x + 1)).unwrap();
+            self.fps
+                .fetch_update(Ordering::Release, Ordering::Relaxed, |x| Some(x + 1))
+                .unwrap();
         }
         let chat_open = self.chat_open.load(Ordering::Acquire);
         if chat_open != self.last_chat_open.load(Ordering::Acquire) {
@@ -1036,10 +1038,14 @@ impl Server {
         }
         self.entity_tick(delta, game.focused, self.dead.load(Ordering::Acquire));
 
-        self.tick_timer.fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x + delta)).unwrap();
+        self.tick_timer
+            .fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x + delta))
+            .unwrap();
         while self.tick_timer.load(Ordering::Acquire) >= 3.0 && self.is_connected() {
             self.minecraft_tick(game);
-            self.tick_timer.fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x - 3.0)).unwrap();
+            self.tick_timer
+                .fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x - 3.0))
+                .unwrap();
         }
 
         self.update_time(renderer.clone(), delta);
@@ -1093,12 +1099,16 @@ impl Server {
         if self.is_connected() || self.disconnect_data.clone().read().just_disconnected {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().just_disconnected = false;
-            self.entity_tick_timer.fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x + delta)).unwrap();
+            self.entity_tick_timer
+                .fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x + delta))
+                .unwrap();
             entities.world.clear_trackers();
             let entity_schedule = entities.entity_schedule.clone();
             while self.entity_tick_timer.load(Ordering::Acquire) >= 3.0 {
                 entity_schedule.clone().write().run(&mut entities.world);
-                self.entity_tick_timer.fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x - 3.0)).unwrap();
+                self.entity_tick_timer
+                    .fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x - 3.0))
+                    .unwrap();
             }
             let schedule = entities.schedule.clone();
             schedule.write().run(&mut entities.world);
