@@ -23,11 +23,10 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use crate::format::{Color, Component, TextComponent};
+use crate::format::{Color, Component, ComponentType};
 use crate::render;
 use crate::ui;
 use parking_lot::Mutex;
-use parking_lot::RwLock;
 
 const FILTERED_CRATES: &[&str] = &[
     //"reqwest", // TODO: needed?
@@ -252,7 +251,7 @@ impl Default for Console {
 impl Console {
     pub fn new() -> Console {
         Console {
-            history: vec![Component::Text(TextComponent::new("")); 200],
+            history: vec![Component::new(ComponentType::new("", None)); 200],
             dirty: false,
             logfile: fs::File::create(paths::get_cache_dir().join("client.log"))
                 .expect("failed to open log file"),
@@ -303,7 +302,7 @@ impl Console {
     pub fn tick(
         &mut self,
         ui_container: &mut ui::Container,
-        renderer: Arc<RwLock<render::Renderer>>,
+        renderer: Arc<render::Renderer>,
         delta: f64,
         width: f64,
     ) {
@@ -351,12 +350,12 @@ impl Console {
             elements.lines.clear();
 
             let mut offset = 0.0;
-            let renderer = &*renderer.read();
             for line in self.history.iter().rev() {
                 if offset >= 210.0 {
                     break;
                 }
-                let (_, height) = ui::Formatted::compute_size(renderer, line, w - 10.0, 1.0);
+                let (_, height) =
+                    ui::Formatted::compute_size(renderer.clone(), line, w - 10.0, 1.0, 1.0, 1.0);
                 elements.lines.push(
                     ui::FormattedBuilder::new()
                         .text(line.clone())
@@ -399,37 +398,32 @@ impl Console {
             println!("{}", line);
 
             self.history.remove(0);
-            let mut msg = TextComponent::new("");
-            msg.modifier.extra = Some(vec![
-                Component::Text(TextComponent::new("[")),
-                {
-                    let mut msg = TextComponent::new(file);
-                    msg.modifier.color = Some(Color::Green);
-                    Component::Text(msg)
-                },
-                Component::Text(TextComponent::new(":")),
-                {
-                    let mut msg = TextComponent::new(&format!("{}", record.line().unwrap_or(0)));
-                    msg.modifier.color = Some(Color::Aqua);
-                    Component::Text(msg)
-                },
-                Component::Text(TextComponent::new("]")),
-                Component::Text(TextComponent::new("[")),
-                {
-                    let mut msg = TextComponent::new(&format!("{}", record.level()));
-                    msg.modifier.color = Some(match record.level() {
-                        log::Level::Debug => Color::Green,
-                        log::Level::Error => Color::Red,
-                        log::Level::Warn => Color::Yellow,
-                        log::Level::Info => Color::Aqua,
-                        log::Level::Trace => Color::Blue,
-                    });
-                    Component::Text(msg)
-                },
-                Component::Text(TextComponent::new("] ")),
-                Component::Text(TextComponent::new(&format!("{}", record.args()))),
-            ]);
-            self.history.push(Component::Text(msg));
+            let component = Component {
+                list: vec![
+                    ComponentType::new("[", None),
+                    ComponentType::new(file, Some(Color::Green)),
+                    ComponentType::new(":", None),
+                    ComponentType::new(
+                        &format!("{}", record.line().unwrap_or(0)),
+                        Some(Color::Aqua),
+                    ),
+                    ComponentType::new("]", None),
+                    ComponentType::new("[", None),
+                    ComponentType::new(
+                        &format!("{}", record.level()),
+                        Some(match record.level() {
+                            log::Level::Debug => Color::Green,
+                            log::Level::Error => Color::Red,
+                            log::Level::Warn => Color::Yellow,
+                            log::Level::Info => Color::Aqua,
+                            log::Level::Trace => Color::Blue,
+                        }),
+                    ),
+                    ComponentType::new("] ", None),
+                    ComponentType::new(&format!("{}", record.args()), None),
+                ],
+            };
+            self.history.push(component);
             self.dirty = true;
         }
     }

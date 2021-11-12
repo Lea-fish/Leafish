@@ -3,8 +3,9 @@ use crate::render;
 use crate::settings;
 use crate::ui;
 
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct UIElements {
     background: ui::ImageRef,
@@ -38,7 +39,12 @@ impl SettingsMenu {
 }
 
 impl super::Screen for SettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
@@ -157,9 +163,6 @@ impl super::Screen for SettingsMenu {
             done_button.add_text(txt);
             done_button.add_click_func(|_, game| {
                 game.screen_sys.clone().pop_screen();
-                if game.server.is_some() {
-                    game.focused = true;
-                }
                 true
             });
         }
@@ -183,10 +186,7 @@ impl super::Screen for SettingsMenu {
                     game.screen_sys.clone().pop_screen();
                     game.screen_sys
                         .clone()
-                        .replace_screen(Box::new(super::ServerList::new(
-                            None,
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                        )));
+                        .replace_screen(Box::new(super::ServerList::new(None)));
                     true
                 });
             }
@@ -199,31 +199,36 @@ impl super::Screen for SettingsMenu {
         });
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
         self.elements = None;
     }
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
-        _delta: f64,
-        renderer: &mut render::Renderer,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -262,7 +267,12 @@ impl VideoSettingsMenu {
 }
 
 impl super::Screen for VideoSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
@@ -372,31 +382,36 @@ impl super::Screen for VideoSettingsMenu {
             _buttons: buttons,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
         self.elements = None;
     }
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
-        _delta: f64,
-        renderer: &mut render::Renderer,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -435,7 +450,12 @@ impl AudioSettingsMenu {
 }
 
 impl super::Screen for AudioSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
@@ -471,31 +491,36 @@ impl super::Screen for AudioSettingsMenu {
             _buttons: buttons,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
         self.elements = None;
     }
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
-        _delta: f64,
-        renderer: &mut render::Renderer,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
             };
         }
-        None
     }
 
     // Events
@@ -534,7 +559,12 @@ impl SkinSettingsMenu {
 }
 
 impl super::Screen for SkinSettingsMenu {
-    fn on_active(&mut self, _renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
@@ -660,31 +690,36 @@ impl super::Screen for SkinSettingsMenu {
             _buttons: buttons,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
         self.elements = None;
     }
 
     // Called every frame the screen is active
     fn tick(
         &mut self,
-        _delta: f64,
-        renderer: &mut render::Renderer,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         {
             let mode = ui_container.mode;
             let mut background = elements.background.borrow_mut();
             background.width = match mode {
                 ui::Mode::Unscaled(scale) => 854.0 / scale,
-                ui::Mode::Scaled => renderer.width as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
             };
             background.height = match mode {
                 ui::Mode::Unscaled(scale) => 480.0 / scale,
-                ui::Mode::Scaled => renderer.height as f64,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
             };
         }
-        None
     }
 
     // Events

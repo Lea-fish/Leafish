@@ -43,6 +43,7 @@ pub mod console;
 pub mod entity;
 mod inventory;
 pub mod model;
+pub mod particle;
 pub mod paths;
 pub mod render;
 pub mod resources;
@@ -52,14 +53,17 @@ pub mod settings;
 pub mod ui;
 pub mod world;
 
-use crate::protocol::mojang;
+use crate::entity::Rotation;
 use crate::render::hud::HudContext;
+use leafish_protocol::protocol::login::{Account, AccountType};
+use leafish_protocol::protocol::mojang::MojangAccount;
 use leafish_protocol::protocol::{Error, Version};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 
@@ -76,7 +80,7 @@ const CL_BRAND: console::CVar<String> = console::CVar {
 };
 
 pub struct Game {
-    renderer: Arc<RwLock<render::Renderer>>,
+    renderer: Arc<render::Renderer>,
     screen_sys: Arc<screen::ScreenSystem>,
     resource_manager: Arc<RwLock<resources::Manager>>,
     clipboard_provider: Arc<RwLock<Box<dyn copypasta::ClipboardProvider>>>,
@@ -99,6 +103,7 @@ pub struct Game {
     is_logo_pressed: bool,
     is_fullscreen: bool,
     default_protocol_version: i32,
+    current_account: Arc<Mutex<Option<Account>>>,
 }
 
 impl Game {
@@ -138,22 +143,20 @@ impl Game {
         }
         let address = address.to_owned();
         let resources = self.resource_manager.clone();
-        let profile = mojang::Profile {
-            username: self.vars.get(auth::CL_USERNAME).clone(),
-            id: self.vars.get(auth::CL_UUID).clone(),
-            access_token: self.vars.get(auth::AUTH_TOKEN).clone(),
-        };
         let renderer = self.renderer.clone();
+        let screen_sys = self.screen_sys.clone();
+        let account = self.current_account.clone();
         let result = thread::spawn(move || {
             server::Server::connect(
                 resources,
-                profile,
+                account.clone().lock().as_ref().unwrap(),
                 &address,
                 protocol_version,
                 forge_mods,
                 fml_network_version,
                 renderer,
                 hud_context.clone(),
+                screen_sys,
             )
         })
         .join();
@@ -180,14 +183,6 @@ impl Game {
 #[derive(StructOpt, Debug)]
 #[structopt(name = "leafish")]
 struct Opt {
-    /// Server to connect to
-    #[structopt(short = "s", long = "server")]
-    server: Option<String>,
-
-    /// Username for offline servers
-    #[structopt(short = "u", long = "username")]
-    username: Option<String>,
-
     /// Log decoded packets received from network
     #[structopt(short = "n", long = "network-debug")]
     network_debug: bool,
@@ -218,6 +213,9 @@ fn main() {
     log::set_max_level(log::LevelFilter::Trace);
 
     info!("Starting Leafish...");
+    protocol::login::ACCOUNT_IMPLS
+        .clone()
+        .insert(AccountType::Mojang, Arc::new(MojangAccount {}));
 
     let (vars, mut vsync) = {
         let mut vars = console::Vars::new();
@@ -285,14 +283,19 @@ fn main() {
 
     let mut last_frame = Instant::now();
 
-    let screen_sys = screen::ScreenSystem::new();
-    if opt.server.is_none() {
-        screen_sys.add_screen(Box::new(screen::Login::new(vars.clone())));
-    }
-
-    if let Some(username) = opt.username {
-        vars.set(auth::CL_USERNAME, username);
-    }
+    let screen_sys = Arc::new(screen::ScreenSystem::new());
+    let active_account = Arc::new(Mutex::new(None));
+    screen_sys.add_screen(Box::new(screen::background::Background::new(
+        vars.clone(),
+        screen_sys.clone(),
+    )));
+    screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(
+        Arc::new(Mutex::new(
+            screen::launcher::load_accounts().unwrap_or_default(),
+        )),
+        screen_sys.clone(),
+        active_account.clone(),
+    )));
 
     let textures = renderer.get_textures();
     let default_protocol_version = protocol::versions::protocol_name_to_protocol_version(
@@ -318,8 +321,8 @@ fn main() {
     let game = Game {
         server: None,
         focused: false,
-        renderer: Arc::new(RwLock::new(renderer)),
-        screen_sys: Arc::new(screen_sys),
+        renderer: Arc::new(renderer),
+        screen_sys,
         resource_manager: resource_manager.clone(),
         console: con,
         vars,
@@ -336,8 +339,9 @@ fn main() {
         is_fullscreen: false,
         default_protocol_version,
         clipboard_provider: Arc::new(RwLock::new(clipboard)),
+        current_account: active_account,
     };
-    game.renderer.write().camera.pos = cgmath::Point3::new(0.5, 13.2, 0.5);
+    game.renderer.camera.lock().pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {
         protocol::enable_network_debug();
     }
@@ -347,12 +351,6 @@ fn main() {
         protocol::try_parse_packet(data, default_protocol_version);
         return;
     }
-
-    /*if opt.server.is_some() { // TODO: Readd?
-        let hud_context = Arc::new(RwLock::new(HudContext::new()));
-        game.connect_to(&opt.server.unwrap(), hud_context.clone());
-        screen_sys.add_screen(Box::new(Hud::new(hud_context.clone())));
-    }*/
 
     let mut last_resource_version = 0;
 
@@ -429,24 +427,9 @@ fn tick_all(
             game.screen_sys.close_closable_screens();
             game.screen_sys
                 .clone()
-                .replace_screen(Box::new(screen::ServerList::new(
-                    disconnect_reason,
-                    game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                )));
-            game.server
-                .as_ref()
-                .unwrap()
-                .clone()
-                .entities
-                .clone()
-                .write()
-                .remove_all_entities(
-                    &*game.server.as_ref().unwrap().clone().world.clone(),
-                    &mut *game.renderer.clone().write(),
-                );
+                .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
             game.server = None;
-            game.renderer.clone().write().reset();
-            game.focused = false;
+            game.renderer.clone().reset();
         }
     } else {
         game.chunk_builder.reset();
@@ -477,7 +460,7 @@ fn tick_all(
     if *vsync != vsync_changed {
         error!("Changing vsync currently requires restarting");
         game.should_close = true;
-        // TODO: after https://github.com/tomaka/glutin/issues/693 Allow changing vsync on a Window
+        // TODO: after changing to wgpu and the new renderer, allow changing vsync on a Window
         //vsync = vsync_changed;
     }
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
@@ -498,32 +481,33 @@ fn tick_all(
     if game.server.is_some() {
         game.renderer
             .clone()
-            .write()
             .update_camera(physical_width, physical_height);
         game.chunk_builder.tick(
             game.server.as_ref().unwrap().world.clone(),
             game.renderer.clone(),
             version,
         );
-    } else if game.renderer.clone().read().safe_width != physical_width
-        || game.renderer.clone().read().safe_height != physical_height
+    } else if game.renderer.clone().screen_data.read().safe_width != physical_width
+        || game.renderer.clone().screen_data.read().safe_height != physical_height
     {
-        game.renderer.clone().write().safe_width = physical_width;
-        game.renderer.clone().write().safe_height = physical_height;
+        game.renderer.clone().screen_data.write().safe_width = physical_width;
+        game.renderer.clone().screen_data.write().safe_height = physical_height;
         gl::viewport(0, 0, physical_width as i32, physical_height as i32);
     }
 
-    game.screen_sys
+    if game
+        .screen_sys
         .clone()
-        .tick(delta, game.renderer.clone(), &mut ui_container, window);
-    /* TODO: open console for chat messages
-    if let Some(received_chat_at) = game.server.received_chat_at {
-        if Instant::now().duration_since(received_chat_at).as_secs() < 5 {
-            game.console.lock().unwrap().activate()
-            // TODO: automatically deactivate the console after inactivity
-        }
+        .tick(delta, game.renderer.clone(), &mut ui_container, window)
+    {
+        window.set_cursor_grab(false).unwrap();
+        window.set_cursor_visible(true);
+        game.focused = false;
+    } else {
+        window.set_cursor_grab(true).unwrap();
+        window.set_cursor_visible(false);
+        game.focused = true;
     }
-    */
     game.console.lock().tick(
         &mut ui_container,
         game.renderer.clone(),
@@ -532,7 +516,7 @@ fn tick_all(
     );
     ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
     let world = game.server.as_ref().map(|server| server.world.clone());
-    game.renderer.clone().write().tick(
+    game.renderer.clone().tick(
         world,
         delta,
         width as u32,
@@ -599,16 +583,23 @@ fn handle_window_event<T>(
             if game.focused {
                 window.set_cursor_grab(true).unwrap();
                 window.set_cursor_visible(false);
-                if game.server.is_some() && !*game.server.as_ref().unwrap().clone().dead.read() {
+                if game.server.is_some()
+                    && !game
+                        .server
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .dead
+                        .load(Ordering::Acquire)
+                {
                     if let Some(player) = *game.server.as_ref().unwrap().player.clone().write() {
-                        let rotation = game
-                            .server
-                            .as_ref()
-                            .unwrap()
-                            .entities
-                            .clone()
-                            .write()
-                            .get_component_mut(player, game.server.as_ref().unwrap().rotation)
+                        let server = game.server.as_ref().unwrap();
+                        let entities = server.entities.clone();
+                        let mut entities = entities.write();
+                        let mut rotation = entities
+                            .world
+                            .entity_mut(player.1)
+                            .get_mut::<Rotation>()
                             .unwrap();
                         rotation.yaw -= rx;
                         rotation.pitch -= ry;
@@ -654,19 +645,8 @@ fn handle_window_event<T>(
                         let physical_size = window.inner_size();
                         let (width, height) =
                             physical_size.to_logical::<f64>(game.dpi_factor).into();
-
-                        if game.server.is_some()
-                            && game.server.as_ref().unwrap().is_connected()
-                            && !game.focused
-                            && !game.screen_sys.clone().is_current_closable()
-                        {
-                            game.focused = true;
-                            window.set_cursor_grab(true).unwrap();
-                            window.set_cursor_visible(false);
-                        } else if !game.focused {
+                        if !game.screen_sys.clone().is_current_ingame() && !game.focused {
                             // TODO: after Pointer Lock https://github.com/rust-windowing/winit/issues/1674
-                            window.set_cursor_grab(false).unwrap();
-                            window.set_cursor_visible(true);
                             ui_container.click_at(
                                 game,
                                 game.last_mouse_x,
@@ -681,18 +661,12 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
                         if game.focused && game.server.is_some() {
-                            game.server
-                                .as_ref()
-                                .unwrap()
-                                .on_right_click(game.renderer.clone());
+                            game.server.as_ref().unwrap().on_right_click();
                         }
                     }
                     (ElementState::Pressed, MouseButton::Left) => {
                         if game.focused && game.server.is_some() {
-                            game.server
-                                .as_ref()
-                                .unwrap()
-                                .on_left_click(game.renderer.clone());
+                            game.server.as_ref().unwrap().on_left_click();
                         }
                     }
                     (_, _) => (),
@@ -744,30 +718,14 @@ fn handle_window_event<T>(
                                 let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
                                 ui_container.key_press(game, key, true, ctrl_pressed);
                             }
-                            if game.screen_sys.clone().press_key(key, true, game) {
-                                window.set_cursor_grab(false).unwrap();
-                                window.set_cursor_visible(true);
-                                game.focused = false;
-                            } else {
-                                window.set_cursor_grab(true).unwrap();
-                                window.set_cursor_visible(false);
-                                game.focused = true;
-                            }
+                            game.screen_sys.clone().press_key(key, true, game);
                         }
                         (ElementState::Released, Some(key)) => {
                             if !game.focused {
                                 let ctrl_pressed = game.is_ctrl_pressed;
                                 ui_container.key_press(game, key, false, ctrl_pressed);
                             }
-                            if game.screen_sys.clone().press_key(key, false, game) {
-                                window.set_cursor_grab(false).unwrap();
-                                window.set_cursor_visible(true);
-                                game.focused = false;
-                            } else {
-                                window.set_cursor_grab(true).unwrap();
-                                window.set_cursor_visible(false);
-                                game.focused = true;
-                            }
+                            game.screen_sys.clone().press_key(key, false, game);
                         }
                         (_, None) => (),
                     }

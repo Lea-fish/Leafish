@@ -4,7 +4,7 @@ use crate::resources;
 use crate::shared::Direction;
 use crate::types::bit::Set;
 use crate::world;
-use crate::world::{block, CPos, ComposedSection, World};
+use crate::world::{block, CPos, ChunkSectionSnapshotGroup, World};
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use parking_lot::RwLock;
@@ -53,18 +53,12 @@ impl ChunkBuilder {
         }
     }
 
-    pub fn tick(
-        &mut self,
-        world: Arc<World>,
-        renderer: Arc<RwLock<render::Renderer>>,
-        version: usize,
-    ) {
+    pub fn tick(&mut self, world: Arc<World>, renderer: Arc<render::Renderer>, version: usize) {
         if version != self.resource_version {
             self.resource_version = version;
             self.models.write().version_change();
         }
 
-        let mut renderer = renderer.write();
         while let Ok((id, mut val)) = self.built_recv.try_recv() {
             world.clone().reset_building_flag(val.position);
 
@@ -182,7 +176,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
         mut solid_buffer,
         mut trans_buffer,
     } = work;
-    let snapshot = ComposedSection::new(world, position.0, position.2, position.1, 2);
+    let snapshot = ChunkSectionSnapshotGroup::new(world, position.0, position.2, position.1, 2);
 
     let mut rng = rand_pcg::Pcg32::from_seed([
         ((position.0 as u32) & 0xff) as u8,
@@ -288,7 +282,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
     }
 }
 
-fn build_cull_info(snapshot: &world::ComposedSection) -> CullInfo {
+fn build_cull_info(snapshot: &world::ChunkSectionSnapshotGroup) -> CullInfo {
     let mut visited = Set::new(16 * 16 * 16);
     let mut info = CullInfo::new();
 
@@ -320,7 +314,13 @@ fn build_cull_info(snapshot: &world::ComposedSection) -> CullInfo {
     info
 }
 
-fn flood_fill(snapshot: &world::ComposedSection, visited: &mut Set, x: i32, y: i32, z: i32) -> u8 {
+fn flood_fill(
+    snapshot: &world::ChunkSectionSnapshotGroup,
+    visited: &mut Set,
+    x: i32,
+    y: i32,
+    z: i32,
+) -> u8 {
     use std::collections::VecDeque;
 
     let mut next_position = VecDeque::with_capacity(16 * 16);

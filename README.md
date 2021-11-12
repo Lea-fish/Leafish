@@ -71,8 +71,6 @@ A list of missing features is available on the [issues page](https://github.com/
 | 1.14.2 | 485 | - |
 | 1.14.1 | 480 | - |
 | 1.14 | 477 | - |
-| 19w02a | 452 | - |
-| 18w50a | 451 | - |
 | 1.13.2 | 404 | - |
 | 1.12.2 | 340 | - |
 | 1.11.2 | 316 | - |
@@ -80,7 +78,6 @@ A list of missing features is available on the [issues page](https://github.com/
 | 1.10.2 | 210 | - |
 | 1.9.2  | 109 | - |
 | 1.9    | 107 | - |
-| 15w39c | 74  | - |
 | 1.8.9  | 47  | - |
 | 1.7.10 | 5   | - |
 
@@ -109,13 +106,13 @@ Rust stable version 1.53.0 or newer is required.
 **Debian/Ubuntu**
 
 ```sh
-sudo apt-get install cargo libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
+sudo apt-get install cargo libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgtk-3-dev
 ```
 
 **Alpine Linux**
 
 ```sh
-sudo apk add cargo openssl-dev xcb-util-dev
+sudo apk add cargo openssl-dev xcb-util-dev gtk+3.0-dev
 ```
 
 #### Building

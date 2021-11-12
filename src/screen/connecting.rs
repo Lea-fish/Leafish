@@ -13,8 +13,9 @@
 // limitations under the License.
 
 use crate::render;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui;
+use std::sync::Arc;
 
 pub struct Connecting {
     elements: Option<UIElements>,
@@ -47,7 +48,12 @@ impl Connecting {
 }
 
 impl super::Screen for Connecting {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         let connect_msg = ui::TextBuilder::new()
@@ -78,21 +84,25 @@ impl super::Screen for Connecting {
             _connect_msg: connect_msg,
         });
     }
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.elements = None
     }
 
     fn tick(
         &mut self,
-        _delta: f64,
-        renderer: &mut render::Renderer,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
-
         elements.logo.tick(renderer);
-        None
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

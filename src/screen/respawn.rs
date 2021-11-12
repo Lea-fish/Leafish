@@ -1,10 +1,11 @@
 use crate::render::hud::Hud;
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui;
 use crate::ui::{Container, ImageRef};
 use leafish_protocol::protocol::packet::play::serverbound::ClientStatus;
 use leafish_protocol::protocol::{VarInt, Version};
+use std::sync::Arc;
 
 pub struct Respawn {
     elements: Option<UIElements>,
@@ -39,12 +40,20 @@ impl Respawn {
 }
 
 impl super::Screen for Respawn {
-    fn on_active(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer);
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<Renderer>,
+        ui_container: &mut Container,
+    ) {
+        let icon_scale = Hud::icon_scale(renderer.clone());
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)
-            .size(renderer.width as f64, renderer.height as f64)
+            .size(
+                renderer.screen_data.read().width as f64,
+                renderer.screen_data.read().height as f64,
+            )
             .colour((104, 0, 0, 100))
             .create(ui_container);
         let text = ui::TextBuilder::new()
@@ -105,8 +114,12 @@ impl super::Screen for Respawn {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *main_menu_button);
             main_menu_button.add_text(txt);
-            main_menu_button.add_click_func(|_, _game| {
-                // TODO: Disconnect!
+            main_menu_button.add_click_func(|_, game| {
+                game.server.as_ref().unwrap().disconnect(None);
+                game.screen_sys.clone().pop_screen();
+                game.screen_sys
+                    .clone()
+                    .replace_screen(Box::new(super::ServerList::new(None)));
                 true
             });
         }
@@ -119,18 +132,33 @@ impl super::Screen for Respawn {
         });
     }
 
-    fn on_deactive(&mut self, _renderer: &mut Renderer, _ui_container: &mut Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<Renderer>,
+        _ui_container: &mut Container,
+    ) {
         self.elements = None;
     }
 
     fn tick(
         &mut self,
-        _delta: f64,
-        _renderer: &mut Renderer,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
-    ) -> Option<Box<dyn Screen>> {
+        _delta: f64,
+    ) {
         // TODO
-        None
+    }
+
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: Arc<Renderer>,
+        ui_container: &mut Container,
+    ) {
+        self.on_deactive(screen_sys, renderer.clone(), ui_container);
+        self.on_active(screen_sys, renderer, ui_container);
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

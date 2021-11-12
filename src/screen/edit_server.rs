@@ -15,12 +15,12 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use crate::paths;
 use crate::ui;
-use crate::{render, settings};
+use crate::{paths, render};
 
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use serde_json::{self, Value};
+use std::sync::Arc;
 
 pub struct EditServerEntry {
     elements: Option<UIElements>,
@@ -91,7 +91,12 @@ impl EditServerEntry {
 }
 
 impl super::Screen for EditServerEntry {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         // Name
@@ -116,7 +121,7 @@ impl super::Screen for EditServerEntry {
             .create(ui_container);
         ui::TextBox::make_focusable(&server_address, ui_container);
         ui::TextBuilder::new()
-            .text("Address")
+            .text("Address:")
             .position(0.0, -18.0)
             .attach(&mut *server_address.borrow_mut());
 
@@ -144,10 +149,7 @@ impl super::Screen for EditServerEntry {
                 );
                 game.screen_sys
                     .clone()
-                    .replace_screen(Box::new(super::ServerList::new(
-                        None,
-                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                    )));
+                    .replace_screen(Box::new(super::ServerList::new(None)));
                 true
             });
         }
@@ -168,10 +170,7 @@ impl super::Screen for EditServerEntry {
             cancel.add_click_func(|_, game| {
                 game.screen_sys
                     .clone()
-                    .replace_screen(Box::new(super::ServerList::new(
-                        None,
-                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                    )));
+                    .replace_screen(Box::new(super::ServerList::new(None)));
                 true
             });
         }
@@ -185,20 +184,25 @@ impl super::Screen for EditServerEntry {
         });
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.elements = None
     }
 
     fn tick(
         &mut self,
-        _delta: f64,
-        renderer: &mut render::Renderer,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         elements.logo.tick(renderer);
-        None
     }
 
     fn is_closable(&self) -> bool {

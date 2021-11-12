@@ -138,7 +138,7 @@ impl Logo {
         }
     }
 
-    pub fn tick(&mut self, renderer: &mut render::Renderer) {
+    pub fn tick(&mut self, renderer: Arc<render::Renderer>) {
         let now = Instant::now().duration_since(self.started);
 
         // Splash text
@@ -147,7 +147,7 @@ impl Logo {
         if self.text_index != text_index {
             self.text_index = text_index;
             text.text = self.text_strings[text_index as usize].clone();
-            let width = (renderer.ui.size_of_string(&text.text) + 2.0) * text.scale_x;
+            let width = (renderer.ui.lock().size_of_string(&text.text) + 2.0) * text.scale_x;
             self.text_base_scale = 300.0 / width;
             if self.text_base_scale > 1.0 {
                 self.text_base_scale = 1.0;

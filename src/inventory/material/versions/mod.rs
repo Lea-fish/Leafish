@@ -8,7 +8,6 @@ mod mapping1_13_2;
 mod mapping1_14_4;
 mod mapping1_15_2;
 mod mapping1_16_5;
-mod mapping1_17_1;
 mod mapping1_7_10;
 mod mapping1_8_8;
 mod mapping1_9_4;

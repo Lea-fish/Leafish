@@ -37,6 +37,7 @@ use instant::{Duration, Instant};
 use lazy_static::lazy_static;
 use log::{debug, warn};
 use num_traits::cast::{cast, NumCast};
+use serde::{Deserialize, Serialize};
 use trust_dns_resolver::config::ResolverConfig;
 use trust_dns_resolver::config::ResolverOpts;
 use trust_dns_resolver::Resolver;
@@ -46,11 +47,12 @@ use crate::nbt;
 use crate::shared::Position;
 
 pub mod forge;
+pub mod login;
 pub mod mojang;
 
-pub const SUPPORTED_PROTOCOLS: [i32; 24] = [
-    754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 452, 451, 404, 340, 316, 315, 210,
-    109, 107, 74, 47, 5,
+pub const SUPPORTED_PROTOCOLS: [i32; 21] = [
+    754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 404, 340, 316, 315, 210, 109, 107,
+    47, 5,
 ];
 
 static CURRENT_PROTOCOL_VERSION: AtomicI32 = AtomicI32::new(SUPPORTED_PROTOCOLS[0]);
@@ -229,6 +231,60 @@ macro_rules! state_packets {
 }
 
 #[macro_export]
+macro_rules! state_mapped_packets {
+     ($($state:ident $stateName:ident {
+        $($dir:ident $dirName:ident {
+            $(
+                $(#[$attr:meta])*
+                packet $name:ident {
+                    $($(#[$fattr:meta])*field $field:ident: $field_type:ty, )+
+                }
+            )*
+        })+
+    })+) => {
+        use crate::protocol::*;
+
+        #[derive(Debug)]
+        pub enum MappedPacket {
+        $(
+            $(
+                $(
+        $name($state::$dir::$name),
+                )*
+            )+
+        )+
+        }
+
+        $(
+        pub mod $state {
+
+            $(
+            pub mod $dir {
+                #![allow(unused_imports)]
+                use crate::protocol::*;
+                use std::io;
+                use crate::format;
+                use crate::nbt;
+                use crate::types;
+                use crate::item;
+                use crate::shared::Position;
+                use crate::protocol::packet::Hand;
+
+
+                $(
+                    #[derive(Default, Debug)]
+                    $(#[$attr])* pub struct $name {
+                        $($(#[$fattr])* pub $field: $field_type),+,
+                    }
+                )*
+            }
+            )+
+        }
+        )+
+    }
+}
+
+#[macro_export]
 macro_rules! protocol_packet_ids {
     ($($state:ident $stateName:ident {
        $($dir:ident $dirName:ident {
@@ -272,6 +328,7 @@ macro_rules! protocol_packet_ids {
     }
 }
 
+pub mod mapped_packet;
 pub mod packet;
 pub mod versions;
 pub trait Serializable: Sized {
@@ -354,7 +411,7 @@ impl Serializable for format::Component {
         let mut bytes = Vec::<u8>::new();
         buf.take(len as u64).read_to_end(&mut bytes)?;
         let ret = String::from_utf8(bytes).unwrap();
-        Ok(Self::from_string(&ret[..]))
+        Ok(Self::from_str(&ret[..]))
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
         let val = serde_json::to_string(&self.to_value()).unwrap();
@@ -474,7 +531,7 @@ impl Serializable for f64 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
 pub struct UUID(u64, u64);
 
 #[derive(Debug)]
@@ -490,14 +547,22 @@ impl fmt::Display for UUIDParseError {
 impl std::str::FromStr for UUID {
     type Err = UUIDParseError;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.len() != 36 {
-            return Err(UUIDParseError {});
-        }
         let mut parts = hex::decode(&s[..8]).unwrap();
-        parts.extend_from_slice(&hex::decode(&s[9..13]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[14..18]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[19..23]).unwrap());
-        parts.extend_from_slice(&hex::decode(&s[24..36]).unwrap());
+        if s.len() != 36 {
+            if s.len() != 32 {
+                return Err(UUIDParseError {});
+            }
+            // TODO: Verify that this parses uuids correctly (although it should).
+            parts.extend_from_slice(&hex::decode(&s[8..12]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[12..16]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[16..20]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[20..32]).unwrap());
+        } else {
+            parts.extend_from_slice(&hex::decode(&s[9..13]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[14..18]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[19..23]).unwrap());
+            parts.extend_from_slice(&hex::decode(&s[24..36]).unwrap());
+        }
         let mut high = 0u64;
         let mut low = 0u64;
         for i in 0..8 {
@@ -1515,7 +1580,7 @@ impl Conn {
                         .ok_or_else(invalid_status)? as i32,
                     sample: Vec::new(), /* TODO */
                 },
-                description: format::Component::from_value(
+                description: format::Component::from_json(
                     val.get("description").ok_or_else(invalid_status)?,
                 ),
                 favicon: val

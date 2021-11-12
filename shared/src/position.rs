@@ -1,8 +1,9 @@
 use crate::direction::Direction;
+use bevy_ecs::prelude::*;
 use std::fmt;
 use std::ops;
 
-#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Position {
     pub x: i32,
     pub y: i32,

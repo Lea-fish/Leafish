@@ -19,8 +19,11 @@ pub mod bit;
 pub mod hash;
 pub mod nibble;
 
-#[derive(Clone, Copy, Debug)]
+use bevy_ecs::prelude::*;
+
+#[derive(Component, Clone, Copy, Debug)]
 pub enum GameMode {
+    NotSet = -1,
     Survival = 0,
     Creative = 1,
     Adventure = 2,
@@ -34,7 +37,8 @@ impl GameMode {
             2 => GameMode::Adventure,
             1 => GameMode::Creative,
             0 => GameMode::Survival,
-            _ => GameMode::Survival,
+            -1 => GameMode::NotSet,
+            _ => GameMode::Adventure,
         }
     }
 
@@ -48,5 +52,12 @@ impl GameMode {
 
     pub fn noclip(&self) -> bool {
         matches!(*self, GameMode::Spectator)
+    }
+
+    pub fn can_interact_with_world(&self) -> bool {
+        matches!(
+            *self,
+            GameMode::Creative | GameMode::Survival | GameMode::NotSet
+        )
     }
 }

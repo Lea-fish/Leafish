@@ -4,9 +4,10 @@ use crate::shared::{Direction, Position};
 use crate::world;
 use crate::world::block;
 use collision::{self, Aabb};
+use std::sync::Arc;
 
 pub struct Info {
-    model: Option<model::ModelKey>,
+    model: Option<model::ModelHandle>,
     last_block: block::Block,
     last_pos: Position,
 }
@@ -26,22 +27,18 @@ impl Info {
         }
     }
 
-    pub fn clear(&mut self, renderer: &mut render::Renderer) {
+    pub fn clear(&mut self) {
         self.last_block = block::Air {};
-        if let Some(model) = self.model.take() {
-            renderer.model.remove_model(model);
-        }
+        self.model.take();
     }
 
-    pub fn update(&mut self, renderer: &mut render::Renderer, pos: Position, bl: block::Block) {
+    pub fn update(&mut self, renderer: Arc<render::Renderer>, pos: Position, bl: block::Block) {
         if self.last_block == bl && self.last_pos == pos {
             return;
         }
         self.last_block = bl;
         self.last_pos = pos;
-        if let Some(model) = self.model.take() {
-            renderer.model.remove_model(model);
-        }
+        self.model.take();
         let mut parts = vec![];
 
         const LINE_SIZE: f64 = 1.0 / 128.0;
@@ -131,7 +128,11 @@ impl Info {
             part.b = 0;
         }
 
-        self.model = Some(renderer.model.create_model(model::DEFAULT, vec![parts]));
+        self.model = Some(renderer.models.lock().create_model(
+            model::DEFAULT,
+            vec![parts],
+            renderer.clone(),
+        ));
     }
 }
 

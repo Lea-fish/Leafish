@@ -12,35 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::BTreeMap;
-use std::fs;
-
-use crate::paths;
 use crate::render;
-use crate::settings;
 use crate::ui;
+use crate::Game;
 
-use crate::screen::Screen;
-use serde_json::{self, Value};
+use crate::screen::{Screen, ScreenSystem};
+use std::rc::Rc;
+use std::sync::Arc;
 
-// TODO: make use of "background_img: String"
-#[allow(dead_code)]
-pub struct DeleteServerEntry {
+pub struct ConfirmBox {
     elements: Option<UIElements>,
-    index: usize,
-    name: String,
-    address: String,
-    background_img: String,
+    prompt: String,
+    cancel_callback: Rc<dyn Fn(&mut Game)>,
+    confirm_callback: Rc<dyn Fn(&mut Game)>,
 }
 
-impl Clone for DeleteServerEntry {
+impl Clone for ConfirmBox {
     fn clone(&self) -> Self {
-        DeleteServerEntry {
+        Self {
             elements: None,
-            index: self.index,
-            name: self.name.clone(),
-            address: self.address.clone(),
-            background_img: self.background_img.clone(),
+            prompt: self.prompt.clone(),
+            cancel_callback: self.cancel_callback.clone(),
+            confirm_callback: self.confirm_callback.clone(),
         }
     }
 }
@@ -53,58 +46,33 @@ struct UIElements {
     _cancel: ui::ButtonRef,
 }
 
-impl DeleteServerEntry {
+impl ConfirmBox {
     pub fn new(
-        index: usize,
-        name: &str,
-        address: &str,
-        background_img: String,
-    ) -> DeleteServerEntry {
-        DeleteServerEntry {
+        prompt: String,
+        cancel_callback: Rc<dyn Fn(&mut Game)>,
+        confirm_callback: Rc<dyn Fn(&mut Game)>,
+    ) -> Self {
+        Self {
             elements: None,
-            index,
-            name: name.to_string(),
-            address: address.to_string(),
-            background_img,
+            prompt,
+            cancel_callback,
+            confirm_callback,
         }
-    }
-
-    fn delete_server(index: usize) {
-        let mut servers_info = match fs::File::open(paths::get_data_dir().join("servers.json")) {
-            Ok(val) => serde_json::from_reader(val).unwrap(),
-            Err(_) => {
-                let mut info = BTreeMap::default();
-                info.insert("servers".to_owned(), Value::Array(vec![]));
-                Value::Object(info.into_iter().collect())
-            }
-        };
-
-        {
-            let servers = servers_info
-                .as_object_mut()
-                .unwrap()
-                .get_mut("servers")
-                .unwrap()
-                .as_array_mut()
-                .unwrap();
-            servers.remove(index);
-        }
-
-        let mut out = fs::File::create(paths::get_data_dir().join("servers.json")).unwrap();
-        serde_json::to_writer_pretty(&mut out, &servers_info).unwrap();
     }
 }
 
-impl super::Screen for DeleteServerEntry {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+impl super::Screen for ConfirmBox {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         // Prompt
         let prompt = ui::TextBuilder::new()
-            .text(format!(
-                "Are you sure you wish to delete {} {}?",
-                self.name, self.address
-            ))
+            .text(self.prompt.clone())
             .position(0.0, 40.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .create(ui_container);
@@ -122,15 +90,9 @@ impl super::Screen for DeleteServerEntry {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *confirm);
             confirm.add_text(txt);
-            let index = self.index;
+            let callback = self.confirm_callback.clone();
             confirm.add_click_func(move |_, game| {
-                Self::delete_server(index);
-                game.screen_sys
-                    .clone()
-                    .replace_screen(Box::new(super::ServerList::new(
-                        None,
-                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                    )));
+                (*callback)(game);
                 true
             });
         }
@@ -148,13 +110,9 @@ impl super::Screen for DeleteServerEntry {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *cancel);
             cancel.add_text(txt);
-            cancel.add_click_func(|_, game| {
-                game.screen_sys
-                    .clone()
-                    .replace_screen(Box::new(super::ServerList::new(
-                        None,
-                        game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                    )));
+            let callback = self.cancel_callback.clone();
+            cancel.add_click_func(move |_, game| {
+                (*callback)(game);
                 true
             });
         }
@@ -167,20 +125,25 @@ impl super::Screen for DeleteServerEntry {
         });
     }
 
-    fn on_deactive(&mut self, _renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         self.elements = None
     }
 
     fn tick(
         &mut self,
-        _delta: f64,
-        renderer: &mut render::Renderer,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
         _ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        _delta: f64,
+    ) {
         let elements = self.elements.as_mut().unwrap();
         elements.logo.tick(renderer);
-        None
     }
 
     fn is_closable(&self) -> bool {

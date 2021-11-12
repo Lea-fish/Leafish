@@ -19,29 +19,29 @@ use std::sync::Arc;
 use std::thread;
 
 use crate::format;
-use crate::format::{Component, TextComponent};
+use crate::format::{Component, ComponentType};
 use crate::paths;
 use crate::protocol;
 use crate::render;
-use crate::settings;
 use crate::ui;
 
 use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
-use crate::screen::Screen;
+use crate::screen::{Screen, ScreenSystem};
 use crate::ui::Container;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, TryRecvError};
 use instant::Duration;
 use parking_lot::RwLock;
 use rand::Rng;
+use serde_json::Value;
+use std::collections::BTreeMap;
 
 pub struct ServerList {
     elements: Option<UIElements>,
     disconnect_reason: Option<Component>,
 
     needs_reload: Rc<RefCell<bool>>,
-    background_image: String,
 }
 
 impl Clone for ServerList {
@@ -50,7 +50,6 @@ impl Clone for ServerList {
             elements: None,
             disconnect_reason: self.disconnect_reason.clone(),
             needs_reload: Rc::new(RefCell::new(false)),
-            background_image: self.background_image.clone(),
         }
     }
 }
@@ -65,7 +64,6 @@ struct UIElements {
     _disclaimer: ui::TextRef,
 
     _disconnected: Option<ui::ImageRef>,
-    _background: Option<ui::ImageRef>,
 }
 
 struct Server {
@@ -108,18 +106,17 @@ impl Server {
 }
 
 impl ServerList {
-    pub fn new(disconnect_reason: Option<Component>, background_image: String) -> ServerList {
+    pub fn new(disconnect_reason: Option<Component>) -> ServerList {
         ServerList {
             elements: None,
             disconnect_reason,
             needs_reload: Rc::new(RefCell::new(false)),
-            background_image,
         }
     }
 
     fn reload_server_list(
         &mut self,
-        renderer: &mut render::Renderer,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
         let elements = self.elements.as_mut().unwrap();
@@ -173,15 +170,15 @@ impl ServerList {
                     let result = game.connect_to(&address, hud_context.clone());
                     game.screen_sys.clone().pop_screen();
                     if let Err(error) = result {
-                        game.screen_sys.clone().add_screen(Box::new(ServerList::new(
-                            Some(Component::Text(TextComponent::new(&*error.to_string()))),
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
-                        )));
+                        game.screen_sys
+                            .clone()
+                            .add_screen(Box::new(ServerList::new(Some(Component::new(
+                                ComponentType::new(&error.to_string(), None),
+                            )))));
                     } else {
                         game.screen_sys
                             .clone()
                             .add_screen(Box::new(Hud::new(hud_context)));
-                        game.focused = true;
                     }
                     true
                 });
@@ -218,14 +215,14 @@ impl ServerList {
 
             // Server's message of the day
             let motd = ui::FormattedBuilder::new()
-                .text(Component::Text(TextComponent::new("Connecting...")))
+                .text(Component::new(ComponentType::new("Connecting...", None)))
                 .position(100.0, 23.0)
                 .max_width(700.0 - (90.0 + 10.0 + 5.0))
                 .attach(&mut *back.borrow_mut());
 
             // Version information
             let version = ui::FormattedBuilder::new()
-                .text(Component::Text(TextComponent::new("")))
+                .text(Component::new(ComponentType::new("", None)))
                 .position(100.0, 5.0)
                 .max_width(700.0 - (90.0 + 10.0 + 5.0))
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Left)
@@ -248,12 +245,17 @@ impl ServerList {
                 let sname = name.clone();
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
-                    game.screen_sys.clone().replace_screen(Box::new(
-                        super::delete_server::DeleteServerEntry::new(
-                            index,
-                            &sname,
-                            &saddr,
-                            game.vars.get(settings::BACKGROUND_IMAGE).clone(),
+                    let text = format!("Are you sure you wish to delete {} {}?", &sname, &saddr);
+                    game.screen_sys.clone().add_screen(Box::new(
+                        super::confirm_box::ConfirmBox::new(
+                            text,
+                            Rc::new(|game| {
+                                game.screen_sys.pop_screen();
+                            }),
+                            Rc::new(move |game| {
+                                game.screen_sys.pop_screen();
+                                Self::delete_server(index);
+                            }),
                         ),
                     ));
                     true
@@ -313,8 +315,7 @@ impl ServerList {
                     .and_then(|conn| conn.do_status())
                 {
                     Ok(res) => {
-                        let mut desc = res.0.description;
-                        format::convert_legacy(&mut desc);
+                        let desc = res.0.description;
                         let favicon = if let Some(icon) = res.0.favicon {
                             let data_base64 = &icon["data:image/png;base64,".len()..];
                             let data_base64: String =
@@ -338,10 +339,9 @@ impl ServerList {
                     }
                     Err(err) => {
                         let e = format!("{}", err);
-                        let mut msg = TextComponent::new(&e);
-                        msg.modifier.color = Some(format::Color::Red);
+                        let msg = ComponentType::new(&e, Some(format::Color::Red));
                         let _ = send.send(PingInfo {
-                            motd: Component::Text(msg),
+                            motd: Component::new(msg),
                             ping: Duration::new(99999, 0),
                             exists: false,
                             online: 0,
@@ -357,7 +357,32 @@ impl ServerList {
         }
     }
 
-    fn init_list(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn delete_server(index: usize) {
+        let mut servers_info = match fs::File::open(paths::get_data_dir().join("servers.json")) {
+            Ok(val) => serde_json::from_reader(val).unwrap(),
+            Err(_) => {
+                let mut info = BTreeMap::default();
+                info.insert("servers".to_owned(), Value::Array(vec![]));
+                Value::Object(info.into_iter().collect())
+            }
+        };
+
+        {
+            let servers = servers_info
+                .as_object_mut()
+                .unwrap()
+                .get_mut("servers")
+                .unwrap()
+                .as_array_mut()
+                .unwrap();
+            servers.remove(index);
+        }
+
+        let mut out = fs::File::create(paths::get_data_dir().join("servers.json")).unwrap();
+        serde_json::to_writer_pretty(&mut out, &servers_info).unwrap();
+    }
+
+    fn init_list(&mut self, renderer: Arc<render::Renderer>, ui_container: &mut ui::Container) {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         // Refresh the server list
@@ -437,13 +462,19 @@ impl ServerList {
 
         // If we are kicked from a server display the reason
         let disconnected = if let Some(ref disconnect_reason) = self.disconnect_reason {
-            let (width, height) =
-                ui::Formatted::compute_size(renderer, disconnect_reason, 600.0, 1.0);
+            let (width, height) = ui::Formatted::compute_size(
+                renderer.clone(),
+                disconnect_reason,
+                600.0,
+                1.0,
+                1.0,
+                1.0,
+            );
             let background = ui::ImageBuilder::new()
                 .texture("leafish:solid")
                 .position(0.0, 3.0)
                 .size(
-                    width.max(renderer.ui.size_of_string("Disconnected")) + 4.0,
+                    width.max(renderer.ui.lock().size_of_string("Disconnected")) + 4.0,
                     height + 4.0 + 16.0,
                 )
                 .colour((0, 0, 0, 100))
@@ -467,23 +498,6 @@ impl ServerList {
             None
         };
 
-        let background = if Renderer::get_texture_optional(
-            renderer.get_textures_ref(),
-            &*format!("#{}", self.background_image),
-        )
-        .is_some()
-        {
-            Some(
-                ui::ImageBuilder::new()
-                    .texture(&*format!("#{}", self.background_image))
-                    .size(renderer.safe_width as f64, renderer.safe_height as f64)
-                    .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                    .create(ui_container),
-            )
-        } else {
-            None
-        };
-
         self.elements = Some(UIElements {
             logo,
             servers: vec![],
@@ -494,18 +508,27 @@ impl ServerList {
             _disclaimer: disclaimer,
 
             _disconnected: disconnected,
-            _background: background,
         });
     }
 }
 
 impl super::Screen for ServerList {
-    fn on_active(&mut self, renderer: &mut render::Renderer, ui_container: &mut ui::Container) {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
         self.init_list(renderer, ui_container);
         *self.needs_reload.borrow_mut() = true;
     }
 
-    fn on_deactive(&mut self, renderer: &mut render::Renderer, _ui_container: &mut ui::Container) {
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
         // Clean up
         {
             let elements = self.elements.as_mut().unwrap();
@@ -521,16 +544,17 @@ impl super::Screen for ServerList {
 
     fn tick(
         &mut self,
-        delta: f64,
-        renderer: &mut render::Renderer,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
-    ) -> Option<Box<dyn super::Screen>> {
+        delta: f64,
+    ) {
         if *self.needs_reload.borrow() {
-            self.reload_server_list(renderer, ui_container);
+            self.reload_server_list(renderer.clone(), ui_container);
         }
         let elements = self.elements.as_mut().unwrap();
 
-        elements.logo.tick(renderer);
+        elements.logo.tick(renderer.clone());
 
         for s in &mut elements.servers {
             // Animate the entries
@@ -543,6 +567,12 @@ impl super::Screen for ServerList {
                 } else {
                     back.y = s.y;
                 }
+            }
+            #[allow(clippy::if_same_then_else)]
+            if s.y < elements._add_btn.borrow().y {
+                // TODO: Make button invisible!
+            } else {
+                // TODO: Make button visible.
             }
 
             // Keep checking to see if the server has finished being
@@ -588,11 +618,9 @@ impl super::Screen for ServerList {
                             } else {
                                 &res.protocol_name
                             };
-                            let mut txt = TextComponent::new(st);
-                            txt.modifier.color = Some(format::Color::Yellow);
-                            let mut msg = Component::Text(txt);
-                            format::convert_legacy(&mut msg);
-                            s.version.borrow_mut().set_text(msg);
+                            let msg_component =
+                                Component::new(ComponentType::new(st, Some(format::Color::Yellow)));
+                            s.version.borrow_mut().set_text(msg_component);
                         }
                         if let Some(favicon) = res.favicon {
                             let name: String = std::iter::repeat(())
@@ -610,15 +638,17 @@ impl super::Screen for ServerList {
                     }
                     Err(TryRecvError::Disconnected) => {
                         s.done_ping = true;
-                        let mut txt = TextComponent::new("Channel dropped");
-                        txt.modifier.color = Some(format::Color::Red);
-                        s.motd.borrow_mut().set_text(Component::Text(txt));
+                        s.motd
+                            .borrow_mut()
+                            .set_text(Component::new(ComponentType::new(
+                                "Channel dropped",
+                                Some(format::Color::Red),
+                            )));
                     }
                     _ => {}
                 }
             }
         }
-        None
     }
 
     fn on_scroll(&mut self, _: f64, y: f64) {
@@ -644,10 +674,15 @@ impl super::Screen for ServerList {
         }
     }
 
-    fn on_resize(&mut self, renderer: &mut Renderer, ui_container: &mut Container) {
+    fn on_resize(
+        &mut self,
+        screen_sys: &ScreenSystem,
+        renderer: Arc<Renderer>,
+        ui_container: &mut Container,
+    ) {
         // TODO: Don't ping the servers on resize!
-        self.on_deactive(renderer, ui_container);
-        self.on_active(renderer, ui_container);
+        self.on_deactive(screen_sys, renderer.clone(), ui_container);
+        self.on_active(screen_sys, renderer, ui_container);
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

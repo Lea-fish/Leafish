@@ -1884,7 +1884,7 @@ state_packets!(
                 field name: String =,
                 field action: u8 =,
                 field object_name: String =,
-                field value: Option<i32 > = when(|p: &UpdateScore_i32| p.action != 1),
+                field value: Option<i32> = when(|p: &UpdateScore_i32| p.action != 1),
             }
             /// SpawnPosition is sent to change the player's current spawn point. Currently
             /// only used by the client for the compass.
@@ -2084,17 +2084,19 @@ state_packets!(
                 field chunk_x: VarInt =,
                 field chunk_z: VarInt =,
                 field trust_edges: bool =,
-                field sky_light_mask: VarInt =,
-                field block_light_mask: VarInt =,
-                field empty_sky_light_mask: VarInt =,
+                field sky_light_mask: VarLong =,
+                field block_light_mask: VarLong =,
+                field empty_block_light_mask: VarLong =,
+                field empty_sky_light_mask: VarLong =,
                 field light_arrays: Vec<u8> =,
             }
             packet UpdateLight_NoTrust {
                 field chunk_x: VarInt =,
                 field chunk_z: VarInt =,
-                field sky_light_mask: VarInt =,
-                field block_light_mask: VarInt =,
-                field empty_sky_light_mask: VarInt =,
+                field sky_light_mask: VarLong =,
+                field block_light_mask: VarLong =,
+                field empty_block_light_mask: VarLong =,
+                field empty_sky_light_mask: VarLong =,
                 field light_arrays: Vec<u8> =,
             }
             packet TradeList_WithoutRestock {
@@ -3311,10 +3313,11 @@ pub enum DigType {
     DropAllItems,
     DropItem,
     ReleaseUseItem,
+    Invalid(i32),
 }
 
 impl DigType {
-    pub fn ordinal(&self) -> u8 {
+    pub fn ordinal(&self) -> i32 {
         match self {
             DigType::StartDestroyBlock => 0,
             DigType::AbortDestroyBlock => 1,
@@ -3322,20 +3325,54 @@ impl DigType {
             DigType::DropAllItems => 3,
             DigType::DropItem => 4,
             DigType::ReleaseUseItem => 5,
+            DigType::Invalid(id) => *id,
         }
     }
 }
 
+impl From<i32> for DigType {
+    fn from(src: i32) -> Self {
+        match src {
+            0 => DigType::StartDestroyBlock,
+            1 => DigType::AbortDestroyBlock,
+            2 => DigType::StopDestroyBlock,
+            3 => DigType::DropAllItems,
+            4 => DigType::DropItem,
+            5 => DigType::ReleaseUseItem,
+            _ => DigType::Invalid(src),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum Hand {
     MainHand,
     OffHand,
+    Invalid(i32),
+}
+
+impl Default for Hand {
+    fn default() -> Self {
+        Hand::MainHand
+    }
 }
 
 impl Hand {
-    pub fn ordinal(&self) -> u8 {
+    pub fn ordinal(&self) -> i32 {
         match self {
             Hand::MainHand => 0,
             Hand::OffHand => 1,
+            Hand::Invalid(id) => *id,
+        }
+    }
+}
+
+impl From<i32> for Hand {
+    fn from(src: i32) -> Self {
+        match src {
+            0 => Hand::MainHand,
+            1 => Hand::OffHand,
+            _ => Hand::Invalid(src),
         }
     }
 }
@@ -3398,7 +3435,7 @@ pub fn send_digging(
 ) -> Result<(), Error> {
     if version < Version::V1_8 {
         conn.write_packet(packet::play::serverbound::PlayerDigging_u8_u8y {
-            status: status.ordinal(),
+            status: status.ordinal() as u8,
             x: pos.x,
             y: pos.y as u8,
             z: pos.z,
@@ -3406,13 +3443,13 @@ pub fn send_digging(
         })
     } else if version < Version::V1_9 {
         conn.write_packet(packet::play::serverbound::PlayerDigging_u8 {
-            status: status.ordinal(),
+            status: status.ordinal() as u8,
             location: pos,
             face: face_index,
         })
     } else {
         conn.write_packet(packet::play::serverbound::PlayerDigging {
-            status: VarInt(status.ordinal() as i32),
+            status: VarInt(status.ordinal()),
             location: pos,
             face: face_index,
         })
@@ -3513,5 +3550,17 @@ pub fn send_client_settings(
             displayed_skin_parts,
             main_hand: VarInt(main_hand.ordinal() as i32),
         })
+    }
+}
+
+pub fn send_keep_alive(conn: &mut Conn, version: Version, id: i64) -> Result<(), Error> {
+    if version < Version::V1_8 {
+        conn.write_packet(packet::play::serverbound::KeepAliveServerbound_i32 { id: id as i32 })
+    } else if version < Version::V1_12 {
+        conn.write_packet(packet::play::serverbound::KeepAliveServerbound_VarInt {
+            id: VarInt(id as i32),
+        })
+    } else {
+        conn.write_packet(packet::play::serverbound::KeepAliveServerbound_i64 { id })
     }
 }
