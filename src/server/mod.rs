@@ -987,8 +987,7 @@ impl Server {
             self.fps.store(0, Ordering::Release);
         } else {
             self.fps
-                .fetch_update(Ordering::Release, Ordering::Relaxed, |x| Some(x + 1))
-                .unwrap();
+                .store(self.fps.load(Ordering::Acquire) + 1, Ordering::Release);
         }
         let chat_open = self.chat_open.load(Ordering::Acquire);
         if chat_open != self.last_chat_open.load(Ordering::Acquire) {
@@ -1038,14 +1037,16 @@ impl Server {
         }
         self.entity_tick(delta, game.focused, self.dead.load(Ordering::Acquire));
 
-        self.tick_timer
-            .fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x + delta))
-            .unwrap();
+        self.tick_timer.store(
+            self.tick_timer.load(Ordering::Acquire) + delta,
+            Ordering::Release,
+        );
         while self.tick_timer.load(Ordering::Acquire) >= 3.0 && self.is_connected() {
             self.minecraft_tick(game);
-            self.tick_timer
-                .fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x - 3.0))
-                .unwrap();
+            self.tick_timer.store(
+                self.tick_timer.load(Ordering::Acquire) - 3.0,
+                Ordering::Release,
+            );
         }
 
         self.update_time(renderer.clone(), delta);
@@ -1099,16 +1100,18 @@ impl Server {
         if self.is_connected() || self.disconnect_data.clone().read().just_disconnected {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().just_disconnected = false;
-            self.entity_tick_timer
-                .fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x + delta))
-                .unwrap();
+            self.entity_tick_timer.store(
+                self.entity_tick_timer.load(Ordering::Acquire) + delta,
+                Ordering::Release,
+            );
             entities.world.clear_trackers();
             let entity_schedule = entities.entity_schedule.clone();
             while self.entity_tick_timer.load(Ordering::Acquire) >= 3.0 {
                 entity_schedule.clone().write().run(&mut entities.world);
-                self.entity_tick_timer
-                    .fetch_update(Ordering::Release, Ordering::Acquire, |x| Some(x - 3.0))
-                    .unwrap();
+                self.entity_tick_timer.store(
+                    self.entity_tick_timer.load(Ordering::Acquire) - 3.0,
+                    Ordering::Release,
+                );
             }
             let schedule = entities.schedule.clone();
             schedule.write().run(&mut entities.world);
