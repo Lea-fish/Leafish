@@ -63,6 +63,7 @@ use parking_lot::RwLock;
 use std::cell::RefCell;
 use std::marker::PhantomData;
 use std::rc::Rc;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 
@@ -582,7 +583,15 @@ fn handle_window_event<T>(
             if game.focused {
                 window.set_cursor_grab(true).unwrap();
                 window.set_cursor_visible(false);
-                if game.server.is_some() && !*game.server.as_ref().unwrap().clone().dead.read() {
+                if game.server.is_some()
+                    && !game
+                        .server
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .dead
+                        .load(Ordering::Acquire)
+                {
                     if let Some(player) = *game.server.as_ref().unwrap().player.clone().write() {
                         let server = game.server.as_ref().unwrap();
                         let entities = server.entities.clone();

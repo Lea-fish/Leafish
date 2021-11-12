@@ -36,6 +36,7 @@ use crate::types::GameMode;
 use crate::world;
 use crate::world::{CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
+use atomic_float::AtomicF64;
 use bevy_ecs::prelude::{Entity, Stage, SystemStage};
 use cgmath::prelude::*;
 use cgmath::Vector3;
@@ -60,7 +61,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -115,8 +116,8 @@ pub struct Server {
     entity_map: Arc<RwLock<HashMap<i32, Entity, BuildHasherDefault<FNVHash>>>>,
     players: Arc<RwLock<HashMap<protocol::UUID, PlayerInfo, BuildHasherDefault<FNVHash>>>>,
 
-    tick_timer: RwLock<f64>,
-    entity_tick_timer: RwLock<f64>,
+    tick_timer: AtomicF64,
+    entity_tick_timer: AtomicF64,
     pub received_chat_at: Arc<RwLock<Option<Instant>>>,
 
     sun_model: RwLock<Option<sun::SunModel>>,
@@ -125,10 +126,10 @@ pub struct Server {
     pub render_list_computer_notify: Receiver<bool>,
     pub hud_context: Arc<RwLock<HudContext>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
-    fps: RwLock<u32>,
+    fps: AtomicU32,
     fps_start: RwLock<u128>,
-    pub dead: RwLock<bool>,
-    just_died: RwLock<bool>,
+    pub dead: AtomicBool,
+    just_died: AtomicBool,
     last_chat_open: AtomicBool,
     pub chat_open: AtomicBool,
     pub chat_ctx: Arc<ChatContext>,
@@ -844,8 +845,7 @@ impl Server {
         let (tx, rx) = unbounded();
         let (etx, erx) = unbounded();
         thread::spawn(move || loop {
-            // println!("doing render list thingy!");
-            let _: bool = rx.recv().unwrap();
+            let _ = rx.recv().unwrap();
             let server = server.clone().lock().as_ref().unwrap().clone();
             let world = server.world.clone();
             world.compute_render_list(renderer.clone());
@@ -923,8 +923,8 @@ impl Server {
                 BuildHasherDefault::default(),
             ))),
 
-            tick_timer: RwLock::from(0.0),
-            entity_tick_timer: RwLock::from(0.0),
+            tick_timer: AtomicF64::new(0.0),
+            entity_tick_timer: AtomicF64::new(0.0),
             received_chat_at: Arc::new(RwLock::new(None)),
             sun_model: RwLock::new(None),
 
@@ -933,10 +933,10 @@ impl Server {
             render_list_computer_notify,
             hud_context,
             inventory_context,
-            fps: RwLock::new(0),
+            fps: AtomicU32::new(0),
             fps_start: RwLock::new(0),
-            dead: RwLock::new(false),
-            just_died: RwLock::new(false),
+            dead: AtomicBool::new(false),
+            just_died: AtomicBool::new(false),
             block_break_info: Mutex::new(BlockBreakInfo {
                 break_position: Default::default(),
                 break_face: BlockDirection::Invalid,
@@ -982,11 +982,12 @@ impl Server {
             self.hud_context
                 .clone()
                 .write()
-                .update_fps(*self.fps.read());
+                .update_fps(self.fps.load(Ordering::Acquire));
             *self.fps_start.write() = time;
-            *self.fps.write() = 0;
+            self.fps.store(0, Ordering::Release);
         } else {
-            *self.fps.write() += 1;
+            self.fps
+                .store(self.fps.load(Ordering::Acquire) + 1, Ordering::Release);
         }
         let chat_open = self.chat_open.load(Ordering::Acquire);
         if chat_open != self.last_chat_open.load(Ordering::Acquire) {
@@ -1034,12 +1035,18 @@ impl Server {
                 renderer.camera.lock().pitch = rotation.pitch;
             }
         }
-        self.entity_tick(delta, game.focused, *self.dead.read());
+        self.entity_tick(delta, game.focused, self.dead.load(Ordering::Acquire));
 
-        *self.tick_timer.write() += delta;
-        while *self.tick_timer.read() >= 3.0 && self.is_connected() {
+        self.tick_timer.store(
+            self.tick_timer.load(Ordering::Acquire) + delta,
+            Ordering::Release,
+        );
+        while self.tick_timer.load(Ordering::Acquire) >= 3.0 && self.is_connected() {
             self.minecraft_tick(game);
-            *self.tick_timer.write() -= 3.0;
+            self.tick_timer.store(
+                self.tick_timer.load(Ordering::Acquire) - 3.0,
+                Ordering::Release,
+            );
         }
 
         self.update_time(renderer.clone(), delta);
@@ -1054,8 +1061,8 @@ impl Server {
         world.tick(&mut self.entities.clone().write());
 
         if self.player.clone().read().is_some() {
-            if *self.just_died.read() {
-                *self.just_died.write() = false;
+            if self.just_died.load(Ordering::Acquire) {
+                self.just_died.store(false, Ordering::Release);
                 game.screen_sys.close_closable_screens();
                 game.screen_sys
                     .clone()
@@ -1093,12 +1100,18 @@ impl Server {
         if self.is_connected() || self.disconnect_data.clone().read().just_disconnected {
             // Allow an extra tick when disconnected to clean up
             self.disconnect_data.clone().write().just_disconnected = false;
-            *self.entity_tick_timer.write() += delta;
+            self.entity_tick_timer.store(
+                self.entity_tick_timer.load(Ordering::Acquire) + delta,
+                Ordering::Release,
+            );
             entities.world.clear_trackers();
             let entity_schedule = entities.entity_schedule.clone();
-            while *self.entity_tick_timer.read() >= 3.0 {
+            while self.entity_tick_timer.load(Ordering::Acquire) >= 3.0 {
                 entity_schedule.clone().write().run(&mut entities.world);
-                *self.entity_tick_timer.write() -= 3.0;
+                self.entity_tick_timer.store(
+                    self.entity_tick_timer.load(Ordering::Acquire) - 3.0,
+                    Ordering::Release,
+                );
             }
             let schedule = entities.schedule.clone();
             schedule.write().run(&mut entities.world);
@@ -1793,9 +1806,9 @@ impl Server {
                 .unwrap()
                 .flying = gamemode.can_fly();
         }
-        if *self.dead.read() {
-            *self.dead.write() = false;
-            *self.just_died.write() = false;
+        if self.dead.load(Ordering::Acquire) {
+            self.dead.store(false, Ordering::Release);
+            self.just_died.store(false, Ordering::Release);
             self.hud_context
                 .clone()
                 .write()
@@ -2593,8 +2606,8 @@ impl Server {
             .clone()
             .write()
             .update_health_and_food(health, food, saturation);
-        if health <= 0.0 && !*self.dead.read() {
-            *self.dead.write() = true;
+        if health <= 0.0 && !self.dead.load(Ordering::Acquire) {
+            self.dead.store(true, Ordering::Release);
             self.screen_sys.close_closable_screens();
             self.screen_sys
                 .clone()
