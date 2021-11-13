@@ -6,6 +6,9 @@ use std::path::Path;
 use log::warn;
 extern crate serde;
 use serde::{Deserialize, Serialize};
+use leafish_protocol::protocol::mapped_packet::MappedPacket;
+use leafish_protocol::protocol::packet::Packet;
+use leafish_protocol::protocol::Version;
 
 pub trait Plugin: Any + Send + Sync {
 
@@ -47,6 +50,7 @@ impl PluginManager {
                     plugin: create_plugin(),
                     _library: library,
                     meta: plugin_meta,
+                    packet_handler: (None, None),
                 };
                 let file_name = Path::new(&path).file_name().unwrap();
                 self.plugins.clone().insert(String::from(file_name.to_str().unwrap()), wrapped_plugin);
@@ -81,28 +85,34 @@ pub struct WrappedPlugin {
     plugin: Box<dyn Plugin>,
     _library: Library,
     meta: PluginMeta,
+    packet_handler: (Option<Box<dyn RawPacketHandler>>, Option<Box<dyn MappedPacketHandler>>),
 
 }
 
 impl WrappedPlugin {
 
+    #[inline]
     pub fn name(&self) -> &'static str {
         self.plugin.get_name()
     }
 
-    pub fn version(&self) -> usize {
+    #[inline]
+    pub fn version(&self) -> u64 {
         self.meta.version
     }
 
+    #[inline]
     pub fn authors(&self) -> &Vec<String> {
         &self.meta.authors
     }
 
+    #[inline]
     pub fn permissions(&self) -> &Vec<PluginPermission> {
         &self.meta.permissions
     }
 
     /// handles an event, returns whether or not the result is `cancel`
+    #[inline]
     pub fn handle_event(&self, event: ClientEvent) -> bool {
         self.plugin.handle_event(event)
     }
@@ -110,17 +120,19 @@ impl WrappedPlugin {
 }
 
 #[derive(Serialize, Deserialize, Default)]
+#[repr(C)]
 pub struct PluginMeta {
 
-    version: usize,
+    version: u64, /// The plugin's version.
     authors: Vec<String>,
     permissions: Vec<PluginPermission>, // TODO: Implement this!
-    modified: bool,
+    modified: bool, // what is this used for?
 
 }
 
 
 #[derive(Serialize, Deserialize)]
+#[repr(C)]
 pub enum PluginPermission {
 
     File,
@@ -130,11 +142,171 @@ pub enum PluginPermission {
 
 }
 
+pub trait RawPacketHandler {
+
+    #[inline]
+    fn incoming_priority(&self) -> i64 {
+        0
+    }
+
+    fn handle_incoming(&self, packet: *mut Packet) -> bool;
+
+    #[inline]
+    fn outgoing_priority(&self) -> i64 {
+        0
+    }
+
+    fn handle_outgoing(&self, packet: *mut Packet) -> bool;
+
+}
+
+pub trait MappedPacketHandler {
+
+    #[inline]
+    fn incoming_priority(&self) -> i64 {
+        0
+    }
+
+    fn handle_incoming(&self, packet: *mut MappedPacket) -> bool;
+
+    #[inline]
+    fn outgoing_priority(&self) -> i64 {
+        0
+    }
+
+    fn handle_outgoing(&self, packet: *mut MappedPacket) -> bool;
+
+}
+
 #[repr(C)]
 pub enum ClientEvent {
 
-    UserInput, // INPUTTYPE: Mouse, Keyboard | down: bool | input: (mousekey or keyboardkey)
-    Resize, // dimensions maybe?
-    Screen, // SUBTYPE: Open, Close
+    UserInput(InputEvent),
+    Screen(ScreenEvent),
+    Entity,
+    ChannelMessage,
+    Inventory(InputEvent),
+    World(WorldEvent),
+    Player,
+
+}
+
+/// Events for local player updates
+#[repr(C)]
+pub enum PlayerEvent {
+
+    Exp,
+    Health,
+    Position,
+    Vehicle,
+    Block,
+    Interact,
+    EntityInteract,
+    HotBar,
+    Food,
+
+}
+
+#[repr(C)]
+pub enum InputEvent {
+
+    Mouse(MouseAction),
+    Keyboard(bool, ), // down, key board key(input)
+
+}
+
+#[repr(C)]
+pub enum WorldEvent {
+
+    Block,
+    Weather,
+    Time,
+
+}
+
+#[repr(C)]
+pub enum InventoryEvent {
+
+    Open,
+    Close,
+    UpdateSlot,
+
+}
+
+#[repr(C)]
+pub enum ScreenEvent {
+
+    Open,
+    Close,
+
+}
+
+#[repr(C)]
+pub enum EntityEvent {
+
+    Spawn,
+    Despawn,
+    Move,
+    UpdateArmor,
+    UpdateHandItem,
+    UpdateName,
+
+}
+
+#[repr(C)]
+pub enum MouseAction {
+
+    UpdateKey(bool, MouseKey), // down, mouse key(input)
+    UseWheel(f64),
+
+}
+
+#[repr(C)]
+pub enum MouseKey {
+
+    Left,
+    Middle, // pressed mouse wheel
+    Right,
+    Other(i64),
+
+}
+
+#[no_mangle]
+pub trait WorldAccess {
+
+    fn get_block(&self);
+
+    fn set_block(&self);
+
+}
+
+#[no_mangle]
+pub trait ServerAccess {
+
+    fn protocol(&self) -> i64;
+
+    fn mapped_version(&self) -> Version;
+
+    fn world(&self) -> Box<dyn WorldAccess>;
+
+}
+
+#[no_mangle]
+pub trait ScreenSystemAccess {
+
+    fn pop_screen(&self);
+
+    fn push_screen(&self);
+
+}
+
+#[repr(C)]
+pub struct ScreenBuilder {
+
+    name: String,
+    active: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    de_active: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    de_init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
 
 }

@@ -1536,7 +1536,6 @@ dependencies = [
  "instant",
  "lazy_static",
  "leafish_blocks",
- "leafish_modding",
  "leafish_protocol",
  "leafish_resources",
  "leafish_shared",
@@ -1564,17 +1563,6 @@ dependencies = [
  "lazy_static",
  "leafish_shared",
  "parking_lot",
-]
-
-[[package]]
-name = "leafish_modding"
-version = "0.0.1"
-dependencies = [
- "dashmap",
- "libloading 0.7.0",
- "log",
- "serde",
- "serde_json",
 ]
 
 [[package]]
