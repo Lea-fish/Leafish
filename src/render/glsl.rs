@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Default)]
 pub struct Registry {
-    shaders: HashMap<String, String>,
+    shaders: HashMap<&'static str, Cow<'static, str>>,
     shader_version: String,
 }
 
@@ -24,16 +24,17 @@ impl Registry {
     pub fn new(shader_version: &str) -> Registry {
         Registry {
             shaders: Default::default(),
-            shader_version: shader_version.to_string(),
+            shader_version: shader_version.into(),
         }
     }
 
-    pub fn register(&mut self, name: &str, source: &str) {
+    pub fn register(&mut self, name: &'static str, source: impl Into<Cow<'static, str>>) {
+        let source = source.into();
         if self.shaders.contains_key(name) {
             panic!("shader {} is already defined", name);
         }
         self.shaders
-            .insert(name.to_owned(), source.trim().to_owned());
+            .insert(name, source);
     }
 
     fn add_version(&self, out: &mut String) {
