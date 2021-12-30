@@ -746,12 +746,12 @@ impl Hud {
         let y_offset = icon_scale * 30.0;
 
         let mut l7 = 16.0;
-        let mut j8 = 0.0;
-
-        if hud_context.hunger {
+        let j8 = if hud_context.hunger {
             l7 += 36.0;
-            j8 = 13.0;
-        }
+            13.0
+        } else {
+            0.0
+        };
 
         drop(hud_context);
 

@@ -3,7 +3,7 @@ use crate::console::CVar;
 use std::marker::PhantomData;
 use winit::event::VirtualKeyCode;
 
-pub const R_MAX_FPS: console::CVar<i64> = console::CVar {
+pub const R_MAX_FPS: console::CVar<u16> = console::CVar {
     ty: PhantomData,
     name: "r_max_fps",
     description: "fps_max caps the maximum FPS for the rendering engine",
@@ -12,7 +12,7 @@ pub const R_MAX_FPS: console::CVar<i64> = console::CVar {
     default: &|| 60,
 };
 
-pub const R_FOV: console::CVar<i64> = console::CVar {
+pub const R_FOV: console::CVar<u8> = console::CVar {
     ty: PhantomData,
     name: "r_fov",
     description: "Setting for controlling the client field of view",
@@ -30,7 +30,7 @@ pub const R_VSYNC: console::CVar<bool> = console::CVar {
     default: &|| false,
 };
 
-pub const CL_MASTER_VOLUME: console::CVar<i64> = console::CVar {
+pub const CL_MASTER_VOLUME: console::CVar<u8> = console::CVar {
     ty: PhantomData,
     name: "cl_master_volume",
     description: "Main volume control",
@@ -111,41 +111,41 @@ macro_rules! create_keybind {
             description: $description,
             mutable: true,
             serializable: true,
-            default: &|| VirtualKeyCode::$keycode as i64,
+            default: &|| VirtualKeyCode::$keycode as u8,
         }
     };
 }
 
-pub const CL_KEYBIND_FORWARD: console::CVar<i64> =
+pub const CL_KEYBIND_FORWARD: console::CVar<u8> =
     create_keybind!(W, "cl_keybind_forward", "Keybinding for moving forward");
-pub const CL_KEYBIND_BACKWARD: console::CVar<i64> =
+pub const CL_KEYBIND_BACKWARD: console::CVar<u8> =
     create_keybind!(S, "cl_keybind_backward", "Keybinding for moving backward");
-pub const CL_KEYBIND_LEFT: console::CVar<i64> =
+pub const CL_KEYBIND_LEFT: console::CVar<u8> =
     create_keybind!(A, "cl_keybind_left", "Keybinding for moving the left");
-pub const CL_KEYBIND_RIGHT: console::CVar<i64> =
+pub const CL_KEYBIND_RIGHT: console::CVar<u8> =
     create_keybind!(D, "cl_keybind_right", "Keybinding for moving to the right");
-pub const CL_KEYBIND_OPEN_INV: console::CVar<i64> = create_keybind!(
+pub const CL_KEYBIND_OPEN_INV: console::CVar<u8> = create_keybind!(
     E,
     "cl_keybind_open_inv",
     "Keybinding for opening the inventory"
 );
-pub const CL_KEYBIND_SNEAK: console::CVar<i64> =
+pub const CL_KEYBIND_SNEAK: console::CVar<u8> =
     create_keybind!(LShift, "cl_keybind_sneak", "Keybinding for sneaking");
-pub const CL_KEYBIND_SPRINT: console::CVar<i64> =
+pub const CL_KEYBIND_SPRINT: console::CVar<u8> =
     create_keybind!(LControl, "cl_keybind_sprint", "Keybinding for sprinting");
-pub const CL_KEYBIND_JUMP: console::CVar<i64> =
+pub const CL_KEYBIND_JUMP: console::CVar<u8> =
     create_keybind!(Space, "cl_keybind_jump", "Keybinding for jumping");
-pub const CL_KEYBIND_TOGGLE_HUD: console::CVar<i64> = create_keybind!(
+pub const CL_KEYBIND_TOGGLE_HUD: console::CVar<u8> = create_keybind!(
     F1,
     "cl_keybind_toggle_hud",
     "Keybinding for toggling the hud"
 );
-pub const CL_KEYBIND_TOGGLE_DEBUG: console::CVar<i64> = create_keybind!(
+pub const CL_KEYBIND_TOGGLE_DEBUG: console::CVar<u8> = create_keybind!(
     F3,
     "cl_keybind_toggle_debug",
     "Keybinding for toggling the debug info"
 );
-pub const CL_KEYBIND_TOGGLE_CHAT: console::CVar<i64> = create_keybind!(
+pub const CL_KEYBIND_TOGGLE_CHAT: console::CVar<u8> = create_keybind!(
     T,
     "cl_keybind_toggle_chat",
     "Keybinding for toggling the chat"
@@ -225,14 +225,14 @@ impl Actionkey {
 
     pub fn get_by_keycode(keycode: VirtualKeyCode, vars: &console::Vars) -> Option<Actionkey> {
         for action_key in Actionkey::values() {
-            if keycode as i64 == *vars.get(action_key.get_cvar()) {
+            if keycode as u8 == *vars.get(action_key.get_cvar()) {
                 return Some(*action_key);
             }
         }
         None
     }
 
-    pub fn get_cvar(&self) -> console::CVar<i64> {
+    pub fn get_cvar(&self) -> console::CVar<u8> {
         match *self {
             Actionkey::Forward => CL_KEYBIND_FORWARD,
             Actionkey::Backward => CL_KEYBIND_BACKWARD,

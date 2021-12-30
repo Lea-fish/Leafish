@@ -1101,10 +1101,8 @@ impl TransInfo {
         let mut data = vec![];
         for f in [
             -1.0, 1.0, 1.0, -1.0, -1.0, -1.0, 1.0, 1.0, 1.0, -1.0, -1.0, 1.0,
-        ]
-        .iter()
-        {
-            data.write_f32::<NativeEndian>(*f).unwrap();
+        ] {
+            data.write_f32::<NativeEndian>(f).unwrap();
         }
         buffer.set_data(gl::ARRAY_BUFFER, &data, gl::STATIC_DRAW);
 
@@ -1322,7 +1320,7 @@ impl TextureManager {
             (32, 48, 16, 16),
             (40, 16, 16, 16),
         ];
-        for bl in blacklist.iter() {
+        for bl in blacklist {
             for x in bl.0..(bl.0 + bl.2) {
                 for y in bl.1..(bl.1 + bl.3) {
                     let mut col = img.get_pixel(x, y);
@@ -1632,7 +1630,7 @@ impl TextureManager {
         full_name.push_str(name);
 
         let t = Texture {
-            name: full_name.to_owned(),
+            name: full_name.clone(),
             version: self.version,
             atlas: missing.atlas,
             x: missing.x,

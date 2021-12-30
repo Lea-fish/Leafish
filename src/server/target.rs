@@ -55,9 +55,7 @@ impl Info {
                 (bound.min.x, bound.max.z),
                 (bound.max.x, bound.min.z),
                 (bound.max.x, bound.max.z),
-            ]
-            .iter()
-            {
+            ] {
                 model::append_box(
                     &mut parts,
                     (point.0 - LINE_SIZE) as f32,
@@ -82,9 +80,7 @@ impl Info {
                 (bound.min.x, bound.max.z, bound.max.x, bound.max.z),
                 (bound.min.x, bound.min.z, bound.min.x, bound.max.z),
                 (bound.max.x, bound.min.z, bound.max.x, bound.max.z),
-            ]
-            .iter()
-            {
+            ] {
                 model::append_box(
                     &mut parts,
                     (point.0 - LINE_SIZE) as f32,

@@ -2531,12 +2531,7 @@ impl Server {
         let new = true;
         self.world
             .clone()
-            .load_chunks18(
-                new,
-                bulk.skylight,
-                &bulk.chunk_meta,
-                bulk.chunk_data.to_vec(),
-            )
+            .load_chunks18(new, bulk.skylight, &bulk.chunk_meta, bulk.chunk_data)
             .unwrap();
     }
 

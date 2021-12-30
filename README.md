@@ -142,6 +142,8 @@ A list of bugs and missing features can be found on the [issue tracker](https://
 Feel free to work on any bug and submit a pull request to the `main` branch with the fix.
 Mentioning that you intend to fix a bug on the issue will prevent other people from trying as well and makes sure no duplicated work is done.
 
+Before making a commit and submitting a PR, make sure no warnings are printed when running `cargo lint`. Then, use `cargo fmt --all` to auto-format your code. If clippy emits no warnings and the code is formatted properly, you should not have any problems passing CI runs.
+
 ### New features
 
 Please talk to the Leafish team first before starting to develop a new feature.

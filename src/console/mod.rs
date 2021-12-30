@@ -78,41 +78,28 @@ fn log_level_from_str(s: &str, default: log::Level) -> log::Level {
     }
 }
 
-impl Var for CVar<i64> {
-    fn serialize(&self, val: &Box<dyn Any>) -> String {
-        val.downcast_ref::<i64>().unwrap().to_string()
-    }
+macro_rules! impl_var_for {
+    ($($t:ty)*) => ($(
+        impl Var for CVar<$t> {
+            fn serialize(&self, val: &Box<dyn Any>) -> String {
+                val.downcast_ref::<$t>().unwrap().to_string()
+            }
 
-    fn deserialize(&self, input: &str) -> Box<dyn Any> {
-        Box::new(input.parse::<i64>().unwrap())
-    }
+            fn deserialize(&self, input: &str) -> Box<dyn Any> {
+                Box::new(input.parse::<$t>().unwrap())
+            }
 
-    fn description(&self) -> &'static str {
-        self.description
-    }
+            fn description(&self) -> &'static str {
+                self.description
+            }
 
-    fn can_serialize(&self) -> bool {
-        self.serializable
-    }
+            fn can_serialize(&self) -> bool {
+                self.serializable
+            }
+        }
+    )*)
 }
-
-impl Var for CVar<bool> {
-    fn serialize(&self, val: &Box<dyn Any>) -> String {
-        val.downcast_ref::<bool>().unwrap().to_string()
-    }
-
-    fn deserialize(&self, input: &str) -> Box<dyn Any> {
-        Box::new(input.parse::<bool>().unwrap())
-    }
-
-    fn description(&self) -> &'static str {
-        self.description
-    }
-
-    fn can_serialize(&self) -> bool {
-        self.serializable
-    }
-}
+impl_var_for!(usize u8 u16 u32 u64 isize i8 i16 i32 i64 bool f32 f64);
 
 impl Var for CVar<String> {
     fn serialize(&self, val: &Box<dyn Any>) -> String {
@@ -273,7 +260,7 @@ impl Console {
         self.log_level_term = log_level_from_str(&vars.get(LOG_LEVEL_TERM), log::Level::Info);
         self.log_level_file = log_level_from_str(&vars.get(LOG_LEVEL_FILE), log::Level::Debug);
 
-        for name in ["RUST_LOG", "LOG_LEVEL"].iter() {
+        for name in ["RUST_LOG", "LOG_LEVEL"] {
             if let Some(level) = Console::log_level_from_env(name) {
                 self.log_level_term = level;
                 self.log_level_file = level;

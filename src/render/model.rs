@@ -488,7 +488,7 @@ pub struct FormatState {
 
 impl FormatState {
     pub fn build(&mut self, components: &format::Component, color: Option<format::Color>) {
-        for component in components.list.iter() {
+        for component in &components.list {
             self.append_text(
                 component.get_text(),
                 if let Some(color) = color {
