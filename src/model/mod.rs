@@ -180,7 +180,7 @@ impl Factory {
         buf: &mut W,
     ) -> usize {
         let (plugin, name) = block.get_model();
-        let key = Key(plugin.to_owned(), name.to_owned());
+        let key = Key(plugin.clone(), name.clone());
         let mut missing_variant;
         {
             let m = models.read();
@@ -272,10 +272,10 @@ impl Factory {
                 let v = match *val {
                     serde_json::Value::Bool(ref v) => v.to_string(),
                     serde_json::Value::Number(ref v) => v.to_string(),
-                    serde_json::Value::String(ref v) => v.to_owned(),
+                    serde_json::Value::String(ref v) => v.clone(),
                     _ => unreachable!(),
                 };
-                rules.push(Rule::Match(name.to_owned(), v));
+                rules.push(Rule::Match(name.clone(), v));
             }
         }
     }
@@ -373,7 +373,7 @@ impl Factory {
                 y: 0.0,
                 uvlock: false,
                 weight: 1.0,
-
+                /*
                 display: HashMap::with_hasher(BuildHasherDefault::default()),
                 builtin: match parent {
                     "builtin/generated" => BuiltinType::Generated,
@@ -381,7 +381,7 @@ impl Factory {
                     "builtin/compass" => BuiltinType::Compass,
                     "builtin/clock" => BuiltinType::Clock,
                     _ => BuiltinType::False,
-                },
+                },*/
             }
         };
 
@@ -435,7 +435,7 @@ impl Factory {
                     ]
                 })
                 .unwrap(),
-            shade: v.get("shade").and_then(|v| v.as_bool()).unwrap_or(false),
+            // TODO: shade: v.get("shade").and_then(|v| v.as_bool()).unwrap_or(false),
             faces: [None, None, None, None, None, None],
             rotation: None,
         };
@@ -542,7 +542,7 @@ impl Factory {
         let mut model = Model {
             faces: vec![],
             ambient_occlusion: raw.ambient_occlusion,
-            weight: raw.weight,
+            // TODO: weight: raw.weight,
         };
         let elements = std::mem::take(&mut raw.elements);
         for el in elements {
@@ -556,7 +556,7 @@ impl Factory {
                         vertices: vec![],
                         vertices_texture: vec![],
                         indices: 0,
-                        shade: el.shade,
+                        // TODO: shade: el.shade,
                         tint_index: face.tint_index,
                     };
                     if raw.x > 0.0 {
@@ -858,12 +858,13 @@ impl Variants {
 
 #[derive(Debug)]
 enum BuiltinType {
-    False,
-    Generated,
-    Entity,
-    Compass,
-    Clock,
-}
+    /* TODO: use these
+False,
+Generated,
+Entity,
+Compass,
+Clock,
+*/}
 
 #[derive(Debug)]
 struct RawModel {
@@ -876,9 +877,10 @@ struct RawModel {
     y: f64,
     uvlock: bool,
     weight: f64,
-
+    /* TODO: use these
     display: HashMap<String, ModelDisplay, BuildHasherDefault<FNVHash>>,
     builtin: BuiltinType,
+    */
 }
 
 impl RawModel {
@@ -897,16 +899,17 @@ impl RawModel {
 
 #[derive(Debug)]
 struct ModelDisplay {
-    rotation: [f64; 3],
-    translation: [f64; 3],
-    scale: [f64; 3],
-}
+    /* TODO: use these
+rotation: [f64; 3],
+translation: [f64; 3],
+scale: [f64; 3],
+*/}
 
 #[derive(Debug)]
 struct ModelElement {
     from: [f64; 3],
     to: [f64; 3],
-    shade: bool,
+    // TODO: shade: bool,
     rotation: Option<BlockRotation>,
     faces: [Option<BlockFace>; 6],
 }
@@ -932,7 +935,8 @@ struct BlockFace {
 struct Model {
     faces: Vec<Face>,
     ambient_occlusion: bool,
-    weight: f64,
+    // TODO use this
+    //weight: f64,
 }
 
 #[derive(Clone, Debug)]
@@ -942,7 +946,8 @@ struct Face {
     vertices: Vec<BlockVertex>,
     vertices_texture: Vec<render::Texture>,
     indices: usize,
-    shade: bool,
+    // TODO use this
+    //shade: bool,
     tint_index: i32,
 }
 
@@ -1099,9 +1104,9 @@ fn calculate_light(
     let dy = (oy as f64) * 0.6;
     let dz = (oz as f64) * 0.6;
 
-    for ox in [-0.6, 0.0].iter() {
-        for oy in [-0.6, 0.0].iter() {
-            for oz in [-0.6, 0.0].iter() {
+    for ox in [-0.6, 0.0] {
+        for oy in [-0.6, 0.0] {
+            for oz in [-0.6, 0.0] {
                 let lx = (x + ox + dx).round() as i32;
                 let ly = (y + oy + dy).round() as i32;
                 let lz = (z + oz + dz).round() as i32;

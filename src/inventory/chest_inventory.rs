@@ -216,7 +216,7 @@ impl Inventory for ChestInventory {
         if self.dirty {
             self.dirty = false;
             inventory_window.elements.get_mut(2).unwrap().clear();
-            for slot in self.slots.iter() {
+            for slot in &self.slots {
                 if slot.item.is_some() {
                     inventory_window.draw_item_internally(
                         slot.item.as_ref().unwrap(),

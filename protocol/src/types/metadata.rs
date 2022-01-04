@@ -657,21 +657,18 @@ impl Serializable for ParticleData {
 
 #[derive(Debug)]
 pub struct VillagerData {
-    villager_type: protocol::VarInt,
-    profession: protocol::VarInt,
-    level: protocol::VarInt,
+    // TODO: use these
+//villager_type: protocol::VarInt,
+//profession: protocol::VarInt,
+//level: protocol::VarInt,
 }
 
 impl Serializable for VillagerData {
-    fn read_from<R: io::Read>(buf: &mut R) -> Result<Self, protocol::Error> {
-        let villager_type = protocol::VarInt::read_from(buf)?;
-        let profession = protocol::VarInt::read_from(buf)?;
-        let level = protocol::VarInt::read_from(buf)?;
-        Ok(VillagerData {
-            villager_type,
-            profession,
-            level,
-        })
+    fn read_from<R: io::Read>(_buf: &mut R) -> Result<Self, protocol::Error> {
+        //let villager_type = protocol::VarInt::read_from(buf)?;
+        //let profession = protocol::VarInt::read_from(buf)?;
+        //let level = protocol::VarInt::read_from(buf)?;
+        Ok(VillagerData {})
     }
 
     fn write_to<W: io::Write>(&self, _buf: &mut W) -> Result<(), protocol::Error> {

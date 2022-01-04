@@ -2,7 +2,7 @@
 name = "leafish_protocol"
 version = "0.0.1"
 authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>", "iceiix <ice_ix@protonmail.ch>", "terrarier2111" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 serde = { version = "1.0.127", features = ["derive"] }

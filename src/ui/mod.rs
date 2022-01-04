@@ -338,7 +338,7 @@ impl Container {
             && !self
                 .focusable_elements
                 .iter()
-                .flat_map(|v| v.upgrade())
+                .filter_map(|v| v.upgrade())
                 .any(|v| v.is_focused())
         {
             self.cycle_focus()
@@ -412,7 +412,7 @@ impl Container {
         let focusables = self
             .focusable_elements
             .iter()
-            .flat_map(|v| v.upgrade())
+            .filter_map(|v| v.upgrade())
             .collect::<Vec<_>>();
 
         // Find the last focused element if there is one
@@ -440,7 +440,7 @@ impl Container {
             }
             return;
         }
-        for el in self.focusable_elements.iter().flat_map(|v| v.upgrade()) {
+        for el in self.focusable_elements.iter().filter_map(|v| v.upgrade()) {
             if el.is_focused() {
                 el.key_press(game, key, down, ctrl_pressed);
             }
@@ -451,7 +451,7 @@ impl Container {
         if c < ' ' && c != '\x08' {
             return;
         }
-        for el in self.focusable_elements.iter().flat_map(|v| v.upgrade()) {
+        for el in self.focusable_elements.iter().filter_map(|v| v.upgrade()) {
             if el.is_focused() {
                 el.key_type(game, c);
             }
@@ -1241,7 +1241,7 @@ impl ElementHolder for FormatState {
 
 impl FormatState {
     fn build(&mut self, components: &format::Component, color: Option<format::Color>) {
-        for component in components.list.iter() {
+        for component in &components.list {
             self.append_text(
                 self.scale_x,
                 self.scale_y,

@@ -1169,9 +1169,7 @@ impl World {
                 (0, 1, 0),
                 (0, 0, -1),
                 (0, 0, 1),
-            ]
-            .iter()
-            {
+            ] {
                 self.flag_section_dirty(x + pos.0, i as i32 + pos.1, z + pos.2);
             }
             self.update_range(
@@ -1207,7 +1205,7 @@ impl World {
         let compressed_chunk_data = &data[0..data_length as usize];
         let metadata = &data[data_length as usize..];
 
-        let mut zlib = ZlibDecoder::new(std::io::Cursor::new(compressed_chunk_data.to_vec()));
+        let mut zlib = ZlibDecoder::new(std::io::Cursor::new(compressed_chunk_data.to_owned()));
         let mut chunk_data = Vec::new();
         zlib.read_to_end(&mut chunk_data)?;
 
@@ -1238,7 +1236,7 @@ impl World {
         mask_add: u16,
         compressed_data: Vec<u8>,
     ) -> Result<(), protocol::Error> {
-        let mut zlib = ZlibDecoder::new(std::io::Cursor::new(compressed_data.to_vec()));
+        let mut zlib = ZlibDecoder::new(std::io::Cursor::new(compressed_data));
         let mut data = Vec::new();
         zlib.read_to_end(&mut data)?;
 

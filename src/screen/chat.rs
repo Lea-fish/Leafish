@@ -88,7 +88,8 @@ pub struct Chat {
     context: Arc<ChatContext>,
     written: String,
     animation: u8,
-    offset: f64, // TODO: Implement this (scrolling in chat)!
+    // TODO: Implement scrolling in chat
+    //offset: f64,
     dirty_written: bool,
 }
 
@@ -102,7 +103,6 @@ impl Chat {
             context,
             written: String::new(),
             animation: 0,
-            offset: 0.0,
             dirty_written: false,
         }
     }

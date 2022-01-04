@@ -369,7 +369,7 @@ impl Manager {
                         .unwrap();
                     let length = v.get("size").and_then(|v| v.as_u64()).unwrap();
                     Self::add_task(&progress_info, "Downloading Asset", k, length);
-                    let mut tmp_file = location.to_owned();
+                    let mut tmp_file = location.clone();
                     tmp_file.set_file_name(format!("{}.tmp", hash));
                     {
                         let mut file = fs::File::create(&tmp_file).unwrap();
@@ -377,7 +377,7 @@ impl Manager {
                             read: res,
                             progress: &progress_info,
                             task_name: "Downloading Asset".into(),
-                            task_file: k.to_owned(),
+                            task_file: k.clone(),
                         };
                         io::copy(&mut progress, &mut file).unwrap();
                     }
