@@ -32,11 +32,12 @@ pub struct MicrosoftAccount {}
 
 impl AccountImpl for MicrosoftAccount {
     fn login(&self, name: &str, password: &str, token: &str) -> Result<Account, super::Error> {
+        // FIXME: To the people who are testing this: replace the todo! calls with your data(azure application stuff etc)
         resolve_account_data(
-            String::new(),
-            String::new(),
-            String::new(),
-            None,
+            todo!(),
+            todo!(),
+            todo!(),
+            todo!(), // You can set this to None if port 80 is free and usable, else choose a different port
             name.to_string(),
             password.to_string(),
         ).map_err(|e| super::Error::Err(e.to_string()))
