@@ -199,7 +199,8 @@ pub struct Profile {
     pub name: String,
 }
 
-fn receive_query(port: u16) -> Query {
+#[tokio::main]
+async fn receive_query(port: u16) -> Query {
     let (sender, receiver) = mpsc::sync_channel(1);
     let route = warp::get()
         .and(warp::filters::query::query())
