@@ -41,7 +41,7 @@ impl AccountImpl for MicrosoftAccount {
             None,
             name.to_string(),
             password.to_string(),
-        );
+        ).map_err(|e| super::Error::Err(e.to_string()))
     }
 
     fn refresh(&self, account: Account, token: &str) -> Result<Account, super::Error> {
@@ -225,12 +225,12 @@ fn random_string() -> String {
 fn resolve_account_data(
     client_id: String,
     client_secret: String,
-    redirect_uri: Stri,
+    redirect_uri: String,
     port: Option<u16>,
     name: String,
     password: String,
 ) -> anyhow::Result<Account> {
-    let redirect_uri = redirect_uri
+    let redirect_uri: Url = redirect_uri
         .parse()
         .context("redirect uri is not a valid url")?;
     match redirect_uri.domain() {
