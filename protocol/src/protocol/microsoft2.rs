@@ -21,8 +21,6 @@ use serde::Deserialize;
 use serde_json::json;
 use sha1::{self, Digest};
 use std::borrow::Cow;
-use std::env;
-use std::str::FromStr;
 use std::sync::mpsc;
 use warp::Filter;
 

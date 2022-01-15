@@ -59,6 +59,7 @@ struct UIElements {
     _disclaimer: ui::TextRef,
     try_login: Rc<Cell<bool>>,
     update_acc_ty: Rc<Cell<bool>>,
+    account_ty: AccountType,
     refresh: bool,
     login_res: Option<mpsc::Receiver<Result<Account, protocol::Error>>>,
 }
@@ -184,6 +185,7 @@ impl super::Screen for Login {
             login_error,
             try_login,
             update_acc_ty,
+            account_ty: AccountType::Mojang,
             refresh,
             login_res: None,
 
@@ -230,13 +232,14 @@ impl super::Screen for Login {
             let username = elements.username_txt.borrow().input.clone();
             let password = elements.password_txt.borrow().input.clone();
             let refresh = elements.refresh;
+            let account_ty = elements.account_ty.clone();
             thread::spawn(move || {
                 tx.send(try_login(
                     refresh,
                     username.clone(),
                     None,
                     password,
-                    AccountType::Mojang,
+                    account_ty,
                     client_token,
                 ))
                 .unwrap();
@@ -264,11 +267,15 @@ impl super::Screen for Login {
         }
 
         if elements.update_acc_ty.get() {
-            let mut text = &mut elements.acc_ty_btn_text.borrow_mut().text;
-
-            *text = match text.as_str() {
-                "Account Type: Mojang" => String::from("Account Type: Microsoft"),
-                "Account Type: Microsoft" => String::from("Account Type: Mojang"),
+            elements.acc_ty_btn_text.borrow_mut().text = match elements.account_ty {
+                AccountType::Mojang => {
+                    elements.account_ty = AccountType::Microsoft;
+                     String::from("Account Type: Microsoft")
+                },
+                AccountType::Microsoft => {
+                    elements.account_ty = AccountType::Mojang;
+                    String::from("Account Type: Mojang")
+                },
                 _ => unreachable!(),
             };
 
