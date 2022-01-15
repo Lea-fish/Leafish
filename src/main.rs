@@ -56,6 +56,7 @@ pub mod world;
 use crate::entity::Rotation;
 use crate::render::hud::HudContext;
 use leafish_protocol::protocol::login::{Account, AccountType};
+use leafish_protocol::protocol::microsoft2::MicrosoftAccount;
 use leafish_protocol::protocol::mojang::MojangAccount;
 use leafish_protocol::protocol::{Error, Version};
 use parking_lot::Mutex;
@@ -66,7 +67,6 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
-use leafish_protocol::protocol::microsoft2::MicrosoftAccount;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 

@@ -34,7 +34,14 @@ pub struct MicrosoftAccount {}
 
 impl AccountImpl for MicrosoftAccount {
     fn login(&self, name: &str, password: &str, token: &str) -> Result<Account, super::Error> {
-        resolve_account_data(String::new(), String::new(), todo!(), None, name.to_string(), password.to_string());
+        resolve_account_data(
+            String::new(),
+            String::new(),
+            String::new(),
+            None,
+            name.to_string(),
+            password.to_string(),
+        );
     }
 
     fn refresh(&self, account: Account, token: &str) -> Result<Account, super::Error> {
@@ -215,7 +222,17 @@ fn random_string() -> String {
         .collect()
 }
 
-fn resolve_account_data(client_id: String, client_secret: String, redirect_uri: Url, port: Option<u16>, name: String, password: String) -> anyhow::Result<Account> {
+fn resolve_account_data(
+    client_id: String,
+    client_secret: String,
+    redirect_uri: Stri,
+    port: Option<u16>,
+    name: String,
+    password: String,
+) -> anyhow::Result<Account> {
+    let redirect_uri = redirect_uri
+        .parse()
+        .context("redirect uri is not a valid url")?;
     match redirect_uri.domain() {
         Some(domain) => anyhow::ensure!(
             domain == "localhost" || domain == "127.0.0.1",
@@ -341,7 +358,9 @@ fn resolve_account_data(client_id: String, client_secret: String, redirect_uri: 
     account.verification_tokens.push(name);
     account.verification_tokens.push("".to_string());
     account.verification_tokens.push(access_token);
-    account.verification_tokens.push(complete_token.refresh_token);
+    account
+        .verification_tokens
+        .push(complete_token.refresh_token);
 
     Ok(account)
 }
