@@ -49,6 +49,8 @@ use crate::shared::Position;
 pub mod forge;
 pub mod login;
 pub mod mojang;
+// pub mod microsoft;
+pub mod microsoft2;
 
 pub const SUPPORTED_PROTOCOLS: [i32; 21] = [
     754, 753, 751, 736, 735, 578, 575, 498, 490, 485, 480, 477, 404, 340, 316, 315, 210, 109, 107,
