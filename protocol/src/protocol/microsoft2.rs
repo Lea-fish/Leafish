@@ -30,9 +30,9 @@ const JOIN_URL: &str = "https://sessionserver.mojang.com/session/minecraft/join"
 
 // CREDIT: Big parts of this implementation were taken from: https://github.com/ALinuxPerson/mcsoft-auth
 
-pub struct MojangAccount {}
+pub struct MicrosoftAccount {}
 
-impl AccountImpl for MojangAccount {
+impl AccountImpl for MicrosoftAccount {
     fn login(&self, name: &str, password: &str, token: &str) -> Result<Account, super::Error> {
         resolve_account_data(String::new(), String::new(), todo!(), None, name.to_string(), password.to_string());
     }

@@ -66,6 +66,7 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
+use leafish_protocol::protocol::microsoft2::MicrosoftAccount;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -216,6 +217,9 @@ fn main() {
     protocol::login::ACCOUNT_IMPLS
         .clone()
         .insert(AccountType::Mojang, Arc::new(MojangAccount {}));
+    protocol::login::ACCOUNT_IMPLS
+        .clone()
+        .insert(AccountType::Microsoft, Arc::new(MicrosoftAccount {}));
 
     let (vars, mut vsync) = {
         let mut vars = console::Vars::new();

@@ -51,11 +51,14 @@ struct UIElements {
 
     login_btn: ui::ButtonRef,
     login_btn_text: ui::TextRef,
+    acc_ty_btn: ui::ButtonRef,
+    acc_ty_btn_text: ui::TextRef,
     login_error: ui::TextRef,
     username_txt: ui::TextBoxRef,
     password_txt: ui::TextBoxRef,
     _disclaimer: ui::TextRef,
     try_login: Rc<Cell<bool>>,
+    update_acc_ty: Rc<Cell<bool>>,
     refresh: bool,
     login_res: Option<mpsc::Receiver<Result<Account, protocol::Error>>>,
 }
@@ -80,10 +83,11 @@ impl super::Screen for Login {
         let logo = ui::logo::Logo::new(renderer.resources.clone(), ui_container);
 
         let try_login = Rc::new(Cell::new(false));
+        let update_acc_ty = Rc::new(Cell::new(false));
 
         // Login
         let login_btn = ui::ButtonBuilder::new()
-            .position(0.0, 100.0)
+            .position(0.0, 130.0)
             .size(400.0, 40.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .create(ui_container);
@@ -102,10 +106,31 @@ impl super::Screen for Login {
             });
         }
 
+        // Account Type
+        let acc_ty_btn = ui::ButtonBuilder::new()
+            .position(0.0, 85.0)
+            .size(400.0, 40.0)
+            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+            .create(ui_container);
+        let acc_ty_btn_text = ui::TextBuilder::new()
+            .text("Account Type: Mojang")
+            .position(0.0, 0.0)
+            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+            .attach(&mut *acc_ty_btn.borrow_mut());
+        {
+            let mut btn = acc_ty_btn.borrow_mut();
+            btn.add_text(acc_ty_btn_text.clone());
+            let uat = update_acc_ty.clone();
+            btn.add_click_func(move |_, _| {
+                uat.set(true);
+                true
+            });
+        }
+
         // Login Error
         let login_error = ui::TextBuilder::new()
             .text("")
-            .position(0.0, 150.0)
+            .position(0.0, 170.0)
             .colour((255, 50, 50, 255))
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .create(ui_container);
@@ -154,8 +179,11 @@ impl super::Screen for Login {
             logo,
             login_btn,
             login_btn_text,
+            acc_ty_btn,
+            acc_ty_btn_text,
             login_error,
             try_login,
+            update_acc_ty,
             refresh,
             login_res: None,
 
@@ -233,6 +261,18 @@ impl super::Screen for Login {
         }
         if done {
             elements.login_res = None;
+        }
+
+        if elements.update_acc_ty.get() {
+            let mut text = &mut elements.acc_ty_btn_text.borrow_mut().text;
+
+            *text = match text.as_str() {
+                "Account Type: Mojang" => String::from("Account Type: Microsoft"),
+                "Account Type: Microsoft" => String::from("Account Type: Mojang"),
+                _ => unreachable!(),
+            };
+
+            elements.update_acc_ty.set(false);
         }
 
         elements.logo.tick(renderer);
