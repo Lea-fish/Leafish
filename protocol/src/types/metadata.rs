@@ -104,7 +104,7 @@ impl Metadata {
     fn write_to18<W: io::Write>(&self, buf: &mut W) -> Result<(), protocol::Error> {
         for (k, v) in &self.map {
             if (*k as u8) > 0x1f {
-                panic!("write metadata index {:x} > 0x1f", *k as u8);
+                return Err(protocol::Error::Err(format!("write metadata index {:x} > 0x1f", *k as u8)));
             }
 
             let ty_index: u8 = *k as u8;
@@ -150,7 +150,7 @@ impl Metadata {
                 }
 
                 _ => {
-                    panic!("attempted to write 1.9+ metadata to 1.8");
+                    return Err(protocol::Error::Err("attempted to write 1.9+ metadata to 1.8".to_string()));
                 }
             }
         }
@@ -279,7 +279,7 @@ impl Metadata {
                     // TODO: write NBT tags metadata
                     //nbt::Tag(*val).write_to(buf)?;
                 }
-                _ => panic!("unexpected metadata"),
+                _ => return Err(protocol::Error::Err("unexpected metadata".to_string())),
             }
         }
         u8::write_to(&0xFF, buf)?;
@@ -340,7 +340,7 @@ impl Metadata {
                         m.put_raw(index, nbt::NamedTag(name, tag));
                     }
                 }
-                15 => panic!("TODO: particle"),
+                15 => return Err(protocol::Error::Err(format!("TODO: particle"))),
                 16 => m.put_raw(index, VillagerData::read_from(buf)?),
                 17 => {
                     if bool::read_from(buf)? {
@@ -441,7 +441,7 @@ impl Metadata {
                     u8::write_to(&18, buf)?;
                     val.write_to(buf)?;
                 }
-                _ => panic!("unexpected metadata"),
+                _ => return Err(protocol::Error::Err(format!("unexpected metadata"))),
             }
         }
         u8::write_to(&0xFF, buf)?;
@@ -646,7 +646,7 @@ impl Serializable for ParticleData {
             47 => ParticleData::BubbleColumnUp,
             48 => ParticleData::Nautilus,
             49 => ParticleData::Dolphin,
-            _ => panic!("unrecognized particle data id {}", id),
+            _ => return Err(protocol::Error::Err(format!("unrecognized particle data id {}", id))),
         })
     }
 
@@ -701,7 +701,7 @@ impl Serializable for PoseData {
             4 => PoseData::SpinAttack,
             5 => PoseData::Sneaking,
             6 => PoseData::Dying,
-            _ => panic!("unknown pose data: {}", n.0),
+            _ => return Err(protocol::Error::Err(format!("unknown pose data: {}", n.0))),
         })
     }
 

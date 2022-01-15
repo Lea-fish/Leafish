@@ -177,7 +177,7 @@ macro_rules! state_packets {
 
                     impl PacketType for $name {
 
-                        fn packet_id(&self, version: i32) -> i32 {
+                        fn packet_id(&self, version: i32) -> Result<i32, Error> {
                             packet::versions::translate_internal_packet_id_for_version(version, State::$stateName, Direction::$dirName, internal_ids::$name, false)
                         }
 
@@ -206,7 +206,7 @@ macro_rules! state_packets {
                         match dir {
                             $(
                                 Direction::$dirName => {
-                                    let internal_id = packet::versions::translate_internal_packet_id_for_version(version, state, dir, id, true);
+                                    let internal_id = packet::versions::translate_internal_packet_id_for_version(version, state, dir, id, true)?;
                                     match internal_id {
                                     $(
                                         self::$state::$dir::internal_ids::$name => {
@@ -298,7 +298,7 @@ macro_rules! protocol_packet_ids {
     })+) => {
         use crate::protocol::*;
 
-        pub fn translate_internal_packet_id(state: State, dir: Direction, id: i32, to_internal: bool) -> i32 {
+        pub fn translate_internal_packet_id(state: State, dir: Direction, id: i32, to_internal: bool) -> Result<i32, crate::protocol::Error> {
             match state {
                 $(
                     State::$stateName => {
@@ -308,16 +308,16 @@ macro_rules! protocol_packet_ids {
                                     if to_internal {
                                         match id {
                                         $(
-                                            $id => crate::protocol::packet::$state::$dir::internal_ids::$name,
+                                            $id => Ok(crate::protocol::packet::$state::$dir::internal_ids::$name),
                                         )*
-                                            _ => panic!("bad packet id 0x{:x} in {:?} {:?}", id, dir, state),
+                                            _ => return Err(crate::protocol::Error::Err(format!("bad packet id 0x{:x} in {:?} {:?}", id, dir, state))),
                                         }
                                     } else {
                                         match id {
                                         $(
-                                            crate::protocol::packet::$state::$dir::internal_ids::$name => $id,
+                                            crate::protocol::packet::$state::$dir::internal_ids::$name => Ok($id),
                                         )*
-                                            _ => panic!("bad packet internal id 0x{:x} in {:?} {:?}", id, dir, state),
+                                            _ => return Err(crate::protocol::Error::Err(format!("bad packet internal id 0x{:x} in {:?} {:?}", id, dir, state))),
                                         }
                                     }
                                 }
@@ -1247,7 +1247,7 @@ impl Conn {
 
     pub fn write_packet<T: PacketType>(&mut self, packet: T) -> Result<(), Error> {
         let mut buf = Vec::new();
-        VarInt(packet.packet_id(self.protocol_version)).write_to(&mut buf)?;
+        VarInt(packet.packet_id(self.protocol_version)?).write_to(&mut buf)?;
         packet.write(&mut buf)?;
 
         let mut extra = if self.compression_threshold >= 0 {
@@ -1717,7 +1717,7 @@ impl Clone for Conn {
 }
 
 pub trait PacketType {
-    fn packet_id(&self, protocol_version: i32) -> i32;
+    fn packet_id(&self, protocol_version: i32) -> Result<i32, crate::protocol::Error>;
 
     fn write<W: io::Write>(&self, buf: &mut W) -> Result<(), Error>;
 }

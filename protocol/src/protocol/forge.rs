@@ -27,7 +27,7 @@ impl Serializable for Phase {
         Ok(match phase {
             2 => Phase::WaitingCAck,
             3 => Phase::Complete,
-            _ => panic!("bad FML|HS server phase: {}", phase),
+            _ => return Err(Error::Err(format!("bad FML|HS server phase: {}", phase))),
         })
     }
 
@@ -38,7 +38,7 @@ impl Serializable for Phase {
             Phase::WaitingServerComplete => 3,
             Phase::PendingComplete => 4,
             Phase::Complete => 5,
-            _ => panic!("bad FML|HS client phase: {:?}", self),
+            _ => return Err(Error::Err(format!("bad FML|HS client phase: {:?}", self))),
         })?;
         Ok(())
     }
@@ -141,7 +141,7 @@ impl Serializable for FmlHs {
                     override_dimension,
                 })
             }
-            1 => panic!("Received unexpected FML|HS ClientHello from server"),
+            1 => Err(Error::Err("Received unexpected FML|HS ClientHello from server".to_string())),
             2 => Ok(FmlHs::ModList {
                 mods: Serializable::read_from(buf)?,
             }),
@@ -167,7 +167,7 @@ impl Serializable for FmlHs {
             255 => Ok(FmlHs::HandshakeAck {
                 phase: Serializable::read_from(buf)?,
             }),
-            _ => panic!("Unhandled FML|HS packet: discriminator={}", discriminator),
+            _ => Err(Error::Err(format!("Unhandled FML|HS packet: discriminator={}", discriminator))),
         }
     }
 

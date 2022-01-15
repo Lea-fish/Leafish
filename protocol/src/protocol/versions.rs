@@ -61,7 +61,7 @@ pub fn translate_internal_packet_id_for_version(
     dir: Direction,
     id: i32,
     to_internal: bool,
-) -> i32 {
+) -> Result<i32, crate::protocol::Error> {
     match version {
         754 | 753 | 751 => v1_16_4::translate_internal_packet_id(state, dir, id, to_internal),
         736 => v1_16_1::translate_internal_packet_id(state, dir, id, to_internal),
@@ -82,6 +82,6 @@ pub fn translate_internal_packet_id_for_version(
         107 => v1_9::translate_internal_packet_id(state, dir, id, to_internal),
         47 => v1_8_9::translate_internal_packet_id(state, dir, id, to_internal),
         5 => v1_7_10::translate_internal_packet_id(state, dir, id, to_internal),
-        _ => panic!("unsupported protocol version: {}", version),
+        _ => return Err(Error::Err(format!("unsupported protocol version: {}", version))),
     }
 }

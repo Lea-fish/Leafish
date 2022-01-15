@@ -2738,7 +2738,7 @@ impl Serializable for PlayerInfoData {
                     },
                 }),
                 4 => m.players.push(PlayerDetail::Remove { uuid }),
-                _ => panic!(),
+                _ => return Result::Err(Error::Err("An error occoured while reading PlayerInfoData.".to_string())),
             }
         }
         Ok(m)
@@ -2983,7 +2983,7 @@ impl Serializable for Recipe {
                 addition: Serializable::read_from(buf)?,
                 result: Serializable::read_from(buf)?,
             },
-            _ => panic!("unrecognized recipe type: {}", ty),
+            _ => return Err(Error::Err(format!("unrecognized recipe type: {}", ty))),
         };
 
         Ok(Recipe { id, ty, data })
@@ -3156,7 +3156,7 @@ impl Serializable for CommandNode {
             0 => CommandNodeType::Root,
             1 => CommandNodeType::Literal,
             2 => CommandNodeType::Argument,
-            _ => panic!("unrecognized command node type {}", flags & 0x03),
+            _ => return Err(Error::Err(format!("unrecognized command node type {}", flags & 0x03))),
         };
         let _is_executable = flags & 0x04 != 0;
         let has_redirect = flags & 0x08 != 0;
@@ -3278,7 +3278,7 @@ impl Serializable for CommandNode {
                 "forge:enum" => CommandProperty::ForgeEnum {
                     cls: Serializable::read_from(buf)?,
                 },
-                _ => panic!("unsupported command node parser {}", parse),
+                _ => return Err(Error::Err(format!("unsupported command node parser {}", parse))),
             })
         } else {
             None
