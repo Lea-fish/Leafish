@@ -1,35 +1,33 @@
-use std::any::Any;
-use libloading::{Library, Symbol, Error};
-use std::sync::Arc;
 use dashmap::DashMap;
-use std::path::Path;
+use libloading::{Error, Library, Symbol};
 use log::warn;
+use std::any::Any;
+use std::path::Path;
+use std::sync::Arc;
 extern crate serde;
-use serde::{Deserialize, Serialize};
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
 use leafish_protocol::protocol::packet::Packet;
 use leafish_protocol::protocol::Version;
+use serde::{Deserialize, Serialize};
 
+const CREATE_PLUGIN_FN_NAME: &[u8] = b"create_plugin";
+
+#[no_mangle]
 pub trait Plugin: Any + Send + Sync {
-
     fn on_enable(&self);
 
     fn on_disable(&self) {}
 
-    fn get_name(&self) -> &'static str;
+    fn get_name(&self) -> &'static str; // TODO: Should this get removed and moved into metadata?
 
     fn handle_event(&self, event: ClientEvent) -> bool;
-
 }
 
 pub struct PluginManager {
-
     plugins: Arc<DashMap<String, WrappedPlugin>>,
-
 }
 
 impl PluginManager {
-
     pub fn load_plugin(&self, path: String) -> bool {
         let raw_plugin_meta = std::fs::read_to_string(format!("{}/meta.json", path));
         let plugin_meta = if let Ok(meta) = raw_plugin_meta {
@@ -44,7 +42,8 @@ impl PluginManager {
 
         let potential_library = unsafe { Library::new(format!("{}/bin", path)) };
         if let Ok(library) = potential_library {
-            let create_plugin: Result<Symbol<fn() -> Box<dyn Plugin>>, Error> = unsafe { library.get(b"create_plugin") };
+            let create_plugin: Result<Symbol<fn() -> Box<dyn Plugin>>, Error> =
+                unsafe { library.get(CREATE_PLUGIN_FN_NAME) };
             if let Ok(create_plugin) = create_plugin {
                 let wrapped_plugin = WrappedPlugin {
                     plugin: create_plugin(),
@@ -53,11 +52,16 @@ impl PluginManager {
                     packet_handler: (None, None),
                 };
                 let file_name = Path::new(&path).file_name().unwrap();
-                self.plugins.clone().insert(String::from(file_name.to_str().unwrap()), wrapped_plugin);
+                self.plugins
+                    .clone()
+                    .insert(String::from(file_name.to_str().unwrap()), wrapped_plugin);
                 return true;
             } else {
                 let file_name = Path::new(&path).file_name().unwrap();
-                warn!("There is no \"create_plugin\" function available in {}!", file_name.to_str().unwrap());
+                warn!(
+                    "There is no \"create_plugin\" function available in {}!",
+                    file_name.to_str().unwrap()
+                );
             }
         }
         false
@@ -77,20 +81,20 @@ impl PluginManager {
         }
         self.plugins.clear();
     }
-
 }
 
 pub struct WrappedPlugin {
-
     plugin: Box<dyn Plugin>,
     _library: Library,
     meta: PluginMeta,
-    packet_handler: (Option<Box<dyn RawPacketHandler>>, Option<Box<dyn MappedPacketHandler>>),
-
+    packet_handler: (
+        Option<Box<dyn RawPacketHandler>>,
+        Option<Box<dyn MappedPacketHandler>>,
+    ),
 }
 
+#[no_mangle]
 impl WrappedPlugin {
-
     #[inline]
     pub fn name(&self) -> &'static str {
         self.plugin.get_name()
@@ -99,6 +103,11 @@ impl WrappedPlugin {
     #[inline]
     pub fn version(&self) -> u64 {
         self.meta.version
+    }
+
+    #[inline]
+    pub fn description(&self) -> &String {
+        &self.meta.description
     }
 
     #[inline]
@@ -111,39 +120,35 @@ impl WrappedPlugin {
         &self.meta.permissions
     }
 
-    /// handles an event, returns whether or not the result is `cancel`
+    /// Handles an event, returns whether or not the result is `cancel`
     #[inline]
     pub fn handle_event(&self, event: ClientEvent) -> bool {
         self.plugin.handle_event(event)
     }
-
 }
 
 #[derive(Serialize, Deserialize, Default)]
 #[repr(C)]
 pub struct PluginMeta {
-
-    version: u64, /// The plugin's version.
+    version: u64,
+    /// The plugin's version.
+    description: String,
     authors: Vec<String>,
     permissions: Vec<PluginPermission>, // TODO: Implement this!
-    modified: bool, // what is this used for?
-
+    modified: bool,                     // what is this used for?
 }
-
 
 #[derive(Serialize, Deserialize)]
 #[repr(C)]
 pub enum PluginPermission {
-
     File,
     Network,
     Device, // grants permission for devices and drivers
     All,
-
 }
 
+#[no_mangle]
 pub trait RawPacketHandler {
-
     #[inline]
     fn incoming_priority(&self) -> i64 {
         0
@@ -157,11 +162,10 @@ pub trait RawPacketHandler {
     }
 
     fn handle_outgoing(&self, packet: *mut Packet) -> bool;
-
 }
 
+#[no_mangle]
 pub trait MappedPacketHandler {
-
     #[inline]
     fn incoming_priority(&self) -> i64 {
         0
@@ -175,26 +179,22 @@ pub trait MappedPacketHandler {
     }
 
     fn handle_outgoing(&self, packet: *mut MappedPacket) -> bool;
-
 }
 
 #[repr(C)]
 pub enum ClientEvent {
-
     UserInput(InputEvent),
     Screen(ScreenEvent),
-    Entity,
+    Entity(EntityEvent),
     ChannelMessage,
     Inventory(InputEvent),
     World(WorldEvent),
-    Player,
-
+    Player(PlayerEvent),
 }
 
 /// Events for local player updates
 #[repr(C)]
 pub enum PlayerEvent {
-
     Exp,
     Health,
     Position,
@@ -204,109 +204,141 @@ pub enum PlayerEvent {
     EntityInteract,
     HotBar,
     Food,
-
 }
 
 #[repr(C)]
 pub enum InputEvent {
-
     Mouse(MouseAction),
-    Keyboard(bool, ), // down, key board key(input)
-
+    Keyboard(bool), // down, key board key(input)
 }
 
 #[repr(C)]
 pub enum WorldEvent {
-
     Block,
     Weather,
     Time,
-
 }
 
 #[repr(C)]
 pub enum InventoryEvent {
-
     Open,
     Close,
     UpdateSlot,
-
 }
 
 #[repr(C)]
 pub enum ScreenEvent {
-
     Open,
     Close,
-
 }
 
 #[repr(C)]
 pub enum EntityEvent {
-
     Spawn,
     Despawn,
     Move,
-    UpdateArmor,
-    UpdateHandItem,
-    UpdateName,
-
+    UpdateArmor,    // TODO: Should this be combined with UpdateMetadata?
+    UpdateHandItem, // TODO: Should this be combined with UpdateMetadata?
+    UpdateName,     // TODO: Should this be combined with UpdateMetadata?
+    UpdateMetadata,
+    UpdateHealth, // TODO: Should this be combined with UpdateMetadata?
 }
 
 #[repr(C)]
 pub enum MouseAction {
-
     UpdateKey(bool, MouseKey), // down, mouse key(input)
     UseWheel(f64),
-
 }
 
 #[repr(C)]
 pub enum MouseKey {
-
     Left,
     Middle, // pressed mouse wheel
     Right,
     Other(i64),
-
 }
 
 #[no_mangle]
 pub trait WorldAccess {
-
     fn get_block(&self);
 
     fn set_block(&self);
 
+    fn is_chunk_loaded(&self, x: i32, z: i32);
 }
 
 #[no_mangle]
 pub trait ServerAccess {
+    // TODO: Combine protocol_version methods into one!
+    fn protocol_version_id(&self) -> i64;
 
-    fn protocol(&self) -> i64;
-
-    fn mapped_version(&self) -> Version;
+    fn protocol_version(&self) -> Version;
 
     fn world(&self) -> Box<dyn WorldAccess>;
 
+    fn is_connected(&self) -> bool;
 }
 
 #[no_mangle]
 pub trait ScreenSystemAccess {
-
     fn pop_screen(&self);
 
-    fn push_screen(&self);
-
+    fn push_screen(&self, screen_builder: ScreenBuilder);
 }
+
+#[no_mangle]
+pub trait ScreenAccess {}
 
 #[repr(C)]
 pub struct ScreenBuilder {
-
     name: String,
-    active: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
-    de_active: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    activate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    de_activate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
     init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
     de_init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+}
 
+#[no_mangle]
+impl ScreenBuilder {
+    #[inline]
+    pub fn name(mut self, name: String) -> Self {
+        self.name = name;
+        self
+    }
+
+    #[inline]
+    pub fn on_activate(
+        mut self,
+        on_activate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    ) -> Self {
+        self.activate = on_activate;
+        self
+    }
+
+    #[inline]
+    pub fn on_de_activate(
+        mut self,
+        on_de_activate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    ) -> Self {
+        self.de_activate = on_de_activate;
+        self
+    }
+
+    #[inline]
+    pub fn on_init(
+        mut self,
+        init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    ) -> Self {
+        self.init = init;
+        self
+    }
+
+    #[inline]
+    pub fn on_de_init(
+        mut self,
+        de_init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    ) -> Self {
+        self.de_init = de_init;
+        self
+    }
 }
