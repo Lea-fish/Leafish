@@ -40,7 +40,8 @@ impl AccountImpl for MicrosoftAccount {
             todo!(), // You can set this to None if port 80 is free and usable, else choose a different port
             name.to_string(),
             password.to_string(),
-        ).map_err(|e| super::Error::Err(e.to_string()))
+        )
+        .map_err(|e| super::Error::Err(e.to_string()))
     }
 
     fn refresh(&self, account: Account, token: &str) -> Result<Account, super::Error> {
