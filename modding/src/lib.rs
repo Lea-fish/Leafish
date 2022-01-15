@@ -7,7 +7,7 @@ use std::sync::Arc;
 extern crate serde;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
 use leafish_protocol::protocol::packet::Packet;
-use leafish_protocol::protocol::Version;
+use leafish_protocol::protocol::{PacketType, Version};
 use serde::{Deserialize, Serialize};
 
 const CREATE_PLUGIN_FN_NAME: &[u8] = b"create_plugin";
@@ -130,8 +130,9 @@ impl WrappedPlugin {
 #[derive(Serialize, Deserialize, Default)]
 #[repr(C)]
 pub struct PluginMeta {
+    /// The plugin's version
     version: u64,
-    /// The plugin's version.
+    /// The plugin's description
     description: String,
     authors: Vec<String>,
     permissions: Vec<PluginPermission>, // TODO: Implement this!
@@ -277,25 +278,32 @@ pub trait ServerAccess {
     fn world(&self) -> Box<dyn WorldAccess>;
 
     fn is_connected(&self) -> bool;
+
+    fn write_packet<T: PacketType>(&self, packet: T); // FIXME: Should this be renamed to "send_packet"?
 }
 
 #[no_mangle]
 pub trait ScreenSystemAccess {
-    fn pop_screen(&self);
+    fn pop_screen(&self) -> Box<dyn ScreenAccess>;
 
     fn push_screen(&self, screen_builder: ScreenBuilder);
+
+    fn current_screen(&self) -> Box<&dyn ScreenAccess>;
 }
 
 #[no_mangle]
-pub trait ScreenAccess {}
+pub trait ScreenAccess {
+    fn ty(&self) -> ScreenType;
+}
 
 #[repr(C)]
 pub struct ScreenBuilder {
     name: String,
+    // FIXME: Why not use a single trait instead of all these closures?
     activate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
-    de_activate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    deactivate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
     init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
-    de_init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+    deinit: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
 }
 
 #[no_mangle]
@@ -316,29 +324,29 @@ impl ScreenBuilder {
     }
 
     #[inline]
-    pub fn on_de_activate(
+    pub fn on_deactivate(
         mut self,
-        on_de_activate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+        on_deactivate: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
     ) -> Self {
-        self.de_activate = on_de_activate;
+        self.deactivate = on_deactivate;
         self
     }
 
     #[inline]
     pub fn on_init(
         mut self,
-        init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+        on_init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
     ) -> Self {
-        self.init = init;
+        self.init = on_init;
         self
     }
 
     #[inline]
-    pub fn on_de_init(
+    pub fn on_deinit(
         mut self,
-        de_init: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
+        on_deinit: Option<dyn Fn(&ScreenSystem, Arc<render::Renderer>, &mut ui::Container)>,
     ) -> Self {
-        self.de_init = de_init;
+        self.deinit = on_deinit;
         self
     }
 }
