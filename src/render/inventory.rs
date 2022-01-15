@@ -2,7 +2,7 @@ use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
-use crate::screen::{Screen, ScreenSystem};
+use crate::screen::{Screen, ScreenSystem, ScreenAttributes};
 use crate::ui::{Container, ImageRef, TextRef, VAttach};
 use crate::{ui, Game};
 use glutin::event::VirtualKeyCode;
@@ -117,16 +117,14 @@ impl Screen for InventoryWindow {
         }
     }
 
-    fn is_closable(&self) -> bool {
-        true
-    }
-
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
     }
 }
 
 impl InventoryWindow {
+    const ATTRIBUTES: ScreenAttributes = ScreenAttributes::default().closable();
+
     pub fn new(
         inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
         inventory_context: Arc<RwLock<InventoryContext>>,

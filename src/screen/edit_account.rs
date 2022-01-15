@@ -15,9 +15,11 @@
 use crate::{ui, Game};
 
 use crate::render::Renderer;
-use crate::screen::{Screen, ScreenSystem};
+use crate::screen::{Screen, ScreenSystem, ScreenAttributes, ScreenType};
 use std::rc::Rc;
 use std::sync::Arc;
+use crate::ui::Container;
+use glutin::event::VirtualKeyCode;
 
 pub struct EditAccountEntry {
     elements: Option<UIElements>,
@@ -169,8 +171,8 @@ impl super::Screen for EditAccountEntry {
         elements.logo.tick(renderer);
     }
 
-    fn is_closable(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default().closable()
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

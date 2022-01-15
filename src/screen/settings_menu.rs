@@ -1,11 +1,14 @@
-use crate::console;
+use crate::{console, Game};
 use crate::render;
 use crate::settings;
 use crate::ui;
 
-use crate::screen::{Screen, ScreenSystem};
+use crate::screen::{Screen, ScreenSystem, ScreenAttributes, ScreenType};
 use std::rc::Rc;
 use std::sync::Arc;
+use crate::render::Renderer;
+use crate::ui::Container;
+use glutin::event::VirtualKeyCode;
 
 pub struct UIElements {
     background: ui::ImageRef,
@@ -234,8 +237,8 @@ impl super::Screen for SettingsMenu {
     // Events
     fn on_scroll(&mut self, _x: f64, _y: f64) {}
 
-    fn is_closable(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default().closable()
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {
@@ -417,8 +420,8 @@ impl super::Screen for VideoSettingsMenu {
     // Events
     fn on_scroll(&mut self, _x: f64, _y: f64) {}
 
-    fn is_closable(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default().closable()
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {
@@ -526,8 +529,8 @@ impl super::Screen for AudioSettingsMenu {
     // Events
     fn on_scroll(&mut self, _x: f64, _y: f64) {}
 
-    fn is_closable(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default().closable()
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {
@@ -725,8 +728,8 @@ impl super::Screen for SkinSettingsMenu {
     // Events
     fn on_scroll(&mut self, _x: f64, _y: f64) {}
 
-    fn is_closable(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default().closable()
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

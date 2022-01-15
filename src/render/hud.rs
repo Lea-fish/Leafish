@@ -26,7 +26,7 @@ use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::{Inventory, Item};
 use crate::render;
 use crate::render::Renderer;
-use crate::screen::{Screen, ScreenSystem, ScreenType};
+use crate::screen::{Screen, ScreenSystem, ScreenType, ScreenAttributes};
 use crate::server::Server;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
@@ -502,12 +502,8 @@ impl Screen for Hud {
         }
     }
 
-    fn is_closable(&self) -> bool {
-        false
-    }
-
-    fn is_tick_always(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        Hud::ATTRIBUTES
     }
 
     fn ty(&self) -> ScreenType {
@@ -517,6 +513,10 @@ impl Screen for Hud {
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
     }
+}
+
+impl Hud {
+    const ATTRIBUTES: ScreenAttributes = ScreenAttributes::default().tick_always();
 }
 
 impl Hud {

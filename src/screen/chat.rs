@@ -17,7 +17,7 @@ use std::sync::Arc;
 use crate::protocol::packet;
 use crate::render::hud::{Hud, START_TICKS};
 use crate::render::{hud, Renderer};
-use crate::screen::{Screen, ScreenSystem, ScreenType};
+use crate::screen::{Screen, ScreenSystem, ScreenType, ScreenAttributes};
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
 use crate::Game;
@@ -336,8 +336,8 @@ impl super::Screen for Chat {
         }
     }
 
-    fn is_closable(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default().closable()
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

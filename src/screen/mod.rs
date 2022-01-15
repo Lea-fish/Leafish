@@ -43,6 +43,7 @@ use winit::event::VirtualKeyCode;
 use winit::window::Window;
 
 pub trait Screen {
+
     // Called once
     fn init(
         &mut self,
@@ -94,21 +95,20 @@ pub trait Screen {
     } // TODO: make non-optional!
 
     fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
-        if key == VirtualKeyCode::Escape && !down && self.is_closable() {
+        if key == VirtualKeyCode::Escape && !down && self.attributes().is_closable() {
             game.screen_sys.pop_screen();
         }
     }
 
     fn on_char_receive(&mut self, _received: char, _game: &mut Game) {}
 
-    fn is_closable(&self) -> bool {
-        false
+    /// Returns an immutable copy of the screen's attributes.
+    #[inline]
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default()
     }
 
-    fn is_tick_always(&self) -> bool {
-        false
-    }
-
+    #[inline]
     fn ty(&self) -> ScreenType {
         Other(String::new())
     }
@@ -119,6 +119,70 @@ pub trait Screen {
 impl Clone for Box<dyn Screen> {
     fn clone(&self) -> Box<dyn Screen> {
         self.clone_screen()
+    }
+}
+
+#[derive(Copy, Clone)]
+pub struct ScreenAttributes(u64);
+
+impl ScreenAttributes {
+    pub const fn default() -> Self {
+        Self(0)
+    }
+}
+
+impl ScreenAttributes {
+    const CLOSABLE: u64 = 1 << 0;
+    const TICK_ALWAYS: u64 = 1 << 1;
+
+    #[inline]
+    pub const fn is_closable(&self) -> bool {
+        self.is_bit_set(Self::CLOSABLE)
+    }
+
+    #[inline]
+    pub const fn is_tick_always(&self) -> bool {
+        self.is_bit_set(Self::TICK_ALWAYS)
+    }
+
+    #[inline]
+    pub const fn set_closable(mut self, flag: bool) -> Self {
+        self.set_flag(Self::CLOSABLE, flag)
+    }
+
+    #[inline]
+    pub const fn set_tick_always(mut self, flag: bool) -> Self {
+        self.set_flag(Self::TICK_ALWAYS, flag)
+    }
+
+    #[inline]
+    pub const fn closable(mut self) -> Self {
+        self.enable_flag(Self::CLOSABLE)
+    }
+
+    #[inline]
+    pub const fn tick_always(mut self) -> Self {
+        self.enable_flag(Self::TICK_ALWAYS)
+    }
+
+    #[inline]
+    const fn enable_flag(mut self, mask: u64) -> Self {
+        self.set_flag(mask, true)
+    }
+
+    #[inline]
+    const fn set_flag(mut self, mask: u64, flag: bool) -> Self {
+        if flag {
+            self.0 |= mask;
+        } else {
+            self.0 &= !mask;
+        }
+        self
+    }
+
+    #[inline]
+    const fn is_bit_set(&self, mask: u64) -> bool {
+        (self.0 & mask) != 0
     }
 }
 
@@ -187,7 +251,7 @@ impl ScreenSystem {
 
     pub fn is_current_closable(&self) -> bool {
         if let Some(last) = self.pre_computed_screens.clone().read().last() {
-            return last.is_closable();
+            return last.attributes().is_closable();
         }
         false
     }
@@ -246,6 +310,7 @@ impl ScreenSystem {
                     .unwrap()
                     .screen
                     .lock()
+                    .attributes()
                     .is_closable()
             } else {
                 false
@@ -336,7 +401,7 @@ impl ScreenSystem {
             {
                 if current.last_width != -1 && current.last_height != -1 {
                     for screen in tmp.iter_mut().enumerate() {
-                        if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
+                        if screen.1.screen.clone().lock().attributes().is_tick_always() || screen.0 == len - 1 {
                             screen.1.screen.clone().lock().on_resize(
                                 self,
                                 renderer.clone(),
@@ -352,7 +417,7 @@ impl ScreenSystem {
                 }
             }
             for screen in tmp.iter_mut().enumerate() {
-                if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
+                if screen.1.screen.clone().lock().attributes().is_tick_always() || screen.0 == len - 1 {
                     screen.1.screen.clone().lock().tick(
                         self,
                         renderer.clone(),

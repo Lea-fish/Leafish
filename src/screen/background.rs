@@ -1,10 +1,11 @@
 use crate::render::Renderer;
-use crate::screen::{Screen, ScreenSystem};
+use crate::screen::{Screen, ScreenSystem, ScreenAttributes, ScreenType};
 use crate::settings::BACKGROUND_IMAGE;
 use crate::ui::Container;
-use crate::{console, ui};
+use crate::{console, ui, Game};
 use std::rc::Rc;
 use std::sync::Arc;
+use glutin::event::VirtualKeyCode;
 
 pub struct Background {
     background: Option<ui::ImageRef>,
@@ -130,8 +131,8 @@ impl Screen for Background {
         self.init(screen_sys, renderer, ui_container);
     }
 
-    fn is_tick_always(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default().tick_always()
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

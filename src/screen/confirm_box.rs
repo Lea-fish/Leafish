@@ -16,9 +16,12 @@ use crate::render;
 use crate::ui;
 use crate::Game;
 
-use crate::screen::{Screen, ScreenSystem};
+use crate::screen::{Screen, ScreenSystem, ScreenAttributes, ScreenType};
 use std::rc::Rc;
 use std::sync::Arc;
+use crate::render::Renderer;
+use crate::ui::Container;
+use glutin::event::VirtualKeyCode;
 
 pub struct ConfirmBox {
     elements: Option<UIElements>,
@@ -47,6 +50,8 @@ struct UIElements {
 }
 
 impl ConfirmBox {
+    const ATTRIBUTES: ScreenAttributes = ScreenAttributes::default().closable();
+
     pub fn new(
         prompt: String,
         cancel_callback: Rc<dyn Fn(&mut Game)>,
@@ -146,8 +151,8 @@ impl super::Screen for ConfirmBox {
         elements.logo.tick(renderer);
     }
 
-    fn is_closable(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        Self::ATTRIBUTES
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {

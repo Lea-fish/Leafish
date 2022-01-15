@@ -15,12 +15,15 @@
 use std::collections::BTreeMap;
 use std::fs;
 
-use crate::ui;
+use crate::{ui, Game};
 use crate::{paths, render};
 
-use crate::screen::{Screen, ScreenSystem};
+use crate::screen::{Screen, ScreenSystem, ScreenAttributes, ScreenType};
 use serde_json::{self, Value};
 use std::sync::Arc;
+use crate::render::Renderer;
+use crate::ui::Container;
+use glutin::event::VirtualKeyCode;
 
 pub struct EditServerEntry {
     elements: Option<UIElements>,
@@ -46,6 +49,8 @@ struct UIElements {
 }
 
 impl EditServerEntry {
+    const ATTRIBUTES: ScreenAttributes = ScreenAttributes::default().closable();
+
     pub fn new(entry_info: Option<(usize, String, String)>) -> EditServerEntry {
         EditServerEntry {
             elements: None,
@@ -205,8 +210,8 @@ impl super::Screen for EditServerEntry {
         elements.logo.tick(renderer);
     }
 
-    fn is_closable(&self) -> bool {
-        true
+    fn attributes(&self) -> ScreenAttributes {
+        ScreenAttributes::default().closable()
     }
 
     fn clone_screen(&self) -> Box<dyn Screen> {
