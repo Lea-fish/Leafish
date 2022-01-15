@@ -270,12 +270,12 @@ impl super::Screen for Login {
             elements.acc_ty_btn_text.borrow_mut().text = match elements.account_ty {
                 AccountType::Mojang => {
                     elements.account_ty = AccountType::Microsoft;
-                     String::from("Account Type: Microsoft")
-                },
+                    String::from("Account Type: Microsoft")
+                }
                 AccountType::Microsoft => {
                     elements.account_ty = AccountType::Mojang;
                     String::from("Account Type: Mojang")
-                },
+                }
                 _ => unreachable!(),
             };
 

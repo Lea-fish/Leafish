@@ -82,6 +82,11 @@ pub fn translate_internal_packet_id_for_version(
         107 => v1_9::translate_internal_packet_id(state, dir, id, to_internal),
         47 => v1_8_9::translate_internal_packet_id(state, dir, id, to_internal),
         5 => v1_7_10::translate_internal_packet_id(state, dir, id, to_internal),
-        _ => return Err(Error::Err(format!("unsupported protocol version: {}", version))),
+        _ => {
+            return Err(Error::Err(format!(
+                "unsupported protocol version: {}",
+                version
+            )))
+        }
     }
 }

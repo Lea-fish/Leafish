@@ -104,7 +104,10 @@ impl Metadata {
     fn write_to18<W: io::Write>(&self, buf: &mut W) -> Result<(), protocol::Error> {
         for (k, v) in &self.map {
             if (*k as u8) > 0x1f {
-                return Err(protocol::Error::Err(format!("write metadata index {:x} > 0x1f", *k as u8)));
+                return Err(protocol::Error::Err(format!(
+                    "write metadata index {:x} > 0x1f",
+                    *k as u8
+                )));
             }
 
             let ty_index: u8 = *k as u8;
@@ -150,7 +153,9 @@ impl Metadata {
                 }
 
                 _ => {
-                    return Err(protocol::Error::Err("attempted to write 1.9+ metadata to 1.8".to_string()));
+                    return Err(protocol::Error::Err(
+                        "attempted to write 1.9+ metadata to 1.8".to_string(),
+                    ));
                 }
             }
         }
@@ -646,7 +651,12 @@ impl Serializable for ParticleData {
             47 => ParticleData::BubbleColumnUp,
             48 => ParticleData::Nautilus,
             49 => ParticleData::Dolphin,
-            _ => return Err(protocol::Error::Err(format!("unrecognized particle data id {}", id))),
+            _ => {
+                return Err(protocol::Error::Err(format!(
+                    "unrecognized particle data id {}",
+                    id
+                )))
+            }
         })
     }
 

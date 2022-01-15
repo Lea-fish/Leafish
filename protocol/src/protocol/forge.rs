@@ -141,7 +141,9 @@ impl Serializable for FmlHs {
                     override_dimension,
                 })
             }
-            1 => Err(Error::Err("Received unexpected FML|HS ClientHello from server".to_string())),
+            1 => Err(Error::Err(
+                "Received unexpected FML|HS ClientHello from server".to_string(),
+            )),
             2 => Ok(FmlHs::ModList {
                 mods: Serializable::read_from(buf)?,
             }),
@@ -167,7 +169,10 @@ impl Serializable for FmlHs {
             255 => Ok(FmlHs::HandshakeAck {
                 phase: Serializable::read_from(buf)?,
             }),
-            _ => Err(Error::Err(format!("Unhandled FML|HS packet: discriminator={}", discriminator))),
+            _ => Err(Error::Err(format!(
+                "Unhandled FML|HS packet: discriminator={}",
+                discriminator
+            ))),
         }
     }
 
