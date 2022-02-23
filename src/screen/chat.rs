@@ -88,6 +88,7 @@ pub struct Chat {
     context: Arc<ChatContext>,
     written: String,
     animation: u8,
+    #[allow(dead_code)]
     offset: f64, // TODO: Implement this (scrolling in chat)!
     dirty_written: bool,
 }

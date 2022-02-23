@@ -876,8 +876,9 @@ struct RawModel {
     y: f64,
     uvlock: bool,
     weight: f64,
-
+    #[allow(dead_code)]
     display: HashMap<String, ModelDisplay, BuildHasherDefault<FNVHash>>,
+    #[allow(dead_code)]
     builtin: BuiltinType,
 }
 
@@ -897,8 +898,11 @@ impl RawModel {
 
 #[derive(Debug)]
 struct ModelDisplay {
+    #[allow(dead_code)]
     rotation: [f64; 3],
+    #[allow(dead_code)]
     translation: [f64; 3],
+    #[allow(dead_code)]
     scale: [f64; 3],
 }
 
@@ -932,6 +936,7 @@ struct BlockFace {
 struct Model {
     faces: Vec<Face>,
     ambient_occlusion: bool,
+    #[allow(dead_code)]
     weight: f64,
 }
 
@@ -942,6 +947,7 @@ struct Face {
     vertices: Vec<BlockVertex>,
     vertices_texture: Vec<render::Texture>,
     indices: usize,
+    #[allow(dead_code)]
     shade: bool,
     tint_index: i32,
 }

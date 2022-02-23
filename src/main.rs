@@ -407,9 +407,9 @@ const DEBUG: bool = false;
 fn tick_all(
     window: &winit::window::Window,
     game: &mut Game,
-    mut ui_container: &mut ui::Container,
+    ui_container: &mut ui::Container,
     last_frame: &mut Instant,
-    mut resui: &mut resources::ManagerUI,
+    resui: &mut resources::ManagerUI,
     last_resource_version: &mut usize,
     vsync: &mut bool,
 ) {
@@ -446,7 +446,7 @@ fn tick_all(
     let version = {
         let try_res = game.resource_manager.try_write();
         if let Some(mut res) = try_res {
-            res.tick(&mut resui, &mut ui_container, delta);
+            res.tick(resui, ui_container, delta);
             res.version()
         } else {
             // TODO: why does game.resource_manager.write() sometimes deadlock?
@@ -498,7 +498,7 @@ fn tick_all(
     if game
         .screen_sys
         .clone()
-        .tick(delta, game.renderer.clone(), &mut ui_container, window)
+        .tick(delta, game.renderer.clone(), ui_container, window)
     {
         window.set_cursor_grab(false).unwrap();
         window.set_cursor_visible(true);
@@ -508,12 +508,9 @@ fn tick_all(
         window.set_cursor_visible(false);
         game.focused = true;
     }
-    game.console.lock().tick(
-        &mut ui_container,
-        game.renderer.clone(),
-        delta,
-        width as f64,
-    );
+    game.console
+        .lock()
+        .tick(ui_container, game.renderer.clone(), delta, width as f64);
     ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
     let world = game.server.as_ref().map(|server| server.world.clone());
     game.renderer.clone().tick(
