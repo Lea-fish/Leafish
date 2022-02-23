@@ -764,6 +764,7 @@ impl Renderer {
         info.count = count;
     }
 
+    #[allow(clippy::uninit_vec)]
     fn do_pending_textures(&self) {
         let len = {
             let tex = self.textures.read();
@@ -771,6 +772,7 @@ impl Renderer {
             if self.texture_data.lock().texture_layers != tex.atlases.len() {
                 let len = ATLAS_SIZE * ATLAS_SIZE * 4 * tex.atlases.len();
                 let mut data = Vec::with_capacity(len);
+                // We are creating uninitialized values here, but as the renderer should be replaced with wgpu-mc soon-ish this isn't worth fixing.
                 unsafe {
                     data.set_len(len);
                 }
