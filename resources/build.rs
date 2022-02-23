@@ -20,10 +20,9 @@ fn main() {
     .unwrap();
     writeln!(file, "    match name {{").unwrap();
     for path in &out {
-        let mut absolute_path = std::env::current_dir().unwrap();
-        absolute_path.push(path);
+        let absolute_path = path.canonicalize().unwrap();
 
-        let absolute = absolute_path.to_str().unwrap().replace("\\", "/");
+        let absolute = absolute_path.to_str().unwrap().replace("\\", "\\\\");
         let relative = path.to_str().unwrap().replace("\\", "/");
 
         writeln!(
