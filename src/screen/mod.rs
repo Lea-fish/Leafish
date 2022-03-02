@@ -141,11 +141,11 @@ struct ScreenInfo {
 unsafe impl Send for ScreenSystem {}
 unsafe impl Sync for ScreenSystem {}
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ScreenSystem {
     screens: Arc<RwLock<Vec<ScreenInfo>>>,
     pre_computed_screens: Arc<RwLock<Vec<Box<dyn Screen>>>>,
-    lowest_offset: AtomicIsize,
+    lowest_offset: Arc<AtomicIsize>,
 }
 
 impl ScreenSystem {
