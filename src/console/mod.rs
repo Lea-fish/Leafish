@@ -376,7 +376,7 @@ impl Console {
             }
         }
 
-        let mut file = &record.file().unwrap_or("").replace("\\", "/")[..];
+        let mut file = &record.file().unwrap_or("").replace('\\', "/")[..];
         if let Some(pos) = file.rfind("src/") {
             file = &file[pos + 4..];
         }
