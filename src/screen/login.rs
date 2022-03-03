@@ -46,11 +46,13 @@ impl Clone for Login {
     }
 }
 
+#[allow(dead_code)]
 struct UIElements {
     logo: ui::logo::Logo,
-
     login_btn: ui::ButtonRef,
     login_btn_text: ui::TextRef,
+    back_btn: ui::ButtonRef,
+    back_btn_text: ui::TextRef,
     login_error: ui::TextRef,
     username_txt: ui::TextBoxRef,
     password_txt: ui::TextBoxRef,
@@ -73,7 +75,7 @@ impl Login {
 impl super::Screen for Login {
     fn on_active(
         &mut self,
-        _screen_sys: &ScreenSystem,
+        screen_sys: &ScreenSystem,
         renderer: Arc<render::Renderer>,
         ui_container: &mut ui::Container,
     ) {
@@ -83,8 +85,8 @@ impl super::Screen for Login {
 
         // Login
         let login_btn = ui::ButtonBuilder::new()
-            .position(0.0, 100.0)
-            .size(400.0, 40.0)
+            .position(-101.5, 100.0)
+            .size(197.0, 40.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .create(ui_container);
         let login_btn_text = ui::TextBuilder::new()
@@ -100,6 +102,26 @@ impl super::Screen for Login {
                 tl.set(true);
                 true
             });
+        }
+
+        let back_btn = ui::ButtonBuilder::new()
+            .position(101.5, 100.0)
+            .size(197.0, 40.0)
+            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+            .create(ui_container);
+        let back_btn_text = ui::TextBuilder::new()
+            .text("Back")
+            .position(0.0, 0.0)
+            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+            .attach(&mut *back_btn.borrow_mut());
+        {
+            let mut btn = back_btn.borrow_mut();
+            btn.add_text(back_btn_text.clone());
+            let local_screen_sys = screen_sys.clone();
+            btn.add_click_func(move |_, _| {
+                local_screen_sys.pop_screen();
+                true
+            })
         }
 
         // Login Error
@@ -154,6 +176,8 @@ impl super::Screen for Login {
             logo,
             login_btn,
             login_btn_text,
+            back_btn,
+            back_btn_text,
             login_error,
             try_login,
             refresh,
@@ -240,6 +264,9 @@ impl super::Screen for Login {
 
     fn clone_screen(&self) -> Box<dyn Screen> {
         Box::new(self.clone())
+    }
+    fn is_closable(&self) -> bool {
+        true
     }
 }
 
