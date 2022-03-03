@@ -1436,14 +1436,14 @@ impl TextureManager {
     fn get_texture(&self, name: &str) -> Option<Texture> {
         if name.starts_with('#') {
             let name = if let Some(name) = name.strip_prefix('#') {
-                &name
+                name
             } else {
                 name
             };
             self.textures.get(&format!("global:{}", name)).cloned()
         } else if name.find(':').is_some() {
             let name = if let Some(name) = name.strip_prefix('#') {
-                &name
+                name
             } else {
                 name
             };
@@ -1456,7 +1456,7 @@ impl TextureManager {
     fn load_texture(&mut self, name: &str) {
         let (plugin, name) = if name.starts_with('#') {
             let name = if let Some(name) = name.strip_prefix('#') {
-                &name
+                name
             } else {
                 name
             };
@@ -1464,7 +1464,7 @@ impl TextureManager {
         } else if let Some(mut pos) = name.find(':') {
             let name = if let Some(name) = name.strip_prefix('#') {
                 pos -= 1;
-                &name
+                name
             } else {
                 name
             };
