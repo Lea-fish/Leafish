@@ -17,15 +17,10 @@ flate2 = { version = "1.0.20", features = ["rust_backend"], default-features = f
 num-traits = "0.2.14"
 instant = "0.1.9"
 cgmath = "0.17.0"
-
 lazy_static = "1.4.0"
 trust-dns-resolver = "0.20.3"
-# srv-rs = { version = "0.2.0", features = ["libresolv"] }
-
 dashmap = "4.0.2"
-
 bevy_ecs = { git = "https://github.com/terrarier2111/bevy" }
-
 reqwest = { version = "0.11.3", features = [ "blocking" ]}
 
 [dependencies.leafish_shared]
