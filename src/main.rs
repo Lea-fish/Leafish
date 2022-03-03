@@ -56,6 +56,7 @@ pub mod world;
 use crate::entity::Rotation;
 use crate::render::hud::HudContext;
 use leafish_protocol::protocol::login::{Account, AccountType};
+use leafish_protocol::protocol::microsoft2::MicrosoftAccount;
 use leafish_protocol::protocol::mojang::MojangAccount;
 use leafish_protocol::protocol::{Error, Version};
 use parking_lot::Mutex;
@@ -216,6 +217,9 @@ fn main() {
     protocol::login::ACCOUNT_IMPLS
         .clone()
         .insert(AccountType::Mojang, Arc::new(MojangAccount {}));
+    protocol::login::ACCOUNT_IMPLS
+        .clone()
+        .insert(AccountType::Microsoft, Arc::new(MicrosoftAccount {}));
 
     let (vars, mut vsync) = {
         let mut vars = console::Vars::new();

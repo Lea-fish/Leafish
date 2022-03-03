@@ -1,11 +1,9 @@
-use super::{Bounds, GameInfo, Light, Position, Rotation, Velocity};
-use crate::ecs::Manager;
-use crate::entity::{resolve_textures, EntityType};
+use super::{GameInfo, Light, Position, Rotation};
+use crate::entity::resolve_textures;
 use crate::render::model;
 use crate::render::Renderer;
 use bevy_ecs::prelude::*;
-use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
-use collision::Aabb3;
+use cgmath::{self, Decomposed, Matrix4, Quaternion, Rad, Rotation3, Vector3};
 use std::sync::Arc;
 
 #[derive(Component)]
@@ -31,22 +29,6 @@ impl SlimeModel {
             idle_time: 0.0,
         }
     }
-}
-
-pub fn create_slime(m: &mut Manager) -> Entity {
-    let mut entity = m.world.spawn();
-    entity
-        .insert(Position::new(1478.5, 44.0, -474.5))
-        .insert(Rotation::new(0.0, 0.0))
-        .insert(Velocity::new(0.0, 0.0, 0.0))
-        .insert(Bounds::new(Aabb3::new(
-            Point3::new(-0.3, 0.0, -0.3),
-            Point3::new(0.3, 1.8, 0.3),
-        )))
-        .insert(Light::new())
-        .insert(EntityType::Slime)
-        .insert(SlimeModel::new("test"));
-    entity.id()
 }
 
 pub fn update_slime(

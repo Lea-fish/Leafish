@@ -179,7 +179,12 @@ impl Server {
             Some(1) => "\0FML\0",
             Some(2) => "\0FML2\0",
             None => "",
-            _ => panic!("unsupported FML network version: {:?}", fml_network_version),
+            _ => {
+                return Err(protocol::Error::Err(format!(
+                    "unsupported FML network version: {:?}",
+                    fml_network_version
+                )))
+            }
         };
 
         let host = conn.host.clone() + tag;
@@ -358,13 +363,20 @@ impl Server {
                                         _ => unimplemented!(),
                                     }
                                 }
-                                _ => panic!(
-                                    "unknown LoginPluginRequest fml:loginwrapper channel: {:?}",
-                                    channel
-                                ),
+                                _ => {
+                                    return Err(protocol::Error::Err(format!(
+                                        "unknown LoginPluginRequest fml:loginwrapper channel: {:?}",
+                                        channel
+                                    )))
+                                }
                             }
                         }
-                        _ => panic!("unsupported LoginPluginRequest channel: {:?}", req.channel),
+                        _ => {
+                            return Err(protocol::Error::Err(format!(
+                                "unsupported LoginPluginRequest channel: {:?}",
+                                req.channel
+                            )))
+                        }
                     }
                 }
                 val => return Err(protocol::Error::Err(format!("Wrong packet 2: {:?}", val))),
