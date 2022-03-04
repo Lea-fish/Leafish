@@ -900,10 +900,10 @@ impl Serializable for VarInt {
         loop {
             let b = buf.read_u8()? as u32;
             val |= (b & PART) << (size * 7);
-            size += 1;
             if size > 5 {
                 return Err(Error::Err("VarInt too big".to_owned()));
             }
+            size += 1;
             if (b & 0x80) == 0 {
                 break;
             }
