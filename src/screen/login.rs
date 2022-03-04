@@ -215,6 +215,7 @@ impl super::Screen for Login {
             elements.login_btn.borrow_mut().disabled = true;
             elements.login_btn_text.borrow_mut().text = "Logging in...".into();
             let mut client_token = self.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+            // Generate random token if it wasn't supplied
             if client_token.is_empty() {
                 client_token = std::iter::repeat(())
                     .map(|()| rand::thread_rng().sample(&rand::distributions::Alphanumeric) as char)
@@ -227,15 +228,31 @@ impl super::Screen for Login {
             let password = elements.password_txt.borrow().input.clone();
             let refresh = elements.refresh;
             thread::spawn(move || {
-                tx.send(try_login(
-                    refresh,
-                    username.clone(),
-                    None,
-                    password,
-                    AccountType::Mojang,
-                    client_token,
-                ))
-                .unwrap();
+                if password.is_empty() {
+                    tx.send(try_login(
+                        refresh,
+                        if username.is_empty() {
+                            format!("Player{}", rand::thread_rng().gen::<u8>())
+                        } else {
+                            username
+                        },
+                        None,
+                        password,
+                        AccountType::None,
+                        client_token,
+                    ))
+                    .unwrap();
+                } else {
+                    tx.send(try_login(
+                        refresh,
+                        username,
+                        None,
+                        password,
+                        AccountType::Mojang,
+                        client_token,
+                    ))
+                    .unwrap();
+                }
             });
         }
         let mut done = false;
