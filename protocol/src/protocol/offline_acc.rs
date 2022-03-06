@@ -1,17 +1,11 @@
 use crate::protocol::login::{Account, AccountImpl, AccountType};
-use rand::{distributions::Alphanumeric, Rng};
 pub struct OfflineAccount {}
 
 impl AccountImpl for OfflineAccount {
     fn login(&self, name: &str, _password: &str, _token: &str) -> Result<Account, super::Error> {
-        let test = std::iter::repeat(())
-            .map(|()| rand::thread_rng().sample(&Alphanumeric) as char)
-            .take(20)
-            .collect();
-
         Ok(Account {
             name: name.to_string(),
-            uuid: Some(test),
+            uuid: None,
             verification_tokens: vec![name.to_string(), "".to_string(), "".to_string()],
             head_img_data: None,
             account_type: AccountType::None,

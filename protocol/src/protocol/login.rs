@@ -41,6 +41,8 @@ impl Account {
     }
 
     /// Whether the profile is complete(not head-wise)
+    /// Will return false if the account is a offline account,
+    /// due to the uuid field being set to None
     pub fn is_complete(&self) -> bool {
         !self.name.is_empty() && self.uuid.is_some() && !self.verification_tokens.is_empty()
     }
