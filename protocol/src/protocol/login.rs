@@ -1,8 +1,9 @@
+use super::mojang::MojangAccount;
+use super::offline_acc::OfflineAccount;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-
 pub trait AccountImpl {
     fn login(&self, username: &str, password: &str, token: &str) -> Result<Account, super::Error>;
 
@@ -40,6 +41,8 @@ impl Account {
     }
 
     /// Whether the profile is complete(not head-wise)
+    /// Will return false if the account is an offline account,
+    /// due to the uuid field being set to None
     pub fn is_complete(&self) -> bool {
         !self.name.is_empty() && self.uuid.is_some() && !self.verification_tokens.is_empty()
     }
@@ -105,7 +108,13 @@ impl Clone for Account {
 
 lazy_static! {
     pub static ref ACCOUNT_IMPLS: Arc<DashMap<AccountType, Arc<dyn AccountImpl + Send + Sync>>> =
-        Arc::new(DashMap::new());
+        Arc::new({
+            let map: DashMap<AccountType, Arc<dyn AccountImpl + Send + Sync>> = DashMap::new();
+            // FIXME: These shouldn't be active all the time - someone might wanna disable them in a config file or something
+            map.insert(AccountType::Mojang, Arc::new(MojangAccount {}));
+            map.insert(AccountType::None, Arc::new(OfflineAccount {}));
+            map
+        });
 }
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]

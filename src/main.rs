@@ -55,8 +55,7 @@ pub mod world;
 
 use crate::entity::Rotation;
 use crate::render::hud::HudContext;
-use leafish_protocol::protocol::login::{Account, AccountType};
-use leafish_protocol::protocol::mojang::MojangAccount;
+use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::{Error, Version};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -213,9 +212,6 @@ fn main() {
     log::set_max_level(log::LevelFilter::Trace);
 
     info!("Starting Leafish...");
-    protocol::login::ACCOUNT_IMPLS
-        .clone()
-        .insert(AccountType::Mojang, Arc::new(MojangAccount {}));
 
     let (vars, mut vsync) = {
         let mut vars = console::Vars::new();

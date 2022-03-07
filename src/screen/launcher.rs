@@ -24,7 +24,7 @@ use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem, ServerList};
 use crate::settings::BACKGROUND_IMAGE;
 use crate::ui::Container;
-use leafish_protocol::protocol::login::Account;
+use leafish_protocol::protocol::login::{Account, AccountType};
 use parking_lot::Mutex;
 use rand::Rng;
 use rfd::FileDialog;
@@ -57,6 +57,7 @@ struct RenderAccount {
     _head_picture: Option<ui::ImageRef>,
     _entry_back: Option<ui::ImageRef>,
     _account_name: Option<ui::TextRef>,
+    _account_type: Option<ui::TextRef>,
 }
 
 impl Launcher {
@@ -296,6 +297,20 @@ impl super::Screen for Launcher {
                 .draw_index(1)
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *back.borrow_mut());
+            let text_account_type = match account_type {
+                AccountType::Microsoft => "Microsoft account".to_string(),
+                AccountType::Mojang => "Mojang account".to_string(),
+                AccountType::None => "Offline account".to_string(),
+                AccountType::Custom(ref str) => str.clone(),
+            };
+            let text_account_type = ui::TextBuilder::new()
+                .text(text_account_type)
+                .position(0.0, 0.0)
+                .colour((150, 150, 150, 255))
+                .draw_index(1)
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .attach(&mut *back.borrow_mut());
+
             let head = ui::ImageBuilder::new()
                 .texture("none") // TODO: Load the actual head image!
                 .position(-200.0, offset * 105.0)
@@ -396,6 +411,7 @@ impl super::Screen for Launcher {
                 _head_picture: Some(head),
                 _entry_back: Some(back),
                 _account_name: Some(account_name),
+                _account_type: Some(text_account_type),
             });
             offset += 1.0;
         }
