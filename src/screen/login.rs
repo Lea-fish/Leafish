@@ -227,10 +227,8 @@ impl super::Screen for Login {
             let username = elements.username_txt.borrow().input.clone();
             let password = elements.password_txt.borrow().input.clone();
             let refresh = elements.refresh;
-            let automatic_offline_accounts = self
-                .vars
-                .get(crate::settings::L_AUTOMATIC_OFFLINE_ACCOUNTS)
-                .eq(&true);
+            let automatic_offline_accounts =
+                *self.vars.get(crate::settings::L_AUTOMATIC_OFFLINE_ACCOUNTS);
 
             thread::spawn(move || {
                 if automatic_offline_accounts && password.is_empty() {
