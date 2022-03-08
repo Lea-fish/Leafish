@@ -194,6 +194,7 @@ pub fn register_vars(vars: &mut console::Vars) {
     vars.register(S_LEFT_PANTS);
     vars.register(S_RIGHT_PANTS);
     vars.register(S_HAT);
+    vars.register(L_AUTOMATIC_OFFLINE_ACCOUNTS);
     vars.register(BACKGROUND_IMAGE);
 }
 
