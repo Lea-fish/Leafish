@@ -20,6 +20,7 @@ use crate::translate::*;
 use serde::Deserialize;
 
 pub use crate::format::color::*;
+use crate::protocol::Error;
 
 const LEGACY_CHAR: char = '§';
 
@@ -248,13 +249,20 @@ impl Component {
         }
     }
 
-    pub fn from_json(v: &serde_json::Value) -> Self {
+    // FIXME: Fix this for MOTD like: [{"color":"green","text":"Sugarcane"},{"color":"gray","text":" -- "},{"color":"red","text":"Release mode"}]
+    pub fn from_json(v: &serde_json::Value) -> Result<Self, Error> {
         match serde_json::from_value::<Chat>(v.clone()) {
-            Ok(chat) => return Component::from_chat(&chat, &Modifier::default()),
+            Ok(chat) => return Ok(Component::from_chat(&chat, &Modifier::default())),
             // Sometimes mojang sends a literal string, so we should interpret it literally
             Err(error) => {
                 log::trace!("Failed error: {}", error);
-                Component::from_legacy_str(v.as_str().expect("valid string"), &Modifier::default())
+                Ok(Component::from_legacy_str(
+                    match v.as_str() {
+                        Some(val) => val,
+                        None => return Err(Error::Err(format!("Couldn't parse json: {}", v))),
+                    },
+                    &Modifier::default(),
+                ))
             }
         }
     }

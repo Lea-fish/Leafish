@@ -426,6 +426,29 @@ fn tick_all(
                 .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
             game.server = None;
             game.renderer.clone().reset();
+        } else if game
+            .server
+            .as_ref()
+            .unwrap()
+            .disconnect_gracefully
+            .load(Ordering::Relaxed)
+        {
+            game.server.as_ref().unwrap().finish_disconnect();
+            let disconnect_reason = game
+                .server
+                .as_ref()
+                .unwrap()
+                .disconnect_data
+                .clone()
+                .write()
+                .disconnect_reason
+                .take();
+            game.screen_sys.close_closable_screens();
+            game.screen_sys
+                .clone()
+                .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
+            game.server = None;
+            game.renderer.clone().reset();
         }
     } else {
         game.chunk_builder.reset();
@@ -462,11 +485,7 @@ fn tick_all(
     let fps_cap = *game.vars.get(settings::R_MAX_FPS);
 
     if game.server.is_some() {
-        game.server
-            .as_ref()
-            .unwrap()
-            .clone()
-            .tick(game.renderer.clone(), delta, game); // TODO: Improve perf in load screen!
+        game.server.as_ref().unwrap().clone().tick(delta, game); // TODO: Improve perf in load screen!
     }
 
     // Check if window is valid, it might be minimized
