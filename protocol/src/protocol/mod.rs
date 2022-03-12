@@ -1583,7 +1583,7 @@ impl Conn {
                 },
                 description: format::Component::from_json(
                     val.get("description").ok_or_else(invalid_status)?,
-                ),
+                )?,
                 favicon: val
                     .get("favicon")
                     .and_then(Value::as_str)

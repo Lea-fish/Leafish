@@ -97,6 +97,7 @@ impl Default for WorldData {
 pub struct Server {
     uuid: protocol::UUID,
     pub conn: Arc<RwLock<Option<protocol::Conn>>>,
+    pub(crate) disconnect_gracefully: AtomicBool,
     pub protocol_version: i32,
     pub mapped_protocol_version: Version,
     forge_mods: Vec<forge::ForgeMod>,
@@ -424,6 +425,7 @@ impl Server {
         server
     }
 
+    #[allow(unused_must_use)]
     fn spawn_reader(mut read: protocol::Conn, server: Arc<Mutex<Option<Arc<Server>>>>) {
         thread::spawn(move || {
             let threads = ThreadPoolBuilder::new().num_threads(8).build().unwrap();
@@ -432,12 +434,14 @@ impl Server {
                 let pck = read.read_packet();
                 match pck {
                     Ok(pck) => match pck.map() {
-                        MappedPacket::KeepAliveClientbound(keep_alive) => packet::send_keep_alive(
-                            server.conn.clone().write().as_mut().unwrap(),
-                            server.mapped_protocol_version,
-                            keep_alive.id,
-                        )
-                        .unwrap(),
+                        MappedPacket::KeepAliveClientbound(keep_alive) => {
+                            packet::send_keep_alive(
+                                server.conn.clone().write().as_mut().unwrap(),
+                                server.mapped_protocol_version,
+                                keep_alive.id,
+                            )
+                            .map_err(|_| server.disconnect_closed(None));
+                        }
                         MappedPacket::ChunkData_NoEntities(chunk_data) => {
                             server.on_chunk_data_no_entities(chunk_data);
                         }
@@ -903,6 +907,7 @@ impl Server {
         Server {
             uuid,
             conn,
+            disconnect_gracefully: Default::default(),
             protocol_version,
             mapped_protocol_version: Version::from_id(protocol_version as u32),
             forge_mods,
@@ -971,11 +976,32 @@ impl Server {
         self.disconnect_data.clone().write().just_disconnected = true;
     }
 
+    pub fn disconnect_closed(&self, reason: Option<format::Component>) {
+        self.disconnect_data.clone().write().disconnect_reason = reason;
+        self.disconnect_data.clone().write().just_disconnected = true;
+        self.disconnect_gracefully.store(true, Ordering::Relaxed);
+    }
+
+    pub fn finish_disconnect(&self) {
+        self.conn.clone().write().take().unwrap().close();
+        if let Some(player) = self.player.clone().write().take() {
+            // TODO: Is this even required if we have the despawn code below?
+            self.entities.clone().write().world.despawn(player.1);
+        }
+        for entity in &*self.entity_map.clone().write() {
+            if self.entities.read().world.get_entity(*entity.1).is_some() {
+                self.entities.clone().write().world.despawn(*entity.1);
+            }
+        }
+        self.sun_model.write().take();
+    }
+
     pub fn is_connected(&self) -> bool {
         return self.conn.clone().read().is_some();
     }
 
-    pub fn tick(&self, renderer: Arc<render::Renderer>, delta: f64, game: &mut Game) {
+    pub fn tick(&self, delta: f64, game: &mut Game) {
+        let renderer = self.renderer.clone();
         let start = SystemTime::now();
         let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis();
         if *self.fps_start.read() + 1000 < time {
@@ -1176,6 +1202,7 @@ impl Server {
         offset * 0.8 + 0.2
     }
 
+    #[allow(unused_must_use)]
     pub fn minecraft_tick(&self, game: &mut Game) {
         if let Some(player) = *self.player.read() {
             let on_ground = {
@@ -1227,7 +1254,7 @@ impl Server {
                 rotation.pitch as f32,
                 on_ground,
             )
-            .unwrap();
+            .map_err(|_| self.disconnect_closed(None));
         }
         if !game.focused {
             if self.block_break_info.lock().pressed {
@@ -1251,7 +1278,7 @@ impl Server {
                         self.block_break_info.lock().break_position,
                         face_idx,
                     )
-                    .unwrap();
+                    .map_err(|_| self.disconnect_closed(None));
                     self.block_break_info.lock().active = false;
                     self.block_break_info.lock().delay = 5;
                     if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
@@ -1263,7 +1290,7 @@ impl Server {
                         self.mapped_protocol_version,
                         Hand::MainHand,
                     )
-                    .unwrap();
+                    .map_err(|_| self.disconnect_closed(None));
                     self.block_break_info.lock().progress += 0.1; // TODO: Make this value meaningful
                     let anim_ent = self.block_break_info.lock().effect_id.unwrap();
                     let entities = self.entities.clone();
@@ -1280,6 +1307,7 @@ impl Server {
         }
     }
 
+    #[allow(unused_must_use)]
     fn reeval_target_block(&self) -> bool {
         if let Some((pos, _, face, _)) = target::trace_ray(
             &self.world.clone(),
@@ -1298,7 +1326,7 @@ impl Server {
                     break_pos,
                     break_face.index() as u8,
                 )
-                .unwrap();
+                .map_err(|_| self.disconnect_closed(None));
                 packet::send_digging(
                     self.conn.clone().write().as_mut().unwrap(),
                     self.mapped_protocol_version,
@@ -1306,7 +1334,7 @@ impl Server {
                     pos,
                     face.index() as u8,
                 )
-                .unwrap();
+                .map_err(|_| self.disconnect_closed(None));
                 self.block_break_info.lock().break_position = pos;
                 self.block_break_info.lock().break_face = face;
                 self.block_break_info.lock().progress = 0.0;
@@ -1391,13 +1419,14 @@ impl Server {
         false
     }
 
+    #[allow(unused_must_use)]
     pub fn on_left_click(&self) {
         packet::send_arm_swing(
             self.conn.clone().write().as_mut().unwrap(),
             self.mapped_protocol_version,
             Hand::MainHand,
         )
-        .unwrap();
+        .map_err(|_| self.disconnect_closed(None));
         // TODO: Implement clientside animation.
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
@@ -1425,7 +1454,7 @@ impl Server {
                         pos,
                         face.index() as u8,
                     )
-                    .unwrap();
+                    .map_err(|_| self.disconnect_closed(None));
                     self.block_break_info.lock().break_face = face;
                     self.block_break_info.lock().break_position = pos;
                     self.block_break_info.lock().progress = 0.0;
@@ -1454,6 +1483,7 @@ impl Server {
         self.abort_breaking(true);
     }
 
+    #[allow(unused_must_use)]
     pub fn abort_breaking(&self, unpress: bool) {
         if unpress && self.block_break_info.lock().pressed {
             self.block_break_info.lock().pressed = false;
@@ -1474,10 +1504,11 @@ impl Server {
                 pos,
                 face.index() as u8,
             )
-            .unwrap();
+            .map_err(|_| self.disconnect_closed(None));
         }
     }
 
+    #[allow(unused_must_use)]
     pub fn on_right_click(&self) {
         if self.player.clone().read().is_some() {
             let world = self.world.clone();
@@ -1519,13 +1550,13 @@ impl Server {
                                 .map(|item| item.stack.clone())
                         }),
                     )
-                    .unwrap();
+                    .map_err(|_| self.disconnect_closed(None));
                     packet::send_arm_swing(
                         self.conn.clone().write().as_mut().unwrap(),
                         self.mapped_protocol_version,
                         Hand::MainHand,
                     )
-                    .unwrap();
+                    .map_err(|_| self.disconnect_closed(None));
                 }
             }
         }
@@ -1721,6 +1752,7 @@ impl Server {
         }
     }
 
+    #[allow(unused_must_use)]
     fn on_game_join(&self, gamemode: u8, entity_id: i32) {
         let gamemode = GameMode::from_int((gamemode & 0x7) as i32);
         let player = entity::player::create_local(&mut self.entities.clone().write());
@@ -1771,7 +1803,7 @@ impl Server {
             127,
             Hand::MainHand,
         )
-        .unwrap(); // TODO: Make these configurable!
+        .map_err(|_| self.disconnect_closed(None)); // TODO: Make these configurable!
     }
 
     fn on_respawn(&self, respawn: mapped_packet::play::clientbound::Respawn) {
