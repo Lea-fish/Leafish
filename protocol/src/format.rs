@@ -672,6 +672,25 @@ pub mod color {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
+    #[test]
+    fn decode_chat() {
+        assert_eq!(
+            serde_json::from_str::<ChatSections>("[]").unwrap(),
+            ChatSections { sections: vec![] }
+        );
+        assert_eq!(
+            serde_json::from_str::<ChatSections>(r#"{"text":"hello world!"}"#).unwrap(),
+            ChatSections {
+                sections: vec![Chat {
+                    text: Some("hello world!".into()),
+                    ..Chat::default()
+                }]
+            }
+        );
+    }
+
     #[test]
     fn test_color_from() {
         match Color::from_str("FF0000").expect("could not parse FF0000") {

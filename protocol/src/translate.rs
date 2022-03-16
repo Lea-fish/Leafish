@@ -6,26 +6,26 @@ use serde::{
 };
 use std::fmt;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(untagged)]
 pub enum ComponentData {
     Chat(Chat),
     Str(String),
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ClickEvent {
     pub action: String,
     pub value: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct Text {
     pub text: String,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct Contents {
     pub id: Option<String>,
     pub name: Option<Text>,
@@ -35,7 +35,7 @@ pub struct Contents {
     pub extra: Option<Vec<ComponentData>>,
 }
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct HoverEvent {
     pub action: String,
     pub contents: Option<Contents>,
@@ -43,7 +43,7 @@ pub struct HoverEvent {
     pub r#type: Option<String>,
 }
 
-#[derive(Default, Clone)]
+#[derive(Default, Clone, PartialEq)]
 pub struct Chat {
     pub translate: Option<String>,
 
@@ -65,7 +65,7 @@ pub struct Chat {
 
 /// Can be deserialized from a single element, which will produce one section,
 /// or from an array of sections.
-#[derive(Clone)]
+#[derive(Default, Debug, Clone, PartialEq)]
 pub struct ChatSections {
     pub sections: Vec<Chat>,
 }
