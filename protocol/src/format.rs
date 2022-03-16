@@ -675,7 +675,50 @@ mod test {
     use super::*;
 
     #[test]
-    fn decode_chat() {
+    fn chat() {
+        assert_eq!(
+            serde_json::from_str::<Chat>(
+                r#"{
+                    "unknownField": "bar",
+                }"#
+            )
+            .unwrap(),
+            Chat::default()
+        );
+        assert_eq!(
+            serde_json::from_str::<Chat>(
+                r#"{
+                    "text": "hello world!",
+                    "translate": "foo.bar",
+                    "color": "green",
+                    "bold": true,
+                    "italic": false,
+                    "underlined": true,
+                    "strikethrough": true,
+                    "obfuscated": false,
+                    "clickEvent": {
+                        "action": "foo",
+                        "data": "Hello world!",
+                    },
+                    "hoverEvent": {
+                        "action": "foo",
+                        "data": "Hello world!",
+                    },
+                    "insertion": "",
+                    "extra": [],
+                    "with": []
+                }"#
+            )
+            .unwrap(),
+            Chat {
+                text: Some("hello world!".into()),
+                ..Chat::default()
+            }
+        );
+    }
+
+    #[test]
+    fn chat_section() {
         assert_eq!(
             serde_json::from_str::<ChatSections>("[]").unwrap(),
             ChatSections { sections: vec![] }
@@ -687,6 +730,21 @@ mod test {
                     text: Some("hello world!".into()),
                     ..Chat::default()
                 }]
+            }
+        );
+        assert_eq!(
+            serde_json::from_str::<ChatSections>(r#"[{"text":"foo"},{"text":"bar"}]"#).unwrap(),
+            ChatSections {
+                sections: vec![
+                    Chat {
+                        text: Some("foo".into()),
+                        ..Chat::default()
+                    },
+                    Chat {
+                        text: Some("bar".into()),
+                        ..Chat::default()
+                    }
+                ]
             }
         );
     }
