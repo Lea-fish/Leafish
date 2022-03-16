@@ -693,13 +693,13 @@ mod test {
                     "obfuscated": false,
                     "clickEvent": {
                         "action": "foo",
-                        "data": "Hello world!"
+                        "value": "Hello world!"
                     },
                     "hoverEvent": {
                         "action": "foo",
-                        "data": "Hello world!"
+                        "value": "Hello world!"
                     },
-                    "insertion": "",
+                    "insertion": "baz",
                     "extra": [],
                     "with": []
                 }"#
@@ -707,7 +707,26 @@ mod test {
             .unwrap(),
             Chat {
                 text: Some("hello world!".into()),
-                ..Chat::default()
+                translate: Some("foo.bar".into()),
+                color: Some(Color::Green),
+                bold: Some(true),
+                italic: Some(false),
+                underlined: Some(true),
+                strikethrough: Some(true),
+                obfuscated: Some(false),
+                click_event: Some(ClickEvent {
+                    action: "foo".into(),
+                    value: "Hello world!".into(),
+                }),
+                hover_event: Some(HoverEvent {
+                    action: "foo".into(),
+                    contents: None,
+                    value: Some("Hello world!".into()),
+                    r#type: None,
+                }),
+                insertion: Some("baz".into()),
+                extra: Some(vec![]),
+                with: vec![],
             }
         );
     }

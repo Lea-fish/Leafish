@@ -20,14 +20,9 @@ pub struct ClickEvent {
 }
 
 #[derive(Deserialize, Debug, Clone, PartialEq)]
-pub struct Text {
-    pub text: String,
-}
-
-#[derive(Deserialize, Debug, Clone, PartialEq)]
 pub struct Contents {
     pub id: Option<String>,
-    pub name: Option<Text>,
+    pub name: Option<String>,
     pub count: Option<usize>,
     pub r#type: Option<String>,
     pub text: Option<String>,
@@ -38,7 +33,7 @@ pub struct Contents {
 pub struct HoverEvent {
     pub action: String,
     pub contents: Option<Contents>,
-    pub value: Option<Text>,
+    pub value: Option<String>,
     pub r#type: Option<String>,
 }
 
