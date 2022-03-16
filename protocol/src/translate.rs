@@ -1,5 +1,10 @@
 use crate::format::Color;
-use serde::Deserialize;
+use serde::{
+    de,
+    de::{MapAccess, SeqAccess, Visitor},
+    Deserialize, Deserializer,
+};
+use std::fmt;
 
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
@@ -38,8 +43,7 @@ pub struct HoverEvent {
     pub r#type: Option<String>,
 }
 
-#[derive(Deserialize, Clone)]
-#[serde(rename_all = "camelCase")]
+#[derive(Default, Clone)]
 pub struct Chat {
     pub translate: Option<String>,
 
@@ -56,8 +60,117 @@ pub struct Chat {
     pub text: Option<String>,
 
     pub extra: Option<Vec<ComponentData>>,
-    #[serde(default)]
     pub with: Vec<ComponentData>,
+}
+
+/// Can be deserialized from a single element, which will produce one section,
+/// or from an array of sections.
+#[derive(Clone)]
+pub struct ChatSections {
+    pub sections: Vec<Chat>,
+}
+
+struct ChatVisitor;
+
+/// This needs to be custom, so that the `ChatSections` deserializer can access
+/// the `ChatVisitor`.
+impl<'de> Deserialize<'de> for Chat {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        deserializer.deserialize_map(ChatVisitor)
+    }
+}
+
+impl<'de> Visitor<'de> for ChatVisitor {
+    type Value = Chat;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a chat section")
+    }
+
+    fn visit_map<M>(self, mut access: M) -> Result<Self::Value, M::Error>
+    where
+        M: MapAccess<'de>,
+    {
+        let mut chat = Chat::default();
+        static FIELDS: &[&str] = &[
+            "translate",
+            "color",
+            "bold",
+            "italic",
+            "underlined",
+            "strikethrough",
+            "obfuscated",
+            "click_event",
+            "hover_event",
+            "insertion",
+            "text",
+            "with",
+        ];
+        // Need to deserialize into a String to make this work for all 3 types of strings
+        while let Some(key) = access.next_key::<String>()? {
+            match key.as_str() {
+                "translate" => chat.translate = Some(access.next_value()?),
+
+                "color" => chat.color = Some(access.next_value()?),
+                "bold" => chat.bold = Some(access.next_value()?),
+                "italic" => chat.italic = Some(access.next_value()?),
+                "underlined" => chat.underlined = Some(access.next_value()?),
+                "strikethrough" => chat.strikethrough = Some(access.next_value()?),
+                "obfuscated" => chat.obfuscated = Some(access.next_value()?),
+
+                "clickEvent" => chat.click_event = Some(access.next_value()?),
+                "hoverEvent" => chat.hover_event = Some(access.next_value()?),
+                "insertion" => chat.insertion = Some(access.next_value()?),
+                "text" => chat.text = Some(access.next_value()?),
+
+                "extra" => chat.extra = Some(access.next_value()?),
+                "with" => chat.with = access.next_value()?,
+                _ => return Err(de::Error::unknown_field(&key, FIELDS)),
+            }
+        }
+        Ok(chat)
+    }
+}
+impl<'de> Deserialize<'de> for ChatSections {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        struct ChatSectionsVisitor;
+
+        impl<'de> Visitor<'de> for ChatSectionsVisitor {
+            type Value = ChatSections;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a chat section")
+            }
+
+            fn visit_map<M>(self, access: M) -> Result<Self::Value, M::Error>
+            where
+                M: MapAccess<'de>,
+            {
+                Ok(ChatSections {
+                    sections: vec![ChatVisitor.visit_map(access)?],
+                })
+            }
+
+            fn visit_seq<A>(self, mut access: A) -> Result<Self::Value, A::Error>
+            where
+                A: SeqAccess<'de>,
+            {
+                let mut sections = Vec::with_capacity(access.size_hint().unwrap_or(0));
+                while let Some(section) = access.next_element()? {
+                    sections.push(section);
+                }
+                Ok(ChatSections { sections })
+            }
+        }
+
+        deserializer.deserialize_any(ChatSectionsVisitor)
+    }
 }
 
 impl std::fmt::Debug for Chat {
