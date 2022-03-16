@@ -679,7 +679,7 @@ mod test {
         assert_eq!(
             serde_json::from_str::<Chat>(
                 r#"{
-                    "unknownField": "bar",
+                    "unknownField": "bar"
                 }"#
             )
             .unwrap(),

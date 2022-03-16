@@ -1,6 +1,5 @@
 use crate::format::Color;
 use serde::{
-    de,
     de::{MapAccess, SeqAccess, Visitor},
     Deserialize, Deserializer,
 };
@@ -95,20 +94,6 @@ impl<'de> Visitor<'de> for ChatVisitor {
         M: MapAccess<'de>,
     {
         let mut chat = Chat::default();
-        static FIELDS: &[&str] = &[
-            "translate",
-            "color",
-            "bold",
-            "italic",
-            "underlined",
-            "strikethrough",
-            "obfuscated",
-            "click_event",
-            "hover_event",
-            "insertion",
-            "text",
-            "with",
-        ];
         // Need to deserialize into a String to make this work for all 3 types of strings
         while let Some(key) = access.next_key::<String>()? {
             match key.as_str() {
@@ -128,7 +113,7 @@ impl<'de> Visitor<'de> for ChatVisitor {
 
                 "extra" => chat.extra = Some(access.next_value()?),
                 "with" => chat.with = access.next_value()?,
-                _ => return Err(de::Error::unknown_field(&key, FIELDS)),
+                _ => {}
             }
         }
         Ok(chat)
