@@ -677,12 +677,7 @@ mod test {
     #[test]
     fn chat() {
         assert_eq!(
-            serde_json::from_str::<Chat>(
-                r#"{
-                    "unknownField": "bar"
-                }"#
-            )
-            .unwrap(),
+            serde_json::from_str::<Chat>(r#"{"unknownField": "bar"}"#).unwrap(),
             Chat::default()
         );
         assert_eq!(
@@ -698,11 +693,11 @@ mod test {
                     "obfuscated": false,
                     "clickEvent": {
                         "action": "foo",
-                        "data": "Hello world!",
+                        "data": "Hello world!"
                     },
                     "hoverEvent": {
                         "action": "foo",
-                        "data": "Hello world!",
+                        "data": "Hello world!"
                     },
                     "insertion": "",
                     "extra": [],

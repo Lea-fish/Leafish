@@ -113,7 +113,9 @@ impl<'de> Visitor<'de> for ChatVisitor {
 
                 "extra" => chat.extra = Some(access.next_value()?),
                 "with" => chat.with = access.next_value()?,
-                _ => {}
+                _ => {
+                    let _: serde_json::Value = access.next_value()?;
+                }
             }
         }
         Ok(chat)
