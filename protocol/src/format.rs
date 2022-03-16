@@ -123,8 +123,8 @@ impl Component {
 
     pub fn from_str(str: &str) -> Self {
         log::trace!("Raw: {}", str);
-        match serde_json::from_str::<Chat>(str) {
-            Ok(chat) => Component::from_chat(&chat, &Modifier::default()),
+        match serde_json::from_str::<ChatSections>(str) {
+            Ok(sections) => Component::from_chat_sections(sections, &Modifier::default()),
             // Sometimes mojang sends a literal string, so we should interpret it literally
             Err(error) => {
                 log::trace!("Failed error: {}", error);
@@ -170,6 +170,16 @@ impl Component {
                 })
                 .flatten()
                 .collect::<_>(),
+        }
+    }
+
+    fn from_chat_sections(sections: ChatSections, modifier: &Modifier) -> Self {
+        Component {
+            list: sections
+                .sections
+                .into_iter()
+                .flat_map(|c| Self::from_chat(&c, modifier).list)
+                .collect(),
         }
     }
 
@@ -249,10 +259,14 @@ impl Component {
         }
     }
 
-    // FIXME: Fix this for MOTD like: [{"color":"green","text":"Sugarcane"},{"color":"gray","text":" -- "},{"color":"red","text":"Release mode"}]
     pub fn from_json(v: &serde_json::Value) -> Result<Self, Error> {
-        match serde_json::from_value::<Chat>(v.clone()) {
-            Ok(chat) => return Ok(Component::from_chat(&chat, &Modifier::default())),
+        match serde_json::from_value::<ChatSections>(v.clone()) {
+            Ok(sections) => {
+                return Ok(Component::from_chat_sections(
+                    sections,
+                    &Modifier::default(),
+                ))
+            }
             // Sometimes mojang sends a literal string, so we should interpret it literally
             Err(error) => {
                 log::trace!("Failed error: {}", error);
@@ -658,6 +672,97 @@ pub mod color {
 
 #[cfg(test)]
 mod test {
+    use super::*;
+
+    #[test]
+    fn chat() {
+        assert_eq!(
+            serde_json::from_str::<Chat>(r#"{"unknownField": "bar"}"#).unwrap(),
+            Chat::default()
+        );
+        assert_eq!(
+            serde_json::from_str::<Chat>(
+                r#"{
+                    "text": "hello world!",
+                    "translate": "foo.bar",
+                    "color": "green",
+                    "bold": true,
+                    "italic": false,
+                    "underlined": true,
+                    "strikethrough": true,
+                    "obfuscated": false,
+                    "clickEvent": {
+                        "action": "foo",
+                        "value": "Hello world!"
+                    },
+                    "hoverEvent": {
+                        "action": "foo",
+                        "value": "Hello world!"
+                    },
+                    "insertion": "baz",
+                    "extra": [],
+                    "with": []
+                }"#
+            )
+            .unwrap(),
+            Chat {
+                text: Some("hello world!".into()),
+                translate: Some("foo.bar".into()),
+                color: Some(Color::Green),
+                bold: Some(true),
+                italic: Some(false),
+                underlined: Some(true),
+                strikethrough: Some(true),
+                obfuscated: Some(false),
+                click_event: Some(ClickEvent {
+                    action: "foo".into(),
+                    value: "Hello world!".into(),
+                }),
+                hover_event: Some(HoverEvent {
+                    action: "foo".into(),
+                    contents: None,
+                    value: Some("Hello world!".into()),
+                    r#type: None,
+                }),
+                insertion: Some("baz".into()),
+                extra: Some(vec![]),
+                with: vec![],
+            }
+        );
+    }
+
+    #[test]
+    fn chat_section() {
+        assert_eq!(
+            serde_json::from_str::<ChatSections>("[]").unwrap(),
+            ChatSections { sections: vec![] }
+        );
+        assert_eq!(
+            serde_json::from_str::<ChatSections>(r#"{"text":"hello world!"}"#).unwrap(),
+            ChatSections {
+                sections: vec![Chat {
+                    text: Some("hello world!".into()),
+                    ..Chat::default()
+                }]
+            }
+        );
+        assert_eq!(
+            serde_json::from_str::<ChatSections>(r#"[{"text":"foo"},{"text":"bar"}]"#).unwrap(),
+            ChatSections {
+                sections: vec![
+                    Chat {
+                        text: Some("foo".into()),
+                        ..Chat::default()
+                    },
+                    Chat {
+                        text: Some("bar".into()),
+                        ..Chat::default()
+                    }
+                ]
+            }
+        );
+    }
+
     #[test]
     fn test_color_from() {
         match Color::from_str("FF0000").expect("could not parse FF0000") {
