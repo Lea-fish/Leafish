@@ -891,37 +891,37 @@ impl Lengthable for VarInt {
     }
 }
 
+const VARINT_SEGMENT_BITS: u32 = 0b0111_1111;
+const VARINT_CONTINUE_BIT: u32 = 0b1000_0000;
+
 impl Serializable for VarInt {
     /// Decodes a `VarInt` from the Reader
     fn read_from<R: io::Read>(buf: &mut R) -> Result<VarInt, Error> {
-        const PART: u32 = 0x7F;
-        let mut size = 0;
+        let mut position = 0;
         let mut val = 0u32;
         loop {
-            let b = buf.read_u8()? as u32;
-            val |= (b & PART) << (size * 7);
-            if size > 5 {
-                return Err(Error::Err("VarInt too big".to_owned()));
-            }
-            size += 1;
-            if (b & 0x80) == 0 {
+            let current_byte = buf.read_u8()? as u32;
+            val |= (current_byte & VARINT_SEGMENT_BITS) << position;
+            if (current_byte & VARINT_CONTINUE_BIT) == 0 {
                 break;
             }
+            position += 7;
+            if position >= 32 {
+                return Err(Error::Err("VarInt too big".to_owned()));
+            }
         }
-
         Ok(VarInt(val as i32))
     }
 
     /// Encodes a `VarInt` into the Writer
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
-        const PART: u32 = 0x7F;
         let mut val = self.0 as u32;
         loop {
-            if (val & !PART) == 0 {
+            if (val & VARINT_CONTINUE_BIT) == 0 {
                 buf.write_u8(val as u8)?;
                 return Ok(());
             }
-            buf.write_u8(((val & PART) | 0x80) as u8)?;
+            buf.write_u8(((val & VARINT_SEGMENT_BITS) | VARINT_CONTINUE_BIT) as u8)?;
             val >>= 7;
         }
     }
@@ -1017,21 +1017,23 @@ impl Lengthable for VarLong {
     }
 }
 
+const VARLONG_SEGMENT_BITS: u64 = 0b0111_1111;
+const VARLONG_CONTINUE_BIT: u64 = 0b1000_0000;
+
 impl Serializable for VarLong {
     /// Decodes a `VarLong` from the Reader
     fn read_from<R: io::Read>(buf: &mut R) -> Result<VarLong, Error> {
-        const PART: u64 = 0x7F;
-        let mut size = 0;
+        let mut position = 0;
         let mut val = 0u64;
         loop {
-            let b = buf.read_u8()? as u64;
-            val |= (b & PART) << (size * 7);
-            size += 1;
-            if size > 10 {
-                return Err(Error::Err("VarLong too big".to_owned()));
-            }
-            if (b & 0x80) == 0 {
+            let current_byte = buf.read_u8()? as u64;
+            val |= (current_byte & VARLONG_SEGMENT_BITS) << position;
+            if (current_byte & VARLONG_CONTINUE_BIT) == 0 {
                 break;
+            }
+            position += 7;
+            if position >= 64 {
+                return Err(Error::Err("VarLong too big".to_owned()));
             }
         }
 
@@ -1040,14 +1042,13 @@ impl Serializable for VarLong {
 
     /// Encodes a `VarLong` into the Writer
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
-        const PART: u64 = 0x7F;
         let mut val = self.0 as u64;
         loop {
-            if (val & !PART) == 0 {
+            if (val & VARLONG_CONTINUE_BIT) == 0 {
                 buf.write_u8(val as u8)?;
                 return Ok(());
             }
-            buf.write_u8(((val & PART) | 0x80) as u8)?;
+            buf.write_u8(((val & VARLONG_SEGMENT_BITS) | VARLONG_CONTINUE_BIT) as u8)?;
             val >>= 7;
         }
     }
