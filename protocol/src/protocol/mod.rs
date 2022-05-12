@@ -78,8 +78,10 @@ pub enum Version {
 }
 
 impl Version {
-    const NEWEST: Version = Version::V1_16;
+    const ACTUAL_VERSIONS: [Version; 10] = [Version::V1_7, Version::V1_8, Version::V1_9, Version::V1_10,
+        Version::V1_11, Version::V1_12, Version::V1_13, Version::V1_14, Version::V1_15, Version::V1_16];
     /// This is only the newest *supported* version
+    const NEWEST: Version = Version::V1_16;
 
     pub fn from_id(protocol_version: u32) -> Version {
         match protocol_version {
@@ -99,13 +101,24 @@ impl Version {
         }
     }
 
-    pub fn is_supported(&self) -> bool {
+    pub fn to_lastest_id(&self) -> u32 {
         match self {
-            Version::Old => false,
-            Version::New => false,
-            Version::Other => false,
-            _ => true,
+            Version::V1_7 => 5,
+            Version::V1_8 => 47,
+            Version::V1_9 => 110,
+            Version::V1_10 => 210,
+            Version::V1_11 => 316,
+            Version::V1_12 => 340,
+            Version::V1_13 => 404,
+            Version::V1_14 => 498,
+            Version::V1_15 => 578,
+            Version::V1_16 => 754,
+            _ => unreachable!(),
         }
+    }
+
+    pub fn is_supported(&self) -> bool {
+        !matches!(self, Version::Old | Version::New | Version::Other)
     }
 }
 
@@ -1228,6 +1241,18 @@ impl Conn {
         Conn::try_stream(&address, port, protocol_version)
     }
 
+    pub fn new_resolved(address: &str, port: u16, protocol_version: i32, resolved: Option<&Vec<(String, u16)>>) -> Result<Conn, Error> {
+        if resolved.is_some() {
+            for (adresse, port) in resolved.unwrap() {
+                if let Ok(conn) = Conn::try_stream(&adresse, port, protocol_version) {
+                    return Ok(conn);
+                }
+            }
+        }
+
+        Conn::try_stream(&address, port, protocol_version)
+    }
+
     fn try_stream(address: &str, port: u16, protocol_version: i32) -> Result<Conn, Error> {
         let stream = TcpStream::connect(format!("{}:{}", address, port))?;
         Ok(Conn {
@@ -1719,4 +1744,13 @@ pub trait PacketType {
     fn packet_id(&self, protocol_version: i32) -> i32;
 
     fn write<W: io::Write>(&self, buf: &mut W) -> Result<(), Error>;
+}
+
+pub fn multi_ping(address: &str, port: u16, resolved: Option<&Vec<String, u16>>) -> Vec<(Version, Result<(), Error>)> {
+    let mut result = vec![];
+    for version in Version::ACTUAL_VERSIONS {
+        let mut conn = Conn::new_resolved(address, port, version.to_lastest_id(), resolved).map(|_| ());
+        result.push(conn);
+    }
+    result
 }
