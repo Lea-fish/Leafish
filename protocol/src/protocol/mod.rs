@@ -60,6 +60,7 @@ static CURRENT_PROTOCOL_VERSION: AtomicI32 = AtomicI32::new(SUPPORTED_PROTOCOLS[
 static NETWORK_DEBUG: AtomicBool = AtomicBool::new(false);
 
 /// A list of all supported versions
+#[repr(C)]
 #[derive(PartialOrd, PartialEq, Debug, Copy, Clone)]
 pub enum Version {
     Other,
@@ -1666,8 +1667,8 @@ pub struct StatusPlayer {
 impl Read for Conn {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         match self.read_cipher.clone().write().unwrap().as_mut() {
-            Option::None => self.stream.read(buf),
-            Option::Some(cipher) => {
+            None => self.stream.read(buf),
+            Some(cipher) => {
                 let ret = self.stream.read(buf)?;
                 cipher.decrypt(&mut buf[..ret]);
 
@@ -1680,8 +1681,8 @@ impl Read for Conn {
 impl Write for Conn {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
         match self.write_cipher.clone().write().unwrap().as_mut() {
-            Option::None => self.stream.write(buf),
-            Option::Some(cipher) => {
+            None => self.stream.write(buf),
+            Some(cipher) => {
                 let mut data = vec![0; buf.len()];
                 data[..buf.len()].clone_from_slice(&buf[..]);
 
@@ -1700,7 +1701,7 @@ impl Write for Conn {
 
 impl Clone for Conn {
     fn clone(&self) -> Self {
-        Conn {
+        Self {
             stream: self.stream.try_clone().unwrap(),
             host: self.host.clone(),
             port: self.port,
@@ -1715,6 +1716,7 @@ impl Clone for Conn {
     }
 }
 
+#[no_mangle]
 pub trait PacketType {
     fn packet_id(&self, protocol_version: i32) -> i32;
 
