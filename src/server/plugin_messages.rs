@@ -1,14 +1,14 @@
 use crate::protocol::packet::play::serverbound::PluginMessageServerbound;
 use crate::protocol::packet::play::serverbound::PluginMessageServerbound_i16;
 use crate::protocol::{Serializable, VarShort};
-use leafish_protocol::protocol::Conn;
+use leafish_protocol::protocol::{Conn, ConnWrapper};
 
 pub struct Brand {
     pub brand: String,
 }
 
 impl Brand {
-    pub fn write_to(self, conn: &mut Conn) {
+    pub fn write_to(self, conn: &mut ConnWrapper) {
         let protocol_version = crate::protocol::current_protocol_version();
 
         let mut data = vec![];

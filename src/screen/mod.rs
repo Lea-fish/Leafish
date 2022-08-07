@@ -149,17 +149,14 @@ pub struct ScreenSystem {
 }
 
 impl ScreenSystem {
-    pub fn new() -> ScreenSystem {
+    pub fn new() -> Self {
         Default::default()
     }
 
     pub fn add_screen(&self, screen: Box<dyn Screen>) {
         let new_offset = self.pre_computed_screens.clone().read().len() as isize;
         self.pre_computed_screens.clone().write().push(screen);
-        let curr_offset = self.lowest_offset.load(Ordering::Acquire);
-        if curr_offset == -1 {
-            self.lowest_offset.store(new_offset, Ordering::Release);
-        }
+        let _ = self.lowest_offset.compare_exchange(-1, new_offset, Ordering::Acquire, Ordering::Relaxed);
     }
 
     pub fn close_closable_screens(&self) {
@@ -169,14 +166,18 @@ impl ScreenSystem {
     }
 
     pub fn pop_screen(&self) {
-        if self.pre_computed_screens.clone().read().last().is_some() {
-            // TODO: Improve thread safety (becuz of possible race conditions (which are VERY UNLIKELY to happen - and only if screens get added and removed very fast (in one tick)))
-            self.pre_computed_screens.clone().write().pop();
-            let curr_offset = self.lowest_offset.load(Ordering::Acquire);
-            let new_offset = self.pre_computed_screens.clone().read().len() as isize;
-            if curr_offset == -1 || new_offset < curr_offset {
-                self.lowest_offset.store(new_offset, Ordering::Release);
-            }
+        let pre_computed_screens = self.pre_computed_screens.clone();
+        let mut pre_computed_screens = pre_computed_screens.write();
+        if pre_computed_screens.last().is_some() {
+            pre_computed_screens.pop();
+            let new_offset = pre_computed_screens.len() as isize;
+            let _ = self.lowest_offset.fetch_update(Ordering::Release, Ordering::Acquire, |curr_offset| {
+                if curr_offset == -1 || new_offset < curr_offset {
+                    Some(new_offset)
+                } else {
+                    None
+                }
+            });
         }
     }
 
@@ -212,7 +213,7 @@ impl ScreenSystem {
         if let Some(last) = self.pre_computed_screens.clone().read().last() {
             return last.ty();
         }
-        ScreenType::Other(String::new())
+        Other(String::new())
     }
 
     pub fn receive_char(&self, received: char, game: &mut Game) {
@@ -231,8 +232,8 @@ impl ScreenSystem {
     pub fn tick(
         &self,
         delta: f64,
-        renderer: Arc<render::Renderer>,
-        ui_container: &mut ui::Container,
+        renderer: Arc<Renderer>,
+        ui_container: &mut Container,
         window: &Window,
     ) -> bool {
         let lowest = self.lowest_offset.load(Ordering::Acquire);
@@ -273,14 +274,14 @@ impl ScreenSystem {
                 .iter()
                 .skip(lowest as usize)
             {
-                let idx = (self.screens.read().len() as isize - 1).max(0) as usize;
-                self.screens.write().push(ScreenInfo {
+                let mut screens = self.screens.write();
+                let idx = (screens.len() as isize - 1).max(0) as usize;
+                screens.push(ScreenInfo {
                     screen: Arc::new(Mutex::new(screen.clone())),
                     active: false,
                     last_width: -1,
                     last_height: -1,
                 });
-                let mut screens = self.screens.write();
                 let last = screens.get_mut(idx);
                 if let Some(last) = last {
                     if last.active {
@@ -293,23 +294,20 @@ impl ScreenSystem {
                     }
                 }
                 let mut current = screens.last_mut().unwrap();
-                current
-                    .screen
-                    .clone()
-                    .lock()
+                let curr_screen = current.screen.clone();
+                let mut curr_screen = curr_screen.lock();
+                curr_screen
                     .init(self, renderer.clone(), ui_container);
                 current.active = true;
-                current
-                    .screen
-                    .clone()
-                    .lock()
+                curr_screen
                     .on_active(self, renderer.clone(), ui_container);
             }
             self.lowest_offset.store(-1, Ordering::Release);
             if !was_closable {
+                let (safe_width, safe_height) = renderer.screen_data.read().safe_dims();
                 window.set_cursor_position(Position::Physical(PhysicalPosition::new(
-                    (renderer.screen_data.read().safe_width / 2) as i32,
-                    (renderer.screen_data.read().safe_height / 2) as i32,
+                    (safe_width / 2) as i32,
+                    (safe_height / 2) as i32,
                 )));
             }
         }
@@ -331,29 +329,37 @@ impl ScreenSystem {
                     .lock()
                     .on_active(self, renderer.clone(), ui_container);
             }
-            if current.last_width != renderer.screen_data.read().safe_width as i32
-                || current.last_height != renderer.screen_data.read().safe_height as i32
+            let (safe_width, safe_height) = renderer.screen_data.read().safe_dims();
+            if current.last_width != safe_width as i32
+                || current.last_height != safe_height as i32
             {
                 if current.last_width != -1 && current.last_height != -1 {
                     for screen in tmp.iter_mut().enumerate() {
-                        if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
-                            screen.1.screen.clone().lock().on_resize(
+                        let inner_screen = screen.1.screen.clone();
+                        let mut inner_screen = inner_screen.lock();
+                        if inner_screen.is_tick_always() || screen.0 == len - 1 {
+                            inner_screen.on_resize(
                                 self,
                                 renderer.clone(),
                                 ui_container,
                             );
-                            screen.1.last_width = renderer.screen_data.read().safe_width as i32;
-                            screen.1.last_height = renderer.screen_data.read().safe_height as i32;
+                            drop(inner_screen);
+                            let (safe_width, safe_height) = renderer.screen_data.read().safe_dims();
+                            screen.1.last_width = safe_width as i32;
+                            screen.1.last_height = safe_height as i32;
                         }
                     }
                 } else {
-                    current.last_width = renderer.screen_data.read().safe_width as i32;
-                    current.last_height = renderer.screen_data.read().safe_height as i32;
+                    let (safe_width, safe_height) = renderer.screen_data.read().safe_dims();
+                    current.last_width = safe_width as i32;
+                    current.last_height = safe_height as i32;
                 }
             }
             for screen in tmp.iter_mut().enumerate() {
-                if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
-                    screen.1.screen.clone().lock().tick(
+                let inner_screen = screen.1.screen.clone();
+                let mut inner_screen = inner_screen.lock();
+                if inner_screen.is_tick_always() || screen.0 == len - 1 {
+                    inner_screen.tick(
                         self,
                         renderer.clone(),
                         ui_container,

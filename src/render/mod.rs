@@ -113,6 +113,20 @@ pub struct ScreenData {
     pub safe_height: u32,
 }
 
+impl ScreenData {
+
+    #[inline(always)]
+    pub fn dims(&self) -> (u32, u32) {
+        (self.width, self.height)
+    }
+
+    #[inline(always)]
+    pub fn safe_dims(&self) -> (u32, u32) {
+        (self.safe_width, self.safe_height)
+    }
+
+}
+
 #[derive(Default)]
 pub struct ChunkBuffer {
     solid: Option<ChunkRenderInfo>,

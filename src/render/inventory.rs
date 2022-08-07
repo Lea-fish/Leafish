@@ -5,9 +5,9 @@ use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
 use crate::ui::{Container, ImageRef, TextRef, VAttach};
 use crate::{ui, Game};
-use glutin::event::VirtualKeyCode;
 use parking_lot::RwLock;
 use std::sync::Arc;
+use winit::event::VirtualKeyCode;
 
 #[derive(Clone)]
 pub struct InventoryWindow {

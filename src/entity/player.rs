@@ -33,7 +33,7 @@ pub fn add_systems(
     // TODO: Check sync/async usage!
     entity_sched.add_system(
         handle_movement
-            .system()
+            // .system()
             .label(SystemExecStage::Normal)
             .before(SystemExecStage::Render),
     );
@@ -41,37 +41,37 @@ pub fn add_systems(
     // m.add_render_system(sys);
     sync.add_system(
         update_render_players
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     )
     .add_system(
         player_added
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     )
     .add_system(
         update_slime
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     )
     .add_system(
         added_slime
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     )
     .add_system(
         update_zombie
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     )
     .add_system(
         added_zombie
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     );

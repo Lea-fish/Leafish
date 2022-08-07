@@ -20,8 +20,6 @@
 use copypasta::nop_clipboard;
 use copypasta::ClipboardContext;
 use copypasta::ClipboardProvider;
-#[cfg(target_os = "linux")]
-use glutin::platform::unix::EventLoopWindowTargetExtUnix;
 use instant::{Duration, Instant};
 use log::{debug, error, info, warn};
 use std::fs;
@@ -65,6 +63,8 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
+#[cfg(target_os = "linux")]
+use winit::platform::unix::EventLoopWindowTargetExtUnix;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -82,7 +82,7 @@ pub struct Game {
     renderer: Arc<render::Renderer>,
     screen_sys: Arc<screen::ScreenSystem>,
     resource_manager: Arc<RwLock<resources::Manager>>,
-    clipboard_provider: Arc<RwLock<Box<dyn copypasta::ClipboardProvider>>>,
+    clipboard_provider: Arc<RwLock<Box<dyn ClipboardProvider>>>,
     console: Arc<Mutex<console::Console>>,
     vars: Rc<console::Vars>,
     should_close: bool,

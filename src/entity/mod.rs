@@ -62,7 +62,7 @@ pub fn add_systems(
 ) {
     entity_sched.add_system(
         systems::update_last_position
-            .system()
+            // .system()
             .label(SystemExecStage::Normal),
     );
 
@@ -70,29 +70,29 @@ pub fn add_systems(
     entity_sched
         .add_system(
             systems::apply_velocity
-                .system()
+                // .system()
                 .label(SystemExecStage::Normal),
         )
         .add_system(
             systems::apply_gravity
-                .system()
+                // .system()
                 .label(SystemExecStage::Normal),
         );
     sync.add_system(
         systems::lerp_position
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     )
     .add_system(
         systems::lerp_rotation
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     )
     .add_system(
         systems::light_entity
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     );

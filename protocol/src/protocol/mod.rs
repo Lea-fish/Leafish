@@ -29,8 +29,8 @@ use std::sync::{Arc, Mutex, RwLock};
 
 use aes::Aes128;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
-use cfb8::cipher::{AsyncStreamCipher, NewCipher};
-use cfb8::Cfb8;
+use cfb8::cipher::AsyncStreamCipher;
+use cfb8::{Decryptor, Encryptor};
 use flate2::read::{ZlibDecoder, ZlibEncoder};
 use flate2::Compression;
 use instant::{Duration, Instant};
@@ -41,6 +41,7 @@ use serde::{Deserialize, Serialize};
 use trust_dns_resolver::config::ResolverConfig;
 use trust_dns_resolver::config::ResolverOpts;
 use trust_dns_resolver::Resolver;
+use aes::cipher::KeyIvInit;
 
 use crate::format;
 use crate::nbt;
@@ -1162,21 +1163,124 @@ impl ::std::fmt::Display for Error {
     }
 }
 
-type Aes128Cfb = Cfb8<Aes128>;
+#[repr(transparent)]
+#[derive(Clone)]
+pub struct ConnWrapper(Arc<Conn>);
+
+impl ConnWrapper {
+
+    #[inline(always)]
+    pub fn new(conn: Arc<Conn>) -> Self {
+        Self(conn)
+    }
+
+    #[inline(always)]
+    pub fn inner(&self) -> &Arc<Conn> {
+        &self.0
+    }
+
+    pub fn write_packet<T: PacketType>(&self, packet: T) -> Result<(), Error> {
+        self.0.write_packet(packet)
+    }
+
+    pub fn write_plugin_message(&self, channel: &str, data: &[u8]) -> Result<(), Error> {
+        self.0.write_plugin_message(channel, data)
+    }
+
+    pub fn write_fmlhs_plugin_message(&self, msg: &forge::FmlHs) -> Result<(), Error> {
+        self.0.write_fmlhs_plugin_message(msg)
+    }
+
+    pub fn write_login_plugin_response(
+        &self,
+        message_id: VarInt,
+        successful: bool,
+        data: &[u8],
+    ) -> Result<(), Error> {
+        self.0.write_login_plugin_response(message_id, successful, data)
+    }
+
+    pub fn write_fml2_handshake_plugin_message(
+        &self,
+        message_id: VarInt,
+        msg: Option<&forge::fml2::FmlHandshake>,
+    ) -> Result<(), Error> {
+        self.0.write_fml2_handshake_plugin_message(message_id, msg)
+    }
+
+    pub fn read_packet(&self) -> Result<packet::Packet, Error> {
+        self.0.read_packet()
+    }
+
+    pub fn close(&self) {
+        self.0.close();
+    }
+
+}
+
+impl Read for ConnWrapper {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        match self.0.create_read_cipher() {
+            None => self.0.stream.lock().unwrap().read(buf),
+            Some(cipher) => {
+                let ret = self.0.stream.lock().unwrap().read(buf)?;
+                cipher.decrypt(&mut buf[..ret]);
+
+                Ok(ret)
+            }
+        }
+    }
+}
+
+impl Write for ConnWrapper {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self.0.create_write_cipher() {
+            None => self.0.stream.lock().unwrap().write(buf),
+            Some(cipher) => {
+                let mut data = vec![0; buf.len()];
+                data[..buf.len()].clone_from_slice(&buf[..]);
+
+                cipher.encrypt(&mut data);
+
+                self.0.stream.lock().unwrap().write_all(&data)?;
+                Ok(buf.len())
+            }
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.0.stream.lock().unwrap().flush()
+    }
+}
+
+/*
+impl Clone for Conn {
+    fn clone(&self) -> Self {
+        Self {
+            stream: self.stream.try_clone().unwrap(),
+            host: self.host.clone(),
+            port: self.port,
+            direction: self.direction,
+            state: self.state,
+            protocol_version: self.protocol_version,
+            compression_threshold: self.compression_threshold,
+            send: self.send.clone(),
+            key: self.key.clone(),
+        }
+    }
+}*/
 
 pub struct Conn {
-    stream: TcpStream,
+    stream: Mutex<TcpStream>,
     pub host: String,
     pub port: u16,
     direction: Direction,
     pub protocol_version: i32,
     pub state: State,
 
-    read_cipher: Arc<RwLock<Option<Aes128Cfb>>>,
-    write_cipher: Arc<RwLock<Option<Aes128Cfb>>>,
+    key: Option<[u8; 16]>,
 
     pub compression_threshold: i32,
-    pub send: Arc<Mutex<Option<bool>>>,
 }
 
 lazy_static! {
@@ -1184,19 +1288,37 @@ lazy_static! {
         Resolver::new(ResolverConfig::default(), ResolverOpts::default()).unwrap();
 }
 
-impl Conn {
-    fn get_server_addresses(hostname: &str) -> Vec<(String, u16)> {
-        let mut addresses = vec![];
+fn get_server_addresses(hostname: &str) -> Vec<(String, u16)> {
+    let mut addresses = vec![];
 
-        let records = RESOLVER.srv_lookup(format!("_minecraft._tcp.{}", hostname));
-        if records.is_ok() {
-            for record in records.unwrap() {
-                debug!("{}:{}", record.target(), record.port());
-                addresses.push((record.target().to_string(), record.port()));
-            }
+    let records = RESOLVER.srv_lookup(format!("_minecraft._tcp.{}", hostname));
+    if records.is_ok() {
+        for record in records.unwrap() {
+            debug!("{}:{}", record.target(), record.port());
+            addresses.push((record.target().to_string(), record.port()));
         }
-        addresses.push((hostname.to_string(), 25565));
-        addresses
+    }
+    addresses.push((hostname.to_string(), 25565));
+    addresses
+}
+
+// FIXME: create a wrapper for Conn which implements the IO traits we need
+impl Conn {
+
+    fn create_read_cipher(&self) -> Option<Decryptor<Aes128>> {
+        if let Some(key) = self.key.as_ref() {
+            Some(Decryptor::new_from_slices(key, key).unwrap())
+        } else {
+            None
+        }
+    }
+
+    fn create_write_cipher(&self) -> Option<Encryptor<Aes128>> {
+        if let Some(key) = self.key.as_ref() {
+            Some(Encryptor::new_from_slices(key, key).unwrap())
+        } else {
+            None
+        }
     }
 
     pub fn new(target: &str, protocol_version: i32) -> Result<Conn, Error> {
@@ -1216,7 +1338,7 @@ impl Conn {
         use std::str::FromStr;
         if let Err(_) = std::net::IpAddr::from_str(&address) {
             debug!("address: {} is not an IP", address);
-            for (adresse, port) in Conn::get_server_addresses(&address) {
+            for (adresse, port) in get_server_addresses(&address) {
                 debug!("{}'s ip may be {}:{}.", target, adresse, port);
                 if let Ok(conn) = Conn::try_stream(&adresse, port, protocol_version) {
                     return Ok(conn);
@@ -1231,21 +1353,19 @@ impl Conn {
     fn try_stream(address: &str, port: u16, protocol_version: i32) -> Result<Conn, Error> {
         let stream = TcpStream::connect(format!("{}:{}", address, port))?;
         Ok(Conn {
-            stream,
+            stream: Mutex::new(stream),
             host: address.to_string(),
             port,
             direction: Direction::Serverbound,
             state: State::Handshaking,
             protocol_version,
-            read_cipher: Arc::new(RwLock::new(None)),
-            write_cipher: Arc::new(RwLock::new(None)),
+            key: None,
             compression_threshold: -1,
-            send: Arc::new(Mutex::new(None)),
         })
     }
 
-    pub fn write_packet<T: PacketType>(&mut self, packet: T) -> Result<(), Error> {
-        let mut buf = Vec::new();
+    pub fn write_packet<T: PacketType>(&self, packet: T) -> Result<(), Error> {
+        let mut buf = vec![];
         VarInt(packet.packet_id(self.protocol_version)).write_to(&mut buf)?;
         packet.write(&mut buf)?;
 
@@ -1257,7 +1377,7 @@ impl Conn {
         if self.compression_threshold >= 0 && buf.len() as i32 > self.compression_threshold {
             extra = 0;
             let uncompressed_size = buf.len();
-            let mut new = Vec::new();
+            let mut new = vec![];
             VarInt(uncompressed_size as i32).write_to(&mut new)?;
             let mut write = ZlibEncoder::new(io::Cursor::new(buf), Compression::default());
             write.read_to_end(&mut new)?;
@@ -1272,18 +1392,18 @@ impl Conn {
             }
             buf = new;
         }
-        let lock = self.send.clone();
-        let _lock = lock.lock();
-        VarInt(buf.len() as i32 + extra).write_to(self)?;
+        let mut stream = self.stream.lock().unwrap();
+        let mut stream = &mut *stream;
+        VarInt(buf.len() as i32 + extra).write_to(stream)?;
         if self.compression_threshold >= 0 && extra == 1 {
-            VarInt(0).write_to(self)?;
+            VarInt(0).write_to(stream)?;
         }
-        self.write_all(&buf)?;
 
+        self.stream.lock().unwrap().write_all(&buf);
         Ok(())
     }
 
-    pub fn write_plugin_message(&mut self, channel: &str, data: &[u8]) -> Result<(), Error> {
+    pub fn write_plugin_message(&self, channel: &str, data: &[u8]) -> Result<(), Error> {
         if is_network_debug() {
             debug!(
                 "Sending plugin message: channel={}, data={:?}",
@@ -1295,26 +1415,24 @@ impl Conn {
             self.write_packet(packet::play::serverbound::PluginMessageServerbound {
                 channel: channel.to_string(),
                 data: data.to_vec(),
-            })?;
+            })
         } else {
             self.write_packet(packet::play::serverbound::PluginMessageServerbound_i16 {
                 channel: channel.to_string(),
                 data: LenPrefixedBytes::<VarShort>::new(data.to_vec()),
-            })?;
+            })
         }
-
-        Ok(())
     }
 
-    pub fn write_fmlhs_plugin_message(&mut self, msg: &forge::FmlHs) -> Result<(), Error> {
-        let mut buf: Vec<u8> = vec![];
+    pub fn write_fmlhs_plugin_message(&self, msg: &forge::FmlHs) -> Result<(), Error> {
+        let mut buf = vec![];
         msg.write_to(&mut buf)?;
 
         self.write_plugin_message("FML|HS", &buf)
     }
 
     pub fn write_login_plugin_response(
-        &mut self,
+        &self,
         message_id: VarInt,
         successful: bool,
         data: &[u8],
@@ -1334,15 +1452,15 @@ impl Conn {
     }
 
     pub fn write_fml2_handshake_plugin_message(
-        &mut self,
+        &self,
         message_id: VarInt,
         msg: Option<&forge::fml2::FmlHandshake>,
     ) -> Result<(), Error> {
         if let Some(msg) = msg {
-            let mut inner_buf: Vec<u8> = vec![];
+            let mut inner_buf = vec![];
             msg.write_to(&mut inner_buf)?;
 
-            let mut outer_buf: Vec<u8> = vec![];
+            let mut outer_buf = vec![];
             "fml:handshake".to_string().write_to(&mut outer_buf)?;
             VarInt(inner_buf.len() as i32).write_to(&mut outer_buf)?;
             inner_buf.write_to(&mut outer_buf)?;
@@ -1392,9 +1510,14 @@ impl Conn {
         Ok((id, Box::new(buf)))
     }
 
-    pub fn read_packet(&mut self) -> Result<packet::Packet, Error> {
+    pub fn read_packet(&self) -> Result<packet::Packet, Error> {
         let compression_threshold = self.compression_threshold;
-        let (id, mut buf) = Conn::read_raw_packet_from(self, compression_threshold)?;
+
+        let (id, mut buf) = {
+            let mut stream = self.stream.lock().unwrap();
+            let mut stream = &mut *stream;
+            Conn::read_raw_packet_from(stream, compression_threshold)?
+        };
 
         let dir = match self.direction {
             Direction::Clientbound => Direction::Serverbound,
@@ -1435,19 +1558,8 @@ impl Conn {
         }
     }
 
-    pub fn enable_encyption(&mut self, key: &[u8]) {
-        let read_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
-        let write_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
-        self.read_cipher
-            .clone()
-            .write()
-            .unwrap()
-            .replace(read_cipher);
-        self.write_cipher
-            .clone()
-            .write()
-            .unwrap()
-            .replace(write_cipher);
+    pub fn enable_encyption(&mut self, key: [u8; 16]) {
+        self.key = Some(key);
     }
 
     pub fn set_compression(&mut self, threshold: i32) {
@@ -1455,7 +1567,7 @@ impl Conn {
     }
 
     pub fn close(&self) {
-        self.stream.shutdown(Shutdown::Both).unwrap();
+        self.stream.lock().unwrap().shutdown(Shutdown::Both).unwrap();
     }
 
     pub fn do_status(mut self) -> Result<(Status, Duration), Error> {
@@ -1502,7 +1614,7 @@ impl Conn {
         let players = val.get("players").ok_or_else(invalid_status)?;
 
         // For modded servers, get the list of Forge mods installed
-        let mut forge_mods: std::vec::Vec<crate::protocol::forge::ForgeMod> = vec![];
+        let mut forge_mods = vec![];
         let mut fml_network_version: Option<i64> = None;
         if let Some(modinfo) = val.get("modinfo") {
             if let Some(modinfo_type) = modinfo.get("type") {
@@ -1661,58 +1773,6 @@ pub struct StatusPlayers {
 pub struct StatusPlayer {
     name: String,
     id: String,
-}
-
-impl Read for Conn {
-    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.read_cipher.clone().write().unwrap().as_mut() {
-            Option::None => self.stream.read(buf),
-            Option::Some(cipher) => {
-                let ret = self.stream.read(buf)?;
-                cipher.decrypt(&mut buf[..ret]);
-
-                Ok(ret)
-            }
-        }
-    }
-}
-
-impl Write for Conn {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.write_cipher.clone().write().unwrap().as_mut() {
-            Option::None => self.stream.write(buf),
-            Option::Some(cipher) => {
-                let mut data = vec![0; buf.len()];
-                data[..buf.len()].clone_from_slice(&buf[..]);
-
-                cipher.encrypt(&mut data);
-
-                self.stream.write_all(&data)?;
-                Ok(buf.len())
-            }
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.stream.flush()
-    }
-}
-
-impl Clone for Conn {
-    fn clone(&self) -> Self {
-        Conn {
-            stream: self.stream.try_clone().unwrap(),
-            host: self.host.clone(),
-            port: self.port,
-            direction: self.direction,
-            state: self.state,
-            protocol_version: self.protocol_version,
-            read_cipher: self.read_cipher.clone(),
-            write_cipher: self.write_cipher.clone(),
-            compression_threshold: self.compression_threshold,
-            send: self.send.clone(),
-        }
-    }
 }
 
 pub trait PacketType {

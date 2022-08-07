@@ -2,8 +2,7 @@
 name = "leafish"
 version = "0.1.0"
 authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>", "iceiix <ice_ix@protonmail.ch>", "terrarier2111" ]
-edition = "2018"
-resolver = "2"
+edition = "2021"
 description = "Multi-protocol multi-platform Minecraft-compatible client"
 repository = "https://github.com/Lea-fish/Leafish"
 license = "MIT/Apache-2.0"
@@ -17,48 +16,50 @@ osx_minimum_system_version = "10.14"
 
 [profile.dev]
 split-debuginfo = "unpacked"
-# Steven runs horrendously slow with no optimizations, and often freezes.
+# Leafish runs horrendously slow with no optimizations, and often freezes.
 # However, building with full -O3 optimizations takes too long for a debug build.
 # Use an -O1 optimization level strikes a good compromise between build and program performance.
 opt-level = 1
 
 [dependencies]
-winit = "0.25.0"
-glow = "0.10.0"
+winit = "0.26.1"
+wgpu-mc = { git = "https://github.com/wgpu-mc/wgpu-mc.git" }
+# wgpu-mc = { git = "https://github.com/wgpu-mc/wgpu-mc/tree/master/rust" }
 byteorder = "1.4.3"
-serde = { version = "1.0.127", features = ["derive"] }
-serde_json = "1.0.66"
-flate2 = { version = "1.0.20", features = ["rust_backend"], default-features = false }
-zip = { version = "0.5.13", features = ["deflate"], default-features = false }
-image = "0.23.14"
-getrandom = { version = "0.2.3", features = ["js"] }
-rand = "0.8.4"
+serde = { version = "1.0.142", features = ["derive"] }
+serde_json = "1.0.83"
+flate2 = { version = "1.0.24", features = ["rust_backend"], default-features = false }
+zip = { version = "0.6.2", features = ["deflate"], default-features = false }
+image = "0.24.3"
+getrandom = { version = "0.2.7", features = ["js"] }
+rand = "0.8.5"
 rand_pcg = "0.3.1"
 base64 = "0.13.0"
-log = { version = "0.4.14", features = ["std"] }
+log = { version = "0.4.17", features = ["std"] }
+# cgmath = "0.18.0"
 cgmath = "0.17.0"
 lazy_static = "1.4.0"
 collision = "0.20.1"
 rsa_public_encrypt_pkcs1 = "0.4.0"
-structopt = "0.3.22"
-copypasta = "0.7.1"
-instant = "0.1.10"
-dirs = "3.0.2"
+structopt = "0.3.26"
+copypasta = "0.8.1"
+instant = "0.1.12"
+dirs = "4.0.0"
 
 # Concurrency features
-dashmap = "4.0.2"
-parking_lot = "0.11.1"
+dashmap = "5.3.4"
+parking_lot = "0.12.1"
 atomic_float = "0.1.0"
 # arc-swap = "1.4.0" # TODO: Use this!
-crossbeam-channel = "0.5.1" # check if flume would be better in terms of performance!
+crossbeam-channel = "0.5.6" # check if flume would be better in terms of performance!
 # flume = "0.10.8" # replaced by crossbeam channel
 # tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
-rayon = "1.5.1"
-rfd = "0.5.0"
-bevy_ecs = { git = "https://github.com/terrarier2111/bevy" }
+rayon = "1.5.3"
+rfd = "0.10.0"
+# bevy_ecs = { git = "https://github.com/terrarier2111/bevy" }
+bevy_ecs = "0.8.0"
 
-reqwest = { version = "0.11.4", features = [ "blocking" ]}
-glutin = "0.27.0"
+reqwest = { version = "0.11.11", features = [ "blocking" ]}
 
 [dependencies.leafish_resources]
 path = "./resources"

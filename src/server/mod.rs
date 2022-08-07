@@ -50,7 +50,7 @@ use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
 use leafish_protocol::protocol::packet::{DigType, Hand};
-use leafish_protocol::protocol::{Conn, Version};
+use leafish_protocol::protocol::{Conn, ConnWrapper, Version};
 use leafish_shared::direction::Direction as BlockDirection;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
@@ -96,7 +96,7 @@ impl Default for WorldData {
 
 pub struct Server {
     uuid: protocol::UUID,
-    pub conn: Arc<RwLock<Option<protocol::Conn>>>,
+    pub conn: Arc<RwLock<Option<ConnWrapper>>>,
     pub(crate) disconnect_gracefully: AtomicBool,
     pub protocol_version: i32,
     pub mapped_protocol_version: Version,
@@ -157,7 +157,7 @@ pub struct PlayerInfo {
     uuid: protocol::UUID,
     skin_url: Option<String>,
 
-    display_name: Option<format::Component>,
+    display_name: Option<Component>,
     ping: i32,
     gamemode: GameMode,
 }
@@ -174,7 +174,7 @@ impl Server {
         hud_context: Arc<RwLock<HudContext>>,
         screen_sys: Arc<ScreenSystem>,
     ) -> Result<Arc<Server>, protocol::Error> {
-        let mut conn = protocol::Conn::new(address, protocol_version)?;
+        let mut conn = Conn::new(address, protocol_version)?;
 
         let tag = match fml_network_version {
             Some(1) => "\0FML\0",
@@ -185,14 +185,14 @@ impl Server {
 
         let host = conn.host.clone() + tag;
         let port = conn.port;
-        conn.write_packet(protocol::packet::handshake::serverbound::Handshake {
+        conn.write_packet(packet::handshake::serverbound::Handshake {
             protocol_version: protocol::VarInt(protocol_version),
             host,
             port,
             next: protocol::VarInt(2),
         })?;
         conn.state = protocol::State::Login;
-        conn.write_packet(protocol::packet::login::serverbound::LoginStart {
+        conn.write_packet(packet::login::serverbound::LoginStart {
             username: account.name.clone(),
         })?;
 
@@ -200,26 +200,27 @@ impl Server {
         let (server_id, public_key, verify_token);
         loop {
             match conn.read_packet()? {
-                protocol::packet::Packet::SetInitialCompression(val) => {
+                packet::Packet::SetInitialCompression(val) => {
                     conn.set_compression(val.threshold.0);
                 }
-                protocol::packet::Packet::EncryptionRequest(val) => {
+                packet::Packet::EncryptionRequest(val) => {
                     server_id = Rc::new(val.server_id);
                     public_key = Rc::new(val.public_key.data);
                     verify_token = Rc::new(val.verify_token.data);
                     break;
                 }
-                protocol::packet::Packet::EncryptionRequest_i16(val) => {
+                packet::Packet::EncryptionRequest_i16(val) => {
                     server_id = Rc::new(val.server_id);
                     public_key = Rc::new(val.public_key.data);
                     verify_token = Rc::new(val.verify_token.data);
                     break;
                 }
-                protocol::packet::Packet::LoginSuccess_String(val) => {
+                packet::Packet::LoginSuccess_String(val) => {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {}", val.username, val.uuid);
                     conn.state = protocol::State::Play;
                     let uuid = protocol::UUID::from_str(&val.uuid).unwrap();
+                    let conn = ConnWrapper::new(Arc::new(conn));
                     let server = Server::connect0(
                         conn,
                         protocol_version,
@@ -232,10 +233,11 @@ impl Server {
                     );
                     return Ok(server);
                 }
-                protocol::packet::Packet::LoginSuccess_UUID(val) => {
+                packet::Packet::LoginSuccess_UUID(val) => {
                     warn!("Server is running in offline mode");
                     debug!("Login: {} {:?}", val.username, val.uuid);
                     conn.state = protocol::State::Play;
+                    let conn = ConnWrapper::new(Arc::new(conn));
                     let server = Server::connect0(
                         conn,
                         protocol_version,
@@ -249,7 +251,7 @@ impl Server {
 
                     return Ok(server);
                 }
-                protocol::packet::Packet::LoginDisconnect(val) => {
+                packet::Packet::LoginDisconnect(val) => {
                     return Err(protocol::Error::Disconnect(val.reason))
                 }
                 val => return Err(protocol::Error::Err(format!("Wrong packet 1: {:?}", val))),
@@ -265,50 +267,50 @@ impl Server {
         account.join_server(&server_id, &shared, &public_key)?;
 
         if protocol_version >= 47 {
-            conn.write_packet(protocol::packet::login::serverbound::EncryptionResponse {
+            conn.write_packet(packet::login::serverbound::EncryptionResponse {
                 shared_secret: protocol::LenPrefixedBytes::new(shared_e),
                 verify_token: protocol::LenPrefixedBytes::new(token_e),
             })?;
         } else {
             conn.write_packet(
-                protocol::packet::login::serverbound::EncryptionResponse_i16 {
+                packet::login::serverbound::EncryptionResponse_i16 {
                     shared_secret: protocol::LenPrefixedBytes::new(shared_e),
                     verify_token: protocol::LenPrefixedBytes::new(token_e),
                 },
             )?;
         }
 
-        conn.enable_encyption(&shared);
+        conn.enable_encyption(shared);
 
         let uuid;
         let compression_threshold = conn.compression_threshold;
         loop {
             match conn.read_packet()? {
-                protocol::packet::Packet::SetInitialCompression(val) => {
+                packet::Packet::SetInitialCompression(val) => {
                     conn.set_compression(val.threshold.0);
                 }
-                protocol::packet::Packet::LoginSuccess_String(val) => {
+                packet::Packet::LoginSuccess_String(val) => {
                     debug!("Login: {} {}", val.username, val.uuid);
                     uuid = protocol::UUID::from_str(&val.uuid).unwrap();
                     conn.state = protocol::State::Play;
                     break;
                 }
-                protocol::packet::Packet::LoginSuccess_UUID(val) => {
+                packet::Packet::LoginSuccess_UUID(val) => {
                     debug!("Login: {} {:?}", val.username, val.uuid);
                     uuid = val.uuid;
                     conn.state = protocol::State::Play;
                     break;
                 }
-                protocol::packet::Packet::LoginDisconnect(val) => {
+                packet::Packet::LoginDisconnect(val) => {
                     return Err(protocol::Error::Disconnect(val.reason))
                 }
-                protocol::packet::Packet::LoginPluginRequest(req) => {
+                packet::Packet::LoginPluginRequest(req) => {
                     match req.channel.as_ref() {
                         "fml:loginwrapper" => {
-                            let mut cursor = std::io::Cursor::new(req.data);
+                            let mut cursor = Cursor::new(req.data);
                             let channel: String = protocol::Serializable::read_from(&mut cursor)?;
 
-                            let (id, mut data) = protocol::Conn::read_raw_packet_from(
+                            let (id, mut data) = Conn::read_raw_packet_from(
                                 &mut cursor,
                                 compression_threshold,
                             )?;
@@ -372,6 +374,7 @@ impl Server {
             }
         }
 
+        let conn = ConnWrapper::new(Arc::new(conn));
         let server = Server::connect0(
             conn,
             protocol_version,
@@ -387,7 +390,7 @@ impl Server {
     }
 
     fn connect0(
-        conn: Conn,
+        conn: ConnWrapper,
         protocol_version: i32,
         forge_mods: Vec<forge::ForgeMod>,
         uuid: protocol::UUID,
@@ -426,7 +429,7 @@ impl Server {
     }
 
     #[allow(unused_must_use)]
-    fn spawn_reader(mut read: protocol::Conn, server: Arc<Mutex<Option<Arc<Server>>>>) {
+    fn spawn_reader(mut read: ConnWrapper, server: Arc<Mutex<Option<Arc<Server>>>>) {
         thread::spawn(move || {
             let threads = ThreadPoolBuilder::new().num_threads(8).build().unwrap();
             loop {
@@ -864,7 +867,7 @@ impl Server {
         forge_mods: Vec<forge::ForgeMod>,
         uuid: protocol::UUID,
         resources: Arc<RwLock<resources::Manager>>,
-        conn: Arc<RwLock<Option<protocol::Conn>>>,
+        conn: Arc<RwLock<Option<ConnWrapper>>>,
         light_updater: Sender<LightUpdate>,
         render_list_computer: Sender<bool>,
         render_list_computer_notify: Receiver<bool>,
@@ -877,7 +880,7 @@ impl Server {
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
         let mut entity_sched = SystemStage::single_threaded();
-        entities.world.insert_resource(entity::GameInfo::new());
+        entities.world.insert_resource(GameInfo::new());
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());

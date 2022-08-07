@@ -35,9 +35,9 @@ use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
 use std::sync::atomic::AtomicBool;
 
-use glutin::event::VirtualKeyCode;
 use instant::Instant;
 use std::sync::atomic::Ordering as AtomicOrdering;
+use winit::event::VirtualKeyCode;
 
 // Textures can be found at: assets/minecraft/textures/gui/icons.png
 

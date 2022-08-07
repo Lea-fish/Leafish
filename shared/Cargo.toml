@@ -2,7 +2,8 @@
 name = "leafish_shared"
 version = "0.0.1"
 authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-bevy_ecs = { git = "https://github.com/terrarier2111/bevy" }
+# bevy_ecs = { git = "https://github.com/terrarier2111/bevy" }
+bevy_ecs = "0.8.0"

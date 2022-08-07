@@ -22,11 +22,11 @@ use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
 use crate::Game;
 use core::cmp;
-use glutin::event::VirtualKeyCode;
 use leafish_protocol::format::Component;
 use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, Ordering};
+use winit::event::VirtualKeyCode;
 
 pub const MAX_MESSAGES: usize = 200;
 const MAX_MESSAGE_LENGTH_PRE_1_11: usize = 100;

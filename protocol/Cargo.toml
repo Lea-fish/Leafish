@@ -2,31 +2,34 @@
 name = "leafish_protocol"
 version = "0.0.1"
 authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>", "iceiix <ice_ix@protonmail.ch>", "terrarier2111" ]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
-serde = { version = "1.0.127", features = ["derive"] }
-serde_json = "1.0.64"
+serde = { version = "1.0.142", features = ["derive"] }
+serde_json = "1.0.83"
 hex = "0.4.3"
-sha-1 = "0.9.7"
-aes = "0.7.4"
-cfb8 = "0.7.1"
+sha-1 = "0.10.0"
+aes = "0.8.1"
+cfb8 = "0.8.1"
 byteorder = "1.4.3"
-log = { version = "0.4.14", features = ["std"] }
-flate2 = { version = "1.0.20", features = ["rust_backend"], default-features = false }
-num-traits = "0.2.14"
-instant = "0.1.9"
+log = { version = "0.4.17", features = ["std"] }
+flate2 = { version = "1.0.24", features = ["rust_backend"], default-features = false }
+num-traits = "0.2.15"
+instant = "0.1.12"
+# cgmath = "0.18.0"
 cgmath = "0.17.0"
+# parking_lot = "0.12.1"
 
 lazy_static = "1.4.0"
-trust-dns-resolver = "0.20.3"
+trust-dns-resolver = "0.21.2"
 # srv-rs = { version = "0.2.0", features = ["libresolv"] }
 
-dashmap = "4.0.2"
+dashmap = "5.3.4"
 
-bevy_ecs = { git = "https://github.com/terrarier2111/bevy" }
+# bevy_ecs = { git = "https://github.com/terrarier2111/bevy" }
+bevy_ecs = "0.8.0"
 
-reqwest = { version = "0.11.3", features = [ "blocking" ]}
+reqwest = { version = "0.11.11", features = [ "blocking" ]}
 
 [dependencies.leafish_shared]
 path = "../shared"

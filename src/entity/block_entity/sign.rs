@@ -12,13 +12,13 @@ use std::sync::Arc;
 pub fn add_systems(_m: &mut ecs::Manager, _parallel: &mut SystemStage, sync: &mut SystemStage) {
     sync.add_system(
         render_sign
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     )
     .add_system(
         on_add_sign
-            .system()
+            // .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     );

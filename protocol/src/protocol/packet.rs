@@ -3378,7 +3378,7 @@ impl From<i32> for Hand {
 }
 
 pub fn send_position_look(
-    conn: &mut Conn,
+    conn: &mut ConnWrapper,
     version: Version,
     position: &Vector3<f64>,
     yaw: f32,
@@ -3411,7 +3411,7 @@ pub fn send_position_look(
     }
 }
 
-pub fn send_arm_swing(conn: &mut Conn, version: Version, hand: Hand) -> Result<(), Error> {
+pub fn send_arm_swing(conn: &mut ConnWrapper, version: Version, hand: Hand) -> Result<(), Error> {
     if version < Version::V1_8 {
         conn.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
             entity_id: 0, // TODO: Check these values!
@@ -3427,7 +3427,7 @@ pub fn send_arm_swing(conn: &mut Conn, version: Version, hand: Hand) -> Result<(
 }
 
 pub fn send_digging(
-    conn: &mut Conn,
+    conn: &mut ConnWrapper,
     version: Version,
     status: DigType,
     pos: Position,
@@ -3457,7 +3457,7 @@ pub fn send_digging(
 }
 
 pub fn send_block_place(
-    conn: &mut Conn,
+    conn: &mut ConnWrapper,
     version: Version,
     pos: Position,
     face: u8,
@@ -3522,7 +3522,7 @@ pub fn send_block_place(
 }
 
 pub fn send_client_settings(
-    conn: &mut Conn,
+    conn: &mut ConnWrapper,
     version: Version,
     locale: String,
     view_distance: u8,
@@ -3553,7 +3553,7 @@ pub fn send_client_settings(
     }
 }
 
-pub fn send_keep_alive(conn: &mut Conn, version: Version, id: i64) -> Result<(), Error> {
+pub fn send_keep_alive(conn: &mut ConnWrapper, version: Version, id: i64) -> Result<(), Error> {
     if version < Version::V1_8 {
         conn.write_packet(packet::play::serverbound::KeepAliveServerbound_i32 { id: id as i32 })
     } else if version < Version::V1_12 {
