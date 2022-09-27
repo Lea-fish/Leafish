@@ -110,6 +110,9 @@ macro_rules! define_blocks {
                 $(collision $collision:expr,)?
                 $(update_state ($world:ident, $pos:ident) => $update_state:expr,)?
                 $(multipart ($mkey:ident, $mval:ident) => $multipart:expr,)?
+                $(hardness $hardness:expr,)?
+                $(harvest_tools [ $($harvest_tool:pat,)+ ],)?
+                $(best_tools [ $($best_tools:pat,)+ ],)?
             }
         )+
     ) => (
@@ -274,6 +277,20 @@ macro_rules! define_blocks {
             }
 
             #[allow(unused_variables, unreachable_code)]
+            pub fn get_hardness(&self) -> Option<f64> {
+                match *self {
+                    $(
+                        Block::$name {
+                            $($fname,)?
+                        } => {
+                            $(return Some($hardness);)?
+                            None
+                        }
+                    )+
+                }
+            }
+
+            #[allow(unused_variables, unreachable_code)]
             pub fn update_state<W: WorldAccess>(&self, world: &W, pos: Position) -> Block {
                 match *self {
                     $(
@@ -309,6 +326,81 @@ macro_rules! define_blocks {
                         }
                     )+
                 }
+            }
+
+            #[allow(unused_variables, unreachable_code)]
+            pub fn is_best_tool(&self, tool: &Option<Tool>) -> bool {
+                match *self {
+                    $(
+                        Block::$name { .. } => {
+                            $(
+                                return match tool {
+                                    $(Some($best_tools) => true,)+
+                                    _ => false,
+                                };
+                            )?
+                            true
+                        }
+                    )+
+                }
+            }
+
+            #[allow(unused_variables, unreachable_code)]
+            pub fn can_harvest(&self, tool: &Option<Tool>) -> bool {
+                match *self {
+                    $(
+                        Block::$name { .. } => {
+                            $(return match *tool {
+                                $(Some($harvest_tool) => true,)+
+                                _ =>  false,
+                            };)?
+                            true
+                        }
+                    )+
+                }
+            }
+
+            #[allow(unused_variables, unreachable_code)]
+            pub fn get_mining_time(&self, tool: &Option<Tool>) -> Option<std::time::Duration> {
+                let mut speed_multiplier = 1.0;
+
+                let tool_multiplier = tool.map(|t| t.get_multiplier()).unwrap_or(1.0);
+
+                let is_best_tool = self.is_best_tool(tool);
+                let can_harvest: bool = self.can_harvest(tool);
+
+                if is_best_tool {
+                    speed_multiplier = tool_multiplier;
+                }
+
+                // TODO: Apply tool efficiency
+                // TODO: Apply haste effect
+                // TODO: Apply mining fatigue effect
+                // TODO: Apply in water multiplier
+                // TODO: Apply on ground multiplier
+
+                let mut damage = match self.get_hardness() {
+                    // Instant mine
+                    Some(n) if n == 0.0 => return Some(std::time::Duration::from_secs_f64(0.05)),
+                    // Impossible to mine
+                    None => return None,
+                    Some(n) => speed_multiplier / n,
+                };
+
+                if can_harvest {
+                    damage /= 30.0;
+                } else {
+                    damage /= 100.0;
+                }
+
+                // Instant breaking
+                if damage > 1.0 {
+                    return Some(std::time::Duration::from_secs_f64(0.05));
+                }
+
+                let ticks = (1.0 / damage).ceil();
+                let seconds = ticks / 20.0;
+                Some(std::time::Duration::from_secs_f64(seconds))
             }
         }
 
@@ -538,6 +630,7 @@ define_blocks! {
         },
         model { ("minecraft", "air") },
         collision vec![],
+        hardness 0.0,
     }
     Stone {
         props {
@@ -553,6 +646,9 @@ define_blocks! {
         },
         data Some(variant.data()),
         model { ("minecraft", variant.as_string() ) },
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Grass {
         props {
@@ -564,6 +660,8 @@ define_blocks! {
         variant format!("snowy={}", snowy),
         tint TintType::Grass,
         update_state (world, pos) => Block::Grass{snowy: is_snowy(world, pos)},
+        hardness 0.6,
+        best_tools [ Tool::Shovel(_), ],
     }
     Dirt {
         props {
@@ -599,10 +697,15 @@ define_blocks! {
         } else {
             Block::Dirt{snowy, variant}
         },
+        hardness 0.5,
+        best_tools [ Tool::Shovel(_), ],
     }
     Cobblestone {
         props {},
         model { ("minecraft", "cobblestone") },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Planks {
         props {
@@ -617,6 +720,8 @@ define_blocks! {
         },
         data Some(variant.plank_data()),
         model { ("minecraft", format!("{}_planks", variant.as_string()) ) },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Sapling {
         props {
@@ -636,6 +741,8 @@ define_blocks! {
         model { ("minecraft", format!("{}_sapling", variant.as_string()) ) },
         variant format!("stage={}", stage),
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Bedrock {
         props {},
@@ -653,6 +760,7 @@ define_blocks! {
         },
         model { ("minecraft", "flowing_water") },
         collision vec![],
+        hardness 100.0,
     }
     Water {
         props {
@@ -665,6 +773,7 @@ define_blocks! {
         },
         model { ("minecraft", "water") },
         collision vec![],
+        hardness 100.0,
     }
     FlowingLava {
         props {
@@ -679,6 +788,7 @@ define_blocks! {
         },
         model { ("minecraft", "flowing_lava") },
         collision vec![],
+        hardness 100.0,
     }
     Lava {
         props {
@@ -692,6 +802,7 @@ define_blocks! {
         },
         model { ("minecraft", "lava") },
         collision vec![],
+        hardness 100.0,
     }
     Sand {
         props {
@@ -699,28 +810,53 @@ define_blocks! {
         },
         data Some(if red { 1 } else { 0 }),
         model { ("minecraft", if red { "red_sand" } else { "sand" } ) },
+        hardness 0.5,
+        best_tools [ Tool::Shovel(_), ],
     }
     Gravel {
         props {},
         model { ("minecraft", "gravel") },
+        hardness 0.6,
+        best_tools [ Tool::Shovel(_), ],
     }
     GoldOre {
         props {},
         model { ("minecraft", "gold_ore") },
+        hardness 3.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     IronOre {
         props {},
         model { ("minecraft", "iron_ore") },
+        hardness 3.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Stone),
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     CoalOre {
         props {},
         model { ("minecraft", "coal_ore") },
+        hardness 3.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     NetherGoldOre {
         props {},
         data None,
         offsets |protocol_version| { if protocol_version >= 735 { Some(0) } else { None } },
         model { ("minecraft", "nether_gold_ore") },
+        hardness 3.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Log {
         props {
@@ -753,6 +889,8 @@ define_blocks! {
         },
         model { ("minecraft", format!("{}_log", variant.as_string()) ) },
         variant format!("axis={}", axis.as_string()),
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Wood {
         props {
@@ -776,6 +914,8 @@ define_blocks! {
         offset Some(variant.offset() * 3 + axis.index()),
         model { ("minecraft", format!("{}_wood", variant.as_string()) ) },
         variant format!("axis={}", axis.as_string()),
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Leaves {
         props {
@@ -810,6 +950,8 @@ define_blocks! {
         material material::LEAVES,
         model { ("minecraft", format!("{}_leaves", variant.as_string()) ) },
         tint TintType::Foliage,
+        hardness 0.2,
+        best_tools [ Tool::Shears, Tool::Hoe(_), ],
     }
     Sponge {
         props {
@@ -818,19 +960,38 @@ define_blocks! {
         data Some(if wet { 1 } else { 0 }),
         model { ("minecraft", "sponge") },
         variant format!("wet={}", wet),
+        hardness 0.6,
+        best_tools [ Tool::Hoe(_), ],
     }
     Glass {
         props {},
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "glass") },
+        hardness 0.3,
     }
     LapisOre {
         props {},
         model { ("minecraft", "lapis_ore") },
+        hardness 3.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Stone),
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     LapisBlock {
         props {},
         model { ("minecraft", "lapis_block") },
+        hardness 3.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Stone),
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Dispenser {
         props {
@@ -848,6 +1009,9 @@ define_blocks! {
         offset Some((facing.offset() << 1) | (if triggered { 0 } else { 1 })),
         model { ("minecraft", "dispenser") },
         variant format!("facing={}", facing.as_string()),
+        hardness 3.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Sandstone {
         props {
@@ -859,6 +1023,9 @@ define_blocks! {
         },
         data Some(variant.data()),
         model { ("minecraft", variant.as_string() ) },
+        hardness 0.8,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     NoteBlock {
         props {
@@ -887,6 +1054,8 @@ define_blocks! {
         offsets |protocol_version| (instrument.offsets(protocol_version)
             .map(|offset| offset * (25 * 2) + ((note as usize) << 1) + if powered { 0 } else { 1 })),
         model { ("minecraft", "noteblock") },
+        hardness 0.8,
+        best_tools [ Tool::Axe(_), ],
     }
     Bed {
         props {
@@ -928,6 +1097,7 @@ define_blocks! {
         model { ("minecraft", "bed") },
         variant format!("facing={},part={}", facing.as_string(), part.as_string()),
         collision vec![Aabb3::new(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 9.0/16.0, 1.0))],
+        hardness 0.2,
     }
     GoldenRail {
         props {
@@ -947,6 +1117,8 @@ define_blocks! {
         model { ("minecraft", "golden_rail") },
         variant format!("powered={},shape={}", powered, shape.as_string()),
         collision vec![],
+        hardness 0.7,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     DetectorRail {
         props {
@@ -966,6 +1138,8 @@ define_blocks! {
         model { ("minecraft", "detector_rail") },
         variant format!("powered={},shape={}", powered, shape.as_string()),
         collision vec![],
+        hardness 0.7,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StickyPiston {
         props {
@@ -988,12 +1162,17 @@ define_blocks! {
         model { ("minecraft", "sticky_piston") },
         variant format!("extended={},facing={}", extended, facing.as_string()),
         collision piston_collision(extended, facing),
+        hardness 0.5,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Web {
         props {},
         material material::NON_SOLID,
         model { ("minecraft", "web") },
         collision vec![],
+        hardness 4.0,
+        harvest_tools [ Tool::Sword(_), Tool::Shears, ],
+        best_tools [ Tool::Sword(_), Tool::Shears, ],
     }
     TallGrass {
         props {
@@ -1009,6 +1188,8 @@ define_blocks! {
         model { ("minecraft", variant.as_string() ) },
         tint TintType::Grass,
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Seagrass {
         props {},
@@ -1017,6 +1198,7 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", "seagrass") },
         collision vec![],
+        hardness 0.0,
     }
     TallSeagrass {
         props {
@@ -1030,6 +1212,7 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", "tall_seagrass") },
         collision vec![],
+        hardness 0.0,
     }
     DeadBush {
         props {},
@@ -1037,6 +1220,8 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", "dead_bush") },
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Piston {
         props {
@@ -1059,6 +1244,8 @@ define_blocks! {
         model { ("minecraft", "piston") },
         variant format!("extended={},facing={}", extended, facing.as_string()),
         collision piston_collision(extended, facing),
+        hardness 0.5,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PistonHead {
         props {
@@ -1096,6 +1283,8 @@ define_blocks! {
                 Point3::new(max_x, max_y, max_z)
             )]
         },
+        hardness 0.5,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Wool {
         props {
@@ -1120,6 +1309,7 @@ define_blocks! {
         },
         data Some(color.data()),
         model { ("minecraft", format!("{}_wool", color.as_string()) ) },
+        hardness 0.8,
     }
     PistonExtension {
         props {
@@ -1143,6 +1333,8 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", "dandelion") },
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     RedFlower {
         props {
@@ -1166,6 +1358,8 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", variant.as_string()) },
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     BrownMushroom {
         props {},
@@ -1175,20 +1369,39 @@ define_blocks! {
         },
         model { ("minecraft", "brown_mushroom") },
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     RedMushroom {
         props {},
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "red_mushroom") },
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     GoldBlock {
         props {},
         model { ("minecraft", "gold_block") },
+        hardness 3.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     IronBlock {
         props {},
         model { ("minecraft", "iron_block") },
+        hardness 5.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Stone),
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     DoubleStoneSlab {
         props {
@@ -1221,6 +1434,9 @@ define_blocks! {
         offset None,
         model { ("minecraft", format!("{}_double_slab", variant.as_string()) ) },
         variant if seamless { "all" } else { "normal" },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StoneSlab {
         props {
@@ -1242,10 +1458,16 @@ define_blocks! {
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("half={}", half.as_string()),
         collision slab_collision(half),
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BrickBlock {
         props {},
         model { ("minecraft", "brick_block") },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     TNT {
         props {
@@ -1254,18 +1476,30 @@ define_blocks! {
         data Some(if explode { 1 } else { 0 }),
         offset Some(if explode { 0 } else { 1 }),
         model { ("minecraft", "tnt") },
+        hardness 0.0,
     }
     BookShelf {
         props {},
         model { ("minecraft", "bookshelf") },
+        hardness 1.5,
+        best_tools [ Tool::Axe(_), ],
     }
     MossyCobblestone {
         props {},
         model { ("minecraft", "mossy_cobblestone") },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Obsidian {
         props {},
         model { ("minecraft", "obsidian") },
+        hardness 50.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Torch {
         props {
@@ -1304,6 +1538,7 @@ define_blocks! {
         model { ("minecraft", "torch") },
         variant format!("facing={}", facing.as_string()),
         collision vec![],
+        hardness 0.0,
     }
     Fire {
         props {
@@ -1346,6 +1581,7 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 0.0,
     }
     SoulFire {
         props {},
@@ -1353,11 +1589,15 @@ define_blocks! {
         offsets |protocol_version| { if protocol_version >= 735 { Some(0) } else { None } },
         model { ("minecraft", "soul_fire") },
         collision vec![],
+        hardness 0.0,
     }
     MobSpawner {
         props {},
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "mob_spawner") },
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     OakStairs {
         props {
@@ -1384,6 +1624,8 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::OakStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Chest {
         props {
@@ -1406,6 +1648,8 @@ define_blocks! {
             facing.horizontal_offset() * (2 * 3)),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "chest") },
+        hardness 2.5,
+        best_tools [ Tool::Axe(_), ],
     }
     RedstoneWire {
         props {
@@ -1447,18 +1691,35 @@ define_blocks! {
             "east" => val.contains(east.as_string()),
             _ => false,
         },
+        hardness 0.0,
     }
     DiamondOre {
         props {},
         model { ("minecraft", "diamond_ore") },
+        hardness 3.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     DiamondBlock {
         props {},
         model { ("minecraft", "diamond_block") },
+        hardness 5.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     CraftingTable {
         props {},
         model { ("minecraft", "crafting_table") },
+        hardness 2.5,
+        best_tools [ Tool::Axe(_), ],
     }
     Wheat {
         props {
@@ -1469,6 +1730,8 @@ define_blocks! {
         model { ("minecraft", "wheat") },
         variant format!("age={}", age),
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Farmland {
         props {
@@ -1482,6 +1745,8 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 15.0/16.0, 1.0)
         )],
+        hardness 0.6,
+        best_tools [ Tool::Shovel(_), ],
     }
     Furnace {
         props {
@@ -1497,6 +1762,9 @@ define_blocks! {
         offset Some(if lit { 0 } else { 1 } + facing.horizontal_offset() * 2),
         model { ("minecraft", "furnace") },
         variant format!("facing={}", facing.as_string()),
+        hardness 3.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     FurnaceLit {
         props {
@@ -1515,6 +1783,9 @@ define_blocks! {
         },
         model { ("minecraft", "lit_furnace") },
         variant format!("facing={}", facing.as_string()),
+        hardness 3.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StandingSign {
         props {
@@ -1562,6 +1833,8 @@ define_blocks! {
         material material::INTERACTABLE,
         model { ("minecraft", "standing_sign") },
         collision vec![],
+        hardness 1.0,
+        best_tools [ Tool::Axe(_), ],
     }
     WoodenDoor {
         props {
@@ -1586,6 +1859,8 @@ define_blocks! {
             let (facing, hinge, open, powered) = update_door_state(world, pos, half, facing, hinge, open, powered);
             Block::WoodenDoor{facing, half, hinge, open, powered}
         },
+        hardness 3.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Ladder {
         props {
@@ -1602,6 +1877,8 @@ define_blocks! {
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "ladder") },
         variant format!("facing={}", facing.as_string()),
+        hardness 0.4,
+        best_tools [ Tool::Axe(_), ],
     }
     Rail {
         props {
@@ -1623,6 +1900,8 @@ define_blocks! {
         model { ("minecraft", "rail") },
         variant format!("shape={}", shape.as_string()),
         collision vec![],
+        hardness 0.7,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StoneStairs {
         props {
@@ -1649,6 +1928,9 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::StoneStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     WallSign {
         props {
@@ -1685,6 +1967,8 @@ define_blocks! {
         model { ("minecraft", "wall_sign") },
         variant format!("facing={}", facing.as_string()),
         collision vec![],
+        hardness 1.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Lever {
         props {
@@ -1707,6 +1991,7 @@ define_blocks! {
         model { ("minecraft", "lever") },
         variant format!("facing={},powered={}", face.variant_with_facing(facing), powered),
         collision vec![],
+        hardness 0.5,
     }
     StonePressurePlate {
         props {
@@ -1718,6 +2003,9 @@ define_blocks! {
         model { ("minecraft", "stone_pressure_plate") },
         variant format!("powered={}", powered),
         collision vec![],
+        hardness 0.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     IronDoor {
         props {
@@ -1742,6 +2030,9 @@ define_blocks! {
             let (facing, hinge, open, powered) = update_door_state(world, pos, half, facing, hinge, open, powered);
             Block::IronDoor{facing, half, hinge, open, powered}
         },
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     WoodenPressurePlate {
         props {
@@ -1761,6 +2052,8 @@ define_blocks! {
         model { ("minecraft", "wooden_pressure_plate") },
         variant format!("powered={}", powered),
         collision vec![],
+        hardness 0.5,
+        best_tools [ Tool::Axe(_), ],
     }
     RedstoneOre {
         props {
@@ -1769,6 +2062,13 @@ define_blocks! {
         data if !lit { Some(0) } else { None },
         offset Some(if lit { 0 } else { 1 }),
         model { ("minecraft", if lit { "lit_redstone_ore" } else { "redstone_ore" }) },
+        hardness 3.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     RedstoneOreLit {
         props {},
@@ -1778,6 +2078,7 @@ define_blocks! {
             ..material::SOLID
         },
         model { ("minecraft", "lit_redstone_ore") },
+        hardness 0.0,
     }
     RedstoneTorchUnlit {
         props {
@@ -1804,6 +2105,7 @@ define_blocks! {
         model { ("minecraft", "unlit_redstone_torch") },
         variant format!("facing={}", facing.as_string()),
         collision vec![],
+        hardness 0.0,
     }
     RedstoneTorchLit {
         props {
@@ -1833,6 +2135,7 @@ define_blocks! {
         model { ("minecraft", "redstone_torch") },
         variant format!("facing={}", facing.as_string()),
         collision vec![],
+        hardness 0.0,
     }
     RedstoneTorchStanding {
         props {
@@ -1844,6 +2147,7 @@ define_blocks! {
         model { ("minecraft", if lit { "redstone_torch" } else { "unlit_redstone_torch" }) },
         variant "facing=up",
         collision vec![],
+        hardness 0.0,
     }
     RedstoneTorchWall {
         props {
@@ -1864,6 +2168,7 @@ define_blocks! {
         model { ("minecraft", if lit { "redstone_torch" } else { "unlit_redstone_torch" }) },
         variant format!("facing={}", facing.as_string()),
         collision vec![],
+        hardness 0.0,
     }
     StoneButton {
         props {
@@ -1885,6 +2190,8 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", "stone_button") },
         variant format!("facing={},powered={}", face.variant_with_facing(facing), powered),
+        hardness 0.5,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     SnowLayer {
         props {
@@ -1898,6 +2205,9 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, (f64::from(layers) - 1.0)/8.0, 1.0),
         )],
+        hardness 0.1,
+        harvest_tools [ Tool::Shovel(_), ],
+        best_tools [ Tool::Shovel(_), ],
     }
     Ice {
         props {},
@@ -1906,10 +2216,15 @@ define_blocks! {
             ..material::TRANSPARENT
         },
         model { ("minecraft", "ice") },
+        hardness 0.5,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Snow {
         props {},
         model { ("minecraft", "snow") },
+        hardness 0.2,
+        harvest_tools [ Tool::Shovel(_), ],
+        best_tools [ Tool::Shovel(_), ],
     }
     Cactus {
         props {
@@ -1922,10 +2237,13 @@ define_blocks! {
             Point3::new(1.0/16.0, 0.0, 1.0/16.0),
             Point3::new(1.0 - (1.0/16.0), 1.0 - (1.0/16.0), 1.0 - (1.0/16.0))
         )],
+        hardness 0.4,
     }
     Clay {
         props {},
         model { ("minecraft", "clay") },
+        hardness 0.6,
+        best_tools [ Tool::Shovel(_), ],
     }
     Reeds {
         props {
@@ -1936,6 +2254,8 @@ define_blocks! {
         model { ("minecraft", "reeds") },
         tint TintType::Foliage,
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Jukebox {
         props {
@@ -1944,6 +2264,8 @@ define_blocks! {
         data Some(if has_record { 1 } else { 0 }),
         offset Some(if has_record { 0 } else { 1 }),
         model { ("minecraft", "jukebox") },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Fence {
         props {
@@ -1973,6 +2295,8 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     PumpkinFace {
         props {
@@ -1988,16 +2312,23 @@ define_blocks! {
         offset None,
         model { ("minecraft", "pumpkin") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.0,
+        best_tools [ Tool::Shears, Tool::Axe(_), ],
     }
     Pumpkin {
         props {},
         data None::<usize>,
         offset Some(0),
         model { ("minecraft", "pumpkin") },
+        hardness 1.0,
+        best_tools [ Tool::Shears, Tool::Axe(_), ],
     }
     Netherrack {
         props {},
         model { ("minecraft", "netherrack") },
+        hardness 0.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     SoulSand {
         props {},
@@ -2007,12 +2338,16 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 7.0/8.0, 1.0)
         )],
+        hardness 0.5,
+        best_tools [ Tool::Shovel(_), ],
     }
     SoulSoil {
         props {},
         data None,
         offsets |protocol_version| { if protocol_version >= 735 { Some(0) } else { None } },
         model { ("minecraft", "soul_soil") },
+        hardness 0.5,
+        best_tools [ Tool::Shovel(_), ],
     }
     Basalt {
         props {
@@ -2027,6 +2362,9 @@ define_blocks! {
                 _ => unreachable!()
             }) } else { None } },
         model { ("minecraft", "basalt") },
+        hardness 1.25,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PolishedBasalt {
         props {
@@ -2041,12 +2379,16 @@ define_blocks! {
                 _ => unreachable!()
             }) } else { None } },
         model { ("minecraft", "polished_basalt") },
+        hardness 1.25,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     SoulTorch {
         props {},
         data None,
         offsets |protocol_version| { if protocol_version >= 735 { Some(0) } else { None } },
         model { ("minecraft", "soul_torch") },
+        hardness 0.0,
     }
     SoulWallTorch {
         props {
@@ -2060,6 +2402,7 @@ define_blocks! {
         data None,
         offsets |protocol_version| { if protocol_version >= 735 { Some(facing.offset()) } else { None } },
         model { ("minecraft", "soul_wall_torch") },
+        hardness 0.0,
     }
     Glowstone {
         props {},
@@ -2068,6 +2411,7 @@ define_blocks! {
             ..material::SOLID
         },
         model { ("minecraft", "glowstone") },
+        hardness 0.3,
     }
     Portal {
         props {
@@ -2100,6 +2444,8 @@ define_blocks! {
         },
         model { ("minecraft", "carved_pumpkin") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.0,
+        best_tools [ Tool::Shears, Tool::Axe(_), ],
     }
     PumpkinLit {
         props {
@@ -2119,6 +2465,8 @@ define_blocks! {
         },
         model { ("minecraft", "lit_pumpkin") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.0,
+        best_tools [ Tool::Shears, Tool::Axe(_), ],
     }
     Cake {
         props {
@@ -2132,6 +2480,7 @@ define_blocks! {
             Point3::new((1.0 + (f64::from(bites) * 2.0)) / 16.0, 0.0, 1.0/16.0),
             Point3::new(1.0 - (1.0/16.0), 0.5, 1.0 - (1.0/16.0))
         )],
+        hardness 0.5,
     }
     Repeater {
         props {
@@ -2158,6 +2507,7 @@ define_blocks! {
             Point3::new(1.0, 1.0/8.0, 1.0)
         )],
         update_state (world, pos) => Repeater{delay, facing, locked: update_repeater_state(world, pos, facing), powered},
+        hardness 0.0,
     }
     RepeaterPowered {
         props {
@@ -2180,6 +2530,7 @@ define_blocks! {
             Point3::new(1.0, 1.0/8.0, 1.0)
         )],
         update_state (world, pos) => RepeaterPowered{delay, facing, locked: update_repeater_state(world, pos, facing)},
+        hardness 0.0,
     }
     StainedGlass {
         props {
@@ -2205,6 +2556,7 @@ define_blocks! {
         data Some(color.data()),
         material material::TRANSPARENT,
         model { ("minecraft", format!("{}_stained_glass", color.as_string()) ) },
+        hardness 0.3,
     }
     TrapDoor {
         props {
@@ -2244,6 +2596,8 @@ define_blocks! {
         model { ("minecraft", "trapdoor") },
         variant format!("facing={},half={},open={}", facing.as_string(), half.as_string(), open),
         collision trapdoor_collision(facing, half, open),
+        hardness 3.0,
+        best_tools [ Tool::Axe(_), ],
     }
     MonsterEgg {
         props {
@@ -2258,6 +2612,8 @@ define_blocks! {
         },
         data Some(variant.data()),
         model { ("minecraft", format!("{}_monster_egg", variant.as_string())) },
+        hardness if variant == MonsterEggVariant::Stone { 1.0 } else { 0.75 },
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StoneBrick {
         props {
@@ -2270,6 +2626,9 @@ define_blocks! {
         },
         data Some(variant.data()),
         model { ("minecraft", variant.as_string() ) },
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BrownMushroomBlock {
         props {
@@ -2285,6 +2644,8 @@ define_blocks! {
         offset mushroom_block_offset(is_stem, west, up, south, north, east, down),
         model { ("minecraft", "brown_mushroom_block") },
         variant format!("variant={}", mushroom_block_variant(is_stem, west, up, south, north, east, down)),
+        hardness 0.2,
+        best_tools [ Tool::Axe(_), ],
     }
     RedMushroomBlock {
         props {
@@ -2300,6 +2661,8 @@ define_blocks! {
         offset mushroom_block_offset(is_stem, west, up, south, north, east, down),
         model { ("minecraft", "red_mushroom_block") },
         variant format!("variant={}", mushroom_block_variant(is_stem, west, up, south, north, east, down)),
+        hardness 0.2,
+        best_tools [ Tool::Axe(_), ],
     }
     MushroomStem {
         props {
@@ -2314,6 +2677,8 @@ define_blocks! {
         offset mushroom_block_offset(false, west, up, south, north, east, down),
         model { ("minecraft", "mushroom_stem") },
         variant "variant=all_stem".to_string(),
+        hardness 0.2,
+        best_tools [ Tool::Axe(_), ],
     }
     IronBars {
         props {
@@ -2345,6 +2710,9 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Chain {
         props {
@@ -2373,6 +2741,9 @@ define_blocks! {
             }
         },
         model { ("minecraft", "chain") },
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     GlassPane {
         props {
@@ -2402,10 +2773,13 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 0.3,
     }
     MelonBlock {
         props {},
         model { ("minecraft", "melon_block") },
+        hardness 1.0,
+        best_tools [ Tool::Shears, Tool::Axe(_), ],
     }
     AttachedPumpkinStem {
         props {
@@ -2434,6 +2808,8 @@ define_blocks! {
 
             Block::AttachedPumpkinStem{facing}
         },
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     AttachedMelonStem {
         props {
@@ -2462,6 +2838,8 @@ define_blocks! {
 
             Block::AttachedMelonStem{facing}
         },
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     PumpkinStem {
         props {
@@ -2498,6 +2876,8 @@ define_blocks! {
 
             Block::PumpkinStem{age, facing}
         },
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     MelonStem {
         props {
@@ -2534,6 +2914,8 @@ define_blocks! {
 
             Block::MelonStem{age, facing}
         },
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Vine {
         props {
@@ -2566,6 +2948,8 @@ define_blocks! {
             let up = mat.renderable && (mat.should_cull_against || mat.never_cull /* Because leaves */);
             Vine{up, south, west, north, east}
         },
+        hardness 0.2,
+        best_tools [ Tool::Axe(_), ],
     }
     FenceGate {
         props {
@@ -2591,6 +2975,8 @@ define_blocks! {
             open,
             powered
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     BrickStairs {
         props {
@@ -2617,6 +3003,9 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::BrickStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StoneBrickStairs {
         props {
@@ -2643,6 +3032,9 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::StoneBrickStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Mycelium {
         props {
@@ -2654,6 +3046,8 @@ define_blocks! {
         model { ("minecraft", "mycelium") },
         variant format!("snowy={}", snowy),
         update_state (world, pos) => Block::Mycelium{snowy: is_snowy(world, pos)},
+        hardness 0.6,
+        best_tools [ Tool::Shovel(_), ],
     }
     Waterlily {
         props {},
@@ -2664,10 +3058,15 @@ define_blocks! {
             Point3::new(1.0/16.0, 0.0, 1.0/16.0),
             Point3::new(15.0/16.0, 3.0/32.0, 15.0/16.0))
         ],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     NetherBrick {
         props {},
         model { ("minecraft", "nether_brick") },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     NetherBrickFence {
         props {
@@ -2705,6 +3104,9 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     NetherBrickStairs {
         props {
@@ -2731,6 +3133,9 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::NetherBrickStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     NetherWart {
         props {
@@ -2741,6 +3146,8 @@ define_blocks! {
         model { ("minecraft", "nether_wart") },
         variant format!("age={}", age),
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     EnchantingTable {
         props {},
@@ -2750,6 +3157,9 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 0.75, 1.0))
         ],
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BrewingStand {
         props {
@@ -2774,6 +3184,9 @@ define_blocks! {
             "has_bottle_2" => (val == "true") == has_bottle_2,
             _ => false,
         },
+        hardness 0.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Cauldron {
         props {
@@ -2783,6 +3196,9 @@ define_blocks! {
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "cauldron") },
         variant format!("level={}", level),
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     EndPortal {
         props {},
@@ -2830,6 +3246,9 @@ define_blocks! {
     EndStone {
         props {},
         model { ("minecraft", "end_stone") },
+        hardness 3.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     DragonEgg {
         props {},
@@ -2842,10 +3261,12 @@ define_blocks! {
             Point3::new(1.0/16.0, 0.0, 1.0/16.0),
             Point3::new(15.0/16.0, 1.0, 15.0/16.0)
         )],
+        hardness 3.0,
     }
     RedstoneLamp {
         props {},
         model { ("minecraft", "redstone_lamp") },
+        hardness 0.3,
     }
     RedstoneLampLit {
         props {},
@@ -2854,6 +3275,7 @@ define_blocks! {
             ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "lit_redstone_lamp") },
+        hardness 0.3,
     }
     DoubleWoodenSlab {
         props {
@@ -2869,6 +3291,7 @@ define_blocks! {
         data Some(variant.data()),
         offset None,
         model { ("minecraft", format!("{}_double_slab", variant.as_string()) ) },
+        hardness 2.0,
     }
     WoodenSlab {
         props {
@@ -2888,6 +3311,7 @@ define_blocks! {
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("half={}", half.as_string()),
         collision slab_collision(half),
+        hardness 2.0,
     }
     Cocoa {
         props {
@@ -2922,6 +3346,8 @@ define_blocks! {
                 Point3::new(max_x / 16.0, max_y / 16.0, max_z / 16.0))
             ]
         },
+        hardness 0.2,
+        best_tools [ Tool::Axe(_), ],
     }
     SandstoneStairs {
         props {
@@ -2948,11 +3374,21 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::SandstoneStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 0.8,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     EmeraldOre {
         props {},
         material material::SOLID,
         model { ("minecraft", "emerald_ore") },
+        hardness 3.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     EnderChest {
         props {
@@ -2976,6 +3412,9 @@ define_blocks! {
             Point3::new(1.0/16.0, 0.0, 1.0/16.0),
             Point3::new(15.0/16.0, 7.0/8.0, 15.0/16.0)
         )],
+        hardness 22.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     TripwireHook {
         props {
@@ -2998,6 +3437,7 @@ define_blocks! {
         model { ("minecraft", "tripwire_hook") },
         variant format!("attached={},facing={},powered={}", attached, facing.as_string(), powered),
         collision vec![],
+        hardness 0.0,
     }
     Tripwire {
         props {
@@ -3053,10 +3493,18 @@ define_blocks! {
                 mojang_cant_even
             }
         },
+        hardness 0.0,
     }
     EmeraldBlock {
         props {},
         model { ("minecraft", "emerald_block") },
+        hardness 5.0,
+        harvest_tools [
+            Tool::Pickaxe(ToolMaterial::Iron),
+            Tool::Pickaxe(ToolMaterial::Diamond),
+            Tool::Pickaxe(ToolMaterial::Netherite),
+        ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     SpruceStairs {
         props {
@@ -3083,6 +3531,8 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::SpruceStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     BirchStairs {
         props {
@@ -3109,6 +3559,8 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::BirchStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     JungleStairs {
         props {
@@ -3135,6 +3587,8 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::JungleStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     CommandBlock {
         props {
@@ -3160,6 +3614,7 @@ define_blocks! {
             ..material::PARTIALLY_SOLID
         },
         model { ("minecraft", "beacon") },
+        hardness 3.0,
     }
     CobblestoneWall {
         props {
@@ -3206,6 +3661,9 @@ define_blocks! {
             "west" => west == (val == "true"),
             _ => false,
         },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     FlowerPot {
         props {
@@ -3244,6 +3702,7 @@ define_blocks! {
         },
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "flower_pot") },
+        hardness 0.0,
     }
     Carrots {
         props {
@@ -3254,6 +3713,8 @@ define_blocks! {
         model { ("minecraft", "carrots") },
         variant format!("age={}", age),
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Potatoes {
         props {
@@ -3264,6 +3725,8 @@ define_blocks! {
         model { ("minecraft", "potatoes") },
         variant format!("age={}", age),
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     WoodenButton {
         props {
@@ -3293,6 +3756,8 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", "wooden_button") },
         variant format!("facing={},powered={}", face.variant_with_facing(facing), powered),
+        hardness 0.5,
+        best_tools [ Tool::Axe(_), ],
     }
     SkullSkeletonWall {
         props {
@@ -3325,6 +3790,7 @@ define_blocks! {
                 Point3::new(max_x, max_y, max_z)
             )]
         },
+        hardness 1.0,
     }
     SkullSkeleton
     {
@@ -3343,6 +3809,7 @@ define_blocks! {
                 Point3::new(max_x, max_y, max_z)
             )]
         },
+        hardness 1.0,
     }
     SkullWitherSkeletonWall {
         props {
@@ -3371,6 +3838,7 @@ define_blocks! {
                 Point3::new(max_x, max_y, max_z)
             )]
         },
+        hardness 1.0,
     }
     SkullWitherSkeleton {
         props {
@@ -3388,6 +3856,7 @@ define_blocks! {
                 Point3::new(max_x, max_y, max_z)
             )]
         },
+        hardness 1.0,
     }
     ZombieWallHead {
         props {
@@ -3402,6 +3871,7 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "zombie_wall_head") },
+        hardness 1.0,
     }
     ZombieHead {
         props {
@@ -3411,6 +3881,7 @@ define_blocks! {
         offset Some(rotation as usize),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "zombie_head") },
+        hardness 1.0,
     }
     PlayerWallHead {
         props {
@@ -3425,6 +3896,7 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "player_wall_head") },
+        hardness 1.0,
     }
     PlayerHead {
         props {
@@ -3434,6 +3906,7 @@ define_blocks! {
         offset Some(rotation as usize),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "player_head") },
+        hardness 1.0,
     }
     CreeperWallHead {
         props {
@@ -3448,6 +3921,7 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "creeper_wall_head") },
+        hardness 1.0,
     }
     CreeperHead {
         props {
@@ -3457,6 +3931,7 @@ define_blocks! {
         offset Some(rotation as usize),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "creeper_head") },
+        hardness 1.0,
     }
     DragonWallHead {
         props {
@@ -3471,6 +3946,7 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "dragon_wall_head") },
+        hardness 1.0,
     }
     DragonHead {
         props {
@@ -3480,6 +3956,7 @@ define_blocks! {
         offset Some(rotation as usize),
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "dragon_head") },
+        hardness 1.0,
     }
     Anvil {
         props {
@@ -3507,6 +3984,9 @@ define_blocks! {
             )],
             _ => unreachable!(),
         },
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     TrappedChest {
         props {
@@ -3534,6 +4014,8 @@ define_blocks! {
             Point3::new(1.0/16.0, 0.0, 1.0/16.0),
             Point3::new(15.0/16.0, 7.0/8.0, 15.0/16.0)
         )],
+        hardness 2.5,
+        best_tools [ Tool::Axe(_), ],
     }
     LightWeightedPressurePlate {
         props {
@@ -3544,6 +4026,9 @@ define_blocks! {
         model { ("minecraft", "light_weighted_pressure_plate") },
         variant format!("power={}", power),
         collision vec![],
+        hardness 0.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     HeavyWeightedPressurePlate {
         props {
@@ -3554,6 +4039,9 @@ define_blocks! {
         model { ("minecraft", "heavy_weighted_pressure_plate") },
         variant format!("power={}", power),
         collision vec![],
+        hardness 0.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     ComparatorUnpowered {
         props {
@@ -3579,6 +4067,7 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 1.0/8.0, 1.0)
         )],
+        hardness 0.0,
     }
     ComparatorPowered {
         props {
@@ -3602,6 +4091,7 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 1.0/8.0, 1.0)
         )],
+        hardness 0.0,
     }
     DaylightDetector {
         props {
@@ -3617,14 +4107,22 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 3.0/8.0, 1.0)
         )],
+        hardness 0.2,
+        best_tools [ Tool::Axe(_), ],
     }
     RedstoneBlock {
         props {},
         model { ("minecraft", "redstone_block") },
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     QuartzOre {
         props {},
         model { ("minecraft", "quartz_ore") },
+        hardness 3.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Hopper {
         props {
@@ -3649,6 +4147,9 @@ define_blocks! {
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "hopper") },
         variant format!("facing={}", facing.as_string()),
+        hardness 3.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     QuartzBlock {
         props {
@@ -3669,6 +4170,9 @@ define_blocks! {
             QuartzVariant::PillarEastWest => "quartz_column",
         } ) },
         variant variant.as_string(),
+        hardness 0.8,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     QuartzStairs {
         props {
@@ -3695,6 +4199,9 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::QuartzStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 0.8,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     ActivatorRail {
         props {
@@ -3714,6 +4221,8 @@ define_blocks! {
         model { ("minecraft", "activator_rail") },
         variant format!("powered={},shape={}", powered, shape.as_string()),
         collision vec![],
+        hardness 0.7,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Dropper {
         props {
@@ -3731,6 +4240,9 @@ define_blocks! {
         offset Some(if triggered { 0 } else { 1 } + facing.offset() * 2),
         model { ("minecraft", "dropper") },
         variant format!("facing={}", facing.as_string()),
+        hardness 3.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StainedHardenedClay {
         props {
@@ -3755,6 +4267,9 @@ define_blocks! {
         },
         data Some(color.data()),
         model { ("minecraft", format!("{}_stained_hardened_clay", color.as_string()) ) },
+        hardness 1.25,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StainedGlassPane {
         props {
@@ -3803,6 +4318,7 @@ define_blocks! {
             "west" => west == (val == "true"),
             _ => false,
         },
+        hardness 0.3,
     }
     Leaves2 {
         props {
@@ -3820,6 +4336,8 @@ define_blocks! {
         material material::LEAVES,
         model { ("minecraft", format!("{}_leaves", variant.as_string()) ) },
         tint TintType::Foliage,
+        hardness 0.2,
+        best_tools [ Tool::Shears, Tool::Hoe(_), ],
     }
     Log2 {
         props {
@@ -3833,6 +4351,8 @@ define_blocks! {
         offset None,
         model { ("minecraft", format!("{}_log", variant.as_string()) ) },
         variant format!("axis={}", axis.as_string()),
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     AcaciaStairs {
         props {
@@ -3859,6 +4379,8 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::AcaciaStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     DarkOakStairs {
         props {
@@ -3885,11 +4407,14 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::DarkOakStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     Slime {
         props {},
         material material::TRANSPARENT,
         model { ("minecraft", "slime") },
+        hardness 0.0,
     }
     Barrier {
         props {},
@@ -3925,6 +4450,9 @@ define_blocks! {
         model { ("minecraft", "iron_trapdoor") },
         variant format!("facing={},half={},open={}", facing.as_string(), half.as_string(), open),
         collision trapdoor_collision(facing, half, open),
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Prismarine {
         props {
@@ -3936,6 +4464,9 @@ define_blocks! {
         },
         data Some(variant.data()),
         model { ("minecraft", variant.as_string() ) },
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PrismarineStairs {
         props {
@@ -3971,6 +4502,9 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::PrismarineStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged, variant},
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PrismarineSlab {
         props {
@@ -3996,6 +4530,9 @@ define_blocks! {
         }) },
         variant format!("type={}", type_.as_string()),
         collision slab_collision(type_),
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     SeaLantern {
         props {},
@@ -4004,6 +4541,7 @@ define_blocks! {
             ..material::SOLID
         },
         model { ("minecraft", "sea_lantern") },
+        hardness 0.3,
     }
     HayBlock {
         props {
@@ -4013,6 +4551,8 @@ define_blocks! {
         offset Some(match axis { Axis::X => 0, Axis::Y => 1, Axis::Z => 2, _ => unreachable!() }),
         model { ("minecraft", "hay_block") },
         variant format!("axis={}", axis.as_string()),
+        hardness 0.5,
+        best_tools [ Tool::Hoe(_), ],
     }
     Carpet {
         props {
@@ -4042,18 +4582,27 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 1.0/16.0, 1.0)
         )],
+        hardness 0.1,
     }
     HardenedClay {
         props {},
         model { ("minecraft", "hardened_clay") },
+        hardness 1.25,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     CoalBlock {
         props {},
         model { ("minecraft", "coal_block") },
+        hardness 5.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PackedIce {
         props {},
         model { ("minecraft", "packed_ice") },
+        hardness 0.5,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     DoublePlant {
         props {
@@ -4078,6 +4627,8 @@ define_blocks! {
             let (half, variant) = update_double_plant_state(world, pos, half, variant);
             Block::DoublePlant{half, variant}
         },
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     StandingBanner {
         props {
@@ -4123,6 +4674,8 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", "standing_banner") },
         variant format!("rotation={}", rotation.as_string()),
+        hardness 1.0,
+        best_tools [ Tool::Axe(_), ],
     }
     WallBanner {
         props {
@@ -4156,6 +4709,8 @@ define_blocks! {
         material material::NON_SOLID,
         model { ("minecraft", "wall_banner") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.0,
+        best_tools [ Tool::Axe(_), ],
     }
     DaylightDetectorInverted {
         props {
@@ -4170,6 +4725,7 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 3.0/8.0, 1.0)
         )],
+        hardness 0.2,
     }
     RedSandstone {
         props {
@@ -4181,6 +4737,9 @@ define_blocks! {
         },
         data Some(variant.data()),
         model { ("minecraft", variant.as_string()) },
+        hardness 0.8,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     RedSandstoneStairs {
         props {
@@ -4207,6 +4766,9 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::RedSandstoneStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 0.8,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     WoodenSlabFlat {
         props {
@@ -4231,6 +4793,8 @@ define_blocks! {
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("type={}", type_.as_string()),
         collision slab_collision(type_),
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     StoneSlabFlat {
         props {
@@ -4260,6 +4824,9 @@ define_blocks! {
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("type={}", type_.as_string()),
         collision slab_collision(type_),
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     DoubleStoneSlab2 {
         props {
@@ -4273,6 +4840,9 @@ define_blocks! {
         material material::SOLID,
         model { ("minecraft", format!("{}_double_slab", variant.as_string()) ) },
         variant if seamless { "all" } else { "normal" },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StoneSlab2 {
         props {
@@ -4285,6 +4855,9 @@ define_blocks! {
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("half={}", half.as_string()),
         collision slab_collision(half),
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     SmoothStone {
         props {
@@ -4304,6 +4877,9 @@ define_blocks! {
             _ => unreachable!(),
         }),
         model { ("minecraft", format!("smooth_{}", variant.as_string()) ) },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     SpruceFenceGate {
         props {
@@ -4329,6 +4905,8 @@ define_blocks! {
             open,
             powered
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     BirchFenceGate {
         props {
@@ -4354,6 +4932,8 @@ define_blocks! {
             open,
             powered
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     JungleFenceGate {
         props {
@@ -4379,6 +4959,8 @@ define_blocks! {
             open,
             powered
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     DarkOakFenceGate {
         props {
@@ -4404,6 +4986,8 @@ define_blocks! {
             open,
             powered
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     AcaciaFenceGate {
         props {
@@ -4429,6 +5013,8 @@ define_blocks! {
             open,
             powered
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     SpruceFence {
         props {
@@ -4458,6 +5044,8 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     BirchFence {
         props {
@@ -4487,6 +5075,8 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     JungleFence {
         props {
@@ -4516,6 +5106,8 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     DarkOakFence {
         props {
@@ -4545,6 +5137,8 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     AcaciaFence {
         props {
@@ -4574,6 +5168,8 @@ define_blocks! {
             "east" => east == (val == "true"),
             _ => false,
         },
+        hardness 2.0,
+        best_tools [ Tool::Axe(_), ],
     }
     SpruceDoor {
         props {
@@ -4598,6 +5194,8 @@ define_blocks! {
             let (facing, hinge, open, powered) = update_door_state(world, pos, half, facing, hinge, open, powered);
             Block::SpruceDoor{facing, half, hinge, open, powered}
         },
+        hardness 3.0,
+        best_tools [ Tool::Axe(_), ],
     }
     BirchDoor {
         props {
@@ -4622,6 +5220,8 @@ define_blocks! {
             let (facing, hinge, open, powered) = update_door_state(world, pos, half, facing, hinge, open, powered);
             Block::BirchDoor{facing, half, hinge, open, powered}
         },
+        hardness 3.0,
+        best_tools [ Tool::Axe(_), ],
     }
     JungleDoor {
         props {
@@ -4646,6 +5246,8 @@ define_blocks! {
             let (facing, hinge, open, powered) = update_door_state(world, pos, half, facing, hinge, open, powered);
             Block::JungleDoor{facing, half, hinge, open, powered}
         },
+        hardness 3.0,
+        best_tools [ Tool::Axe(_), ],
     }
     AcaciaDoor {
         props {
@@ -4670,6 +5272,8 @@ define_blocks! {
             let (facing, hinge, open, powered) = update_door_state(world, pos, half, facing, hinge, open, powered);
             Block::AcaciaDoor{facing, half, hinge, open, powered}
         },
+        hardness 3.0,
+        best_tools [ Tool::Axe(_), ],
     }
     DarkOakDoor {
         props {
@@ -4694,6 +5298,8 @@ define_blocks! {
             let (facing, hinge, open, powered) = update_door_state(world, pos, half, facing, hinge, open, powered);
             Block::DarkOakDoor{facing, half, hinge, open, powered}
         },
+        hardness 3.0,
+        best_tools [ Tool::Axe(_), ],
     }
     EndRod {
         props {
@@ -4731,6 +5337,7 @@ define_blocks! {
                 _ => unreachable!(),
             }
         },
+        hardness 0.0,
     }
     ChorusPlant {
         props {
@@ -4817,6 +5424,8 @@ define_blocks! {
             "west" => west == (val == "true"),
             _ => false,
         },
+        hardness 0.4,
+        best_tools [ Tool::Axe(_), ],
     }
     ChorusFlower {
         props {
@@ -4826,10 +5435,15 @@ define_blocks! {
         material material::PARTIALLY_SOLID,
         model { ("minecraft", "chorus_flower") },
         variant format!("age={}", age),
+        hardness 0.4,
+        best_tools [ Tool::Axe(_), ],
     }
     PurpurBlock {
         props {},
         model { ("minecraft", "purpur_block") },
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PurpurPillar {
         props {
@@ -4839,6 +5453,9 @@ define_blocks! {
         offset Some(match axis { Axis::X => 0, Axis::Y => 1, Axis::Z => 2, _ => unreachable!() }),
         model { ("minecraft", "purpur_pillar") },
         variant format!("axis={}", axis.as_string()),
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PurpurStairs {
         props {
@@ -4865,6 +5482,9 @@ define_blocks! {
         variant format!("facing={},half={},shape={}", facing.as_string(), half.as_string(), shape.as_string()),
         collision stair_collision(facing, shape, half),
         update_state (world, pos) => Block::PurpurStairs{facing, half, shape: update_stair_shape(world, pos, facing), waterlogged},
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PurpurDoubleSlab {
         props {
@@ -4872,6 +5492,9 @@ define_blocks! {
         },
         offset None,
         model { ("minecraft", format!("{}_double_slab", variant.as_string()) ) },
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PurpurSlab {
         props {
@@ -4884,10 +5507,16 @@ define_blocks! {
         model { ("minecraft", format!("{}_slab", variant.as_string()) ) },
         variant format!("half={},variant=default", half.as_string()),
         collision slab_collision(half),
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     EndBricks {
         props {},
         model { ("minecraft", "end_bricks") },
+        hardness 3.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Beetroots {
         props {
@@ -4898,6 +5527,8 @@ define_blocks! {
         model { ("minecraft", "beetroots") },
         variant format!("age={}", age),
         collision vec![],
+        hardness 0.0,
+        best_tools [ Tool::Axe(_), ],
     }
     GrassPath {
         props {},
@@ -4907,6 +5538,8 @@ define_blocks! {
             Point3::new(0.0, 0.0, 0.0),
             Point3::new(1.0, 15.0/16.0, 1.0)
         )],
+        hardness 0.65,
+        best_tools [ Tool::Shovel(_), ],
     }
     EndGateway {
         props {},
@@ -4955,18 +5588,27 @@ define_blocks! {
         data if age == 0 { Some(0) } else { None },
         offset Some(age as usize),
         model { ("minecraft", "frosted_ice") },
+        hardness 0.5,
     }
     MagmaBlock {
         props {},
         model { ("minecraft", "magma") },
+        hardness 0.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     NetherWartBlock {
         props {},
         model { ("minecraft", "nether_wart_block") },
+        hardness 1.0,
+        best_tools [ Tool::Hoe(_), ],
     }
     RedNetherBrick {
         props {},
         model { ("minecraft", "red_nether_brick") },
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BoneBlock {
         props {
@@ -4976,6 +5618,9 @@ define_blocks! {
         offset Some(match axis { Axis::X => 0, Axis::Y => 1, Axis::Z => 2, _ => unreachable!() }),
         model { ("minecraft", "bone_block") },
         variant format!("axis={}", axis.as_string()),
+        hardness 2.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     StructureVoid {
         props {},
@@ -4986,6 +5631,7 @@ define_blocks! {
         model { ("minecraft", "structure_void") },
         // TODO: a small hit box but no collision
         collision vec![],
+        hardness 0.0,
     }
     Observer {
         props {
@@ -5003,6 +5649,9 @@ define_blocks! {
         offset Some(if powered { 0 } else { 1 } + facing.offset() * 2),
         model { ("minecraft", "observer") },
         variant format!("facing={},powered={}", facing.as_string(), powered),
+        hardness 3.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     // TODO: Shulker box textures (1.11+), since there is no model, we use wool for now
     // The textures should be built from textures/blocks/shulker_top_<color>.png
@@ -5021,6 +5670,8 @@ define_blocks! {
         data None::<usize>,
         offset Some(facing.offset()),
         model { ("minecraft", "sponge") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     WhiteShulkerBox {
         props {
@@ -5036,6 +5687,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "white_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     OrangeShulkerBox {
         props {
@@ -5051,6 +5704,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "orange_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     MagentaShulkerBox {
         props {
@@ -5066,6 +5721,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "magenta_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     LightBlueShulkerBox {
         props {
@@ -5081,6 +5738,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "light_blue_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     YellowShulkerBox {
         props {
@@ -5096,6 +5755,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "yellow_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     LimeShulkerBox {
         props {
@@ -5111,6 +5772,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "lime_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PinkShulkerBox {
         props {
@@ -5126,6 +5789,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "pink_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     GrayShulkerBox {
         props {
@@ -5141,6 +5806,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "gray_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     LightGrayShulkerBox {
         props {
@@ -5156,6 +5823,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "light_gray_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     CyanShulkerBox {
         props {
@@ -5171,6 +5840,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "cyan_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PurpleShulkerBox {
         props {
@@ -5186,6 +5857,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "purple_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BlueShulkerBox {
         props {
@@ -5201,6 +5874,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "blue_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BrownShulkerBox {
         props {
@@ -5216,6 +5891,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "brown_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     GreenShulkerBox {
         props {
@@ -5231,6 +5908,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "green_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     RedShulkerBox {
         props {
@@ -5246,6 +5925,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "red_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BlackShulkerBox {
         props {
@@ -5261,6 +5942,8 @@ define_blocks! {
         data Some(facing.index()),
         offset Some(facing.offset()),
         model { ("minecraft", "black_wool") },
+        hardness 2.0,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     WhiteGlazedTerracotta {
         props {
@@ -5275,6 +5958,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "white_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     OrangeGlazedTerracotta {
         props {
@@ -5289,6 +5975,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "orange_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     MagentaGlazedTerracotta {
         props {
@@ -5303,6 +5992,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "magenta_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     LightBlueGlazedTerracotta {
         props {
@@ -5317,6 +6009,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "light_blue_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     YellowGlazedTerracotta {
         props {
@@ -5331,6 +6026,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "yellow_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     LimeGlazedTerracotta {
         props {
@@ -5345,6 +6043,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "lime_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PinkGlazedTerracotta {
         props {
@@ -5359,6 +6060,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "pink_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     GrayGlazedTerracotta {
         props {
@@ -5373,6 +6077,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "gray_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     LightGrayGlazedTerracotta {
         props {
@@ -5387,6 +6094,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "silver_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     CyanGlazedTerracotta {
         props {
@@ -5401,6 +6111,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "cyan_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     PurpleGlazedTerracotta {
         props {
@@ -5415,6 +6128,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "purple_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BlueGlazedTerracotta {
         props {
@@ -5429,6 +6145,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "blue_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BrownGlazedTerracotta {
         props {
@@ -5443,6 +6162,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "brown_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     GreenGlazedTerracotta {
         props {
@@ -5457,6 +6179,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "green_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     RedGlazedTerracotta {
         props {
@@ -5471,6 +6196,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "red_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     BlackGlazedTerracotta {
         props {
@@ -5485,6 +6213,9 @@ define_blocks! {
         offset Some(facing.horizontal_offset()),
         model { ("minecraft", "black_glazed_terracotta") },
         variant format!("facing={}", facing.as_string()),
+        hardness 1.4,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Concrete {
         props {
@@ -5509,6 +6240,9 @@ define_blocks! {
         },
         data Some(color.data()),
         model { ("minecraft", format!("{}_concrete", color.as_string()) ) },
+        hardness 1.8,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     ConcretePowder {
         props {
@@ -5533,6 +6267,8 @@ define_blocks! {
         },
         data Some(color.data()),
         model { ("minecraft", format!("{}_concrete_powder", color.as_string()) ) },
+        hardness 0.5,
+        best_tools [ Tool::Shovel(_), ],
     }
     Kelp {
         props {
@@ -5541,18 +6277,22 @@ define_blocks! {
         data None::<usize>,
         offset Some(age as usize),
         model { ("minecraft", "kelp") },
+        hardness 0.0,
     }
     KelpPlant {
         props {},
         data None::<usize>,
         offset Some(0),
         model { ("minecraft", "kelp_plant") },
+        hardness 0.0,
     }
     DriedKelpBlock {
         props {},
         data None::<usize>,
         offset Some(0),
         model { ("minecraft", "dried_kelp_block") },
+        hardness 0.5,
+        best_tools [ Tool::Hoe(_), ],
     }
     TurtleEgg {
         props {
@@ -5562,6 +6302,7 @@ define_blocks! {
         data None::<usize>,
         offset Some((hatch as usize) + ((age - 1) as usize) * 3),
         model { ("minecraft", "turtle_egg") },
+        hardness 0.5,
     }
     CoralBlock {
         props {
@@ -5581,6 +6322,9 @@ define_blocks! {
         data None::<usize>,
         offset Some(variant.offset()),
         model { ("minecraft", format!("{}_block", variant.as_string())) },
+        hardness 1.5,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Coral {
         props {
@@ -5601,6 +6345,9 @@ define_blocks! {
         data None::<usize>,
         offset Some(if waterlogged { 0 } else { 1 } + variant.offset() * 2),
         model { ("minecraft", variant.as_string()) },
+        hardness 0.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     CoralWallFan {
         props {
@@ -5629,6 +6376,9 @@ define_blocks! {
                     facing.horizontal_offset() * 2 +
                     variant.offset() * (2 * 4)),
         model { ("minecraft", format!("{}_wall_fan", variant.as_string())) },
+        hardness 0.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     CoralFan {
         props {
@@ -5650,6 +6400,9 @@ define_blocks! {
         offset Some(if waterlogged { 0 } else { 1 } +
                     variant.offset() * 2),
         model { ("minecraft", format!("{}_fan", variant.as_string())) },
+        hardness 0.0,
+        harvest_tools [ Tool::Pickaxe(_), ],
+        best_tools [ Tool::Pickaxe(_), ],
     }
     SeaPickle {
         props {
@@ -5661,12 +6414,15 @@ define_blocks! {
                     ((age - 1) as usize) * 2),
         model { ("minecraft", "sea_pickle") },
         variant format!("age={}", age),
+        hardness 0.0,
     }
     BlueIce {
         props {},
         data None::<usize>,
         offset Some(0),
         model { ("minecraft", "blue_ice") },
+        hardness 2.8,
+        best_tools [ Tool::Pickaxe(_), ],
     }
     Conduit {
         props {
@@ -5676,6 +6432,7 @@ define_blocks! {
         offset Some(if waterlogged { 0 } else { 1 }),
         material material::NON_SOLID,
         model { ("minecraft", "conduit") },
+        hardness 3.0,
     }
     VoidAir {
         props {},
@@ -5687,6 +6444,7 @@ define_blocks! {
         },
         model { ("minecraft", "air") },
         collision vec![],
+        hardness 0.0,
     }
     CaveAir {
         props {},
@@ -5698,6 +6456,7 @@ define_blocks! {
         },
         model { ("minecraft", "air") },
         collision vec![],
+        hardness 0.0,
     }
     BubbleColumn {
         props {
@@ -5706,18 +6465,21 @@ define_blocks! {
         data None::<usize>,
         offset Some(if drag { 0 } else { 1 }),
         model { ("minecraft", "bubble_column") },
+        hardness 0.0,
     }
     Missing253 {
         props {},
         data Some(0),
         offset None,
         model { ("leafish", "missing_block") },
+        hardness 0.0,
     }
     Missing254 {
         props {},
         data Some(0),
         offset None,
         model { ("leafish", "missing_block") },
+        hardness 0.0,
     }
     StructureBlock {
         props {
@@ -5831,6 +6593,134 @@ mod tests {
                 powered: false
             }
         );
+    }
+
+    #[test]
+    fn verify_blocks() {
+        let dirt = Block::Dirt { snowy: true, variant: DirtVariant::Normal };
+        let stone = Block::Stone { variant: StoneVariant::Normal };
+        let vine = Block::Vine { up: false, south: false, west: false, north: true, east: false };
+        let pumpkin_lit = Block::PumpkinLit { facing: Direction::North, without_face: true };
+        let cocoa = Block::Cocoa { age: 1, facing: Direction::North };
+        let leaves = Block::Leaves { variant: TreeVariant::Oak, decayable: false, check_decay: false, distance: 1 };
+        let leaves2 = Block::Leaves2 { variant: TreeVariant::Oak, decayable: false, check_decay: false };
+        let wool = Block::Wool { color: ColoredVariant::White };
+        let tall_seagrass = Block::TallSeagrass { half: TallSeagrassHalf::Upper };
+        let data = [
+            (dirt, None, Some(0.75)),
+            (dirt, Some(Tool::Shovel(ToolMaterial::Wood)), Some(0.4)),
+            (dirt, Some(Tool::Pickaxe(ToolMaterial::Wood)), Some(0.75)),
+
+            (stone, None, Some(7.5)),
+            (stone, Some(Tool::Shovel(ToolMaterial::Wood)), Some(7.5)),
+            (stone, Some(Tool::Pickaxe(ToolMaterial::Wood)), Some(1.15)),
+
+            (Block::Obsidian {}, None, Some(250.0)),
+            (Block::Obsidian {}, Some(Tool::Pickaxe(ToolMaterial::Wood)), Some(125.0)),
+            (Block::Obsidian {}, Some(Tool::Pickaxe(ToolMaterial::Stone)), Some(62.5)),
+            (Block::Obsidian {}, Some(Tool::Pickaxe(ToolMaterial::Iron)), Some(41.7)),
+            (Block::Obsidian {}, Some(Tool::Pickaxe(ToolMaterial::Diamond)), Some(9.4)),
+            (Block::Obsidian {}, Some(Tool::Pickaxe(ToolMaterial::Netherite)), Some(8.35)),
+            (Block::Obsidian {}, Some(Tool::Pickaxe(ToolMaterial::Gold)), Some(20.85)),
+
+            (Block::Bedrock {}, None, None),
+            (Block::Bedrock {}, Some(Tool::Pickaxe(ToolMaterial::Wood)), None),
+            (Block::Bedrock {}, Some(Tool::Pickaxe(ToolMaterial::Stone)), None),
+            (Block::Bedrock {}, Some(Tool::Pickaxe(ToolMaterial::Iron)), None),
+            (Block::Bedrock {}, Some(Tool::Pickaxe(ToolMaterial::Diamond)), None),
+            (Block::Bedrock {}, Some(Tool::Pickaxe(ToolMaterial::Netherite)), None),
+            (Block::Bedrock {}, Some(Tool::Pickaxe(ToolMaterial::Gold)), None),
+
+            (Block::Web {}, None, Some(20.0)),
+            (Block::Web {}, Some(Tool::Pickaxe(ToolMaterial::Wood)), Some(20.0)),
+
+            (vine, None, Some(0.3)),
+            (vine, Some(Tool::Pickaxe(ToolMaterial::Wood)), Some(0.3)),
+            (vine, Some(Tool::Axe(ToolMaterial::Wood)), Some(0.15)),
+            (vine, Some(Tool::Axe(ToolMaterial::Stone)), Some(0.1)),
+            (vine, Some(Tool::Axe(ToolMaterial::Iron)), Some(0.05)),
+            (vine, Some(Tool::Axe(ToolMaterial::Diamond)), Some(0.05)),
+
+            (wool, None, Some(1.2)),
+
+            (leaves, None, Some(0.3)),
+            (leaves, Some(Tool::Hoe(ToolMaterial::Wood)), Some(0.15)),
+            (leaves, Some(Tool::Hoe(ToolMaterial::Stone)), Some(0.1)),
+            (leaves, Some(Tool::Hoe(ToolMaterial::Iron)), Some(0.05)),
+            (leaves, Some(Tool::Hoe(ToolMaterial::Diamond)), Some(0.05)),
+
+            (leaves2, None, Some(0.3)),
+            (leaves2, Some(Tool::Hoe(ToolMaterial::Wood)), Some(0.15)),
+            (leaves2, Some(Tool::Hoe(ToolMaterial::Stone)), Some(0.1)),
+            (leaves2, Some(Tool::Hoe(ToolMaterial::Iron)), Some(0.05)),
+            (leaves2, Some(Tool::Hoe(ToolMaterial::Diamond)), Some(0.05)),
+
+            (Block::DeadBush {}, None, Some(0.05)),
+            (Block::DeadBush {}, Some(Tool::Shears), Some(0.05)),
+
+            (Block::Seagrass {}, None, Some(0.05)),
+            (Block::Seagrass {}, Some(Tool::Shears), Some(0.05)),
+
+            (tall_seagrass, None, Some(0.05)),
+            (tall_seagrass, Some(Tool::Shears), Some(0.05)),
+
+            (cocoa, None, Some(0.3)),
+            (cocoa, Some(Tool::Axe(ToolMaterial::Wood)), Some(0.15)),
+            (cocoa, Some(Tool::Axe(ToolMaterial::Stone)), Some(0.1)),
+            (cocoa, Some(Tool::Axe(ToolMaterial::Iron)), Some(0.05)),
+            (cocoa, Some(Tool::Axe(ToolMaterial::Diamond)), Some(0.05)),
+
+            (Block::MelonBlock {}, None, Some(1.5)),
+            (Block::MelonBlock {}, Some(Tool::Axe(ToolMaterial::Wood)), Some(0.75)),
+            (Block::MelonBlock {}, Some(Tool::Axe(ToolMaterial::Stone)), Some(0.4)),
+            (Block::MelonBlock {}, Some(Tool::Axe(ToolMaterial::Iron)), Some(0.25)),
+            (Block::MelonBlock {}, Some(Tool::Axe(ToolMaterial::Diamond)), Some(0.2)),
+            (Block::MelonBlock {}, Some(Tool::Axe(ToolMaterial::Netherite)), Some(0.2)),
+            (Block::MelonBlock {}, Some(Tool::Axe(ToolMaterial::Gold)), Some(0.15)),
+
+            (Block::Pumpkin {}, None, Some(1.5)),
+            (Block::Pumpkin {}, Some(Tool::Axe(ToolMaterial::Wood)), Some(0.75)),
+            (Block::Pumpkin {}, Some(Tool::Axe(ToolMaterial::Stone)), Some(0.4)),
+            (Block::Pumpkin {}, Some(Tool::Axe(ToolMaterial::Iron)), Some(0.25)),
+
+            (pumpkin_lit, None, Some(1.5)),
+            (pumpkin_lit, Some(Tool::Axe(ToolMaterial::Wood)), Some(0.75)),
+            (pumpkin_lit, Some(Tool::Axe(ToolMaterial::Stone)), Some(0.4)),
+            (pumpkin_lit, Some(Tool::Axe(ToolMaterial::Iron)), Some(0.25)),
+
+            // TODO: Fix special sword rules
+            //(Block::Web {}, Some(Tool::Sword(ToolMaterial::Wood)), Some(0.4)),
+            //(Block::Web {}, Some(Tool::Sword(ToolMaterial::Stone)), Some(0.4)),
+            //(cocoa, Some(Tool::Sword(ToolMaterial::Stone)), Some(0.2)),
+            //(leaves, Some(Tool::Sword(ToolMaterial::St
+            //(leaves2, Some(Tool::Sword(ToolMaterial::Stone)), Some(0.2)),
+            //(Block::MelonBlock {}, Some(Tool::Sword(ToolMaterial::Stone)), Some(1.0)),
+            //(Block::Pumpkin {}, Some(Tool::Sword(ToolMaterial::Stone)), Some(1.0)),
+            //(pumpkin_lit, Some(Tool::Sword(ToolMaterial::Stone)), Some(1.0)),
+            //(vine, Some(Tool::Sword(ToolMaterial::Stone)), Some(0.2)),
+
+            // TODO: Fix special shears rules
+            //(Block::Web {}, Some(Tool::Shears), Some(0.4)),
+            //(wool, Some(Tool::Shears), Some(0.25)),
+            //(leaves, Some(Tool::Shears), Some(0.05)),
+            //(leaves2, Some(Tool::Shears), Some(0.05)),
+            //(vine, Some(Tool::Shears), Some(0.3)),
+        ];
+        for (block, tool, time) in data {
+            let result = block.get_mining_time(&tool).map(|d| d.as_secs_f64());
+            match (time, result) {
+                (Some(time), Some(result)) => assert_eq!(result, time,
+                    "Expected to mine block {:?} with {:?} in {} seconds, but it took {} seconds",
+                    block, tool, time, result),
+                (None, Some(result)) => panic!(
+                    "Expected to never mine block {:?} with {:?}, but it took {} seconds",
+                    block, tool, result),
+                (Some(time), None) => panic!(
+                    "Expected to mine block {:?} with {:?} in {} seconds, but it will never be mined",
+                    block, tool, time),
+                _ => {},
+            }
+        }
     }
 }
 
@@ -7848,6 +8738,52 @@ impl CoralVariant {
             CoralVariant::Bubble => 7,
             CoralVariant::Fire => 8,
             CoralVariant::Horn => 9,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum ToolMaterial {
+    Wood,
+    Stone,
+    Gold,
+    Iron,
+    Diamond,
+    Netherite,
+}
+
+impl ToolMaterial {
+    fn get_multiplier(&self) -> f64 {
+        match *self {
+            ToolMaterial::Wood => 2.0,
+            ToolMaterial::Stone => 4.0,
+            ToolMaterial::Gold => 12.0,
+            ToolMaterial::Iron => 6.0,
+            ToolMaterial::Diamond => 8.0,
+            ToolMaterial::Netherite => 9.0
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum Tool {
+    Pickaxe(ToolMaterial),
+    Axe(ToolMaterial),
+    Shovel(ToolMaterial),
+    Hoe(ToolMaterial),
+    Sword(ToolMaterial),
+    Shears,
+}
+
+impl Tool {
+    fn get_multiplier(&self) -> f64 {
+        match *self {
+            Tool::Pickaxe(m) => m.get_multiplier(),
+            Tool::Axe(m) => m.get_multiplier(),
+            Tool::Shovel(m) => m.get_multiplier(),
+            Tool::Hoe(m) => m.get_multiplier(),
+            Tool::Sword(_) => 1.5, // TODO: Handle different block values.
+            Tool::Shears => 2.0, // TODO: Handle different block values.
         }
     }
 }
