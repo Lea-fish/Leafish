@@ -1518,6 +1518,8 @@ impl Button {
     }
 }
 
+type TextBoxSubmitCallback = dyn Fn(&mut TextBox, &mut crate::Game);
+
 element! {
     ref TextBoxRef
     pub struct TextBox {
@@ -1529,7 +1531,7 @@ element! {
         priv text: Option<TextRef>,
         priv was_focused: bool,
         priv cursor_tick: f64,
-        priv submit_funcs: Vec<Box<dyn Fn(&mut TextBox, &mut crate::Game)>>,
+        priv submit_funcs: Vec<Box<TextBoxSubmitCallback>>,
     }
     builder TextBoxBuilder {
         hardcode button = None,
