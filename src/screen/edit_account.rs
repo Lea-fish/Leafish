@@ -19,10 +19,12 @@ use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
 use std::sync::Arc;
 
+type EditAccountEntryCallback = dyn Fn(&mut Game, String, String);
+
 pub struct EditAccountEntry {
     elements: Option<UIElements>,
     entry_info: Option<(String, String)>,
-    done_callback: Rc<dyn Fn(&mut Game, String, String)>, // game, name, password
+    done_callback: Rc<EditAccountEntryCallback>, // game, name, password
 }
 
 impl Clone for EditAccountEntry {
@@ -47,7 +49,7 @@ struct UIElements {
 impl EditAccountEntry {
     pub fn new(
         entry_info: Option<(String, String)>,
-        done_callback: Rc<dyn Fn(&mut Game, String, String)>,
+        done_callback: Rc<EditAccountEntryCallback>,
     ) -> Self {
         Self {
             elements: None,

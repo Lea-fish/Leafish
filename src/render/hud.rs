@@ -1166,15 +1166,14 @@ impl Hud {
             } else {
                 textures.1
             };
-        let image = ui::ImageBuilder::new()
+        ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
             .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)
             .texture(format!("minecraft:{}", texture))
-            .create(ui_container);
-        image
+            .create(ui_container)
     }
 }
 

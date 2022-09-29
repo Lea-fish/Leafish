@@ -1285,7 +1285,7 @@ impl World {
                 if i == 0 {
                     let _size = VarInt::read_from(data);
 
-                    data.consume(16 * 16 * 16);
+                    data.consume(2048);
                     continue;
                 }
                 let i = i - 1;
@@ -1301,7 +1301,7 @@ impl World {
         if sky_light_mask & (1 << 63) != 0 {
             let _size = VarInt::read_from(data);
 
-            data.consume(16 * 16 * 16);
+            data.consume(2048);
         }
         for i in 0..17 {
             if block_light_mask & (1 << i) == 0 {
@@ -1310,7 +1310,7 @@ impl World {
             if i == 0 {
                 let _size = VarInt::read_from(data);
 
-                data.consume(16 * 16 * 16);
+                data.consume(2048);
                 continue;
             }
             let i = i - 1;
