@@ -72,7 +72,7 @@ pub struct World {
 
     block_entity_actions: (Sender<BlockEntityAction>, Receiver<BlockEntityAction>),
 
-    protocol_version: i32,
+    pub protocol_version: i32,
     pub modded_block_ids: Arc<RwLock<HashMap<usize, String>>>,
     pub id_map: Arc<block::VanillaIDMap>,
 }

@@ -1,5 +1,5 @@
 use super::{
-    Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity,
+    Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity, Digging, MouseButtons
 };
 use crate::ecs::{Manager, SystemExecStage};
 use crate::entity::slime::{added_slime, update_slime};
@@ -95,6 +95,8 @@ pub fn create_local(m: &mut Manager) -> Entity {
         )))
         .insert(PlayerModel::new("", false, false, true))
         .insert(Light::new())
+        .insert(Digging::new())
+        .insert(MouseButtons::new())
         .insert(EntityType::Player);
     entity.id()
 }

@@ -1,7 +1,13 @@
 use super::*;
+use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::entity::player::PlayerMovement;
 use crate::shared::Position as BPos;
+use leafish_blocks::Block;
+use leafish_protocol::protocol;
+use leafish_protocol::protocol::{packet, Version};
 use cgmath::InnerSpace;
+use parking_lot::RwLock;
+use shared::Direction;
 
 pub fn apply_velocity(mut query: Query<(&mut Position, &Velocity), Without<PlayerMovement>>) {
     // Player's handle their own physics
@@ -107,5 +113,173 @@ pub fn light_entity(
             light.block_light = block_light / count;
             light.sky_light = sky_light / count;
         }
+    }
+}
+
+pub fn apply_digging(
+    renderer: Res<Arc<crate::render::Renderer>>,
+    world: Res<Arc<crate::world::World>>,
+    conn: Res<Arc<RwLock<Option<protocol::Conn>>>>,
+    commands: Commands,
+    mut query: Query<(&MouseButtons, &mut Digging)>,
+    mut effect_query: Query<&mut BlockBreakEffect>,
+) {
+    use crate::server::target::{trace_ray, test_block};
+    use cgmath::EuclideanSpace;
+    let target = trace_ray(
+        world.as_ref(),
+        4.0,
+        renderer.camera.lock().pos.to_vec(),
+        renderer.view_vector.lock().cast().unwrap(),
+        test_block,
+    );
+
+    let version = Version::from_id(world.protocol_version as u32);
+    let mut system = ApplyDigging::new(target, conn.clone(), commands, version);
+    for (mouse_buttons, mut digging) in query.iter_mut() {
+        if let Some(effect) = digging.effect {
+            if let Ok(mut effect) = effect_query.get_mut(effect) {
+                system.update(mouse_buttons, digging.as_mut(), Some(effect.as_mut()));
+            }
+        }
+        system.update(mouse_buttons, digging.as_mut(), None);
+    }
+}
+
+struct ApplyDigging<'w, 's> {
+    target: Option<(shared::Position, Block, Direction, Vector3<f64>)>,
+    conn: Arc<RwLock<Option<protocol::Conn>>>,
+    commands: Commands<'w, 's>,
+    version: Version,
+}
+
+impl ApplyDigging<'_, '_> {
+    pub fn new<'a, 'b>(
+        target: Option<(shared::Position, Block, Direction, Vector3<f64>)>,
+        conn: Arc<RwLock<Option<protocol::Conn>>>,
+        commands: Commands<'a, 'b>,
+        version: Version,
+    ) -> ApplyDigging<'a, 'b> {
+        ApplyDigging {
+            target,
+            conn,
+            commands,
+            version,
+        }
+    }
+
+    fn update(&mut self,
+        mouse_buttons: &MouseButtons,
+        digging: &mut Digging,
+        effect: Option<&mut BlockBreakEffect>
+    ) {
+        // Move the previous current value into last, and then calculate the
+        // new current value.
+        std::mem::swap(&mut digging.last, &mut digging.current);
+        digging.current = self.next_state(&digging.last, mouse_buttons, self.target);
+
+        // Send required digging packets
+        match (&digging.last, &mut digging.current) {
+            // Start the new digging operation.
+            (None, Some(current)) => self.start_digging(current, &mut digging.effect),
+            // Cancel the previous digging operation.
+            (Some(last), None) if !last.finished => self.abort_digging(last, &mut digging.effect),
+            // Move to digging a new block
+            (Some(last), Some(current)) if last.position != current.position => {
+                // Cancel the previous digging operation.
+                if !current.finished {
+                    self.abort_digging(last, &mut digging.effect);
+                }
+                // Start the new digging operation.
+                self.start_digging(current, &mut digging.effect);
+            },
+            // Finish the new digging operation.
+            (Some(_), Some(current)) if !current.is_finished() => {
+                current.finished = true;
+                self.finish_digging(current, &mut digging.effect);
+            },
+            _ => {},
+        }
+
+        if let Some(effect) = effect {
+            // Update the block break animation progress.
+            if let Some(current) = &digging.current {
+                effect.update_ratio(current.get_ratio());
+            }
+        }
+    }
+
+    fn next_state(&self,
+        last: &Option<DiggingState>,
+        mouse_buttons: &MouseButtons,
+        target: Option<(shared::Position, block::Block, shared::Direction, Vector3<f64>)>
+    ) -> Option<DiggingState> {
+        if !mouse_buttons.left {
+            return None;
+        }
+
+        match (last, target) {
+            // Started digging
+            (None, Some((position, block, face, _))) => Some(DiggingState {
+                block, face, position,
+                start: std::time::Instant::now(),
+                finished: false,
+            }),
+            (Some(current), Some((position, block, face, ..))) => {
+                if position == current.position {
+                    // Continue digging
+                    last.clone()
+                } else {
+                    // Start digging a different block.
+                    Some(DiggingState {
+                        block, face, position,
+                        start: std::time::Instant::now(),
+                        finished: false,
+                    })
+                }
+            },
+            // Not pointing at any target
+            (_, None) => None,
+        }
+    }
+
+    fn start_digging(&mut self, state: &DiggingState, effect: &mut Option<Entity>) {
+        self.send_digging(state, packet::DigType::StartDestroyBlock);
+
+        let mut entity = self.commands.spawn();
+        let pos = state.position;
+        entity.insert(BlockEffectData {
+            position: Vector3::new(pos.x as f64, pos.y as f64, pos.z as f64),
+            status: -1,
+        });
+        effect.replace(entity.id());
+        //ParticleType::BlockBreak.create_particle(&self.commands, entity);
+    }
+
+    fn abort_digging(&mut self, state: &DiggingState, effect: &mut Option<Entity>) {
+        self.send_digging(state, packet::DigType::AbortDestroyBlock);
+
+        if let Some(effect) = effect.take() {
+            self.commands.entity(effect).despawn();
+        }
+    }
+
+    fn finish_digging(&mut self, state: &DiggingState, effect: &mut Option<Entity>) {
+        self.send_digging(state, packet::DigType::FinishDestroyBlock);
+
+        if let Some(effect) = effect.take() {
+            self.commands.entity(effect).despawn();
+        }
+    }
+
+    fn send_digging(&self, state: &DiggingState, status: packet::DigType) {
+        let mut conn = self.conn.write();
+        packet::send_digging(
+            conn.as_mut().unwrap(),
+            self.version,
+            status,
+            state.position,
+            state.face.index() as u8
+        ).unwrap();
     }
 }

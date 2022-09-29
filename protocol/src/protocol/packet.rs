@@ -3309,7 +3309,7 @@ impl Serializable for CommandNode {
 pub enum DigType {
     StartDestroyBlock,
     AbortDestroyBlock,
-    StopDestroyBlock,
+    FinishDestroyBlock,
     DropAllItems,
     DropItem,
     ReleaseUseItem,
@@ -3321,7 +3321,7 @@ impl DigType {
         match self {
             DigType::StartDestroyBlock => 0,
             DigType::AbortDestroyBlock => 1,
-            DigType::StopDestroyBlock => 2,
+            DigType::FinishDestroyBlock => 2,
             DigType::DropAllItems => 3,
             DigType::DropItem => 4,
             DigType::ReleaseUseItem => 5,
@@ -3335,7 +3335,7 @@ impl From<i32> for DigType {
         match src {
             0 => DigType::StartDestroyBlock,
             1 => DigType::AbortDestroyBlock,
-            2 => DigType::StopDestroyBlock,
+            2 => DigType::FinishDestroyBlock,
             3 => DigType::DropAllItems,
             4 => DigType::DropItem,
             5 => DigType::ReleaseUseItem,

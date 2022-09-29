@@ -5,6 +5,7 @@ use crate::ecs::{Manager, SystemExecStage};
 use crate::entity::slime::SlimeModel;
 use crate::entity::zombie::ZombieModel;
 use crate::render::Texture;
+use crate::world::block;
 use bevy_ecs::component::Component;
 use bevy_ecs::prelude::*;
 use cgmath::Vector3;
@@ -92,6 +93,12 @@ pub fn add_systems(
     )
     .add_system(
         systems::light_entity
+            .system()
+            .label(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
+    )
+    .add_system(
+        systems::apply_digging
             .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
@@ -498,4 +505,77 @@ pub fn resolve_textures(
             height / (texture.get_height() as f32),
         )),
     ]
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DiggingState {
+    pub block: block::Block,
+    pub position: shared::Position,
+    pub face: shared::Direction,
+    pub start: std::time::Instant,
+    pub finished: bool,
+}
+
+impl DiggingState {
+    pub fn is_finished(&self) -> bool {
+        // If marked as finished, we don't need to calculate the mining time
+        // again.
+        if self.finished {
+            return true;
+        }
+
+        let mining_time = self.block.get_mining_time(&None);
+        match mining_time {
+            Some(mining_time) => {
+                let finish_time = self.start + mining_time;
+                finish_time > std::time::Instant::now()
+            },
+            None => false,
+        }
+    }
+
+    pub fn get_ratio(&self) -> f32 {
+        // If marked as finished, we don't need to calculate the mining time
+        // again.
+        if self.finished {
+            return 1.0;
+        }
+
+        // TODO: Use in-hand tool
+        let mining_time = self.block.get_mining_time(&None);
+        let mining_time = match mining_time {
+            Some(mining_time) => mining_time,
+            None => return 0.0,
+        };
+        let now = std::time::Instant::now();
+        let expected = now - self.start;
+        let ratio = expected.as_secs_f32() / mining_time.as_secs_f32();
+        return ratio.min(1.0);
+    }
+}
+
+#[derive(Component, Default)]
+pub struct Digging {
+    pub last: Option<DiggingState>,
+    pub current: Option<DiggingState>,
+    pub processed: bool,
+    pub effect: Option<Entity>,
+}
+
+impl Digging {
+    pub fn new() -> Self {
+        Default::default()
+    }
+}
+
+#[derive(Component, Default)]
+pub struct MouseButtons {
+    pub left: bool,
+    pub right: bool,
+}
+
+impl MouseButtons {
+    pub fn new() -> Self {
+        Default::default()
+    }
 }
