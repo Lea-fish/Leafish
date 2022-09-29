@@ -50,7 +50,7 @@ impl BlockBreakEffect {
 
     pub fn update_ratio(&mut self, ratio: f32) {
         // 0.0 - 1.0
-        let anim_id = ((ratio * 10.0) as i8 - 1).max(0);
+        let anim_id = ((ratio * 10.0) as i8 + 1).min(10);
         self.update(anim_id);
     }
 }
