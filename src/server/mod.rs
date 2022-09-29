@@ -858,6 +858,11 @@ impl Server {
     ) -> Server {
         let world = Arc::new(world::World::new(protocol_version, light_updater));
         let mapped_protocol_version = Version::from_id(protocol_version as u32);
+        let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
+            mapped_protocol_version,
+            renderer.clone(),
+            hud_context.clone(),
+        )));
         let mut entities = Manager::default();
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
@@ -867,6 +872,7 @@ impl Server {
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
         entities.world.insert_resource(Network::new(conn.clone(), mapped_protocol_version));
+        entities.world.insert_resource(inventory_context.clone());
         entity::add_systems(&mut entities, &mut parallel, &mut sync, &mut entity_sched);
         entities
             .schedule
@@ -880,12 +886,6 @@ impl Server {
             .write()
             .add_stage("entity", entity_sched);
 
-        let version = Version::from_id(protocol_version as u32);
-        let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
-            version,
-            renderer.clone(),
-            hud_context.clone(),
-        )));
         hud_context.write().player_inventory =
             Some(inventory_context.read().player_inventory.clone());
 

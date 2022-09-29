@@ -517,14 +517,14 @@ pub struct DiggingState {
 }
 
 impl DiggingState {
-    pub fn is_finished(&self) -> bool {
+    pub fn is_finished(&self, tool: &Option<block::Tool>) -> bool {
         // If marked as finished, we don't need to calculate the mining time
         // again.
         if self.finished {
             return true;
         }
 
-        let mining_time = self.block.get_mining_time(&None);
+        let mining_time = self.block.get_mining_time(tool);
         match mining_time {
             Some(mining_time) => {
                 let finish_time = self.start + mining_time;
@@ -534,15 +534,14 @@ impl DiggingState {
         }
     }
 
-    pub fn get_ratio(&self) -> f32 {
+    pub fn get_ratio(&self, tool: &Option<block::Tool>) -> f32 {
         // If marked as finished, we don't need to calculate the mining time
         // again.
         if self.finished {
             return 1.0;
         }
 
-        // TODO: Use in-hand tool
-        let mining_time = self.block.get_mining_time(&None);
+        let mining_time = self.block.get_mining_time(tool);
         let mining_time = match mining_time {
             Some(mining_time) => mining_time,
             None => return 0.0,

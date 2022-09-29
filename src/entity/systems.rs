@@ -120,12 +120,15 @@ pub fn apply_digging(
     renderer: Res<Arc<crate::render::Renderer>>,
     world: Res<Arc<crate::world::World>>,
     network: Res<crate::server::Network>,
+    inventory: Res<Arc<RwLock<crate::inventory::InventoryContext>>>,
     commands: Commands,
     mut query: Query<(&MouseButtons, &mut Digging)>,
     mut effect_query: Query<&mut BlockBreakEffect>,
 ) {
     use crate::server::target::{trace_ray, test_block};
+    use crate::inventory::Inventory;
     use cgmath::EuclideanSpace;
+
     let target = trace_ray(
         world.as_ref(),
         4.0,
@@ -134,7 +137,21 @@ pub fn apply_digging(
         test_block,
     );
 
-    let mut system = ApplyDigging::new(target, network.conn.clone(), commands, network.version);
+    let tool = {
+        let inventory = inventory.read();
+        let hotbar_index = inventory.hotbar_index;
+        let inventory = inventory.player_inventory.read();
+        let item = inventory.get_item(36 + hotbar_index as u16);
+        item.map(|i| i.material.as_tool()).flatten()
+    };
+
+    let mut system = ApplyDigging::new(
+        target,
+        network.conn.clone(),
+        commands,
+        network.version,
+        tool);
+
     for (mouse_buttons, mut digging) in query.iter_mut() {
         if let Some(effect) = digging.effect {
             if let Ok(mut effect) = effect_query.get_mut(effect) {
@@ -150,6 +167,7 @@ struct ApplyDigging<'w, 's> {
     conn: Arc<RwLock<Option<protocol::Conn>>>,
     commands: Commands<'w, 's>,
     version: Version,
+    tool: Option<block::Tool>,
 }
 
 impl ApplyDigging<'_, '_> {
@@ -158,12 +176,14 @@ impl ApplyDigging<'_, '_> {
         conn: Arc<RwLock<Option<protocol::Conn>>>,
         commands: Commands<'a, 'b>,
         version: Version,
+        tool: Option<block::Tool>,
     ) -> ApplyDigging<'a, 'b> {
         ApplyDigging {
             target,
             conn,
             commands,
             version,
+            tool,
         }
     }
 
@@ -193,7 +213,7 @@ impl ApplyDigging<'_, '_> {
                 self.start_digging(current, &mut digging.effect);
             },
             // Finish the new digging operation.
-            (Some(_), Some(current)) if !current.is_finished() => {
+            (Some(_), Some(current)) if !current.is_finished(&self.tool) => {
                 current.finished = true;
                 self.finish_digging(current, &mut digging.effect);
             },
@@ -203,7 +223,7 @@ impl ApplyDigging<'_, '_> {
         if let Some(effect) = effect {
             // Update the block break animation progress.
             if let Some(current) = &digging.current {
-                effect.update_ratio(current.get_ratio());
+                effect.update_ratio(current.get_ratio(&self.tool));
             }
         }
     }
