@@ -11,10 +11,10 @@ use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::screen::ScreenSystem;
 use crate::ui::Container;
+use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::Version;
-use leafish_blocks as block;
 use parking_lot::RwLock;
 use std::sync::Arc;
 

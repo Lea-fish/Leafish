@@ -15,7 +15,7 @@
 use crate::ecs::Manager;
 use crate::entity;
 use crate::entity::player::{create_local, PlayerModel, PlayerMovement};
-use crate::entity::{EntityType, GameInfo, Gravity, TargetPosition, TargetRotation, MouseButtons};
+use crate::entity::{EntityType, GameInfo, Gravity, MouseButtons, TargetPosition, TargetRotation};
 use crate::format;
 use crate::inventory::material::versions::to_material;
 use crate::inventory::{inventory_from_type, Inventory, InventoryContext, InventoryType, Item};
@@ -867,11 +867,12 @@ impl Server {
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
         let mut entity_sched = SystemStage::single_threaded();
+        let network = Network::new(conn.clone(), mapped_protocol_version);
         entities.world.insert_resource(entity::GameInfo::new());
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
-        entities.world.insert_resource(Network::new(conn.clone(), mapped_protocol_version));
+        entities.world.insert_resource(network);
         entities.world.insert_resource(inventory_context.clone());
         entity::add_systems(&mut entities, &mut parallel, &mut sync, &mut entity_sched);
         entities
@@ -2485,9 +2486,6 @@ pub struct Network {
 
 impl Network {
     pub fn new(conn: Arc<RwLock<Option<protocol::Conn>>>, version: Version) -> Self {
-        Self {
-            conn,
-            version,
-        }
+        Self { conn, version }
     }
 }

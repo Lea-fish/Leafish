@@ -1,5 +1,6 @@
 use super::{
-    Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity, Digging, MouseButtons
+    Bounds, Digging, GameInfo, Gravity, Light, MouseButtons, Position, Rotation, TargetPosition,
+    TargetRotation, Velocity,
 };
 use crate::ecs::{Manager, SystemExecStage};
 use crate::entity::slime::{added_slime, update_slime};
@@ -769,8 +770,7 @@ pub fn handle_movement(
                     let ground =
                         Aabb3::new(Point3::new(-0.3, -0.005, -0.3), Point3::new(0.3, 0.0, 0.3));
                     let prev = gravity.on_ground;
-                    let (_, hit) =
-                        check_collisions(&world, &mut position, &last_position, ground);
+                    let (_, hit) = check_collisions(&world, &mut position, &last_position, ground);
                     gravity.on_ground = hit;
                     if !prev && gravity.on_ground {
                         movement.did_touch_ground = true;

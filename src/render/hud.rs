@@ -1116,10 +1116,7 @@ impl Hud {
 
             let mut component_lines = 0;
             for message in messages.iter().take(cmp::min(10, history_size)).enumerate() {
-                let lines = (renderer
-                    .ui
-                    .lock()
-                    .size_of_string(&message.1 .1.to_string())
+                let lines = (renderer.ui.lock().size_of_string(&message.1 .1.to_string())
                     / (CHAT_WIDTH * scale))
                     .ceil() as u8;
                 let transparency = if message.1 .0 >= FADE_OUT_START_TICKS {

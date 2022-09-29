@@ -1,7 +1,7 @@
 use leafish_blocks::VanillaIDMap;
+use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::env;
-use parking_lot::RwLock;
 use std::sync::Arc;
 
 fn main() {

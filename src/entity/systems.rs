@@ -1,11 +1,11 @@
 use super::*;
-use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::entity::player::PlayerMovement;
+use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::shared::Position as BPos;
+use cgmath::InnerSpace;
 use leafish_blocks::Block;
 use leafish_protocol::protocol;
 use leafish_protocol::protocol::{packet, Version};
-use cgmath::InnerSpace;
 use parking_lot::RwLock;
 use shared::Direction;
 
@@ -125,8 +125,8 @@ pub fn apply_digging(
     mut query: Query<(&MouseButtons, &mut Digging)>,
     mut effect_query: Query<&mut BlockBreakEffect>,
 ) {
-    use crate::server::target::{trace_ray, test_block};
     use crate::inventory::Inventory;
+    use crate::server::target::{test_block, trace_ray};
     use cgmath::EuclideanSpace;
 
     let target = trace_ray(
@@ -150,7 +150,8 @@ pub fn apply_digging(
         network.conn.clone(),
         commands,
         network.version,
-        tool);
+        tool,
+    );
 
     for (mouse_buttons, mut digging) in query.iter_mut() {
         if let Some(effect) = digging.effect {
@@ -187,10 +188,11 @@ impl ApplyDigging<'_, '_> {
         }
     }
 
-    fn update(&mut self,
+    fn update(
+        &mut self,
         mouse_buttons: &MouseButtons,
         digging: &mut Digging,
-        effect: Option<&mut BlockBreakEffect>
+        effect: Option<&mut BlockBreakEffect>,
     ) {
         // Move the previous current value into last, and then calculate the
         // new current value.
@@ -211,13 +213,13 @@ impl ApplyDigging<'_, '_> {
                 }
                 // Start the new digging operation.
                 self.start_digging(current, &mut digging.effect);
-            },
+            }
             // Finish the new digging operation.
             (Some(_), Some(current)) if !current.is_finished(&self.tool) => {
                 current.finished = true;
                 self.finish_digging(current, &mut digging.effect);
-            },
-            _ => {},
+            }
+            _ => {}
         }
 
         if let Some(current) = &digging.current {
@@ -229,10 +231,16 @@ impl ApplyDigging<'_, '_> {
         }
     }
 
-    fn next_state(&self,
+    fn next_state(
+        &self,
         last: &Option<DiggingState>,
         mouse_buttons: &MouseButtons,
-        target: Option<(shared::Position, block::Block, shared::Direction, Vector3<f64>)>
+        target: Option<(
+            shared::Position,
+            block::Block,
+            shared::Direction,
+            Vector3<f64>,
+        )>,
     ) -> Option<DiggingState> {
         if !mouse_buttons.left {
             return None;
@@ -241,7 +249,9 @@ impl ApplyDigging<'_, '_> {
         match (last, target) {
             // Started digging
             (None, Some((position, block, face, _))) => Some(DiggingState {
-                block, face, position,
+                block,
+                face,
+                position,
                 start: std::time::Instant::now(),
                 finished: false,
             }),
@@ -252,12 +262,14 @@ impl ApplyDigging<'_, '_> {
                 } else {
                     // Start digging a different block.
                     Some(DiggingState {
-                        block, face, position,
+                        block,
+                        face,
+                        position,
                         start: std::time::Instant::now(),
                         finished: false,
                     })
                 }
-            },
+            }
             // Not pointing at any target
             (_, None) => None,
         }
@@ -299,16 +311,14 @@ impl ApplyDigging<'_, '_> {
             self.version,
             status,
             state.position,
-            state.face.index() as u8
-        ).unwrap();
+            state.face.index() as u8,
+        )
+        .unwrap();
     }
 
     fn swing_arm(&self) {
         let mut conn = self.conn.write();
-        packet::send_arm_swing(
-            conn.as_mut().unwrap(),
-            self.version,
-            packet::Hand::MainHand,
-        ).unwrap();
+        packet::send_arm_swing(conn.as_mut().unwrap(), self.version, packet::Hand::MainHand)
+            .unwrap();
     }
 }

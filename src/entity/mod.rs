@@ -529,7 +529,7 @@ impl DiggingState {
             Some(mining_time) => {
                 let finish_time = self.start + mining_time;
                 finish_time > std::time::Instant::now()
-            },
+            }
             None => false,
         }
     }
