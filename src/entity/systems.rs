@@ -119,7 +119,7 @@ pub fn light_entity(
 pub fn apply_digging(
     renderer: Res<Arc<crate::render::Renderer>>,
     world: Res<Arc<crate::world::World>>,
-    conn: Res<Arc<RwLock<Option<protocol::Conn>>>>,
+    network: Res<crate::server::Network>,
     commands: Commands,
     mut query: Query<(&MouseButtons, &mut Digging)>,
     mut effect_query: Query<&mut BlockBreakEffect>,
@@ -134,8 +134,7 @@ pub fn apply_digging(
         test_block,
     );
 
-    let version = Version::from_id(world.protocol_version as u32);
-    let mut system = ApplyDigging::new(target, conn.clone(), commands, version);
+    let mut system = ApplyDigging::new(target, network.conn.clone(), commands, network.version);
     for (mouse_buttons, mut digging) in query.iter_mut() {
         if let Some(effect) = digging.effect {
             if let Ok(mut effect) = effect_query.get_mut(effect) {

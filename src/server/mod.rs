@@ -857,6 +857,7 @@ impl Server {
         renderer: Arc<Renderer>,
     ) -> Server {
         let world = Arc::new(world::World::new(protocol_version, light_updater));
+        let mapped_protocol_version = Version::from_id(protocol_version as u32);
         let mut entities = Manager::default();
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
@@ -865,7 +866,7 @@ impl Server {
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
-        entities.world.insert_resource(conn.clone());
+        entities.world.insert_resource(Network::new(conn.clone(), mapped_protocol_version));
         entity::add_systems(&mut entities, &mut parallel, &mut sync, &mut entity_sched);
         entities
             .schedule
@@ -894,7 +895,7 @@ impl Server {
             conn,
             disconnect_gracefully: Default::default(),
             protocol_version,
-            mapped_protocol_version: Version::from_id(protocol_version as u32),
+            mapped_protocol_version,
             forge_mods,
             disconnect_data: Arc::new(RwLock::new(DisconnectData::default())),
 
@@ -2475,5 +2476,19 @@ fn calculate_relative_teleport(flag: TeleportFlag, flags: u8, base: f64, val: f6
         val
     } else {
         base + val
+    }
+}
+
+pub struct Network {
+    pub conn: Arc<RwLock<Option<protocol::Conn>>>,
+    pub version: Version,
+}
+
+impl Network {
+    pub fn new(conn: Arc<RwLock<Option<protocol::Conn>>>, version: Version) -> Self {
+        Self {
+            conn,
+            version,
+        }
     }
 }
