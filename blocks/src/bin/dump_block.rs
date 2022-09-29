@@ -1,6 +1,8 @@
 use leafish_blocks::VanillaIDMap;
 use std::collections::HashMap;
 use std::env;
+use parking_lot::RwLock;
+use std::sync::Arc;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -15,7 +17,7 @@ fn main() {
     let id = str::parse::<usize>(&args[2]).unwrap();
 
     let id_map = VanillaIDMap::new(protocol_version);
-    let block = id_map.by_vanilla_id(id, &HashMap::new());
+    let block = id_map.by_vanilla_id(id, Arc::new(RwLock::new(HashMap::new())));
 
     println!("{:?}", block);
 }
