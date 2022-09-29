@@ -149,7 +149,7 @@ impl super::Screen for Launcher {
                                 accounts.lock().push(account);
                             }
                             screen_sys.pop_screen();
-                            save_accounts(&*accounts.lock());
+                            save_accounts(&accounts.lock());
                         }),
                         game.vars.clone(),
                     )));
@@ -220,7 +220,7 @@ impl super::Screen for Launcher {
                     if client_token.is_empty() {
                         client_token = std::iter::repeat(())
                             .map(|()| {
-                                rand::thread_rng().sample(&rand::distributions::Alphanumeric)
+                                rand::thread_rng().sample(rand::distributions::Alphanumeric)
                                     as char
                             })
                             .take(20)
@@ -232,7 +232,7 @@ impl super::Screen for Launcher {
                         .get(&account.account_type)
                         .unwrap()
                         .value()
-                        .refresh(account.clone(), &*client_token);
+                        .refresh(account.clone(), &client_token);
                     if result.is_ok() {
                         active_account.clone().lock().replace(result.ok().unwrap());
                         game.screen_sys
@@ -265,7 +265,7 @@ impl super::Screen for Launcher {
                                     match account {
                                         Ok(account) => {
                                             drop(std::mem::replace(&mut (*accounts)[idx], account));
-                                            save_accounts(&*accounts);
+                                            save_accounts(&accounts);
                                         }
                                         Err(err) => {
                                             println!(
@@ -391,7 +391,7 @@ impl super::Screen for Launcher {
                                 match account {
                                     Ok(account) => {
                                         drop(std::mem::replace(&mut (*accounts)[idx], account));
-                                        save_accounts(&*accounts);
+                                        save_accounts(&accounts);
                                     }
                                     Err(err) => {
                                         println!(
@@ -488,7 +488,7 @@ pub fn load_accounts() -> Option<Vec<Account>> {
     if let Ok(mut file) = fs::File::open(paths::get_config_dir().join("accounts.cfg")) {
         let mut content = String::new();
         file.read_to_string(&mut content).unwrap();
-        let accounts: Option<Vec<Account>> = serde_json::from_str(&*content).ok();
+        let accounts: Option<Vec<Account>> = serde_json::from_str(&content).ok();
         return accounts;
     }
     None

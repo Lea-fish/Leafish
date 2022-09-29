@@ -63,8 +63,8 @@ pub fn render_sign(
 ) {
     for (mut info, position) in query.iter_mut() {
         if info.dirty {
-            remove_sign(&mut *info);
-            add_sign(renderer.clone(), world.clone(), &mut *info, position);
+            remove_sign(&mut info);
+            add_sign(renderer.clone(), world.clone(), &mut info, position);
         }
         if let Some(model) = &info.model {
             let renderer = renderer.clone();
@@ -82,7 +82,7 @@ pub fn on_add_sign(
     mut query: Query<(&mut SignInfo, &Position), Added<SignInfo>>,
 ) {
     for (mut info, position) in query.iter_mut() {
-        add_sign(renderer.clone(), world.clone(), &mut *info, position);
+        add_sign(renderer.clone(), world.clone(), &mut info, position);
     }
 }
 

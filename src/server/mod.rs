@@ -785,7 +785,7 @@ impl Server {
                                 .write()
                                 .disconnect_reason
                                 .replace(Component::new(format::ComponentType::new(
-                                    &*format!("An error occurred while reading a packet: {}", err),
+                                    &format!("An error occurred while reading a packet: {}", err),
                                     None,
                                 )));
                         }
@@ -1238,7 +1238,6 @@ impl Server {
                     .unwrap();
                 mouse_buttons.left = false;
                 mouse_buttons.right = false;
-                return;
             }
         }
     }
@@ -1628,7 +1627,7 @@ impl Server {
         }
 
         let entity_id = self.player.read().unwrap().0;
-        let local_player = create_local(&mut *self.entities.clone().write());
+        let local_player = create_local(&mut self.entities.clone().write());
         *self.player.clone().write() = Some((entity_id, local_player));
         let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
 

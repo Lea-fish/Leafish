@@ -218,7 +218,7 @@ impl super::Screen for Login {
             // Generate random token if it wasn't supplied
             if client_token.is_empty() {
                 client_token = std::iter::repeat(())
-                    .map(|()| rand::thread_rng().sample(&rand::distributions::Alphanumeric) as char)
+                    .map(|()| rand::thread_rng().sample(rand::distributions::Alphanumeric) as char)
                     .take(20)
                     .collect();
                 self.vars.set(auth::AUTH_CLIENT_TOKEN, client_token);
@@ -325,12 +325,12 @@ fn try_login_account(
     };
     if refresh && (account.name.is_empty() || password.is_empty()) {
         // password is at idx 1 in the verification tokens
-        account.refresh(&*client_token)
+        account.refresh(&client_token)
     } else {
         Account::login(
             account.verification_tokens.get(0).unwrap(),
             password,
-            &*client_token,
+            &client_token,
             account.account_type,
         )
     }

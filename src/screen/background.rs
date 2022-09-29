@@ -44,7 +44,7 @@ impl Screen for Background {
         let path = self.vars.get(BACKGROUND_IMAGE);
         self.last_path = (*path).clone();
         let background =
-            if Renderer::get_texture_optional(renderer.get_textures_ref(), &*format!("#{}", path))
+            if Renderer::get_texture_optional(renderer.get_textures_ref(), &format!("#{}", path))
                 .is_some()
             {
                 Some(

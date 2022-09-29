@@ -142,7 +142,7 @@ pub fn apply_digging(
         let hotbar_index = inventory.hotbar_index;
         let inventory = inventory.player_inventory.read();
         let item = inventory.get_item(36 + hotbar_index as u16);
-        item.map(|i| i.material.as_tool()).flatten()
+        item.and_then(|i| i.material.as_tool())
     };
 
     let mut system = ApplyDigging::new(

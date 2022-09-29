@@ -549,7 +549,7 @@ impl DiggingState {
         let now = std::time::Instant::now();
         let expected = now - self.start;
         let ratio = expected.as_secs_f32() / mining_time.as_secs_f32();
-        return ratio.min(1.0);
+        ratio.min(1.0)
     }
 }
 
