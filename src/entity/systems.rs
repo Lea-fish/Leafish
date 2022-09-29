@@ -220,11 +220,12 @@ impl ApplyDigging<'_, '_> {
             _ => {},
         }
 
-        if let Some(effect) = effect {
+        if let Some(current) = &digging.current {
             // Update the block break animation progress.
-            if let Some(current) = &digging.current {
+            if let Some(effect) = effect {
                 effect.update_ratio(current.get_ratio(&self.tool));
             }
+            self.swing_arm();
         }
     }
 
@@ -299,6 +300,15 @@ impl ApplyDigging<'_, '_> {
             status,
             state.position,
             state.face.index() as u8
+        ).unwrap();
+    }
+
+    fn swing_arm(&self) {
+        let mut conn = self.conn.write();
+        packet::send_arm_swing(
+            conn.as_mut().unwrap(),
+            self.version,
+            packet::Hand::MainHand,
         ).unwrap();
     }
 }
