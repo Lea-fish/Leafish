@@ -759,8 +759,8 @@ impl Server {
                                     ),
                                     status: block_break.stage,
                                 });
+                                entity.insert(crate::particle::ParticleType::BlockBreak);
                                 let entity = entity.id();
-                                //ParticleType::BlockBreak.create_particle(&mut entities.world, entity);
                                 server
                                     .active_block_break_anims
                                     .clone()

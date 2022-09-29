@@ -78,7 +78,13 @@ pub fn add_systems(
             systems::apply_gravity
                 .system()
                 .label(SystemExecStage::Normal),
+        )
+        .add_system(
+            systems::apply_digging
+                .system()
+                .label(SystemExecStage::Normal),
         );
+
     sync.add_system(
         systems::lerp_position
             .system()
@@ -93,12 +99,6 @@ pub fn add_systems(
     )
     .add_system(
         systems::light_entity
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        systems::apply_digging
             .system()
             .label(SystemExecStage::Render)
             .after(SystemExecStage::Normal),

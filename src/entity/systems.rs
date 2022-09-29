@@ -271,8 +271,8 @@ impl ApplyDigging<'_, '_> {
             position: Vector3::new(pos.x as f64, pos.y as f64, pos.z as f64),
             status: -1,
         });
+        entity.insert(crate::particle::ParticleType::BlockBreak);
         effect.replace(entity.id());
-        //ParticleType::BlockBreak.create_particle(&self.commands, entity);
     }
 
     fn abort_digging(&mut self, state: &DiggingState, effect: &mut Option<Entity>) {
