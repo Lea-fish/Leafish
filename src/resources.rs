@@ -326,7 +326,7 @@ impl Manager {
                 Self::add_task(
                     &progress_info,
                     "Downloading Asset Index",
-                    &*location.to_string_lossy(),
+                    &location.to_string_lossy(),
                     length,
                 );
                 let tmp_file = paths::get_cache_dir().join(format!("index-{}.tmp", ASSET_VERSION));
@@ -351,7 +351,7 @@ impl Manager {
             Self::add_task(
                 &progress_info,
                 "Downloading Assets",
-                &*root_location.to_string_lossy(),
+                &root_location.to_string_lossy(),
                 objects.len() as u64,
             );
             for (k, v) in objects {
@@ -386,7 +386,7 @@ impl Manager {
                 Self::add_task_progress(
                     &progress_info,
                     "Downloading Assets",
-                    &*root_location.to_string_lossy(),
+                    &root_location.to_string_lossy(),
                     1,
                 );
             }
@@ -529,7 +529,7 @@ impl ObjectPack {
     fn new() -> ObjectPack {
         let loc = paths::get_data_dir().join(format!("index/{}.json", ASSET_VERSION));
         let location = path::Path::new(&loc);
-        let file = fs::File::open(&location).unwrap();
+        let file = fs::File::open(location).unwrap();
         let index: serde_json::Value = serde_json::from_reader(&file).unwrap();
         let objects = index.get("objects").and_then(|v| v.as_object()).unwrap();
         let mut hash_objs = HashMap::with_hasher(BuildHasherDefault::default());

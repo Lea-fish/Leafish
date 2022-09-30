@@ -15,12 +15,11 @@
 use crate::ecs::Manager;
 use crate::entity;
 use crate::entity::player::{create_local, PlayerModel, PlayerMovement};
-use crate::entity::{EntityType, GameInfo, Gravity, TargetPosition, TargetRotation};
+use crate::entity::{EntityType, GameInfo, Gravity, MouseButtons, TargetPosition, TargetRotation};
 use crate::format;
 use crate::inventory::material::versions::to_material;
 use crate::inventory::{inventory_from_type, Inventory, InventoryContext, InventoryType, Item};
 use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
-use crate::particle::ParticleType;
 use crate::protocol::{self, forge, mapped_packet, packet};
 use crate::render;
 use crate::render::hud::HudContext;
@@ -49,9 +48,8 @@ use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
-use leafish_protocol::protocol::packet::{DigType, Hand};
+use leafish_protocol::protocol::packet::Hand;
 use leafish_protocol::protocol::{Conn, Version};
-use leafish_shared::direction::Direction as BlockDirection;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
@@ -111,8 +109,6 @@ pub struct Server {
     version: AtomicUsize,
 
     // Entity accessors
-    block_break_info: Mutex<BlockBreakInfo>,
-    //
     pub player: Arc<RwLock<Option<(i32, Entity)>>>,
     entity_map: Arc<RwLock<HashMap<i32, Entity, BuildHasherDefault<FNVHash>>>>,
     players: Arc<RwLock<HashMap<protocol::UUID, PlayerInfo, BuildHasherDefault<FNVHash>>>>,
@@ -137,18 +133,6 @@ pub struct Server {
     screen_sys: Arc<ScreenSystem>,
     renderer: Arc<Renderer>,
     active_block_break_anims: Arc<DashMap<i32, Entity>>,
-}
-
-#[derive(Debug)]
-pub struct BlockBreakInfo {
-    break_position: Position,
-    break_face: BlockDirection,
-    hardness: f32,
-    progress: f32,
-    delay: u8,
-    active: bool,
-    pressed: bool,
-    effect_id: Option<Entity>,
 }
 
 #[derive(Debug)]
@@ -437,7 +421,6 @@ impl Server {
                         MappedPacket::KeepAliveClientbound(keep_alive) => {
                             packet::send_keep_alive(
                                 server.conn.clone().write().as_mut().unwrap(),
-                                server.mapped_protocol_version,
                                 keep_alive.id,
                             )
                             .map_err(|_| server.disconnect_closed(None));
@@ -775,8 +758,8 @@ impl Server {
                                     ),
                                     status: block_break.stage,
                                 });
+                                entity.insert(crate::particle::ParticleType::BlockBreak);
                                 let entity = entity.id();
-                                ParticleType::BlockBreak.create_particle(&mut entities, entity);
                                 server
                                     .active_block_break_anims
                                     .clone()
@@ -801,7 +784,7 @@ impl Server {
                                 .write()
                                 .disconnect_reason
                                 .replace(Component::new(format::ComponentType::new(
-                                    &*format!("An error occurred while reading a packet: {}", err),
+                                    &format!("An error occurred while reading a packet: {}", err),
                                     None,
                                 )));
                         }
@@ -873,6 +856,12 @@ impl Server {
         renderer: Arc<Renderer>,
     ) -> Server {
         let world = Arc::new(world::World::new(protocol_version, light_updater));
+        let mapped_protocol_version = Version::from_id(protocol_version as u32);
+        let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
+            mapped_protocol_version,
+            renderer.clone(),
+            hud_context.clone(),
+        )));
         let mut entities = Manager::default();
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
@@ -881,6 +870,8 @@ impl Server {
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
+        entities.world.insert_resource(conn.clone());
+        entities.world.insert_resource(inventory_context.clone());
         entity::add_systems(&mut entities, &mut parallel, &mut sync, &mut entity_sched);
         entities
             .schedule
@@ -894,12 +885,6 @@ impl Server {
             .write()
             .add_stage("entity", entity_sched);
 
-        let version = Version::from_id(protocol_version as u32);
-        let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
-            version,
-            renderer.clone(),
-            hud_context.clone(),
-        )));
         hud_context.write().player_inventory =
             Some(inventory_context.read().player_inventory.clone());
 
@@ -909,7 +894,7 @@ impl Server {
             conn,
             disconnect_gracefully: Default::default(),
             protocol_version,
-            mapped_protocol_version: Version::from_id(protocol_version as u32),
+            mapped_protocol_version,
             forge_mods,
             disconnect_data: Arc::new(RwLock::new(DisconnectData::default())),
 
@@ -942,16 +927,6 @@ impl Server {
             fps_start: RwLock::new(0),
             dead: AtomicBool::new(false),
             just_died: AtomicBool::new(false),
-            block_break_info: Mutex::new(BlockBreakInfo {
-                break_position: Default::default(),
-                break_face: BlockDirection::Invalid,
-                hardness: 0.0,
-                progress: 0.0,
-                delay: 0,
-                active: false,
-                pressed: false,
-                effect_id: None,
-            }),
             last_chat_open: AtomicBool::new(false),
             chat_open: AtomicBool::new(false),
             chat_ctx: Arc::new(ChatContext::new()),
@@ -1205,9 +1180,9 @@ impl Server {
     #[allow(unused_must_use)]
     pub fn minecraft_tick(&self, game: &mut Game) {
         if let Some(player) = *self.player.read() {
+            let entities = self.entities.clone();
+            let mut entities = entities.write();
             let on_ground = {
-                let entities = self.entities.clone();
-                let mut entities = entities.write();
                 let mut movement = entities
                     .world
                     .entity_mut(player.1)
@@ -1224,14 +1199,12 @@ impl Server {
                 }
             }
             .unwrap_or_else(|| {
-                self.entities
-                    .read()
+                entities
                     .world
                     .entity(player.1)
                     .get::<Gravity>()
                     .map_or(false, |v| v.on_ground)
             });
-            let entities = self.entities.read();
 
             let position = entities
                 .world
@@ -1248,117 +1221,23 @@ impl Server {
             // Use the smaller packets when possible
             packet::send_position_look(
                 self.conn.clone().write().as_mut().unwrap(),
-                self.mapped_protocol_version,
                 &position.position,
                 rotation.yaw as f32,
                 rotation.pitch as f32,
                 on_ground,
             )
             .map_err(|_| self.disconnect_closed(None));
-        }
-        if !game.focused {
-            if self.block_break_info.lock().pressed {
-                self.abort_breaking(true);
-            }
-            return;
-        }
-        let break_delay = self.block_break_info.lock().delay;
-        if break_delay > 0 {
-            if !self.reeval_target_block() {
-                self.block_break_info.lock().delay -= 1;
-            }
-        } else if self.block_break_info.lock().active {
-            if !self.reeval_target_block() {
-                if self.block_break_info.lock().progress >= 1.0 {
-                    let face_idx = self.block_break_info.lock().break_face.index() as u8;
-                    packet::send_digging(
-                        self.conn.clone().write().as_mut().unwrap(),
-                        self.mapped_protocol_version,
-                        DigType::StopDestroyBlock,
-                        self.block_break_info.lock().break_position,
-                        face_idx,
-                    )
-                    .map_err(|_| self.disconnect_closed(None));
-                    self.block_break_info.lock().active = false;
-                    self.block_break_info.lock().delay = 5;
-                    if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
-                        self.entities.clone().write().world.despawn(break_id);
-                    }
-                } else {
-                    packet::send_arm_swing(
-                        self.conn.clone().write().as_mut().unwrap(),
-                        self.mapped_protocol_version,
-                        Hand::MainHand,
-                    )
-                    .map_err(|_| self.disconnect_closed(None));
-                    self.block_break_info.lock().progress += 0.1; // TODO: Make this value meaningful
-                    let anim_ent = self.block_break_info.lock().effect_id.unwrap();
-                    let entities = self.entities.clone();
-                    let mut entities = entities.write();
-                    let mut anim = entities.world.get_entity_mut(anim_ent).unwrap();
-                    let effect = anim.get_mut::<BlockBreakEffect>();
-                    if let Some(mut effect) = effect {
-                        effect.update_ratio(self.block_break_info.lock().progress);
-                    }
-                }
-            }
-        } else if self.block_break_info.lock().pressed {
-            self.on_left_click();
-        }
-    }
 
-    #[allow(unused_must_use)]
-    fn reeval_target_block(&self) -> bool {
-        if let Some((pos, _, face, _)) = target::trace_ray(
-            &self.world.clone(),
-            4.0,
-            self.renderer.camera.lock().pos.to_vec(),
-            self.renderer.view_vector.lock().cast().unwrap(),
-            target::test_block,
-        ) {
-            let break_pos = self.block_break_info.lock().break_position;
-            let break_face = self.block_break_info.lock().break_face;
-            if pos != break_pos || face != break_face {
-                packet::send_digging(
-                    self.conn.clone().write().as_mut().unwrap(),
-                    self.mapped_protocol_version,
-                    DigType::AbortDestroyBlock,
-                    break_pos,
-                    break_face.index() as u8,
-                )
-                .map_err(|_| self.disconnect_closed(None));
-                packet::send_digging(
-                    self.conn.clone().write().as_mut().unwrap(),
-                    self.mapped_protocol_version,
-                    DigType::StartDestroyBlock,
-                    pos,
-                    face.index() as u8,
-                )
-                .map_err(|_| self.disconnect_closed(None));
-                self.block_break_info.lock().break_position = pos;
-                self.block_break_info.lock().break_face = face;
-                self.block_break_info.lock().progress = 0.0;
-                self.block_break_info.lock().hardness = 1.0; // TODO: Get actual hardness values depending on blocktype and version and tool in hands
-                if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
-                    self.entities.clone().write().world.despawn(break_id);
-                }
-
-                let entities = self.entities.clone();
-                let mut entities = entities.write();
-                let mut entity = entities.world.spawn();
-                entity.insert(BlockEffectData {
-                    position: Vector3::new(pos.x as f64, pos.y as f64, pos.z as f64),
-                    status: -1,
-                });
-                let entity = entity.id();
-                ParticleType::BlockBreak.create_particle(&mut entities, entity);
-                self.block_break_info.lock().effect_id.replace(entity);
-                return true;
+            if !game.focused {
+                let mut mouse_buttons = entities
+                    .world
+                    .entity_mut(player.1)
+                    .get_mut::<MouseButtons>()
+                    .unwrap();
+                mouse_buttons.left = false;
+                mouse_buttons.right = false;
             }
-            return false;
         }
-        self.abort_breaking(false);
-        true
     }
 
     pub fn key_press(&self, down: bool, key: Actionkey, focused: &mut bool) -> bool {
@@ -1421,91 +1300,23 @@ impl Server {
 
     #[allow(unused_must_use)]
     pub fn on_left_click(&self) {
-        packet::send_arm_swing(
-            self.conn.clone().write().as_mut().unwrap(),
-            self.mapped_protocol_version,
-            Hand::MainHand,
-        )
-        .map_err(|_| self.disconnect_closed(None));
-        // TODO: Implement clientside animation.
-        if self.player.clone().read().is_some() {
-            let world = self.world.clone();
-            let gamemode = *self
-                .entities
-                .read()
-                .world
-                .entity(self.player.clone().read().as_ref().unwrap().1)
-                .get::<GameMode>()
-                .unwrap();
-            if gamemode.can_interact_with_world() && self.block_break_info.lock().delay == 0 {
-                self.block_break_info.lock().pressed = true;
-                // TODO: Check this
-                if let Some((pos, _, face, _)) = target::trace_ray(
-                    &world,
-                    4.0,
-                    self.renderer.camera.lock().pos.to_vec(),
-                    self.renderer.view_vector.lock().cast().unwrap(),
-                    target::test_block,
-                ) {
-                    packet::send_digging(
-                        self.conn.clone().write().as_mut().unwrap(),
-                        self.mapped_protocol_version,
-                        DigType::StartDestroyBlock,
-                        pos,
-                        face.index() as u8,
-                    )
-                    .map_err(|_| self.disconnect_closed(None));
-                    self.block_break_info.lock().break_face = face;
-                    self.block_break_info.lock().break_position = pos;
-                    self.block_break_info.lock().progress = 0.0;
-                    self.block_break_info.lock().hardness = 1.0; // TODO: Get actual hardness values depending on blocktype and version and tool in hands
-                    self.block_break_info.lock().active = true;
-                    if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
-                        self.entities.clone().write().world.despawn(break_id);
-                    }
-
-                    let entities = self.entities.clone();
-                    let mut entities = entities.write();
-                    let mut entity = entities.world.spawn();
-                    entity.insert(BlockEffectData {
-                        position: Vector3::new(pos.x as f64, pos.y as f64, pos.z as f64),
-                        status: -1,
-                    });
-                    let entity = entity.id();
-                    ParticleType::BlockBreak.create_particle(&mut entities, entity);
-                    self.block_break_info.lock().effect_id.replace(entity);
-                }
-            }
-        }
+        let mut entities = self.entities.write();
+        let mut mouse_buttons = entities
+            .world
+            .entity_mut(self.player.read().unwrap().1)
+            .get_mut::<MouseButtons>()
+            .unwrap();
+        mouse_buttons.left = true;
     }
 
     pub fn on_release_left_click(&self) {
-        self.abort_breaking(true);
-    }
-
-    #[allow(unused_must_use)]
-    pub fn abort_breaking(&self, unpress: bool) {
-        if unpress && self.block_break_info.lock().pressed {
-            self.block_break_info.lock().pressed = false;
-        }
-        if let Some(break_id) = self.block_break_info.lock().effect_id.take() {
-            self.entities.clone().write().world.despawn(break_id);
-        }
-        // TODO: Call this on hand switching (hotbar scrolling), but let pressed as it is!
-        if self.block_break_info.lock().active {
-            self.block_break_info.lock().active = false;
-            self.block_break_info.lock().delay = 5;
-            let pos = self.block_break_info.lock().break_position;
-            let face = self.block_break_info.lock().break_face;
-            packet::send_digging(
-                self.conn.clone().write().as_mut().unwrap(),
-                self.mapped_protocol_version,
-                DigType::AbortDestroyBlock,
-                pos,
-                face.index() as u8,
-            )
-            .map_err(|_| self.disconnect_closed(None));
-        }
+        let mut entities = self.entities.write();
+        let mut mouse_buttons = entities
+            .world
+            .entity_mut(self.player.read().unwrap().1)
+            .get_mut::<MouseButtons>()
+            .unwrap();
+        mouse_buttons.left = false;
     }
 
     #[allow(unused_must_use)]
@@ -1531,7 +1342,6 @@ impl Server {
                     let hud_context = self.hud_context.clone();
                     packet::send_block_place(
                         self.conn.clone().write().as_mut().unwrap(),
-                        self.mapped_protocol_version,
                         pos,
                         face.index() as u8,
                         at,
@@ -1553,7 +1363,6 @@ impl Server {
                     .map_err(|_| self.disconnect_closed(None));
                     packet::send_arm_swing(
                         self.conn.clone().write().as_mut().unwrap(),
-                        self.mapped_protocol_version,
                         Hand::MainHand,
                     )
                     .map_err(|_| self.disconnect_closed(None));
@@ -1795,7 +1604,6 @@ impl Server {
 
         packet::send_client_settings(
             self.conn.clone().write().as_mut().unwrap(),
-            self.mapped_protocol_version,
             "en_us".to_string(),
             8,
             0,
@@ -1814,7 +1622,7 @@ impl Server {
         }
 
         let entity_id = self.player.read().unwrap().0;
-        let local_player = create_local(&mut *self.entities.clone().write());
+        let local_player = create_local(&mut self.entities.clone().write());
         *self.player.clone().write() = Some((entity_id, local_player));
         let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
 

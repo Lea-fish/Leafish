@@ -11,6 +11,7 @@ use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::screen::ScreenSystem;
 use crate::ui::Container;
+use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::Version;
@@ -1693,5 +1694,48 @@ impl Material {
             }
         }
         (format!("items/{}", result), format!("blocks/{}", result))
+    }
+
+    pub fn as_tool(&self) -> Option<block::Tool> {
+        use block::{Tool, ToolMaterial};
+        match *self {
+            Material::WoodPickaxe => Some(Tool::Pickaxe(ToolMaterial::Wood)),
+            Material::StonePickaxe => Some(Tool::Pickaxe(ToolMaterial::Stone)),
+            Material::GoldPickaxe => Some(Tool::Pickaxe(ToolMaterial::Gold)),
+            Material::IronPickaxe => Some(Tool::Pickaxe(ToolMaterial::Iron)),
+            Material::DiamondPickaxe => Some(Tool::Pickaxe(ToolMaterial::Diamond)),
+            Material::NetheritePickaxe => Some(Tool::Pickaxe(ToolMaterial::Netherite)),
+
+            Material::WoodAxe => Some(Tool::Axe(ToolMaterial::Wood)),
+            Material::StoneAxe => Some(Tool::Axe(ToolMaterial::Stone)),
+            Material::GoldAxe => Some(Tool::Axe(ToolMaterial::Gold)),
+            Material::IronAxe => Some(Tool::Axe(ToolMaterial::Iron)),
+            Material::DiamondAxe => Some(Tool::Axe(ToolMaterial::Diamond)),
+            Material::NetheriteAxe => Some(Tool::Axe(ToolMaterial::Netherite)),
+
+            Material::WoodSpade => Some(Tool::Shovel(ToolMaterial::Wood)),
+            Material::StoneSpade => Some(Tool::Shovel(ToolMaterial::Stone)),
+            Material::GoldSpade => Some(Tool::Shovel(ToolMaterial::Gold)),
+            Material::IronSpade => Some(Tool::Shovel(ToolMaterial::Iron)),
+            Material::DiamondSpade => Some(Tool::Shovel(ToolMaterial::Diamond)),
+            Material::NetheriteShovel => Some(Tool::Shovel(ToolMaterial::Netherite)),
+
+            Material::WoodHoe => Some(Tool::Hoe(ToolMaterial::Wood)),
+            Material::StoneHoe => Some(Tool::Hoe(ToolMaterial::Stone)),
+            Material::GoldHoe => Some(Tool::Hoe(ToolMaterial::Gold)),
+            Material::IronHoe => Some(Tool::Hoe(ToolMaterial::Iron)),
+            Material::DiamondHoe => Some(Tool::Hoe(ToolMaterial::Diamond)),
+            Material::NetheriteHoe => Some(Tool::Hoe(ToolMaterial::Netherite)),
+
+            Material::WoodSword => Some(Tool::Sword(ToolMaterial::Wood)),
+            Material::StoneSword => Some(Tool::Sword(ToolMaterial::Stone)),
+            Material::GoldSword => Some(Tool::Sword(ToolMaterial::Gold)),
+            Material::IronSword => Some(Tool::Sword(ToolMaterial::Iron)),
+            Material::DiamondSword => Some(Tool::Sword(ToolMaterial::Diamond)),
+            Material::NetheriteSword => Some(Tool::Sword(ToolMaterial::Netherite)),
+
+            Material::Shears => Some(Tool::Shears),
+            _ => None,
+        }
     }
 }

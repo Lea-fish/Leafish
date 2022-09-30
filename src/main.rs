@@ -295,8 +295,7 @@ fn main() {
 
     let textures = renderer.get_textures();
     let default_protocol_version = protocol::versions::protocol_name_to_protocol_version(
-        opt.default_protocol_version
-            .unwrap_or_else(|| "".to_string()),
+        opt.default_protocol_version.unwrap_or_default(),
     );
 
     #[cfg(target_os = "linux")]

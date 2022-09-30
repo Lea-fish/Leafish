@@ -1,5 +1,6 @@
 use super::{
-    Bounds, GameInfo, Gravity, Light, Position, Rotation, TargetPosition, TargetRotation, Velocity,
+    Bounds, Digging, GameInfo, Gravity, Light, MouseButtons, Position, Rotation, TargetPosition,
+    TargetRotation, Velocity,
 };
 use crate::ecs::{Manager, SystemExecStage};
 use crate::entity::slime::{added_slime, update_slime};
@@ -95,6 +96,8 @@ pub fn create_local(m: &mut Manager) -> Entity {
         )))
         .insert(PlayerModel::new("", false, false, true))
         .insert(Light::new())
+        .insert(Digging::new())
+        .insert(MouseButtons::new())
         .insert(EntityType::Player);
     entity.id()
 }
@@ -179,7 +182,7 @@ fn update_render_players(
         use std::f64::consts::PI as PI64;
 
         if player_model.dirty {
-            add_player(renderer.clone(), &mut *player_model);
+            add_player(renderer.clone(), &mut player_model);
         }
 
         if let Some(pmodel) = &player_model.model {
@@ -330,7 +333,7 @@ pub fn player_added(
     mut query: Query<&mut PlayerModel, Added<PlayerModel>>,
 ) {
     for mut player_model in query.iter_mut() {
-        add_player(renderer.clone(), &mut *player_model);
+        add_player(renderer.clone(), &mut player_model);
     }
 }
 
@@ -714,13 +717,13 @@ pub fn handle_movement(
                 // effect when pushing up against walls.
 
                 let (bounds, xhit) =
-                    check_collisions(&**world, &mut position, &last_position, player_bounds);
+                    check_collisions(&world, &mut position, &last_position, player_bounds);
                 position.position.x = bounds.min.x + 0.3;
                 last_position.x = position.position.x;
 
                 position.position.z = target.z;
                 let (bounds, zhit) =
-                    check_collisions(&**world, &mut position, &last_position, player_bounds);
+                    check_collisions(&world, &mut position, &last_position, player_bounds);
                 position.position.z = bounds.min.z + 0.3;
                 last_position.z = position.position.z;
 
@@ -742,7 +745,7 @@ pub fn handle_movement(
                             0.0,
                         ));
                         let (_, hit) =
-                            check_collisions(&**world, &mut position, &last_position, mini);
+                            check_collisions(&world, &mut position, &last_position, mini);
                         if !hit {
                             target.y += offset as f64 / 16.0;
                             ox = target.x;
@@ -756,7 +759,7 @@ pub fn handle_movement(
 
                 position.position.y = target.y;
                 let (bounds, yhit) =
-                    check_collisions(&**world, &mut position, &last_position, player_bounds);
+                    check_collisions(&world, &mut position, &last_position, player_bounds);
                 position.position.y = bounds.min.y;
                 last_position.y = position.position.y;
                 if yhit {
@@ -767,8 +770,7 @@ pub fn handle_movement(
                     let ground =
                         Aabb3::new(Point3::new(-0.3, -0.005, -0.3), Point3::new(0.3, 0.0, 0.3));
                     let prev = gravity.on_ground;
-                    let (_, hit) =
-                        check_collisions(&**world, &mut position, &last_position, ground);
+                    let (_, hit) = check_collisions(&world, &mut position, &last_position, ground);
                     gravity.on_ground = hit;
                     if !prev && gravity.on_ground {
                         movement.did_touch_ground = true;

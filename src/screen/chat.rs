@@ -208,7 +208,7 @@ impl super::Screen for Chat {
                     .text("_")
                     .alignment(VAttach::Bottom, HAttach::Left)
                     .position(
-                        renderer.ui.lock().size_of_string(&*self.written) + 2.0 * scale,
+                        renderer.ui.lock().size_of_string(&self.written) + 2.0 * scale,
                         2.0 * scale,
                     )
                     .create(ui_container),
@@ -227,7 +227,7 @@ impl super::Screen for Chat {
                         .text("_")
                         .alignment(VAttach::Bottom, HAttach::Left)
                         .position(
-                            renderer.ui.lock().size_of_string(&*self.written) + 2.0 * scale,
+                            renderer.ui.lock().size_of_string(&self.written) + 2.0 * scale,
                             2.0 * scale,
                         )
                         .create(ui_container),
@@ -358,7 +358,7 @@ impl Chat {
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
             let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
-            let lines = (renderer.ui.lock().size_of_string(&*message.1.to_string())
+            let lines = (renderer.ui.lock().size_of_string(&message.1.to_string())
                 / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
             component_lines += lines;
@@ -397,7 +397,7 @@ impl Chat {
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
             let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
-            let lines = (renderer.ui.lock().size_of_string(&*message.1.to_string())
+            let lines = (renderer.ui.lock().size_of_string(&message.1.to_string())
                 / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
             let text = ui::FormattedBuilder::new()

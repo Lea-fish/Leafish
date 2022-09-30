@@ -50,7 +50,7 @@ impl BlockBreakEffect {
 
     pub fn update_ratio(&mut self, ratio: f32) {
         // 0.0 - 1.0
-        let anim_id = ((ratio * 10.0) as i8 - 1).max(0);
+        let anim_id = ((ratio * 10.0) as i8 + 1).min(10);
         self.update(anim_id);
     }
 }
@@ -73,7 +73,7 @@ pub fn effect_added(
 pub fn effect_updated(renderer: Res<Arc<Renderer>>, mut query: Query<&mut BlockBreakEffect>) {
     for mut effect in query.iter_mut() {
         if effect.dirty {
-            readd_model(renderer.clone(), &mut *effect);
+            readd_model(renderer.clone(), &mut effect);
             effect.dirty = false;
         }
         if let Some(model) = &effect.model {
@@ -103,7 +103,7 @@ fn readd_model(renderer: Arc<Renderer>, effect: &mut BlockBreakEffect) {
         let mut model = vec![];
         let tex = render::Renderer::get_texture(
             renderer.get_textures_ref(),
-            &*format!("blocks/destroy_stage_{}", effect.status - 1),
+            &format!("blocks/destroy_stage_{}", effect.status - 1),
         );
         model::append_box(
             &mut model,
