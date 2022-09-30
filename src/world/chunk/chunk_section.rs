@@ -186,7 +186,7 @@ impl ChunkSectionSnapshotGroup {
         let x = if x < 0 { 16 + x } else { x & 15 };
         let y = if y < 0 { 16 + y } else { y & 15 };
         let z = if z < 0 { 16 + z } else { z & 15 };
-        section.map_or(block::Missing {}, |s| s.get_block(x, y, z))
+        section.map_or(block::Air {}, |s| s.get_block(x, y, z))
     }
 
     pub fn get_block_light(&self, x: i32, y: i32, z: i32) -> u8 {
