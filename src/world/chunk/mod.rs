@@ -107,7 +107,7 @@ impl Chunk {
     pub(crate) fn get_block(&self, x: i32, y: i32, z: i32) -> block::Block {
         let s_idx = y >> 4;
         if !(0..=15).contains(&s_idx) {
-            return block::Missing {};
+            return block::Air {};
         }
         match self.sections[s_idx as usize].as_ref() {
             Some(sec) => sec.get_block(x, y & 0xF, z),
