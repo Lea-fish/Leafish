@@ -5,7 +5,7 @@ use crate::shared::Position as BPos;
 use cgmath::InnerSpace;
 use leafish_blocks::Block;
 use leafish_protocol::protocol;
-use leafish_protocol::protocol::{packet, Version};
+use leafish_protocol::protocol::packet;
 use parking_lot::RwLock;
 use shared::Direction;
 
@@ -119,7 +119,7 @@ pub fn light_entity(
 pub fn apply_digging(
     renderer: Res<Arc<crate::render::Renderer>>,
     world: Res<Arc<crate::world::World>>,
-    network: Res<crate::server::Network>,
+    conn: Res<Arc<RwLock<Option<protocol::Conn>>>>,
     inventory: Res<Arc<RwLock<crate::inventory::InventoryContext>>>,
     commands: Commands,
     mut query: Query<(&MouseButtons, &mut Digging)>,
@@ -145,13 +145,7 @@ pub fn apply_digging(
         item.and_then(|i| i.material.as_tool())
     };
 
-    let mut system = ApplyDigging::new(
-        target,
-        network.conn.clone(),
-        commands,
-        network.version,
-        tool,
-    );
+    let mut system = ApplyDigging::new(target, conn.clone(), commands, tool);
 
     for (mouse_buttons, mut digging) in query.iter_mut() {
         if let Some(effect) = digging.effect {
@@ -167,7 +161,6 @@ struct ApplyDigging<'w, 's> {
     target: Option<(shared::Position, Block, Direction, Vector3<f64>)>,
     conn: Arc<RwLock<Option<protocol::Conn>>>,
     commands: Commands<'w, 's>,
-    version: Version,
     tool: Option<block::Tool>,
 }
 
@@ -176,14 +169,12 @@ impl ApplyDigging<'_, '_> {
         target: Option<(shared::Position, Block, Direction, Vector3<f64>)>,
         conn: Arc<RwLock<Option<protocol::Conn>>>,
         commands: Commands<'a, 'b>,
-        version: Version,
         tool: Option<block::Tool>,
     ) -> ApplyDigging<'a, 'b> {
         ApplyDigging {
             target,
             conn,
             commands,
-            version,
             tool,
         }
     }
@@ -308,7 +299,6 @@ impl ApplyDigging<'_, '_> {
         let mut conn = self.conn.write();
         packet::send_digging(
             conn.as_mut().unwrap(),
-            self.version,
             status,
             state.position,
             state.face.index() as u8,
@@ -318,7 +308,6 @@ impl ApplyDigging<'_, '_> {
 
     fn swing_arm(&self) {
         let mut conn = self.conn.write();
-        packet::send_arm_swing(conn.as_mut().unwrap(), self.version, packet::Hand::MainHand)
-            .unwrap();
+        packet::send_arm_swing(conn.as_mut().unwrap(), packet::Hand::MainHand).unwrap();
     }
 }

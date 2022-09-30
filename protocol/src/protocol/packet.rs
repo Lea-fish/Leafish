@@ -3379,12 +3379,12 @@ impl From<i32> for Hand {
 
 pub fn send_position_look(
     conn: &mut Conn,
-    version: Version,
     position: &Vector3<f64>,
     yaw: f32,
     pitch: f32,
     on_ground: bool,
 ) -> Result<(), Error> {
+    let version = conn.get_version();
     if version >= Version::V1_8 {
         conn.write_packet(
             crate::protocol::packet::play::serverbound::PlayerPositionLook {
@@ -3411,7 +3411,8 @@ pub fn send_position_look(
     }
 }
 
-pub fn send_arm_swing(conn: &mut Conn, version: Version, hand: Hand) -> Result<(), Error> {
+pub fn send_arm_swing(conn: &mut Conn, hand: Hand) -> Result<(), Error> {
+    let version = conn.get_version();
     if version < Version::V1_8 {
         conn.write_packet(packet::play::serverbound::ArmSwing_Handsfree_ID {
             entity_id: 0, // TODO: Check these values!
@@ -3428,11 +3429,11 @@ pub fn send_arm_swing(conn: &mut Conn, version: Version, hand: Hand) -> Result<(
 
 pub fn send_digging(
     conn: &mut Conn,
-    version: Version,
     status: DigType,
     pos: Position,
     face_index: u8,
 ) -> Result<(), Error> {
+    let version = conn.get_version();
     if version < Version::V1_8 {
         conn.write_packet(packet::play::serverbound::PlayerDigging_u8_u8y {
             status: status.ordinal() as u8,
@@ -3458,13 +3459,13 @@ pub fn send_digging(
 
 pub fn send_block_place(
     conn: &mut Conn,
-    version: Version,
     pos: Position,
     face: u8,
     cursor_position: Vector3<f64>,
     hand: Hand,
     item: Box<dyn Fn() -> Option<Stack>>,
 ) -> Result<(), Error> {
+    let version = conn.get_version();
     if version >= Version::V1_14 {
         conn.write_packet(
             packet::play::serverbound::PlayerBlockPlacement_insideblock {
@@ -3523,7 +3524,6 @@ pub fn send_block_place(
 
 pub fn send_client_settings(
     conn: &mut Conn,
-    version: Version,
     locale: String,
     view_distance: u8,
     chat_mode: u8,
@@ -3531,6 +3531,7 @@ pub fn send_client_settings(
     displayed_skin_parts: u8,
     main_hand: Hand,
 ) -> Result<(), Error> {
+    let version = conn.get_version();
     if version < Version::V1_9 {
         // TODO: Do this for protocol version 48
         // 1 snapshot after 1.8
@@ -3553,7 +3554,8 @@ pub fn send_client_settings(
     }
 }
 
-pub fn send_keep_alive(conn: &mut Conn, version: Version, id: i64) -> Result<(), Error> {
+pub fn send_keep_alive(conn: &mut Conn, id: i64) -> Result<(), Error> {
+    let version = conn.get_version();
     if version < Version::V1_8 {
         conn.write_packet(packet::play::serverbound::KeepAliveServerbound_i32 { id: id as i32 })
     } else if version < Version::V1_12 {

@@ -1594,6 +1594,10 @@ impl Conn {
             ping,
         ))
     }
+
+    pub fn get_version(&self) -> Version {
+        Version::from_id(self.protocol_version as u32)
+    }
 }
 
 /// Parse a clientbound packet, for debugging packet parsing issues (Conn::read_packet)

@@ -421,7 +421,6 @@ impl Server {
                         MappedPacket::KeepAliveClientbound(keep_alive) => {
                             packet::send_keep_alive(
                                 server.conn.clone().write().as_mut().unwrap(),
-                                server.mapped_protocol_version,
                                 keep_alive.id,
                             )
                             .map_err(|_| server.disconnect_closed(None));
@@ -867,12 +866,11 @@ impl Server {
         let mut parallel = SystemStage::parallel();
         let mut sync = SystemStage::single_threaded();
         let mut entity_sched = SystemStage::single_threaded();
-        let network = Network::new(conn.clone(), mapped_protocol_version);
         entities.world.insert_resource(entity::GameInfo::new());
         entities.world.insert_resource(world.clone());
         entities.world.insert_resource(renderer.clone());
         entities.world.insert_resource(screen_sys.clone());
-        entities.world.insert_resource(network);
+        entities.world.insert_resource(conn.clone());
         entities.world.insert_resource(inventory_context.clone());
         entity::add_systems(&mut entities, &mut parallel, &mut sync, &mut entity_sched);
         entities
@@ -1223,7 +1221,6 @@ impl Server {
             // Use the smaller packets when possible
             packet::send_position_look(
                 self.conn.clone().write().as_mut().unwrap(),
-                self.mapped_protocol_version,
                 &position.position,
                 rotation.yaw as f32,
                 rotation.pitch as f32,
@@ -1345,7 +1342,6 @@ impl Server {
                     let hud_context = self.hud_context.clone();
                     packet::send_block_place(
                         self.conn.clone().write().as_mut().unwrap(),
-                        self.mapped_protocol_version,
                         pos,
                         face.index() as u8,
                         at,
@@ -1367,7 +1363,6 @@ impl Server {
                     .map_err(|_| self.disconnect_closed(None));
                     packet::send_arm_swing(
                         self.conn.clone().write().as_mut().unwrap(),
-                        self.mapped_protocol_version,
                         Hand::MainHand,
                     )
                     .map_err(|_| self.disconnect_closed(None));
@@ -1609,7 +1604,6 @@ impl Server {
 
         packet::send_client_settings(
             self.conn.clone().write().as_mut().unwrap(),
-            self.mapped_protocol_version,
             "en_us".to_string(),
             8,
             0,
@@ -2476,16 +2470,5 @@ fn calculate_relative_teleport(flag: TeleportFlag, flags: u8, base: f64, val: f6
         val
     } else {
         base + val
-    }
-}
-
-pub struct Network {
-    pub conn: Arc<RwLock<Option<protocol::Conn>>>,
-    pub version: Version,
-}
-
-impl Network {
-    pub fn new(conn: Arc<RwLock<Option<protocol::Conn>>>, version: Version) -> Self {
-        Self { conn, version }
     }
 }
