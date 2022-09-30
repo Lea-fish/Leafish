@@ -13,6 +13,7 @@
 // limitations under the License.
 
 pub use leafish_blocks as block;
+use leafish_protocol::nbt::NamedTag;
 
 use crate::shared::Position;
 use crate::{chunk_builder, ecs, format, render};
@@ -75,6 +76,8 @@ pub struct World {
     protocol_version: i32,
     pub modded_block_ids: Arc<RwLock<HashMap<usize, String>>>,
     pub id_map: Arc<block::VanillaIDMap>,
+
+    pub dimension: Arc<RwLock<Dimension>>,
 }
 
 impl World {
@@ -89,6 +92,7 @@ impl World {
             light_updates: sender,
             render_list: Arc::new(Default::default()),
             block_entity_actions: unbounded(),
+            dimension: Arc::new(Default::default()),
         }
     }
 
@@ -834,6 +838,7 @@ impl World {
                 if chunk.sections[i].is_none() {
                     let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
                     fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
+                    fill_sky &= self.dimension.read().has_sky_light();
                     if !fill_sky || mask & (1 << i) != 0 {
                         chunk.sections[i] = Some(ChunkSection::new(i as u8, fill_sky));
                     }
@@ -847,7 +852,7 @@ impl World {
                 } else if version == 18 {
                     self.prep_section_18(chunk, data, i);
                 } else if version == 19 {
-                    self.prep_section_19(chunk, data, i);
+                    self.prep_section_19(chunk, data, i, skylight);
                 }
                 let mut section = chunk.sections[i as usize].as_mut().unwrap();
                 section.dirty = true;
@@ -879,7 +884,13 @@ impl World {
         Ok(())
     }
 
-    fn prep_section_19(&self, chunk: &mut Chunk, data: &mut Cursor<Vec<u8>>, section_id: usize) {
+    fn prep_section_19(
+        &self,
+        chunk: &mut Chunk,
+        data: &mut Cursor<Vec<u8>>,
+        section_id: usize,
+        skylight: bool,
+    ) {
         use crate::protocol::LenPrefixed;
         use leafish_protocol::types::bit;
         if self.protocol_version >= 451 {
@@ -891,9 +902,14 @@ impl World {
         let mut bit_size = data.read_u8().unwrap();
         let mut mappings: HashMap<usize, block::Block, BuildHasherDefault<FNVHash>> =
             HashMap::with_hasher(BuildHasherDefault::default());
+
         if bit_size == 0 {
             bit_size = 13;
-        } else {
+        } else if bit_size < 4 {
+            bit_size = 4;
+        }
+
+        if bit_size <= 8 {
             let count = VarInt::read_from(data).unwrap().0;
             for i in 0..count {
                 let id = VarInt::read_from(data).unwrap().0;
@@ -948,7 +964,9 @@ impl World {
             // Skylight in update skylight packet for 1.14+
         } else {
             data.read_exact(&mut section.block_light.data).unwrap();
-            data.read_exact(&mut section.sky_light.data).unwrap();
+            if skylight {
+                data.read_exact(&mut section.sky_light.data).unwrap();
+            }
         }
     }
 
@@ -1329,10 +1347,11 @@ impl World {
         x: i32,
         z: i32,
         new: bool,
+        sky_light: bool,
         mask: u16,
         data: Vec<u8>,
     ) -> Result<(), protocol::Error> {
-        self.load_chunk19_or_115(true, x, z, new, mask, data)
+        self.load_chunk19_or_115(true, x, z, new, sky_light, mask, data)
     }
 
     pub fn load_chunk115(
@@ -1340,10 +1359,11 @@ impl World {
         x: i32,
         z: i32,
         new: bool,
+        sky_light: bool,
         mask: u16,
         data: Vec<u8>,
     ) -> Result<(), protocol::Error> {
-        self.load_chunk19_or_115(false, x, z, new, mask, data)
+        self.load_chunk19_or_115(false, x, z, new, sky_light, mask, data)
     }
 
     #[allow(clippy::or_fun_call)]
@@ -1353,6 +1373,7 @@ impl World {
         x: i32,
         z: i32,
         new: bool,
+        sky_light: bool,
         mask: u16,
         data: Vec<u8>,
     ) -> Result<(), protocol::Error> {
@@ -1360,7 +1381,7 @@ impl World {
             x,
             z,
             new,
-            true,
+            sky_light,
             read_biomes,
             mask,
             0,
@@ -1380,10 +1401,226 @@ impl World {
             }
         }
     }
+
+    pub fn set_dimension(&self, new_dimension: Dimension) {
+        let mut dimension = self.dimension.write();
+        *dimension = new_dimension;
+    }
 }
 
 impl block::WorldAccess for World {
     fn get_block(&self, pos: Position) -> block::Block {
         World::get_block(self, pos)
+    }
+}
+
+#[derive(Debug)]
+pub enum DimensionID {
+    Index(i32),
+    Name(String),
+    Tag(NamedTag),
+}
+
+#[derive(Default, Debug)]
+pub enum Dimension {
+    #[default]
+    Overworld,
+    Nether,
+    End,
+    Other(DimensionID),
+}
+
+impl Dimension {
+    pub fn from_index(index: i32) -> Self {
+        match index {
+            -1 => Self::Nether,
+            0 => Self::Overworld,
+            1 => Self::End,
+            _ => Self::Other(DimensionID::Index(index)),
+        }
+    }
+
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "minecraft:the_nether" => Self::Nether,
+            "minecraft:overworld" => Self::Overworld,
+            "minecraft:the_end" => Self::End,
+            _ => Self::Other(DimensionID::Name(name.to_string())),
+        }
+    }
+
+    pub fn from_tag(tag: &NamedTag) -> Self {
+        let name = tag.1.get("name").unwrap();
+        match name.as_str().unwrap() {
+            "minecraft:the_nether" => Self::Nether,
+            "minecraft:overworld" => Self::Overworld,
+            "minecraft:the_end" => Self::End,
+            _ => Self::Other(DimensionID::Tag(tag.clone())),
+        }
+    }
+
+    pub fn has_sky_light(&self) -> bool {
+        matches!(*self, Dimension::Overworld)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn build_world(protocol_version: i32) -> World {
+        let (tx, _) = unbounded();
+        World::new(protocol_version, tx)
+    }
+
+    fn load_chunk(
+        world: &World,
+        x: i32,
+        z: i32,
+        new: bool,
+        skylight: bool,
+        read_biomes: bool,
+        mask: u16,
+        mask_add: u16,
+        data: &[u8],
+        version: u8,
+    ) {
+        let mut data = Cursor::new(data.to_vec());
+        world
+            .load_chunk(
+                x,
+                z,
+                new,
+                skylight,
+                read_biomes,
+                mask,
+                mask_add,
+                &mut data,
+                version,
+            )
+            .unwrap();
+    }
+
+    #[test]
+    fn parse_chunk_1_12_2() {
+        let world = build_world(340);
+
+        let data = include_bytes!("testdata/chunk_1.12.2.bin");
+        load_chunk(&world, 7, 8, true, true, true, 63, 16, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1_12_2_nether.bin");
+        load_chunk(&world, -8, -9, true, false, true, 0xcb, 0x0, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_13_2() {
+        let world = build_world(404);
+        let data = include_bytes!("testdata/chunk_1.13.2.bin");
+        load_chunk(&world, -20, -7, true, true, true, 31, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_18w50a() {
+        let world = build_world(451);
+        let data = include_bytes!("testdata/chunk_18w50a.bin");
+        load_chunk(&world, -25, -18, true, true, true, 31, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_19w02a() {
+        let world = build_world(452);
+        let data = include_bytes!("testdata/chunk_19w02a.bin");
+        load_chunk(&world, -10, -26, true, true, true, 15, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_14() {
+        let world = build_world(477);
+        let data = include_bytes!("testdata/chunk_1.14.bin");
+        load_chunk(&world, -14, 0, true, true, true, 63, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_14_1() {
+        let world = build_world(480);
+        let data = include_bytes!("testdata/chunk_1.14.1.bin");
+        load_chunk(&world, 2, -25, true, true, true, 31, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_14_2() {
+        let world = build_world(485);
+        let data = include_bytes!("testdata/chunk_1.14.2.bin");
+        load_chunk(&world, 1, 5, true, true, true, 15, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_14_3() {
+        let world = build_world(490);
+        let data = include_bytes!("testdata/chunk_1.14.3.bin");
+        load_chunk(&world, -9, -25, true, true, true, 31, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_14_4() {
+        let world = build_world(498);
+        let data = include_bytes!("testdata/chunk_1.14.4.bin");
+        load_chunk(&world, 2, -14, true, true, true, 31, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_15_1() {
+        let world = build_world(575);
+        let data = include_bytes!("testdata/chunk_1.15.1.bin");
+        load_chunk(&world, -10, -10, true, true, false, 63, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_15_2() {
+        let world = build_world(578);
+        let data = include_bytes!("testdata/chunk_1.15.2.bin");
+        load_chunk(&world, -19, -18, true, true, false, 31, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_16() {
+        let world = build_world(735);
+        let data = include_bytes!("testdata/chunk_1.16.bin");
+        load_chunk(&world, 2, -26, true, true, false, 63, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_16_1() {
+        let world = build_world(736);
+        let data = include_bytes!("testdata/chunk_1.16.1.bin");
+        load_chunk(&world, -6, -5, true, true, false, 31, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_16_2() {
+        let world = build_world(751);
+        let data = include_bytes!("testdata/chunk_1.16.2.bin");
+        load_chunk(&world, -22, -20, true, true, false, 15, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_16_3() {
+        let world = build_world(753);
+        let data = include_bytes!("testdata/chunk_1.16.3.bin");
+        load_chunk(&world, 4, 2, true, true, false, 63, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_16_4() {
+        let world = build_world(754);
+        let data = include_bytes!("testdata/chunk_1.16.4.bin");
+        load_chunk(&world, -10, -8, true, true, false, 15, 16, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_17_1() {
+        let world = build_world(756);
+        let data = include_bytes!("testdata/chunk_1.17.1.bin");
+        load_chunk(&world, -3, -25, true, true, false, 31, 16, data, 19);
     }
 }
