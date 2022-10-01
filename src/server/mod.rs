@@ -426,7 +426,8 @@ impl Server {
                             .map_err(|_| server.disconnect_closed(None));
                         }
                         MappedPacket::ChunkData_NoEntities(chunk_data) => {
-                            server.on_chunk_data_no_entities(chunk_data);
+                            let sky_light = server.world.dimension.read().has_sky_light();
+                            server.on_chunk_data_no_entities(chunk_data, sky_light);
                         }
                         MappedPacket::ChunkData_NoEntities_u16(chunk_data) => {
                             server.on_chunk_data_no_entities_u16(chunk_data);
@@ -450,28 +451,33 @@ impl Server {
                             server.on_block_entity_update(block_update);
                         }
                         MappedPacket::ChunkData_Biomes3D(chunk_data) => {
+                            let sky_light = server.world.dimension.read().has_sky_light();
                             threads.spawn(move || {
-                                server.on_chunk_data_biomes3d(chunk_data);
+                                server.on_chunk_data_biomes3d(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::ChunkData_Biomes3D_i32(chunk_data) => {
+                            let sky_light = server.world.dimension.read().has_sky_light();
                             threads.spawn(move || {
-                                server.on_chunk_data_biomes3d_varint(chunk_data);
+                                server.on_chunk_data_biomes3d_varint(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::ChunkData_Biomes3D_bool(chunk_data) => {
+                            let sky_light = server.world.dimension.read().has_sky_light();
                             threads.spawn(move || {
-                                server.on_chunk_data_biomes3d_bool(chunk_data);
+                                server.on_chunk_data_biomes3d_bool(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::ChunkData(chunk_data) => {
+                            let sky_light = server.world.dimension.read().has_sky_light();
                             threads.spawn(move || {
-                                server.on_chunk_data(chunk_data);
+                                server.on_chunk_data(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::ChunkData_HeightMap(chunk_data) => {
+                            let sky_light = server.world.dimension.read().has_sky_light();
                             threads.spawn(move || {
-                                server.on_chunk_data_heightmap(chunk_data);
+                                server.on_chunk_data_heightmap(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::UpdateSign(update_sign) => {
@@ -514,7 +520,27 @@ impl Server {
                             }
                         }
                         MappedPacket::JoinGame(join) => {
-                            server.on_game_join(join.gamemode, join.entity_id);
+                            let protocol::mapped_packet::play::clientbound::JoinGame {
+                                gamemode,
+                                entity_id,
+                                dimension_id,
+                                dimension_name,
+                                dimension,
+                                world_name,
+                                ..
+                            } = join;
+
+                            server.on_game_join(gamemode, entity_id);
+
+                            let dimension = dimension_id
+                                .map(world::Dimension::from_index)
+                                .or_else(|| dimension_name.map(|d| world::Dimension::from_name(&d)))
+                                .or_else(|| world_name.map(|d| world::Dimension::from_name(&d)))
+                                .or_else(|| dimension.map(|d| world::Dimension::from_tag(&d)));
+
+                            if let Some(dimension) = dimension {
+                                server.world.set_dimension(dimension);
+                            }
                         }
                         MappedPacket::TeleportPlayer(teleport) => {
                             server.on_teleport_player(teleport);
@@ -1615,6 +1641,15 @@ impl Server {
     }
 
     fn on_respawn(&self, respawn: mapped_packet::play::clientbound::Respawn) {
+        let protocol::mapped_packet::play::clientbound::Respawn {
+            gamemode,
+            dimension,
+            dimension_name,
+            dimension_tag,
+            world_name,
+            ..
+        } = respawn;
+
         for entity in &*self.entity_map.clone().write() {
             if self.entities.read().world.get_entity(*entity.1).is_some() {
                 self.entities.clone().write().world.despawn(*entity.1);
@@ -1624,7 +1659,7 @@ impl Server {
         let entity_id = self.player.read().unwrap().0;
         let local_player = create_local(&mut self.entities.clone().write());
         *self.player.clone().write() = Some((entity_id, local_player));
-        let gamemode = GameMode::from_int((respawn.gamemode & 0x7) as i32);
+        let gamemode = GameMode::from_int((gamemode & 0x7) as i32);
 
         if let Some(player) = *self.player.clone().write() {
             self.hud_context.clone().write().update_game_mode(gamemode);
@@ -1664,6 +1699,16 @@ impl Server {
             .clone()
             .write()
             .insert(entity_id, local_player);
+
+        let dimension = dimension
+            .map(world::Dimension::from_index)
+            .or_else(|| dimension_name.map(|d| world::Dimension::from_name(&d)))
+            .or_else(|| world_name.map(|d| world::Dimension::from_name(&d)))
+            .or_else(|| dimension_tag.map(|d| world::Dimension::from_tag(&d)));
+
+        if let Some(dimension) = dimension {
+            self.world.set_dimension(dimension);
+        }
     }
 
     // TODO: make use of "on_disconnect"
@@ -2241,6 +2286,7 @@ impl Server {
     fn on_chunk_data_biomes3d_varint(
         &self,
         chunk_data: mapped_packet::play::clientbound::ChunkData_Biomes3D_i32,
+        sky_light: bool,
     ) {
         self.world
             .clone()
@@ -2248,6 +2294,7 @@ impl Server {
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
                 chunk_data.new,
+                sky_light,
                 chunk_data.bitmask as u16,
                 chunk_data.data,
             )
@@ -2258,6 +2305,7 @@ impl Server {
     fn on_chunk_data_biomes3d_bool(
         &self,
         chunk_data: mapped_packet::play::clientbound::ChunkData_Biomes3D_bool,
+        sky_light: bool,
     ) {
         self.world
             .clone()
@@ -2265,6 +2313,7 @@ impl Server {
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
                 chunk_data.new,
+                sky_light,
                 chunk_data.bitmask as u16,
                 chunk_data.data,
             )
@@ -2275,6 +2324,7 @@ impl Server {
     fn on_chunk_data_biomes3d(
         &self,
         chunk_data: mapped_packet::play::clientbound::ChunkData_Biomes3D,
+        sky_light: bool,
     ) {
         self.world
             .clone()
@@ -2282,6 +2332,7 @@ impl Server {
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
                 chunk_data.new,
+                sky_light,
                 chunk_data.bitmask as u16,
                 chunk_data.data,
             )
@@ -2289,13 +2340,18 @@ impl Server {
         self.load_block_entities(chunk_data.block_entities);
     }
 
-    fn on_chunk_data(&self, chunk_data: mapped_packet::play::clientbound::ChunkData) {
+    fn on_chunk_data(
+        &self,
+        chunk_data: mapped_packet::play::clientbound::ChunkData,
+        sky_light: bool,
+    ) {
         self.world
             .clone()
             .load_chunk19(
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
                 chunk_data.new,
+                sky_light,
                 chunk_data.bitmask as u16,
                 chunk_data.data,
             )
@@ -2306,6 +2362,7 @@ impl Server {
     fn on_chunk_data_heightmap(
         &self,
         chunk_data: mapped_packet::play::clientbound::ChunkData_HeightMap,
+        sky_light: bool,
     ) {
         self.world
             .clone()
@@ -2313,6 +2370,7 @@ impl Server {
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
                 chunk_data.new,
+                sky_light,
                 chunk_data.bitmask as u16,
                 chunk_data.data,
             )
@@ -2323,6 +2381,7 @@ impl Server {
     fn on_chunk_data_no_entities(
         &self,
         chunk_data: mapped_packet::play::clientbound::ChunkData_NoEntities,
+        sky_light: bool,
     ) {
         self.world
             .clone()
@@ -2330,6 +2389,7 @@ impl Server {
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
                 chunk_data.new,
+                sky_light,
                 chunk_data.bitmask as u16,
                 chunk_data.data,
             )
