@@ -1208,11 +1208,11 @@ impl World {
         x: i32,
         z: i32,
         new: bool,
-        _skylight: bool, // unused!
+        skylight: bool,
         mask: u16,
         data: &mut std::io::Cursor<Vec<u8>>,
     ) -> Result<(), protocol::Error> {
-        self.load_chunk(x, z, new, true, new, mask, 0, data, 18)
+        self.load_chunk(x, z, new, skylight, new, mask, 0, data, 18)
     }
 
     pub fn load_chunks17(
@@ -1450,13 +1450,7 @@ impl Dimension {
     }
 
     pub fn from_tag(tag: &NamedTag) -> Self {
-        let name = tag.1.get("name").unwrap();
-        match name.as_str().unwrap() {
-            "minecraft:the_nether" => Self::Nether,
-            "minecraft:overworld" => Self::Overworld,
-            "minecraft:the_end" => Self::End,
-            _ => Self::Other(DimensionID::Tag(tag.clone())),
-        }
+        Self::Other(DimensionID::Tag(tag.clone()))
     }
 
     pub fn has_sky_light(&self) -> bool {
@@ -1502,125 +1496,208 @@ mod tests {
     }
 
     #[test]
+    fn parse_chunk_1_8_9() {
+        let world = build_world(47);
+
+        let data = include_bytes!("testdata/chunk_1.8.9.bin");
+        load_chunk(&world, 0, 0, true, false, true, 0, 0, data, 18);
+
+        let data = include_bytes!("testdata/chunk_1.8.9_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 511, 0, data, 18);
+    }
+
+    #[test]
+    fn parse_chunk_1_9() {
+        let world = build_world(107);
+
+        let data = include_bytes!("testdata/chunk_1.9.bin");
+        load_chunk(&world, 0, 0, true, true, true, 511, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.9_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 511, 0, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_9_2() {
+        let world = build_world(109);
+
+        let data = include_bytes!("testdata/chunk_1.9.2.bin");
+        load_chunk(&world, 0, 0, true, true, true, 31, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.9.2_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 507, 0, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_10_2() {
+        let world = build_world(210);
+        let data = include_bytes!("testdata/chunk_1.10.2.bin");
+        load_chunk(&world, 0, 0, true, true, true, 79, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.10.2_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 195, 0, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_11() {
+        let world = build_world(315);
+
+        let data = include_bytes!("testdata/chunk_1.11.bin");
+        load_chunk(&world, 0, 0, true, true, true, 31, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.11_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 511, 0, data, 19);
+    }
+
+    #[test]
+    fn parse_chunk_1_11_2() {
+        let world = build_world(316);
+
+        let data = include_bytes!("testdata/chunk_1.11.2.bin");
+        load_chunk(&world, 0, 0, true, true, true, 63, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.11.2_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 511, 0, data, 19);
+    }
+
+    #[test]
     fn parse_chunk_1_12_2() {
         let world = build_world(340);
 
         let data = include_bytes!("testdata/chunk_1.12.2.bin");
-        load_chunk(&world, 7, 8, true, true, true, 63, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, true, 31, 0, data, 19);
 
-        let data = include_bytes!("testdata/chunk_1_12_2_nether.bin");
-        load_chunk(&world, -8, -9, true, false, true, 0xcb, 0x0, data, 19);
+        let data = include_bytes!("testdata/chunk_1.12.2_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 511, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_13_2() {
         let world = build_world(404);
         let data = include_bytes!("testdata/chunk_1.13.2.bin");
-        load_chunk(&world, -20, -7, true, true, true, 31, 16, data, 19);
-    }
+        load_chunk(&world, 0, 0, true, true, true, 31, 0, data, 19);
 
-    #[test]
-    fn parse_chunk_18w50a() {
-        let world = build_world(451);
-        let data = include_bytes!("testdata/chunk_18w50a.bin");
-        load_chunk(&world, -25, -18, true, true, true, 31, 16, data, 19);
-    }
-
-    #[test]
-    fn parse_chunk_19w02a() {
-        let world = build_world(452);
-        let data = include_bytes!("testdata/chunk_19w02a.bin");
-        load_chunk(&world, -10, -26, true, true, true, 15, 16, data, 19);
+        let data = include_bytes!("testdata/chunk_1.13.2_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_14() {
         let world = build_world(477);
         let data = include_bytes!("testdata/chunk_1.14.bin");
-        load_chunk(&world, -14, 0, true, true, true, 63, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, true, 31, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.14_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 207, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_14_1() {
         let world = build_world(480);
         let data = include_bytes!("testdata/chunk_1.14.1.bin");
-        load_chunk(&world, 2, -25, true, true, true, 31, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, true, 31, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.14.1_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_14_2() {
         let world = build_world(485);
         let data = include_bytes!("testdata/chunk_1.14.2.bin");
-        load_chunk(&world, 1, 5, true, true, true, 15, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, true, 15, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.14.2_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_14_3() {
         let world = build_world(490);
         let data = include_bytes!("testdata/chunk_1.14.3.bin");
-        load_chunk(&world, -9, -25, true, true, true, 31, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, true, 31, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.14.3_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_14_4() {
         let world = build_world(498);
         let data = include_bytes!("testdata/chunk_1.14.4.bin");
-        load_chunk(&world, 2, -14, true, true, true, 31, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, true, 63, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.14.4_nether.bin");
+        load_chunk(&world, 0, 0, true, false, true, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_15_1() {
         let world = build_world(575);
         let data = include_bytes!("testdata/chunk_1.15.1.bin");
-        load_chunk(&world, -10, -10, true, true, false, 63, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, false, 63, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.15.1_nether.bin");
+        load_chunk(&world, 0, 0, true, false, false, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_15_2() {
         let world = build_world(578);
         let data = include_bytes!("testdata/chunk_1.15.2.bin");
-        load_chunk(&world, -19, -18, true, true, false, 31, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, false, 31, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.15.2_nether.bin");
+        load_chunk(&world, 0, 0, true, false, false, 195, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_16() {
         let world = build_world(735);
         let data = include_bytes!("testdata/chunk_1.16.bin");
-        load_chunk(&world, 2, -26, true, true, false, 63, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, false, 15, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.16_nether.bin");
+        load_chunk(&world, 0, 0, true, false, false, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_16_1() {
         let world = build_world(736);
         let data = include_bytes!("testdata/chunk_1.16.1.bin");
-        load_chunk(&world, -6, -5, true, true, false, 31, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, false, 63, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.16.1_nether.bin");
+        load_chunk(&world, 0, 0, true, false, false, 195, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_16_2() {
         let world = build_world(751);
         let data = include_bytes!("testdata/chunk_1.16.2.bin");
-        load_chunk(&world, -22, -20, true, true, false, 15, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, false, 15, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.16.2_nether.bin");
+        load_chunk(&world, 0, 0, true, false, false, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_16_3() {
         let world = build_world(753);
         let data = include_bytes!("testdata/chunk_1.16.3.bin");
-        load_chunk(&world, 4, 2, true, true, false, 63, 16, data, 19);
+        load_chunk(&world, 0, 0, true, true, false, 31, 0, data, 19);
+
+        let data = include_bytes!("testdata/chunk_1.16.3_nether.bin");
+        load_chunk(&world, 0, 0, true, false, false, 255, 0, data, 19);
     }
 
     #[test]
     fn parse_chunk_1_16_4() {
         let world = build_world(754);
         let data = include_bytes!("testdata/chunk_1.16.4.bin");
-        load_chunk(&world, -10, -8, true, true, false, 15, 16, data, 19);
-    }
+        load_chunk(&world, 0, 0, true, true, false, 31, 0, data, 19);
 
-    #[test]
-    fn parse_chunk_1_17_1() {
-        let world = build_world(756);
-        let data = include_bytes!("testdata/chunk_1.17.1.bin");
-        load_chunk(&world, -3, -25, true, true, false, 31, 16, data, 19);
+        let data = include_bytes!("testdata/chunk_1.16.4_nether.bin");
+        load_chunk(&world, 0, 0, true, false, false, 247, 0, data, 19);
     }
 }

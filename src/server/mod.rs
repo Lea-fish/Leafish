@@ -526,6 +526,7 @@ impl Server {
                                 dimension_id,
                                 dimension_name,
                                 dimension,
+                                world_name,
                                 ..
                             } = join;
 
@@ -534,6 +535,7 @@ impl Server {
                             let dimension = dimension_id
                                 .map(world::Dimension::from_index)
                                 .or_else(|| dimension_name.map(|d| world::Dimension::from_name(&d)))
+                                .or_else(|| world_name.map(|d| world::Dimension::from_name(&d)))
                                 .or_else(|| dimension.map(|d| world::Dimension::from_tag(&d)));
 
                             if let Some(dimension) = dimension {
@@ -1644,6 +1646,7 @@ impl Server {
             dimension,
             dimension_name,
             dimension_tag,
+            world_name,
             ..
         } = respawn;
 
@@ -1700,6 +1703,7 @@ impl Server {
         let dimension = dimension
             .map(world::Dimension::from_index)
             .or_else(|| dimension_name.map(|d| world::Dimension::from_name(&d)))
+            .or_else(|| world_name.map(|d| world::Dimension::from_name(&d)))
             .or_else(|| dimension_tag.map(|d| world::Dimension::from_tag(&d)));
 
         if let Some(dimension) = dimension {
