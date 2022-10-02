@@ -712,25 +712,31 @@ impl Server {
                                 .try_close_inventory(server.screen_sys.clone());
                         }
                         MappedPacket::WindowOpen(open) => {
-                            if open.ty_name.is_some() {
-                                print!("inv type name: {}", open.ty_name.as_ref().unwrap());
+                            let inv_type = if let Some(name) = &open.ty_name {
+                                InventoryType::from_name(name, open.slot_count.unwrap())
                             } else {
-                                let inv_type = InventoryType::from_id(open.ty.unwrap());
-                                let inventory = inventory_from_type(
-                                    inv_type,
-                                    open.title,
-                                    server.renderer.clone(),
-                                    server.hud_context.clone(),
-                                    server.inventory_context.read().base_inventory.clone(),
-                                    open.id,
-                                );
-                                if let Some(inventory) = inventory {
-                                    server.inventory_context.clone().write().open_inventory(
-                                        inventory.clone(),
-                                        server.screen_sys.clone(),
-                                        server.inventory_context.clone(),
+                                InventoryType::from_id(open.ty.unwrap())
+                            };
+
+                            match inv_type {
+                                Some(inv_type) => {
+                                    let inventory = inventory_from_type(
+                                        inv_type,
+                                        open.title,
+                                        server.renderer.clone(),
+                                        server.hud_context.clone(),
+                                        server.inventory_context.read().base_inventory.clone(),
+                                        open.id,
                                     );
+                                    if let Some(inventory) = inventory {
+                                        server.inventory_context.clone().write().open_inventory(
+                                            inventory.clone(),
+                                            server.screen_sys.clone(),
+                                            server.inventory_context.clone(),
+                                        );
+                                    }
                                 }
+                                None => {}
                             }
                         }
                         MappedPacket::EntityVelocity(_velocity) => {

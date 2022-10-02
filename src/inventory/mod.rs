@@ -216,9 +216,13 @@ pub enum InventoryType {
 }
 
 impl InventoryType {
-    pub fn from_id(id: i32) -> Self {
-        match id {
+    // Lookup a window type based on the inventory type strings used in 1.14+.
+    pub fn from_id(id: i32) -> Option<Self> {
+        Some(match id {
+            // General-purpose n-row inventory. Used by chest, large chest,
+            // minecart with chest, ender chest, and barrel
             0..=5 => InventoryType::Chest((1 + id) as u8),
+            // Used by dispenser or dropper
             6 => InventoryType::Dropper,
             7 => InventoryType::Anvil,
             8 => InventoryType::Beacon,
@@ -228,6 +232,7 @@ impl InventoryType {
             12 => InventoryType::EnchantingTable,
             13 => InventoryType::Furnace,
             14 => InventoryType::Grindstone,
+            // Used by hopper or minecart with hopper
             15 => InventoryType::Hopper,
             16 => InventoryType::Lectern,
             17 => InventoryType::Loom,
@@ -237,12 +242,33 @@ impl InventoryType {
             21 => InventoryType::Smoker,
             22 => InventoryType::CartographyTable,
             23 => InventoryType::Stonecutter,
-            _ => InventoryType::Chest(1),
-        }
+            _ => {
+                println!("Unhandled inventory type {id}");
+                return None;
+            }
+        })
     }
 
-    pub fn from_name(_name: String) -> Self {
-        InventoryType::Chest(1)
+    // Lookup a window type based on the inventory type strings used between
+    // 1.8 and 1.13.
+    pub fn from_name(name: &str, slot_count: u8) -> Option<Self> {
+        Some(match name {
+            "minecraft:anvil" => InventoryType::Anvil,
+            "minecraft:beacon" => InventoryType::Beacon,
+            "minecraft:brewing_stand" => InventoryType::BrewingStand,
+            "minecraft:chest" => InventoryType::Chest(slot_count / 9),
+            "minecraft:crafting_table" => InventoryType::CraftingTable,
+            "minecraft:dispenser" => InventoryType::Dropper,
+            "minecraft:dropper" => InventoryType::Dropper,
+            "minecraft:enchanting_table" => InventoryType::EnchantingTable,
+            "minecraft:furnace" => InventoryType::Furnace,
+            "minecraft:hopper" => InventoryType::Hopper,
+            "minecraft:shulker_box" => InventoryType::ShulkerBox,
+            _ => {
+                println!("Unhandled inventory type {name}");
+                return None;
+            }
+        })
     }
 }
 
