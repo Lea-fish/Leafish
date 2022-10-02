@@ -236,8 +236,18 @@ impl Inventory for ChestInventory {
         // TODO
     }
 
-    fn click_at(&self, _cursor: (u32, u32)) {
-        // TODO
+    fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
+        for (i, slot) in self.slots.iter().enumerate() {
+            if slot.contains(x, y) {
+                return Some(i as u8);
+            }
+        }
+        
+        if let Some(i) = self.inv_below.read().get_slot(x, y) {
+            return Some(i + self.slots.len() as u8);
+        }
+
+        None
     }
 
     fn resize(

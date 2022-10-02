@@ -1330,30 +1330,36 @@ impl Server {
         false
     }
 
-    #[allow(unused_must_use)]
-    pub fn on_left_click(&self) {
-        let mut entities = self.entities.write();
-        let mut mouse_buttons = entities
-            .world
-            .entity_mut(self.player.read().unwrap().1)
-            .get_mut::<MouseButtons>()
-            .unwrap();
-        mouse_buttons.left = true;
+    pub fn on_left_click(&self, focused: bool) {
+        match focused {
+            true => {
+                let mut entities = self.entities.write();
+                let mut mouse_buttons = entities
+                    .world
+                    .entity_mut(self.player.read().unwrap().1)
+                    .get_mut::<MouseButtons>()
+                    .unwrap();
+                mouse_buttons.left = true;
+            }
+            false => self.inventory_context.write().on_click(self.renderer.clone())
+        }
     }
 
-    pub fn on_release_left_click(&self) {
-        let mut entities = self.entities.write();
-        let mut mouse_buttons = entities
-            .world
-            .entity_mut(self.player.read().unwrap().1)
-            .get_mut::<MouseButtons>()
-            .unwrap();
-        mouse_buttons.left = false;
+    pub fn on_release_left_click(&self, focused: bool) {
+        if focused {
+            let mut entities = self.entities.write();
+            let mut mouse_buttons = entities
+                .world
+                .entity_mut(self.player.read().unwrap().1)
+                .get_mut::<MouseButtons>()
+                .unwrap();
+            mouse_buttons.left = false;
+        }
     }
 
     #[allow(unused_must_use)]
-    pub fn on_right_click(&self) {
-        if self.player.clone().read().is_some() {
+    pub fn on_right_click(&self, focused: bool) {
+        if self.player.clone().read().is_some() && focused {
             let world = self.world.clone();
             let gamemode = *self
                 .entities
@@ -1400,7 +1406,32 @@ impl Server {
                     .map_err(|_| self.disconnect_closed(None));
                 }
             }
+
+            let mut entities = self.entities.write();
+            let mut mouse_buttons = entities
+                .world
+                .entity_mut(self.player.read().unwrap().1)
+                .get_mut::<MouseButtons>()
+                .unwrap();
+            mouse_buttons.right = true;
         }
+    }
+
+    pub fn on_release_right_click(&self, focused: bool) {
+        if focused {
+            let mut entities = self.entities.write();
+            let mut mouse_buttons = entities
+                .world
+                .entity_mut(self.player.read().unwrap().1)
+                .get_mut::<MouseButtons>()
+                .unwrap();
+            mouse_buttons.right = false;
+        }
+    }
+
+    pub fn on_cursor_moved(&self, x: f64, y: f64) {
+        let mut inventory = self.inventory_context.write();
+        inventory.on_cursor_moved(x, y);
     }
 
     pub fn write_packet<T: protocol::PacketType>(&self, p: T) {

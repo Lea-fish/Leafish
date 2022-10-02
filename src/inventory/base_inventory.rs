@@ -171,8 +171,16 @@ impl Inventory for BaseInventory {
         self.custom_offset = false;
     }
 
-    fn click_at(&self, _cursor: (u32, u32)) {
-        // TODO
+    fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
+        let mut inventory = self.player_inventory.write();
+        for i in 0..36 {
+            let slot = inventory.get_raw_slot_mut(i + 9);
+            if slot.contains(x, y) {
+                return Some(i as u8);
+            }
+        }
+
+        None
     }
 
     fn resize(

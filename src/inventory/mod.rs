@@ -45,7 +45,17 @@ pub trait Inventory {
 
     fn close(&mut self);
 
-    fn click_at(&self, cursor: (u32, u32)); // TODO: Pass mouse data (buttons, wheel etc and shift button state)
+    // TODO: Pass mouse data (buttons, wheel etc and shift button state)
+    fn click_at(&self, x: f64, y: f64) {
+        if let Some(slot) = self.get_slot(x as f64, y as f64) {
+            println!("Clicked at {x}x{y}, slot {slot}");
+        } else {
+            println!("Clicked at {x}x{y}, no slot");
+        }
+    }
+
+    /// Find the slot containing this position on the screen.
+    fn get_slot(&self, x: f64, y: f64) -> Option<u8>;
 
     fn resize(
         &mut self,
@@ -124,6 +134,15 @@ impl Slot {
         self.y = y;
         self.size = size;
     }
+
+    pub fn contains(&self, x: f64, y: f64) -> bool {
+        if (self.x - self.size/2.0) <= x && x <= (self.x + self.size/2.0) {
+            if self.y <= y && y <= (self.y + self.size) {
+                return true;
+            }
+        }
+        false
+    }
 }
 
 pub struct InventoryContext {
@@ -134,6 +153,7 @@ pub struct InventoryContext {
     pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
     pub base_inventory: Arc<RwLock<BaseInventory>>,
+    pub mouse_position: Option<(f64, f64)>,
 }
 
 impl InventoryContext {
@@ -159,6 +179,7 @@ impl InventoryContext {
                 player_inventory,
                 renderer,
             ))),
+            mouse_position: None,
         }
     }
 
@@ -186,6 +207,19 @@ impl InventoryContext {
             return true;
         }
         false
+    }
+
+    pub fn on_click(&self, renderer: Arc<Renderer>) {
+        if let Some(inventory) = &self.inventory {
+            if let Some((x, y)) = self.mouse_position {
+                let x = x - (renderer.screen_data.read().safe_width/2) as f64;
+                inventory.write().click_at(x, y);
+            }
+        }
+    }
+
+    pub fn on_cursor_moved(&mut self, x: f64, y: f64) {
+        self.mouse_position = Some((x, y));
     }
 }
 
