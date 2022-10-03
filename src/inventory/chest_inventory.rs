@@ -18,6 +18,7 @@ pub struct ChestInventory {
     name: String,
     slot_count: u16,
     id: i32,
+    action_number: i16,
 }
 
 impl ChestInventory {
@@ -61,6 +62,7 @@ impl ChestInventory {
             name,
             slot_count,
             id,
+            action_number: 0,
         }
     }
 
@@ -110,8 +112,21 @@ impl Inventory for ChestInventory {
         Some(&self.name)
     }
 
+    fn get_action_number(&self) -> i16 {
+        return self.action_number;
+    }
+
+    fn set_action_number(&mut self, action_number: i16) {
+        self.action_number = action_number;
+    }
+
     fn get_item(&self, slot: u16) -> Option<Item> {
-        self.slots[slot as usize].item.clone()
+        let base_offset = self.slots.len() as u16;
+        if slot < base_offset {
+            self.slots[slot as usize].item.clone()
+        } else {
+            self.inv_below.read().get_item(slot - base_offset)
+        }
     }
 
     fn set_item(&mut self, slot: u16, item: Option<Item>) {

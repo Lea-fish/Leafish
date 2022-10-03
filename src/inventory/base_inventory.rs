@@ -96,6 +96,14 @@ impl Inventory for BaseInventory {
         None
     }
 
+    fn get_action_number(&self) -> i16 {
+        panic!("Base inventory doesn't have an action number");
+    }
+
+    fn set_action_number(&mut self, _action_number: i16) {
+        panic!("Base inventory doesn't have an action number");
+    }
+
     fn get_item(&self, slot: u16) -> Option<Item> {
         self.player_inventory
             .clone()

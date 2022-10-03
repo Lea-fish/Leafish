@@ -14,7 +14,7 @@ use crate::ui::Container;
 use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
-use leafish_protocol::protocol::Version;
+use leafish_protocol::protocol::{Conn, Version, packet};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -24,6 +24,10 @@ pub trait Inventory {
     fn id(&self) -> i32;
 
     fn name(&self) -> Option<&String>;
+
+    fn get_action_number(&self) -> i16;
+
+    fn set_action_number(&mut self, action_number: i16);
 
     fn get_item(&self, slot: u16) -> Option<Item>;
 
@@ -44,15 +48,6 @@ pub trait Inventory {
     );
 
     fn close(&mut self);
-
-    // TODO: Pass mouse data (buttons, wheel etc and shift button state)
-    fn click_at(&self, x: f64, y: f64) {
-        if let Some(slot) = self.get_slot(x as f64, y as f64) {
-            println!("Clicked at {x}x{y}, slot {slot}");
-        } else {
-            println!("Clicked at {x}x{y}, no slot");
-        }
-    }
 
     /// Find the slot containing this position on the screen.
     fn get_slot(&self, x: f64, y: f64) -> Option<u8>;
@@ -153,7 +148,9 @@ pub struct InventoryContext {
     pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
     pub base_inventory: Arc<RwLock<BaseInventory>>,
-    pub mouse_position: Option<(f64, f64)>,
+    mouse_position: Option<(f64, f64)>,
+    conn: Arc<RwLock<Option<Conn>>>,
+
 }
 
 impl InventoryContext {
@@ -161,6 +158,7 @@ impl InventoryContext {
         version: Version,
         renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
+        conn: Arc<RwLock<Option<Conn>>>,
     ) -> Self {
         let player_inventory = Arc::new(RwLock::new(PlayerInventory::new(
             version,
@@ -180,6 +178,7 @@ impl InventoryContext {
                 renderer,
             ))),
             mouse_position: None,
+            conn,
         }
     }
 
@@ -209,17 +208,78 @@ impl InventoryContext {
         false
     }
 
-    pub fn on_click(&self, renderer: Arc<Renderer>) {
+    pub fn on_click(&mut self, renderer: Arc<Renderer>) {
         if let Some(inventory) = &self.inventory {
             if let Some((x, y)) = self.mouse_position {
                 let x = x - (renderer.screen_data.read().safe_width/2) as f64;
-                inventory.write().click_at(x, y);
+                let mut inventory = inventory.write();
+
+                if let Some(slot) = inventory.get_slot(x as f64, y as f64) {
+                    let mut item = inventory.get_item(slot as u16);
+                    let mut conn = self.conn.write();
+                    let conn = conn.as_mut().unwrap();
+
+                    // Send the update to the server
+                    packet::send_click_container(
+                        conn,
+                        inventory.id() as u8,
+                        slot as i16,
+                        packet::InventoryOperation::LeftClick,
+                        inventory.get_action_number() as u16,
+                        item.as_ref().map(|i| i.stack.clone()),
+                    ).unwrap();
+
+                    // Simulate the operation on the inventory screen.
+                    (self.cursor, item) = match (self.cursor.clone(), item) {
+                        (Some(mut cursor), Some(mut item)) => {
+                            // Merge the cursor into a slot stack of the same
+                            // material.
+                            if item.matches(&cursor) {
+                                let max = item.material.get_stack_size(conn.get_version());
+                                let total = (item.stack.count + cursor.stack.count) as u8;
+                                item.stack.count = total.min(max) as isize;
+
+                                if total > max {
+                                    cursor.stack.count = (total - max) as isize;
+                                    (Some(cursor), Some(item))
+                                } else {
+                                    (None, Some(item))
+                                }
+
+                            } else {
+                                (Some(item), Some(cursor))
+                            }
+                        }
+                        (Some(cursor), None) => (None, Some(cursor)),
+                        (None, Some(item)) => (Some(item), None),
+                        (None, None) => (None, None),
+                    };
+                    inventory.set_item(slot as u16, item);
+                }
             }
         }
     }
 
     pub fn on_cursor_moved(&mut self, x: f64, y: f64) {
         self.mouse_position = Some((x, y));
+    }
+
+    pub fn on_confirm_transaction(&self, id: u8, action_number: i16, _accepted: bool) {
+        if id as i32 == self.player_inventory.read().id() {
+            self.player_inventory.write().set_action_number(action_number);
+        } else {
+            let mut inventory = match &self.inventory {
+                Some(inventory) => inventory.write(),
+                None => return,
+            };
+
+            if id as i32 != inventory.id() {
+                println!("Expected inventory id {}, but instead got {}", inventory.id(), id);
+                return;
+            }
+
+            inventory.set_action_number(action_number);
+        }
     }
 }
 
@@ -312,7 +372,15 @@ pub struct Item {
     pub material: Material,
 }
 
-#[derive(Debug, Clone)]
+impl Item {
+    /// Check if this item stack matches another, allowing these to be merged
+    /// on an inventory slot.
+    pub fn matches(&self, other: &Item) -> bool {
+        self.material == other.material && self.stack.damage == other.stack.damage
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Material {
     Air,                             // 1.7.10 (id: 0, stack: 0)| 1.13 (id: 9648)
     Stone,                           // 1.7.10 (id: 1)| 1.13 (id: 22948)
@@ -1797,5 +1865,13 @@ impl Material {
             Material::Shears => Some(Tool::Shears),
             _ => None,
         }
+    }
+
+    pub fn get_stack_size(&self, version: Version) -> u8 {
+        material::versions::get_stack_size(*self, version)
+    }
+
+    pub fn to_id(&self, version: Version) -> u16 {
+        material::versions::to_id(*self, version)
     }
 }

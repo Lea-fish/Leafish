@@ -632,11 +632,17 @@ impl Server {
                             server.on_player_info(player_info);
                         }
                         MappedPacket::ConfirmTransaction(transaction) => {
+                            server.on_confirm_transaction(
+                                transaction.id,
+                                transaction.action_number,
+                                transaction.accepted,
+                            );
+
                             read.write_packet(
                                 packet::play::serverbound::ConfirmTransactionServerbound {
-                                    id: 0, // TODO: Use current container id, if the id of the transaction is not 0.
+                                    id: transaction.id,
                                     action_number: transaction.action_number,
-                                    accepted: true,
+                                    accepted: transaction.accepted,
                                 },
                             )
                             .unwrap();
@@ -893,6 +899,7 @@ impl Server {
             mapped_protocol_version,
             renderer.clone(),
             hud_context.clone(),
+            conn.clone(),
         )));
         let mut entities = Manager::default();
         let mut parallel = SystemStage::parallel();
@@ -1622,6 +1629,10 @@ impl Server {
             });
             inventory.clone().write().set_item(slot as u16, item);
         }
+    }
+
+    fn on_confirm_transaction(&self, id: u8, action_number: i16, accepted: bool) {
+        self.inventory_context.write().on_confirm_transaction(id, action_number, accepted);
     }
 
     #[allow(unused_must_use)]

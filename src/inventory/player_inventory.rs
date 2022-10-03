@@ -15,6 +15,7 @@ pub struct PlayerInventory {
     dirty: bool,
     version: Version,
     hud_context: Arc<RwLock<HudContext>>,
+    action_number: i16,
 }
 
 impl PlayerInventory {
@@ -122,6 +123,7 @@ impl PlayerInventory {
             dirty: false,
             version,
             hud_context,
+            action_number: 0,
         }
     }
 
@@ -232,6 +234,14 @@ impl Inventory for PlayerInventory {
 
     fn name(&self) -> Option<&String> {
         None
+    }
+
+    fn get_action_number(&self) -> i16 {
+        return self.action_number;
+    }
+
+    fn set_action_number(&mut self, action_number: i16) {
+        self.action_number = action_number;
     }
 
     fn get_item(&self, slot: u16) -> Option<Item> {
