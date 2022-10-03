@@ -10,7 +10,7 @@ use crate::render::hud::HudContext;
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::screen::ScreenSystem;
-use crate::ui::Container;
+use crate::ui::{Container, VAttach};
 use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
@@ -150,7 +150,7 @@ pub struct InventoryContext {
     pub base_inventory: Arc<RwLock<BaseInventory>>,
     mouse_position: Option<(f64, f64)>,
     conn: Arc<RwLock<Option<Conn>>>,
-
+    dirty: bool,
 }
 
 impl InventoryContext {
@@ -179,6 +179,7 @@ impl InventoryContext {
             ))),
             mouse_position: None,
             conn,
+            dirty: false,
         }
     }
 
@@ -208,60 +209,103 @@ impl InventoryContext {
         false
     }
 
-    pub fn on_click(&mut self, renderer: Arc<Renderer>) {
-        if let Some(inventory) = &self.inventory {
-            if let Some((x, y)) = self.mouse_position {
-                let x = x - (renderer.screen_data.read().safe_width/2) as f64;
-                let mut inventory = inventory.write();
+    pub fn draw_cursor(
+        &mut self,
+        renderer: Arc<Renderer>,
+        ui_container: &mut Container,
+        inventory_window: &mut InventoryWindow,
+    ) {
+        if self.dirty {
+            self.dirty = false;
+            inventory_window.cursor_element.clear();
+            if let Some(item) = &self.cursor {
+                if let Some(mouse_position) = &self.mouse_position {
+                    // To center the icon, we need to know the size of a slot.
+                    let mut player_inventory = self.player_inventory.write();
+                    let slot_size = player_inventory.get_raw_slot_mut(0).size;
 
-                if let Some(slot) = inventory.get_slot(x as f64, y as f64) {
-                    let mut item = inventory.get_item(slot as u16);
-                    let mut conn = self.conn.write();
-                    let conn = conn.as_mut().unwrap();
+                    let (x, y) = *mouse_position;
+                    let x = x - (renderer.screen_data.read().safe_width/2) as f64;
+                    let y = y - slot_size/2.0;
 
-                    // Send the update to the server
-                    packet::send_click_container(
-                        conn,
-                        inventory.id() as u8,
-                        slot as i16,
-                        packet::InventoryOperation::LeftClick,
-                        inventory.get_action_number() as u16,
-                        item.as_ref().map(|i| i.stack.clone()),
-                    ).unwrap();
-
-                    // Simulate the operation on the inventory screen.
-                    (self.cursor, item) = match (self.cursor.clone(), item) {
-                        (Some(mut cursor), Some(mut item)) => {
-                            // Merge the cursor into a slot stack of the same
-                            // material.
-                            if item.matches(&cursor) {
-                                let max = item.material.get_stack_size(conn.get_version());
-                                let total = (item.stack.count + cursor.stack.count) as u8;
-                                item.stack.count = total.min(max) as isize;
-
-                                if total > max {
-                                    cursor.stack.count = (total - max) as isize;
-                                    (Some(cursor), Some(item))
-                                } else {
-                                    (None, Some(item))
-                                }
-
-                            } else {
-                                (Some(item), Some(cursor))
-                            }
-                        }
-                        (Some(cursor), None) => (None, Some(cursor)),
-                        (None, Some(item)) => (Some(item), None),
-                        (None, None) => (None, None),
-                    };
-                    inventory.set_item(slot as u16, item);
+                    InventoryWindow::draw_item(
+                        item,
+                        x,
+                        y,
+                        &mut inventory_window.cursor_element,
+                        ui_container,
+                        renderer.clone(),
+                        VAttach::Top,
+                    );
                 }
+            }
+        }
+    }
+
+    pub fn on_click(&mut self, renderer: Arc<Renderer>) {
+        if let Some(inventory) = &self.inventory.clone() {
+            let mut inventory = inventory.write();
+            self.click_inventory(&mut *inventory, renderer);
+        } else {
+            let inventory = self.player_inventory.clone();
+            let mut inventory = inventory.write();
+            self.click_inventory(&mut *inventory, renderer);
+        };
+    }
+
+    fn click_inventory(&mut self, inventory: &mut dyn Inventory, renderer: Arc<Renderer>) {
+        if let Some((x, y)) = self.mouse_position {
+            let x = x - (renderer.screen_data.read().safe_width/2) as f64;
+
+            if let Some(slot) = inventory.get_slot(x as f64, y as f64) {
+                self.dirty = true;
+                let mut item = inventory.get_item(slot as u16);
+                let mut conn = self.conn.write();
+                let conn = conn.as_mut().unwrap();
+
+                // Send the update to the server
+                packet::send_click_container(
+                    conn,
+                    inventory.id() as u8,
+                    slot as i16,
+                    packet::InventoryOperation::LeftClick,
+                    inventory.get_action_number() as u16,
+                    item.as_ref().map(|i| i.stack.clone()),
+                ).unwrap();
+
+                // Simulate the operation on the inventory screen.
+                (self.cursor, item) = match (self.cursor.clone(), item) {
+                    (Some(mut cursor), Some(mut item)) => {
+                        // Merge the cursor into a slot stack of the same
+                        // material.
+                        if item.matches(&cursor) {
+                            let max = item.material.get_stack_size(conn.get_version());
+                            let total = (item.stack.count + cursor.stack.count) as u8;
+                            item.stack.count = total.min(max) as isize;
+
+                            if total > max {
+                                cursor.stack.count = (total - max) as isize;
+                                (Some(cursor), Some(item))
+                            } else {
+                                (None, Some(item))
+                            }
+
+                        } else {
+                            (Some(item), Some(cursor))
+                        }
+                    }
+                    (Some(cursor), None) => (None, Some(cursor)),
+                    (None, Some(item)) => (Some(item), None),
+                    (None, None) => (None, None),
+                };
+                inventory.set_item(slot as u16, item);
             }
         }
     }
 
     pub fn on_cursor_moved(&mut self, x: f64, y: f64) {
         self.mouse_position = Some((x, y));
+        self.dirty = true;
     }
 
     pub fn on_confirm_transaction(&self, id: u8, action_number: i16, _accepted: bool) {
