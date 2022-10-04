@@ -130,12 +130,12 @@ impl Inventory for ChestInventory {
     }
 
     fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
-        let base_offset = self.slots.len() as u16;
-        if slot_id < base_offset {
-            self.slots[slot_id as usize].item = item;
+        if let Some(slot) = self.slots.get_mut(slot_id as usize) {
+            slot.item = item;
             self.dirty = true;
         } else {
-            self.inv_below.write().set_item(slot_id - base_offset, item)
+            let slot_id = slot_id - self.slots.len() as u16;
+            self.inv_below.write().set_item(slot_id, item)
         }
     }
 

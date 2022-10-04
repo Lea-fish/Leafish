@@ -952,7 +952,10 @@ impl Hud {
                 if let Some(item) = player_inventory.clone().read().get_item(36 + i as u16) {
                     let slot = self.draw_item(
                         &item,
-                        -(icon_scale * 90.0) + (i as f64 * (icon_scale * 20.0)) + icon_scale * 11.0,
+                        (icon_scale) * -1.0
+                            + -(icon_scale * 90.0)
+                            + (i as f64 * (icon_scale * 20.0))
+                            + icon_scale * 11.0,
                         icon_scale * 3.0,
                         ui_container,
                         renderer.clone(),
