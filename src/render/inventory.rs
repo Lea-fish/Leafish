@@ -46,9 +46,7 @@ impl Screen for InventoryWindow {
         _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
-        self.inventory_context.write().inventory = None;
-        self.base_inventory.write().close();
-        self.inventory.write().close();
+        self.inventory_context.clone().write().inventory = None;
         self.clear_elements();
     }
 

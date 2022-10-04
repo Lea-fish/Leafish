@@ -3649,3 +3649,7 @@ pub fn send_click_container(
         })
     }
 }
+
+pub fn send_close_window(conn: &mut Conn, id: u8) -> Result<(), Error> {
+    conn.write_packet(packet::play::serverbound::CloseWindow { id })
+}

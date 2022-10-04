@@ -81,7 +81,7 @@ impl Inventory for BaseInventory {
     }
 
     fn id(&self) -> i32 {
-        -1
+        panic!("Base inventory doesn't have an id");
     }
 
     fn name(&self) -> Option<&String> {
@@ -148,9 +148,6 @@ impl Inventory for BaseInventory {
                 }
             }
         }
-    }
-
-    fn close(&mut self) {
     }
 
     fn get_slot(&self, x: f64, y: f64) -> Option<u8> {

@@ -240,10 +240,6 @@ impl Inventory for ChestInventory {
         }
     }
 
-    fn close(&mut self) {
-        // TODO
-    }
-
     fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
         for (i, slot) in self.slots.iter().enumerate() {
             if slot.contains(x, y) {

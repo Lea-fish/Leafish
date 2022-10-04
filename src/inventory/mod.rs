@@ -47,8 +47,6 @@ pub trait Inventory {
         inventory_window: &mut InventoryWindow,
     );
 
-    fn close(&mut self);
-
     /// Find the slot containing this position on the screen.
     fn get_slot(&self, x: f64, y: f64) -> Option<u8>;
 
@@ -201,7 +199,13 @@ impl InventoryContext {
     pub fn try_close_inventory(&mut self, screen_sys: Arc<ScreenSystem>) -> bool {
         if self.has_inv_open {
             self.has_inv_open = false;
-            self.safe_inventory.take();
+            if let Some(inventory) = self.safe_inventory.take() {
+                let inventory = inventory.read();
+                let mut conn = self.conn.write();
+                let conn = conn.as_mut().unwrap();
+                println!("Closing window {}", inventory.id());
+                packet::send_close_window(conn, inventory.id() as u8).unwrap();
+            }
             screen_sys.pop_screen();
             return true;
         }

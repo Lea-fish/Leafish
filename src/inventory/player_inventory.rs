@@ -222,7 +222,7 @@ impl Inventory for PlayerInventory {
     }
 
     fn id(&self) -> i32 {
-        -1
+        0
     }
 
     fn name(&self) -> Option<&String> {
@@ -362,10 +362,6 @@ impl Inventory for PlayerInventory {
                 }
             }
         }
-    }
-
-    fn close(&mut self) {
-        // TODO
     }
 
     fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
