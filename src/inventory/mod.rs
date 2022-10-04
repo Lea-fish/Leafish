@@ -6,7 +6,7 @@ pub mod player_inventory;
 use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::player_inventory::PlayerInventory;
-use crate::render::hud::HudContext;
+use crate::render::hud::{HudContext, Hud};
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::screen::ScreenSystem;
@@ -29,9 +29,9 @@ pub trait Inventory {
 
     fn set_action_number(&mut self, action_number: i16);
 
-    fn get_item(&self, slot: u16) -> Option<Item>;
+    fn get_item(&self, slot_id: u16) -> Option<Item>;
 
-    fn set_item(&mut self, slot: u16, item: Option<Item>);
+    fn set_item(&mut self, slot_id: u16, item: Option<Item>);
 
     fn init(
         &mut self,
@@ -159,11 +159,10 @@ impl InventoryContext {
         renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
         conn: Arc<RwLock<Option<Conn>>>,
-    ) -> Self {
-        let player_inventory = Arc::new(RwLock::new(PlayerInventory::new(
-            version,
-            renderer.clone(),
+    ) -> Self { 
+        let base_inventory = Arc::new(RwLock::new(BaseInventory::new(
             hud_context.clone(),
+            renderer.clone(),
         )));
         Self {
             cursor: None,
@@ -171,12 +170,12 @@ impl InventoryContext {
             inventory: None,
             safe_inventory: None,
             has_inv_open: false,
-            player_inventory: player_inventory.clone(),
-            base_inventory: Arc::new(RwLock::new(BaseInventory::new(
-                hud_context,
-                player_inventory,
+            player_inventory: Arc::new(RwLock::new(PlayerInventory::new(
+                version,
                 renderer,
+                base_inventory.clone(),
             ))),
+            base_inventory,
             mouse_position: None,
             conn,
             dirty: false,
@@ -220,13 +219,10 @@ impl InventoryContext {
             inventory_window.cursor_element.clear();
             if let Some(item) = &self.cursor {
                 if let Some(mouse_position) = &self.mouse_position {
-                    // To center the icon, we need to know the size of a slot.
-                    let mut player_inventory = self.player_inventory.write();
-                    let slot_size = player_inventory.get_raw_slot_mut(0).size;
-
+                    let scale = Hud::icon_scale(renderer.clone());
                     let (x, y) = *mouse_position;
                     let x = x - (renderer.screen_data.read().safe_width/2) as f64;
-                    let y = y - slot_size/2.0;
+                    let y = y - scale * 8.0;
 
                     InventoryWindow::draw_item(
                         item,
@@ -243,62 +239,55 @@ impl InventoryContext {
     }
 
     pub fn on_click(&mut self, renderer: Arc<Renderer>) {
-        if let Some(inventory) = &self.inventory.clone() {
+        if let Some(inventory) = &self.safe_inventory {
             let mut inventory = inventory.write();
-            self.click_inventory(&mut *inventory, renderer);
-        } else {
-            let inventory = self.player_inventory.clone();
-            let mut inventory = inventory.write();
-            self.click_inventory(&mut *inventory, renderer);
-        };
-    }
 
-    fn click_inventory(&mut self, inventory: &mut dyn Inventory, renderer: Arc<Renderer>) {
-        if let Some((x, y)) = self.mouse_position {
-            let x = x - (renderer.screen_data.read().safe_width/2) as f64;
+            if let Some((x, y)) = self.mouse_position {
+                let x = x - (renderer.screen_data.read().safe_width/2) as f64;
 
-            if let Some(slot) = inventory.get_slot(x as f64, y as f64) {
-                self.dirty = true;
-                let mut item = inventory.get_item(slot as u16);
-                let mut conn = self.conn.write();
-                let conn = conn.as_mut().unwrap();
+                if let Some(slot) = inventory.get_slot(x as f64, y as f64) {
+                    self.dirty = true;
+                    let mut item = inventory.get_item(slot as u16);
+                    let mut conn = self.conn.write();
+                    let conn = conn.as_mut().unwrap();
 
-                // Send the update to the server
-                packet::send_click_container(
-                    conn,
-                    inventory.id() as u8,
-                    slot as i16,
-                    packet::InventoryOperation::LeftClick,
-                    inventory.get_action_number() as u16,
-                    item.as_ref().map(|i| i.stack.clone()),
-                ).unwrap();
+                    // Send the update to the server
+                    packet::send_click_container(
+                        conn,
+                        inventory.id() as u8,
+                        slot as i16,
+                        packet::InventoryOperation::LeftClick,
+                        inventory.get_action_number() as u16,
+                        item.as_ref().map(|i| i.stack.clone()),
+                    ).unwrap();
 
-                // Simulate the operation on the inventory screen.
-                (self.cursor, item) = match (self.cursor.clone(), item) {
-                    (Some(mut cursor), Some(mut item)) => {
-                        // Merge the cursor into a slot stack of the same
-                        // material.
-                        if item.matches(&cursor) {
-                            let max = item.material.get_stack_size(conn.get_version());
-                            let total = (item.stack.count + cursor.stack.count) as u8;
-                            item.stack.count = total.min(max) as isize;
+                    // Simulate the operation on the inventory screen.
+                    (self.cursor, item) = match (self.cursor.clone(), item) {
+                        (Some(mut cursor), Some(mut item)) => {
+                            // Merge the cursor into a slot stack of the same
+                            // material.
+                            if item.matches(&cursor) {
+                                let max = item.material.get_stack_size(conn.get_version());
+                                let total = (item.stack.count + cursor.stack.count) as u8;
+                                item.stack.count = total.min(max) as isize;
 
-                            if total > max {
-                                cursor.stack.count = (total - max) as isize;
-                                (Some(cursor), Some(item))
+                                if total > max {
+                                    cursor.stack.count = (total - max) as isize;
+                                    (Some(cursor), Some(item))
+                                } else {
+                                    (None, Some(item))
+                                }
+
                             } else {
-                                (None, Some(item))
+                                (Some(item), Some(cursor))
                             }
-
-                        } else {
-                            (Some(item), Some(cursor))
                         }
-                    }
-                    (Some(cursor), None) => (None, Some(cursor)),
-                    (None, Some(item)) => (Some(item), None),
-                    (None, None) => (None, None),
-                };
-                inventory.set_item(slot as u16, item);
+                        (Some(cursor), None) => (None, Some(cursor)),
+                        (None, Some(item)) => (Some(item), None),
+                        (None, None) => (None, None),
+                    };
+                    inventory.set_item(slot as u16, item);
+                }
             }
         }
     }
@@ -312,7 +301,7 @@ impl InventoryContext {
         if id as i32 == self.player_inventory.read().id() {
             self.player_inventory.write().set_action_number(action_number);
         } else {
-            let mut inventory = match &self.inventory {
+            let mut inventory = match &self.safe_inventory {
                 Some(inventory) => inventory.write(),
                 None => return,
             };

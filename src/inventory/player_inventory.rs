@@ -1,5 +1,6 @@
 use crate::inventory::{Inventory, InventoryType, Item, Slot};
-use crate::render::hud::{Hud, HudContext};
+use crate::inventory::base_inventory::BaseInventory;
+use crate::render::hud::Hud;
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::ui;
@@ -8,21 +9,21 @@ use std::sync::Arc;
 
 use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
-use std::sync::atomic::Ordering;
 
 pub struct PlayerInventory {
     slots: Vec<Slot>,
+    offhand_slot: Option<Slot>,
     dirty: bool,
     version: Version,
-    hud_context: Arc<RwLock<HudContext>>,
     action_number: i16,
+    base_inventory: Arc<RwLock<BaseInventory>>,
 }
 
 impl PlayerInventory {
     pub fn new(
         version: Version,
         renderer: Arc<Renderer>,
-        hud_context: Arc<RwLock<HudContext>>,
+        base_inventory: Arc<RwLock<BaseInventory>>,
     ) -> Self {
         let scale = Hud::icon_scale(renderer);
         let size = scale * 16.0;
@@ -94,36 +95,19 @@ impl PlayerInventory {
         slots.push(slot_chestplate);
         slots.push(slot_leggings);
         slots.push(slot_boots);
-        for y in (0..3).rev() {
-            for x in 0..9 {
-                slots.push(Slot::new(
-                    x_offset + (x as f64) * (size + size * 1.0 / 8.0),
-                    y_offset
-                        + -((y as f64 + 1.0 / 8.0) * (size + size * 1.0 / 8.0)
-                            + size
-                            + size * 1.0 / 8.0
-                            + hot_bar_offset),
-                    size,
-                ));
-            }
-        }
-        for i in 0..9 {
-            slots.push(Slot::new(
-                x_offset + (i as f64) * (size + size * 1.0 / 8.0),
-                y_offset,
-                size,
-            ));
-        }
-        if version > Version::V1_8 {
-            let slot = Slot::new(-(scale * 3.0), scale * 5.0 - scale * 18.0, size);
-            slots.push(slot);
-        }
+
+        let offhand_slot = if version > Version::V1_8 {
+            Some(Slot::new(-(scale * 3.0), scale * 5.0 - scale * 18.0, size))
+        } else {
+            None
+        };
         Self {
             slots,
+            offhand_slot,
             dirty: false,
             version,
-            hud_context,
             action_number: 0,
+            base_inventory,
         }
     }
 
@@ -205,7 +189,7 @@ impl PlayerInventory {
             size,
         );
         if self.version > Version::V1_8 {
-            let slot = self.slots.get_mut(45).unwrap();
+            let slot = self.offhand_slot.as_mut().unwrap();
             slot.update_position(
                 -(scale * 3.0),
                 middle
@@ -215,17 +199,26 @@ impl PlayerInventory {
                 size,
             );
         }
+        let x_offset = -(size * 4.5);
+        let screen_height = renderer.screen_data.read().safe_height as f64;
+        let y_offset = (screen_height / scale) / 2.0;
+        self.base_inventory.clone().write().update_offset(
+            x_offset / size,
+            (y_offset + 59 as f64) / 16.0,
+            renderer,
+        );
         self.dirty = true;
-    }
-
-    pub(crate) fn get_raw_slot_mut(&mut self, idx: u16) -> &mut Slot {
-        self.slots.get_mut(idx as usize).unwrap()
     }
 }
 
 impl Inventory for PlayerInventory {
     fn size(&self) -> u16 {
-        self.slots.len() as u16
+        let mut size = self.slots.len() as u16;
+        size += self.base_inventory.read().size();
+        if self.offhand_slot.is_some() {
+            size += 1;
+        }
+        size
     }
 
     fn id(&self) -> i32 {
@@ -237,25 +230,35 @@ impl Inventory for PlayerInventory {
     }
 
     fn get_action_number(&self) -> i16 {
-        return self.action_number;
+        self.action_number
     }
 
     fn set_action_number(&mut self, action_number: i16) {
         self.action_number = action_number;
     }
 
-    fn get_item(&self, slot: u16) -> Option<Item> {
-        self.slots[slot as usize].item.clone()
+    fn get_item(&self, slot_id: u16) -> Option<Item> {
+        if let Some(slot) = self.slots.get(slot_id as usize) {
+            slot.item.clone()
+        } else if slot_id == 45 {
+            self.offhand_slot.as_ref().unwrap().item.clone()
+        } else {
+            let slot_id = slot_id - self.slots.len() as u16;
+            self.base_inventory.read().get_item(slot_id).clone()
+        }
     }
 
-    fn set_item(&mut self, slot: u16, item: Option<Item>) {
-        self.slots[slot as usize].item = item;
-        self.dirty = true;
-        self.hud_context
-            .clone()
-            .read()
-            .dirty_slots
-            .store(true, Ordering::Relaxed);
+    fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
+        if let Some(slot) = self.slots.get_mut(slot_id as usize) {
+            slot.item = item;
+            self.dirty = true;
+        } else if slot_id == 45 {
+            self.offhand_slot.as_mut().unwrap().item = item;
+            self.dirty = true;
+        } else {
+            let slot_id = slot_id - self.slots.len() as u16;
+            self.base_inventory.write().set_item(slot_id, item);
+        }
     }
 
     #[allow(clippy::eq_op)]
@@ -321,11 +324,6 @@ impl Inventory for PlayerInventory {
         basic_text_elements.push(crafting_text);
         inventory_window.elements.push(vec![]);
         self.update_icons(renderer);
-        self.hud_context
-            .clone()
-            .read()
-            .dirty_slots
-            .store(true, Ordering::Relaxed);
     }
 
     fn tick(
@@ -337,8 +335,7 @@ impl Inventory for PlayerInventory {
         if self.dirty {
             self.dirty = false;
             inventory_window.elements.get_mut(2).unwrap().clear();
-            for slot in 0..9 {
-                let slot = self.slots.get(slot).unwrap();
+            for slot in &self.slots {
                 if let Some(item) = &slot.item {
                     inventory_window.draw_item_internally(
                         item,
@@ -351,8 +348,7 @@ impl Inventory for PlayerInventory {
                     );
                 }
             }
-            if self.slots.len() == 46 {
-                let slot = self.slots.get(45).unwrap();
+            if let Some(slot) = &self.offhand_slot {
                 if let Some(item) = &slot.item {
                     inventory_window.draw_item_internally(
                         item,
@@ -379,7 +375,13 @@ impl Inventory for PlayerInventory {
             }
         }
 
-        None
+        if let Some(slot) = &self.offhand_slot {
+            if slot.contains(x, y) {
+                return Some(45);
+            }
+        }
+
+        self.base_inventory.read().get_slot(x, y).map(|i| i + self.slots.len() as u8)
     }
 
     fn resize(

@@ -113,36 +113,29 @@ impl Inventory for ChestInventory {
     }
 
     fn get_action_number(&self) -> i16 {
-        return self.action_number;
+        self.action_number
     }
 
     fn set_action_number(&mut self, action_number: i16) {
         self.action_number = action_number;
     }
 
-    fn get_item(&self, slot: u16) -> Option<Item> {
-        let base_offset = self.slots.len() as u16;
-        if slot < base_offset {
-            self.slots[slot as usize].item.clone()
+    fn get_item(&self, slot_id: u16) -> Option<Item> {
+        if let Some(slot) = self.slots.get(slot_id as usize) {
+            slot.item.clone()
         } else {
-            self.inv_below.read().get_item(slot - base_offset)
+            let slot_id = slot_id - self.slots.len() as u16;
+            self.inv_below.read().get_item(slot_id).clone()
         }
     }
 
-    fn set_item(&mut self, slot: u16, item: Option<Item>) {
-        if self.slots.len() > slot as usize {
-            self.slots[slot as usize].item = item;
+    fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
+        let base_offset = self.slots.len() as u16;
+        if slot_id < base_offset {
+            self.slots[slot_id as usize].item = item;
             self.dirty = true;
-            self.hud_context
-                .clone()
-                .read()
-                .dirty_slots
-                .store(true, Ordering::Relaxed);
         } else {
-            self.inv_below
-                .clone()
-                .write()
-                .set_item(slot - self.slot_count, item);
+            self.inv_below.write().set_item(slot_id - base_offset, item)
         }
     }
 
@@ -257,12 +250,7 @@ impl Inventory for ChestInventory {
                 return Some(i as u8);
             }
         }
-        
-        if let Some(i) = self.inv_below.read().get_slot(x, y) {
-            return Some(i + self.slots.len() as u8);
-        }
-
-        None
+        self.inv_below.read().get_slot(x, y).map(|i| i + self.slots.len() as u8)
     }
 
     fn resize(
