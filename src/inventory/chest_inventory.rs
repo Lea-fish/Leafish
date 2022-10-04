@@ -125,7 +125,7 @@ impl Inventory for ChestInventory {
             slot.item.clone()
         } else {
             let slot_id = slot_id - self.slots.len() as u16;
-            self.inv_below.read().get_item(slot_id).clone()
+            self.inv_below.read().get_item(slot_id)
         }
     }
 
@@ -246,7 +246,10 @@ impl Inventory for ChestInventory {
                 return Some(i as u8);
             }
         }
-        self.inv_below.read().get_slot(x, y).map(|i| i + self.slots.len() as u8)
+        self.inv_below
+            .read()
+            .get_slot(x, y)
+            .map(|i| i + self.slots.len() as u8)
     }
 
     fn resize(

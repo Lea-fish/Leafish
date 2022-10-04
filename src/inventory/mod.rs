@@ -6,7 +6,7 @@ pub mod player_inventory;
 use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::player_inventory::PlayerInventory;
-use crate::render::hud::{HudContext, Hud};
+use crate::render::hud::{Hud, HudContext};
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::screen::ScreenSystem;
@@ -14,7 +14,7 @@ use crate::ui::{Container, VAttach};
 use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
-use leafish_protocol::protocol::{Conn, Version, packet};
+use leafish_protocol::protocol::{packet, Conn, Version};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -129,12 +129,10 @@ impl Slot {
     }
 
     pub fn contains(&self, x: f64, y: f64) -> bool {
-        if (self.x - self.size/2.0) <= x && x <= (self.x + self.size/2.0) {
-            if self.y <= y && y <= (self.y + self.size) {
-                return true;
-            }
-        }
-        false
+        (self.x - self.size / 2.0) <= x
+            && x <= (self.x + self.size / 2.0)
+            && self.y <= y
+            && y <= (self.y + self.size)
     }
 }
 
@@ -157,9 +155,9 @@ impl InventoryContext {
         renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
         conn: Arc<RwLock<Option<Conn>>>,
-    ) -> Self { 
+    ) -> Self {
         let base_inventory = Arc::new(RwLock::new(BaseInventory::new(
-            hud_context.clone(),
+            hud_context,
             renderer.clone(),
         )));
         Self {
@@ -203,7 +201,6 @@ impl InventoryContext {
                 let inventory = inventory.read();
                 let mut conn = self.conn.write();
                 let conn = conn.as_mut().unwrap();
-                println!("Closing window {}", inventory.id());
                 packet::send_close_window(conn, inventory.id() as u8).unwrap();
             }
             screen_sys.pop_screen();
@@ -225,7 +222,7 @@ impl InventoryContext {
                 if let Some(mouse_position) = &self.mouse_position {
                     let scale = Hud::icon_scale(renderer.clone());
                     let (x, y) = *mouse_position;
-                    let x = x - (renderer.screen_data.read().safe_width/2) as f64;
+                    let x = x - (renderer.screen_data.read().safe_width / 2) as f64;
                     let y = y - scale * 8.0;
 
                     InventoryWindow::draw_item(
@@ -234,7 +231,7 @@ impl InventoryContext {
                         y,
                         &mut inventory_window.cursor_element,
                         ui_container,
-                        renderer.clone(),
+                        renderer,
                         VAttach::Top,
                     );
                 }
@@ -247,7 +244,7 @@ impl InventoryContext {
             let mut inventory = inventory.write();
 
             if let Some((x, y)) = self.mouse_position {
-                let x = x - (renderer.screen_data.read().safe_width/2) as f64;
+                let x = x - (renderer.screen_data.read().safe_width / 2) as f64;
 
                 if let Some(slot) = inventory.get_slot(x as f64, y as f64) {
                     self.dirty = true;
@@ -263,7 +260,8 @@ impl InventoryContext {
                         packet::InventoryOperation::LeftClick,
                         inventory.get_action_number() as u16,
                         item.as_ref().map(|i| i.stack.clone()),
-                    ).unwrap();
+                    )
+                    .unwrap();
 
                     // Simulate the operation on the inventory screen.
                     (self.cursor, item) = match (self.cursor.clone(), item) {
@@ -281,7 +279,6 @@ impl InventoryContext {
                                 } else {
                                     (None, Some(item))
                                 }
-
                             } else {
                                 (Some(item), Some(cursor))
                             }
@@ -303,7 +300,9 @@ impl InventoryContext {
 
     pub fn on_confirm_transaction(&self, id: u8, action_number: i16, _accepted: bool) {
         if id as i32 == self.player_inventory.read().id() {
-            self.player_inventory.write().set_action_number(action_number);
+            self.player_inventory
+                .write()
+                .set_action_number(action_number);
         } else {
             let mut inventory = match &self.safe_inventory {
                 Some(inventory) => inventory.write(),
@@ -311,7 +310,10 @@ impl InventoryContext {
             };
 
             if id as i32 != inventory.id() {
-                println!("Expected inventory id {}, but instead got {}", inventory.id(), id);
+                println!(
+                    "Expected inventory id {}, but instead got {id}",
+                    inventory.id()
+                );
                 return;
             }
 
@@ -417,7 +419,7 @@ impl Item {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Material {
     Air,                             // 1.7.10 (id: 0, stack: 0)| 1.13 (id: 9648)
     Stone,                           // 1.7.10 (id: 1)| 1.13 (id: 22948)
@@ -1906,9 +1908,5 @@ impl Material {
 
     pub fn get_stack_size(&self, version: Version) -> u8 {
         material::versions::get_stack_size(*self, version)
-    }
-
-    pub fn to_id(&self, version: Version) -> u16 {
-        material::versions::to_id(*self, version)
     }
 }

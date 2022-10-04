@@ -18,10 +18,7 @@ pub struct BaseInventory {
 }
 
 impl BaseInventory {
-    pub fn new(
-        hud_context: Arc<RwLock<HudContext>>,
-        renderer: Arc<Renderer>,
-    ) -> Self {
+    pub fn new(hud_context: Arc<RwLock<HudContext>>, renderer: Arc<Renderer>) -> Self {
         let mut slots = vec![];
         for _ in (0..3).rev() {
             for _ in 0..9 {
@@ -48,7 +45,7 @@ impl BaseInventory {
         let x_offset = size * self.x_offset;
         let y_offset = size * self.y_offset;
         let hot_bar_offset = scale * 4.0;
-        let slot_offset = size + size * 1.0 / 8.0;
+        let slot_offset = size + size / 8.0;
         for y in (0..3).rev() {
             for x in 0..9 {
                 self.slots[x + y * 9].update_position(
@@ -59,11 +56,7 @@ impl BaseInventory {
             }
         }
         for i in 0..9 {
-            self.slots[27 + i].update_position(
-                x_offset + i as f64 * (size + size * 1.0 / 8.0),
-                y_offset,
-                size,
-            );
+            self.slots[27 + i].update_position(x_offset + i as f64 * slot_offset, y_offset, size);
         }
         self.dirty = true;
     }
@@ -99,7 +92,7 @@ impl Inventory for BaseInventory {
     fn get_item(&self, slot_id: u16) -> Option<Item> {
         self.slots[slot_id as usize].item.clone()
     }
- 
+
     fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
         self.slots[slot_id as usize].item = item;
         self.dirty = true;

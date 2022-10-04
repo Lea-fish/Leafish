@@ -724,25 +724,22 @@ impl Server {
                                 InventoryType::from_id(open.ty.unwrap())
                             };
 
-                            match inv_type {
-                                Some(inv_type) => {
-                                    let inventory = inventory_from_type(
-                                        inv_type,
-                                        open.title,
-                                        server.renderer.clone(),
-                                        server.hud_context.clone(),
-                                        server.inventory_context.read().base_inventory.clone(),
-                                        open.id,
+                            if let Some(inv_type) = inv_type {
+                                let inventory = inventory_from_type(
+                                    inv_type,
+                                    open.title,
+                                    server.renderer.clone(),
+                                    server.hud_context.clone(),
+                                    server.inventory_context.read().base_inventory.clone(),
+                                    open.id,
+                                );
+                                if let Some(inventory) = inventory {
+                                    server.inventory_context.clone().write().open_inventory(
+                                        inventory.clone(),
+                                        server.screen_sys.clone(),
+                                        server.inventory_context.clone(),
                                     );
-                                    if let Some(inventory) = inventory {
-                                        server.inventory_context.clone().write().open_inventory(
-                                            inventory.clone(),
-                                            server.screen_sys.clone(),
-                                            server.inventory_context.clone(),
-                                        );
-                                    }
                                 }
-                                None => {}
                             }
                         }
                         MappedPacket::EntityVelocity(_velocity) => {
@@ -1348,7 +1345,10 @@ impl Server {
                     .unwrap();
                 mouse_buttons.left = true;
             }
-            false => self.inventory_context.write().on_click(self.renderer.clone())
+            false => self
+                .inventory_context
+                .write()
+                .on_click(self.renderer.clone()),
         }
     }
 
@@ -1632,7 +1632,9 @@ impl Server {
     }
 
     fn on_confirm_transaction(&self, id: u8, action_number: i16, accepted: bool) {
-        self.inventory_context.write().on_confirm_transaction(id, action_number, accepted);
+        self.inventory_context
+            .write()
+            .on_confirm_transaction(id, action_number, accepted);
     }
 
     #[allow(unused_must_use)]

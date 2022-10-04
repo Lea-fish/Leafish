@@ -84,7 +84,7 @@ impl Screen for InventoryWindow {
         self.inventory_context
             .clone()
             .write()
-            .draw_cursor(renderer.clone(), ui_container, self);
+            .draw_cursor(renderer, ui_container, self);
     }
 
     fn on_resize(

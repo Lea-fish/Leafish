@@ -1,5 +1,5 @@
-use crate::inventory::{Inventory, InventoryType, Item, Slot};
 use crate::inventory::base_inventory::BaseInventory;
+use crate::inventory::{Inventory, InventoryType, Item, Slot};
 use crate::render::hud::Hud;
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
@@ -204,7 +204,7 @@ impl PlayerInventory {
         let y_offset = (screen_height / scale) / 2.0;
         self.base_inventory.clone().write().update_offset(
             x_offset / size,
-            (y_offset + 59 as f64) / 16.0,
+            (y_offset + 59.0) / 16.0,
             renderer,
         );
         self.dirty = true;
@@ -244,7 +244,7 @@ impl Inventory for PlayerInventory {
             self.offhand_slot.as_ref().unwrap().item.clone()
         } else {
             let slot_id = slot_id - self.slots.len() as u16;
-            self.base_inventory.read().get_item(slot_id).clone()
+            self.base_inventory.read().get_item(slot_id)
         }
     }
 
@@ -377,7 +377,10 @@ impl Inventory for PlayerInventory {
             }
         }
 
-        self.base_inventory.read().get_slot(x, y).map(|i| i + self.slots.len() as u8)
+        self.base_inventory
+            .read()
+            .get_slot(x, y)
+            .map(|i| i + self.slots.len() as u8)
     }
 
     fn resize(
