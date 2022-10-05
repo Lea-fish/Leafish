@@ -22,8 +22,8 @@ use parking_lot::RwLock;
 use rand::rngs::ThreadRng;
 use rand::Rng;
 
-use crate::inventory::player_inventory::PlayerInventory;
-use crate::inventory::{Inventory, Item};
+use crate::inventory::slot_mapping::SlotMapping;
+use crate::inventory::Item;
 use crate::render;
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem, ScreenType};
@@ -71,7 +71,7 @@ pub struct HudContext {
     dirty_exp: bool,
     breath: i16, // TODO: Update this!
     dirty_breath: bool,
-    pub player_inventory: Option<Arc<RwLock<PlayerInventory>>>,
+    pub inventory: Option<Arc<RwLock<SlotMapping>>>,
     pub server: Option<Arc<Server>>,
     pub dirty_slots: AtomicBool,
     slot_index: u8,
@@ -116,7 +116,7 @@ impl HudContext {
             breath: 0, /*-1*/
             // -1 = disabled (not under water) | 1 bubble = 30 | +2 = broken bubble -- -1 is causing crashes when attempting to join servers!
             dirty_breath: false,
-            player_inventory: None,
+            inventory: None,
             server: None,
             dirty_slots: AtomicBool::new(false),
             slot_index: 0,
@@ -521,16 +521,13 @@ impl Screen for Hud {
 
 impl Hud {
     pub fn icon_scale(renderer: Arc<Renderer>) -> f64 {
-        Hud::icon_scale_by_height(renderer.screen_data.read().safe_height)
+        let screen = renderer.screen_data.read();
+        Hud::icon_scale_by_height(screen.safe_width, screen.safe_height)
     }
 
-    pub fn icon_scale_by_height(height: u32) -> f64 {
-        let icon_scale = if height > 500 {
-            height as f64 / 36.50
-        } else {
-            height as f64 / 26.50 /*27.5*/
-        };
-        icon_scale / 9.0
+    pub fn icon_scale_by_height(width: u32, height: u32) -> f64 {
+        // See https://minecraft.fandom.com/wiki/Options#Video_Settings
+        (width / 320).min(height / 240).max(1) as f64
     }
 
     fn render_health(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
@@ -946,10 +943,8 @@ impl Hud {
     fn render_slots_items(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer.clone());
         for i in 0..9 {
-            if let Some(player_inventory) =
-                self.hud_context.clone().read().player_inventory.as_ref()
-            {
-                if let Some(item) = player_inventory.clone().read().get_item(36 + i as u16) {
+            if let Some(inventory) = &self.hud_context.clone().read().inventory {
+                if let Some(item) = inventory.clone().read().get_item(27 + i as u16) {
                     let slot = self.draw_item(
                         &item,
                         (icon_scale) * -1.0

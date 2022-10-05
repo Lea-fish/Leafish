@@ -113,6 +113,12 @@ pub struct ScreenData {
     pub safe_height: u32,
 }
 
+impl ScreenData {
+    pub fn center(&self) -> (u32, u32) {
+        (self.safe_width / 2, self.safe_height / 2)
+    }
+}
+
 #[derive(Default)]
 pub struct ChunkBuffer {
     solid: Option<ChunkRenderInfo>,
