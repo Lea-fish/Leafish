@@ -18,7 +18,7 @@ pub struct ChestInventory {
     name: String,
     slot_count: u16,
     id: i32,
-    action_number: i16,
+    client_state_id: i16,
 }
 
 impl ChestInventory {
@@ -62,7 +62,7 @@ impl ChestInventory {
             name,
             slot_count,
             id,
-            action_number: 0,
+            client_state_id: 0,
         }
     }
 
@@ -108,16 +108,12 @@ impl Inventory for ChestInventory {
         self.id
     }
 
-    fn name(&self) -> Option<&String> {
-        Some(&self.name)
+    fn get_client_state_id(&self) -> i16 {
+        self.client_state_id
     }
 
-    fn get_action_number(&self) -> i16 {
-        self.action_number
-    }
-
-    fn set_action_number(&mut self, action_number: i16) {
-        self.action_number = action_number;
+    fn set_client_state_id(&mut self, client_state_id: i16) {
+        self.client_state_id = client_state_id;
     }
 
     fn get_item(&self, slot_id: u16) -> Option<Item> {
@@ -182,12 +178,10 @@ impl Inventory for ChestInventory {
             .scale_y(scale)
             .position(
                 icon_scale
-                    * -(176.0 / 2.0
-                        - 8.0
-                        - renderer.ui.lock().size_of_string(self.name().unwrap()) / 4.0),
+                    * -(176.0 / 2.0 - 8.0 - renderer.ui.lock().size_of_string(&self.name) / 4.0),
                 icon_scale * (6.0 + y),
             )
-            .text(self.name().unwrap())
+            .text(&self.name)
             .colour((64, 64, 64, 255))
             .shadow(false)
             .create(ui_container);
@@ -242,7 +236,7 @@ impl Inventory for ChestInventory {
 
     fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
         for (i, slot) in self.slots.iter().enumerate() {
-            if slot.contains(x, y) {
+            if slot.is_within(x, y) {
                 return Some(i as u8);
             }
         }

@@ -15,23 +15,35 @@ use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::{packet, Conn, Version};
+use log::warn;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
 pub trait Inventory {
+    /// The number of item slots in this inventory.
     fn size(&self) -> u16;
 
+    /// The id of this inventory. This is either sent to the client by the open
+    /// open window packet, or 0 in the case of the player inventory.
     fn id(&self) -> i32;
 
-    fn name(&self) -> Option<&String>;
+    /// Get this inventory's current action number. This is a sequence number
+    /// sent with every window click packet to allow the server to determine if
+    /// any conflicts occurred.
+    fn get_client_state_id(&self) -> i16;
 
-    fn get_action_number(&self) -> i16;
+    /// Set this inventory's action number. This is normally only done when the
+    /// server sends a confirm transaction packet.
+    fn set_client_state_id(&mut self, client_state_id: i16);
 
-    fn set_action_number(&mut self, action_number: i16);
-
+    /// Get the item currently stored in a slot.
     fn get_item(&self, slot_id: u16) -> Option<Item>;
 
+    /// Set the new item in a slot, replacing any item previous in the slot.
     fn set_item(&mut self, slot_id: u16, item: Option<Item>);
+
+    /// Find the slot containing this position on the screen.
+    fn get_slot(&self, x: f64, y: f64) -> Option<u8>;
 
     fn init(
         &mut self,
@@ -46,9 +58,6 @@ pub trait Inventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     );
-
-    /// Find the slot containing this position on the screen.
-    fn get_slot(&self, x: f64, y: f64) -> Option<u8>;
 
     fn resize(
         &mut self,
@@ -128,7 +137,7 @@ impl Slot {
         self.size = size;
     }
 
-    pub fn contains(&self, x: f64, y: f64) -> bool {
+    pub fn is_within(&self, x: f64, y: f64) -> bool {
         (self.x - self.size / 2.0) <= x
             && x <= (self.x + self.size / 2.0)
             && self.y <= y
@@ -198,10 +207,10 @@ impl InventoryContext {
         if self.has_inv_open {
             self.has_inv_open = false;
             if let Some(inventory) = self.safe_inventory.take() {
-                let inventory = inventory.read();
+                let inventory_id = inventory.read().id() as u8;
                 let mut conn = self.conn.write();
                 let conn = conn.as_mut().unwrap();
-                packet::send_close_window(conn, inventory.id() as u8).unwrap();
+                packet::send_close_window(conn, inventory_id).unwrap();
             }
             screen_sys.pop_screen();
             return true;
@@ -258,7 +267,7 @@ impl InventoryContext {
                         inventory.id() as u8,
                         slot as i16,
                         packet::InventoryOperation::LeftClick,
-                        inventory.get_action_number() as u16,
+                        inventory.get_client_state_id() as u16,
                         item.as_ref().map(|i| i.stack.clone()),
                     )
                     .unwrap();
@@ -268,7 +277,7 @@ impl InventoryContext {
                         (Some(mut cursor), Some(mut item)) => {
                             // Merge the cursor into a slot stack of the same
                             // material.
-                            if item.matches(&cursor) {
+                            if item.is_stackable(&cursor) {
                                 let max = item.material.get_stack_size(conn.get_version());
                                 let total = (item.stack.count + cursor.stack.count) as u8;
                                 item.stack.count = total.min(max) as isize;
@@ -302,22 +311,18 @@ impl InventoryContext {
         if id as i32 == self.player_inventory.read().id() {
             self.player_inventory
                 .write()
-                .set_action_number(action_number);
-        } else {
-            let mut inventory = match &self.safe_inventory {
-                Some(inventory) => inventory.write(),
-                None => return,
-            };
-
+                .set_client_state_id(action_number);
+        } else if let Some(inventory) = &self.safe_inventory {
+            let mut inventory = inventory.write();
             if id as i32 != inventory.id() {
-                println!(
+                warn!(
                     "Expected inventory id {}, but instead got {id}",
                     inventory.id()
                 );
                 return;
             }
 
-            inventory.set_action_number(action_number);
+            inventory.set_client_state_id(action_number);
         }
     }
 }
@@ -376,7 +381,7 @@ impl InventoryType {
             22 => InventoryType::CartographyTable,
             23 => InventoryType::Stonecutter,
             _ => {
-                println!("Unhandled inventory type {id}");
+                warn!("Unhandled inventory type {id}");
                 return None;
             }
         })
@@ -389,7 +394,13 @@ impl InventoryType {
             "minecraft:anvil" => InventoryType::Anvil,
             "minecraft:beacon" => InventoryType::Beacon,
             "minecraft:brewing_stand" => InventoryType::BrewingStand,
-            "minecraft:chest" => InventoryType::Chest(slot_count / 9),
+            "minecraft:chest" => {
+                if slot_count % 9 != 0 {
+                    warn!("Chest slot count of {slot_count} wasn't divisible by 9");
+                    return None;
+                }
+                InventoryType::Chest(slot_count / 9)
+            }
             "minecraft:crafting_table" => InventoryType::CraftingTable,
             "minecraft:dispenser" => InventoryType::Dropper,
             "minecraft:dropper" => InventoryType::Dropper,
@@ -398,7 +409,7 @@ impl InventoryType {
             "minecraft:hopper" => InventoryType::Hopper,
             "minecraft:shulker_box" => InventoryType::ShulkerBox,
             _ => {
-                println!("Unhandled inventory type {name}");
+                warn!("Unhandled inventory type {name}");
                 return None;
             }
         })
@@ -414,7 +425,7 @@ pub struct Item {
 impl Item {
     /// Check if this item stack matches another, allowing these to be merged
     /// on an inventory slot.
-    pub fn matches(&self, other: &Item) -> bool {
+    pub fn is_stackable(&self, other: &Item) -> bool {
         self.material == other.material && self.stack.damage == other.stack.damage
     }
 }

@@ -77,16 +77,12 @@ impl Inventory for BaseInventory {
         panic!("Base inventory doesn't have an id");
     }
 
-    fn name(&self) -> Option<&String> {
-        None
+    fn get_client_state_id(&self) -> i16 {
+        panic!("Base inventory doesn't have a state id number");
     }
 
-    fn get_action_number(&self) -> i16 {
-        panic!("Base inventory doesn't have an action number");
-    }
-
-    fn set_action_number(&mut self, _action_number: i16) {
-        panic!("Base inventory doesn't have an action number");
+    fn set_client_state_id(&mut self, _client_state_id: i16) {
+        panic!("Base inventory doesn't have a state id number");
     }
 
     fn get_item(&self, slot_id: u16) -> Option<Item> {
@@ -145,7 +141,7 @@ impl Inventory for BaseInventory {
 
     fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
         for (i, slot) in self.slots.iter().enumerate() {
-            if slot.contains(x, y) {
+            if slot.is_within(x, y) {
                 return Some(i as u8);
             }
         }

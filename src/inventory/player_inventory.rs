@@ -15,7 +15,7 @@ pub struct PlayerInventory {
     offhand_slot: Option<Slot>,
     dirty: bool,
     version: Version,
-    action_number: i16,
+    client_state_id: i16,
     base_inventory: Arc<RwLock<BaseInventory>>,
 }
 
@@ -106,7 +106,7 @@ impl PlayerInventory {
             offhand_slot,
             dirty: false,
             version,
-            action_number: 0,
+            client_state_id: 0,
             base_inventory,
         }
     }
@@ -222,19 +222,17 @@ impl Inventory for PlayerInventory {
     }
 
     fn id(&self) -> i32 {
+        // The player inventory always uses the id 0.
+        // See: https://wiki.vg/Protocol#Set_Container_Content
         0
     }
 
-    fn name(&self) -> Option<&String> {
-        None
+    fn get_client_state_id(&self) -> i16 {
+        self.client_state_id
     }
 
-    fn get_action_number(&self) -> i16 {
-        self.action_number
-    }
-
-    fn set_action_number(&mut self, action_number: i16) {
-        self.action_number = action_number;
+    fn set_client_state_id(&mut self, client_state_id: i16) {
+        self.client_state_id = client_state_id;
     }
 
     fn get_item(&self, slot_id: u16) -> Option<Item> {
@@ -366,13 +364,13 @@ impl Inventory for PlayerInventory {
 
     fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
         for (i, slot) in self.slots.iter().enumerate() {
-            if slot.contains(x, y) {
+            if slot.is_within(x, y) {
                 return Some(i as u8);
             }
         }
 
         if let Some(slot) = &self.offhand_slot {
-            if slot.contains(x, y) {
+            if slot.is_within(x, y) {
                 return Some(45);
             }
         }

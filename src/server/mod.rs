@@ -1335,20 +1335,18 @@ impl Server {
     }
 
     pub fn on_left_click(&self, focused: bool) {
-        match focused {
-            true => {
-                let mut entities = self.entities.write();
-                let mut mouse_buttons = entities
-                    .world
-                    .entity_mut(self.player.read().unwrap().1)
-                    .get_mut::<MouseButtons>()
-                    .unwrap();
-                mouse_buttons.left = true;
-            }
-            false => self
-                .inventory_context
+        if focused {
+            let mut entities = self.entities.write();
+            let mut mouse_buttons = entities
+                .world
+                .entity_mut(self.player.read().unwrap().1)
+                .get_mut::<MouseButtons>()
+                .unwrap();
+            mouse_buttons.left = true;
+        } else {
+            self.inventory_context
                 .write()
-                .on_click(self.renderer.clone()),
+                .on_click(self.renderer.clone())
         }
     }
 
@@ -1362,6 +1360,7 @@ impl Server {
                 .unwrap();
             mouse_buttons.left = false;
         }
+        // TODO: Pass events into inventory context when not focused
     }
 
     #[allow(unused_must_use)]
@@ -1422,6 +1421,7 @@ impl Server {
                 .unwrap();
             mouse_buttons.right = true;
         }
+        // TODO: Pass events into inventory context when not focused
     }
 
     pub fn on_release_right_click(&self, focused: bool) {
@@ -1434,6 +1434,7 @@ impl Server {
                 .unwrap();
             mouse_buttons.right = false;
         }
+        // TODO: Pass events into inventory context when not focused
     }
 
     pub fn on_cursor_moved(&self, x: f64, y: f64) {
