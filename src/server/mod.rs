@@ -920,7 +920,7 @@ impl Server {
             .write()
             .add_stage("entity", entity_sched);
 
-        hud_context.write().inventory = Some(inventory_context.read().base_slots.clone());
+        hud_context.write().slots = Some(inventory_context.read().base_slots.clone());
 
         let version = resources.read().version();
         Server {
@@ -1390,7 +1390,7 @@ impl Server {
                             hud_context
                                 .clone()
                                 .read()
-                                .inventory
+                                .slots
                                 .as_ref()
                                 .unwrap()
                                 .clone()

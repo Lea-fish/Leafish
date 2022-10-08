@@ -1,5 +1,5 @@
 use crate::inventory::slot_mapping::SlotMapping;
-use crate::inventory::{Inventory, Item};
+use crate::inventory::{Inventory, InventoryType, Item};
 use crate::render::hud::Hud;
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
@@ -8,6 +8,14 @@ use crate::ui::{Container, HAttach, VAttach};
 use std::sync::Arc;
 
 use parking_lot::RwLock;
+
+const WINDOW_WIDTH: i32 = 176;
+const SLOT_SIZE: i32 = 18;
+const INVENTORY_HEIGHT: i32 = 96;
+
+fn chest_height(rows: u8) -> i32 {
+    rows as i32 * SLOT_SIZE + 17
+}
 
 pub struct ChestInventory {
     slots: SlotMapping,
@@ -25,13 +33,13 @@ impl ChestInventory {
         name: String,
         id: i32,
     ) -> Self {
-        let mut slots = SlotMapping::new((176, 113 + 18 * rows as i32));
+        let mut slots = SlotMapping::new((WINDOW_WIDTH, chest_height(rows) + INVENTORY_HEIGHT));
         let child_range = ((rows as u16 * 9)..(rows as u16 * 9 + 36)).collect();
-        slots.set_child(base_slots, (8, 31 + 18 * rows as i32), child_range);
+        slots.set_child(base_slots, (8, chest_height(rows) + 14), child_range);
 
         for y in 0..rows as i32 {
             for x in 0..9 {
-                slots.add_slot((x + y * 9) as u16, (8 + x * 18, (y + 1) * 18));
+                slots.add_slot((x + y * 9) as u16, (8 + x * SLOT_SIZE, (y + 1) * SLOT_SIZE));
             }
         }
 
@@ -88,11 +96,13 @@ impl Inventory for ChestInventory {
         inventory_window.text_elements.push(vec![]);
 
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
+        let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
+
         let icon_scale = Hud::icon_scale(renderer.clone()) as i32;
-        let chest_grid_height = icon_scale * (self.rows as i32 * 18 + 17);
-        let inventory_grid_height = icon_scale * 96;
-        let total_height = chest_grid_height + inventory_grid_height;
-        let total_width = icon_scale * 176;
+        let chest_height_scaled = icon_scale * chest_height(self.rows);
+        let inventory_height_scaled = icon_scale * INVENTORY_HEIGHT;
+        let total_height_scaled = chest_height_scaled + inventory_height_scaled;
+        let total_width_scaled = icon_scale * WINDOW_WIDTH;
         let center = renderer.screen_data.read().center();
 
         // Chest section
@@ -101,59 +111,65 @@ impl Inventory for ChestInventory {
                 .texture_coords((
                     0.0 / 256.0,
                     0.0 / 256.0,
-                    176.0 / 256.0,
-                    (self.rows * 18 + 17) as f64 / 256.0,
+                    WINDOW_WIDTH as f64 / 256.0,
+                    chest_height(self.rows) as f64 / 256.0,
                 ))
                 .position(
-                    (center.0 as i32 - total_width / 2) as f64,
-                    (center.1 as i32 - total_height / 2) as f64,
+                    (center.0 as i32 - total_width_scaled / 2) as f64,
+                    (center.1 as i32 - total_height_scaled / 2) as f64,
                 )
                 .alignment(VAttach::Top, HAttach::Left)
-                .size(total_width as f64, chest_grid_height as f64)
-                .texture("minecraft:gui/container/generic_54")
-                .create(ui_container),
-        );
-        // Player inventory
-        basic_elements.push(
-            ui::ImageBuilder::new()
-                .texture_coords((0.0 / 256.0, 126.0 / 256.0, 176.0 / 256.0, 96.0 / 256.0))
-                .position(
-                    (center.0 as i32 - total_width / 2) as f64,
-                    (center.1 as i32 - total_height / 2 + chest_grid_height) as f64,
-                )
-                .alignment(VAttach::Top, HAttach::Left)
-                .size(total_width as f64, inventory_grid_height as f64)
+                .size(total_width_scaled as f64, chest_height_scaled as f64)
                 .texture("minecraft:gui/container/generic_54")
                 .create(ui_container),
         );
 
-        let scale = icon_scale as f64 / 2.0;
-        let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
+        // Player inventory
+        basic_elements.push(
+            ui::ImageBuilder::new()
+                .texture_coords((
+                    0.0 / 256.0,
+                    (chest_height(6) + 1) as f64 / 256.0,
+                    WINDOW_WIDTH as f64 / 256.0,
+                    INVENTORY_HEIGHT as f64 / 256.0,
+                ))
+                .position(
+                    (center.0 as i32 - total_width_scaled / 2) as f64,
+                    (center.1 as i32 - total_height_scaled / 2 + chest_height_scaled) as f64,
+                )
+                .alignment(VAttach::Top, HAttach::Left)
+                .size(total_width_scaled as f64, inventory_height_scaled as f64)
+                .texture("minecraft:gui/container/generic_54")
+                .create(ui_container),
+        );
+
         // Title text
         basic_text_elements.push(
             ui::TextBuilder::new()
                 .alignment(VAttach::Top, HAttach::Left)
-                .scale_x(scale)
-                .scale_y(scale)
+                .scale_x(icon_scale as f64 / 2.0)
+                .scale_y(icon_scale as f64 / 2.0)
                 .position(
-                    (center.0 as i32 - total_width / 2 + icon_scale * 8) as f64,
-                    (center.1 as i32 - total_height / 2 + icon_scale * 6) as f64,
+                    (center.0 as i32 - total_width_scaled / 2 + icon_scale * 8) as f64,
+                    (center.1 as i32 - total_height_scaled / 2 + icon_scale * 6) as f64,
                 )
                 .text(&self.name)
                 .colour((64, 64, 64, 255))
                 .shadow(false)
                 .create(ui_container),
         );
+
         // Inventory text
         basic_text_elements.push(
             ui::TextBuilder::new()
                 .alignment(VAttach::Top, HAttach::Left)
-                .scale_x(scale)
-                .scale_y(scale)
+                .scale_x(icon_scale as f64 / 2.0)
+                .scale_y(icon_scale as f64 / 2.0)
                 .position(
-                    (center.0 as i32 - total_width / 2 + icon_scale * 8) as f64,
-                    (center.1 as i32 - total_height / 2 + icon_scale * 3 + chest_grid_height)
-                        as f64,
+                    (center.0 as i32 - total_width_scaled / 2 + icon_scale * 8) as f64,
+                    (center.1 as i32 - total_height_scaled / 2
+                        + icon_scale * 3
+                        + chest_height_scaled) as f64,
                 )
                 .text("Inventory")
                 .colour((64, 64, 64, 255))
@@ -182,5 +198,9 @@ impl Inventory for ChestInventory {
         inventory_window: &mut InventoryWindow,
     ) {
         self.init(renderer, ui_container, inventory_window);
+    }
+
+    fn ty(&self) -> InventoryType {
+        InventoryType::Chest(self.rows)
     }
 }

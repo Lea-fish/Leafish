@@ -68,6 +68,8 @@ pub trait Inventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     );
+
+    fn ty(&self) -> InventoryType;
 }
 
 pub fn inventory_from_type(

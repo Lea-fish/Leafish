@@ -23,16 +23,23 @@ pub struct SlotMapping {
     dirty: bool,
     /// A child slot mapping to be used as a fallback if a slot wasn't found
     /// in the parent mapping. This is used to handle the base inventory.
-    child: Option<Arc<RwLock<SlotMapping>>>,
+    child: Option<ChildSlotMapping>,
+}
+
+/// A container required to store information about how a child slot mapping
+/// behaves under a specific parent mapping.
+struct ChildSlotMapping {
+    /// The child's slots.
+    pub slots: Arc<RwLock<SlotMapping>>,
     /// The offset between the top-left corner of the current mapping window,
     /// and the corner of the sub-section that the child mapping manages, in
     /// pixels.
-    child_offset: Option<(i32, i32)>,
+    pub offset: (i32, i32),
     /// The slot ids to be used on the parent interface to access slots in the
     /// child. We use the index of each parent slot id as the child slot id.
     /// For example, if set to `[5, 6, 7]`, then accessing slot id `6` on the
     /// parent will look up the slot_id `1` on the child.
-    child_range: Option<Vec<u16>>,
+    pub range: Vec<u16>,
 }
 
 impl SlotMapping {
@@ -43,29 +50,29 @@ impl SlotMapping {
             size,
             dirty: false,
             child: None,
-            child_offset: None,
-            child_range: None,
         }
     }
 
     /// Get the number of slots in this mapping, including any child slots.
     pub fn size(&self) -> u16 {
-        (match &self.child_range {
-            Some(child_range) => self.slots.len() + child_range.len(),
-            None => self.slots.len(),
-        }) as u16
+        match &self.child {
+            Some(child) => self.slots.len() as u16 + child.slots.read().size(),
+            None => self.slots.len() as u16,
+        }
     }
 
     /// Set the child slot mapping. This will replace any child previously set.
     pub fn set_child(
         &mut self,
-        child: Arc<RwLock<SlotMapping>>,
+        slots: Arc<RwLock<SlotMapping>>,
         offset: (i32, i32),
         range: Vec<u16>,
     ) {
-        self.child = Some(child);
-        self.child_offset = Some(offset);
-        self.child_range = Some(range);
+        self.child = Some(ChildSlotMapping {
+            slots,
+            offset,
+            range,
+        });
     }
 
     /// Add a slot to this mapping with a specific pixel offset where the slot
@@ -81,9 +88,9 @@ impl SlotMapping {
             return slot.item.clone();
         }
 
-        if let (Some(child), Some(child_range)) = (&self.child, &self.child_range) {
-            let slot_id = child_range.iter().position(|id| *id == slot_id).unwrap();
-            return child.read().get_item(slot_id as u16);
+        if let Some(child) = &self.child {
+            let slot_id = child.range.iter().position(|id| *id == slot_id).unwrap();
+            return child.slots.read().get_item(slot_id as u16);
         }
 
         None
@@ -98,9 +105,9 @@ impl SlotMapping {
             return;
         }
 
-        if let (Some(child), Some(child_range)) = (&self.child, &self.child_range) {
-            let slot_id = child_range.iter().position(|id| *id == slot_id).unwrap();
-            child.write().set_item(slot_id as u16, item);
+        if let Some(child) = &self.child {
+            let slot_id = child.range.iter().position(|id| *id == slot_id).unwrap();
+            child.slots.write().set_item(slot_id as u16, item);
         }
     }
 
@@ -112,11 +119,12 @@ impl SlotMapping {
             }
         }
 
-        if let (Some(child), Some(child_range)) = (&self.child, &self.child_range) {
+        if let Some(child) = &self.child {
             return child
+                .slots
                 .read()
                 .get_slot(x, y)
-                .map(|i| child_range[i as usize] as u16);
+                .map(|i| child.range[i as usize] as u16);
         }
 
         None
@@ -147,11 +155,11 @@ impl SlotMapping {
             slot.update_position(x as f64, y as f64, slot_size);
         }
 
-        if let (Some(child), Some(child_offset)) = (&self.child, self.child_offset) {
+        if let Some(child) = &self.child {
             child
-                .clone()
+                .slots
                 .write()
-                .update_icons(renderer, child_offset, Some(self.size));
+                .update_icons(renderer, child.offset, Some(self.size));
         }
 
         self.dirty = true;
@@ -189,7 +197,7 @@ impl SlotMapping {
 
         if let Some(child) = &self.child {
             child
-                .clone()
+                .slots
                 .write()
                 .tick(renderer, ui_container, inventory_window, element_idx + 1);
         }

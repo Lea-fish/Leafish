@@ -1,5 +1,5 @@
 use crate::inventory::slot_mapping::SlotMapping;
-use crate::inventory::{Inventory, Item};
+use crate::inventory::{Inventory, InventoryType, Item};
 use crate::render::hud::Hud;
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
@@ -9,6 +9,9 @@ use std::sync::Arc;
 
 use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
+
+const WINDOW_WIDTH: i32 = 176;
+const WINDOW_HEIGHT: i32 = 166;
 
 pub struct PlayerInventory {
     slots: SlotMapping,
@@ -22,13 +25,15 @@ impl PlayerInventory {
         renderer: Arc<Renderer>,
         base_slots: Arc<RwLock<SlotMapping>>,
     ) -> Self {
-        let mut slots = SlotMapping::new((176, 166));
+        let mut slots = SlotMapping::new((WINDOW_WIDTH, WINDOW_HEIGHT));
         slots.set_child(base_slots, (8, 84), (9..45).collect());
 
         // Crafting output
+        // TODO: Use different click rules for crafting output
         slots.add_slot(0, (154, 28));
 
         // Crafting input
+        // TODO: Reduce the count on each of these slots when output is taken
         slots.add_slot(1, (98, 18));
         slots.add_slot(2, (116, 18));
         slots.add_slot(3, (98, 36));
@@ -39,7 +44,7 @@ impl PlayerInventory {
         slots.add_slot(5, (8, 8));
         slots.add_slot(6, (8, 26));
         slots.add_slot(7, (8, 44));
-        slots.add_slot(8, (8, 80));
+        slots.add_slot(8, (8, 62));
 
         if version > Version::V1_8 {
             slots.add_slot(45, (77, 62));
@@ -86,76 +91,83 @@ impl Inventory for PlayerInventory {
         self.slots.get_slot(x, y)
     }
 
-    #[allow(clippy::eq_op)]
     fn init(
         &mut self,
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
-        inventory_window.elements.push(vec![]);
-        let center = {
-            let size = renderer.screen_data.read();
-            (size.safe_width as i32 / 2, size.safe_height as i32 / 2)
-        };
+        inventory_window.elements.push(vec![]); // Window texture
+        inventory_window.elements.push(vec![]); // Player slots
+        inventory_window.elements.push(vec![]); // Base slots
+        inventory_window.text_elements.push(vec![]);
+
+        let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
+
+        let center = renderer.screen_data.read().center();
         let icon_scale = Hud::icon_scale(renderer.clone());
-        let size = icon_scale * 16.0;
-        let slot_offset = size + size * 1.0 / 8.0;
-        let base = icon_scale
-            * ((renderer.screen_data.read().safe_height as f64 / icon_scale - 166.0) / 2.0);
-        let middle = base + icon_scale * 166.0 / 2.0;
-        let image = ui::ImageBuilder::new()
-            .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, 166.0 / 256.0))
-            .position(
-                center.0 as f64 - icon_scale * 176.0 / 2.0,
-                center.1 as f64 - icon_scale * 166.0 / 2.0,
-            )
-            .alignment(ui::VAttach::Top, ui::HAttach::Left)
-            .size(icon_scale * 176.0, icon_scale * 166.0)
-            .texture("minecraft:gui/container/inventory")
-            .create(ui_container);
-        basic_elements.push(image);
-        if self.version < Version::V1_9 {
-            // Removes the 2nd hand slot from the inv by rendering the background color over it.
-            let image = ui::ImageBuilder::new()
+
+        // Inventory window
+        basic_elements.push(
+            ui::ImageBuilder::new()
                 .texture_coords((
-                    (176.0 / 2.0 - 9.0) / 256.0,
-                    10.0 / 256.0,
-                    18.0 / 256.0,
-                    18.0 / 256.0,
+                    0.0 / 256.0,
+                    0.0 / 256.0,
+                    WINDOW_WIDTH as f64 / 256.0,
+                    WINDOW_HEIGHT as f64 / 256.0,
                 ))
                 .position(
-                    -(icon_scale * 3.0),
-                    middle
-                        - (icon_scale
-                            * (16.0 * 4.0 + 16.0 * 1.0 / 8.0 / 2.0
-                                - slot_offset / icon_scale * 2.5
-                                + 16.0 * 1.0 / 8.0)),
+                    center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0,
+                    center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0,
                 )
-                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
-                .size(icon_scale * 18.0, icon_scale * 18.0)
+                .alignment(VAttach::Top, HAttach::Left)
+                .size(
+                    icon_scale * WINDOW_WIDTH as f64,
+                    icon_scale * WINDOW_HEIGHT as f64,
+                )
                 .texture("minecraft:gui/container/inventory")
-                .create(ui_container);
-            basic_elements.push(image);
+                .create(ui_container),
+        );
+
+        // If before 1.9, removes the 2nd hand slot from the inv by rendering
+        // the background color over it.
+        if self.version < Version::V1_9 {
+            basic_elements.push(
+                ui::ImageBuilder::new()
+                    .texture_coords((
+                        (WINDOW_WIDTH as f64 / 2.0 - 9.0) / 256.0,
+                        10.0 / 256.0,
+                        18.0 / 256.0,
+                        18.0 / 256.0,
+                    ))
+                    .position(
+                        center.0 as f64 - icon_scale * (WINDOW_WIDTH as f64 / 2.0 - 76.0),
+                        center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 61.0),
+                    )
+                    .alignment(VAttach::Top, HAttach::Left)
+                    .size(icon_scale * 18.0, icon_scale * 18.0)
+                    .texture("minecraft:gui/container/inventory")
+                    .create(ui_container),
+            );
         }
-        inventory_window.text_elements.push(vec![]);
-        let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
-        let crafting_text = ui::TextBuilder::new()
-            .alignment(VAttach::Top, HAttach::Center)
-            .scale_x(icon_scale / 2.0)
-            .scale_y(icon_scale / 2.0)
-            .position(
-                icon_scale * 9.0 * 3.2,
-                middle - (icon_scale * (16.0 * 4.0 + 11.0)),
-            )
-            .text("Crafting")
-            .colour((64, 64, 64, 255))
-            .shadow(false)
-            .create(ui_container);
-        basic_text_elements.push(crafting_text);
-        inventory_window.elements.push(vec![]); // For player slots
-        inventory_window.elements.push(vec![]); // For base slots
+
+        // Crafting text
+        basic_text_elements.push(
+            ui::TextBuilder::new()
+                .alignment(VAttach::Top, HAttach::Left)
+                .scale_x(icon_scale / 2.0)
+                .scale_y(icon_scale / 2.0)
+                .position(
+                    center.0 as f64 - icon_scale * (WINDOW_WIDTH as f64 / 2.0 - 97.0),
+                    center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 8.0),
+                )
+                .text("Crafting")
+                .colour((64, 64, 64, 255))
+                .shadow(false)
+                .create(ui_container),
+        );
+
         self.slots.update_icons(renderer, (0, 0), None);
     }
 
@@ -177,5 +189,9 @@ impl Inventory for PlayerInventory {
         inventory_window: &mut InventoryWindow,
     ) {
         self.init(renderer, ui_container, inventory_window);
+    }
+
+    fn ty(&self) -> InventoryType {
+        InventoryType::Main
     }
 }
