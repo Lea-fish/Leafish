@@ -1,9 +1,11 @@
 pub mod chest_inventory;
+pub mod crafting_table_inventory;
 pub(crate) mod material;
 pub mod player_inventory;
 pub mod slot_mapping;
 
 use crate::inventory::chest_inventory::ChestInventory;
+use crate::inventory::crafting_table_inventory::CraftingTableInventory;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::slot_mapping::SlotMapping;
 use crate::render::hud::{Hud, HudContext};
@@ -79,27 +81,25 @@ pub fn inventory_from_type(
     base_slots: Arc<RwLock<SlotMapping>>,
     id: i32,
 ) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
-    Some(Arc::new(RwLock::new(match ty {
+    match ty {
         /*InventoryType::Internal => {}
         InventoryType::Main => {}*/
-        InventoryType::Chest(rows) => {
-            ChestInventory::new(renderer, base_slots, rows, title.to_string(), id)
-        }
-        /*
-        InventoryType::CraftingTable => CraftingTableInventory::new(
+        InventoryType::Chest(rows) => Some(Arc::new(RwLock::new(ChestInventory::new(
             renderer,
-            hud_context,
-            inv_below,
-            rows as u16 * 9,
+            base_slots,
+            rows,
             title.to_string(),
             id,
-        ),
+        )))),
+        InventoryType::CraftingTable => Some(Arc::new(RwLock::new(CraftingTableInventory::new(
+            renderer, base_slots, id,
+        )))),
+        /*
         InventoryType::Dropper => {}
         InventoryType::Anvil => {}
         InventoryType::Beacon => {}
         InventoryType::BlastFurnace => {}
         InventoryType::BrewingStand => {}
-        InventoryType::CraftingTable => {}
         InventoryType::EnchantingTable => {}
         InventoryType::Furnace => {}
         InventoryType::Grindstone => {}
@@ -113,8 +113,8 @@ pub fn inventory_from_type(
         InventoryType::CartographyTable => {}
         InventoryType::Stonecutter => {}
         InventoryType::Horse => {}*/
-        _ => return None,
-    })))
+        _ => None,
+    }
 }
 
 #[derive(Debug)]
