@@ -721,7 +721,8 @@ impl Server {
                             let inv_type = if let Some(name) = &open.ty_name {
                                 InventoryType::from_name(name, open.slot_count.unwrap())
                             } else {
-                                InventoryType::from_id(open.ty.unwrap())
+                                let version = server.mapped_protocol_version;
+                                InventoryType::from_id(version, open.ty.unwrap())
                             };
 
                             if let Some(inv_type) = inv_type {

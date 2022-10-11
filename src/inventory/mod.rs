@@ -1,6 +1,7 @@
 pub mod chest_inventory;
 pub mod crafting_table_inventory;
 pub mod dropper_inventory;
+pub mod furnace_inventory;
 pub(crate) mod material;
 pub mod player_inventory;
 pub mod slot_mapping;
@@ -8,6 +9,7 @@ pub mod slot_mapping;
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::crafting_table_inventory::CraftingTableInventory;
 use crate::inventory::dropper_inventory::DropperInventory;
+use crate::inventory::furnace_inventory::FurnaceInventory;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::slot_mapping::SlotMapping;
 use crate::render::hud::{Hud, HudContext};
@@ -102,13 +104,20 @@ pub fn inventory_from_type(
             title.to_string(),
             id,
         )))),
+        InventoryType::Furnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
+        InventoryType::Smoker => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
+        InventoryType::BlastFurnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
         /*
         InventoryType::Anvil => {}
         InventoryType::Beacon => {}
-        InventoryType::BlastFurnace => {}
         InventoryType::BrewingStand => {}
         InventoryType::EnchantingTable => {}
-        InventoryType::Furnace => {}
         InventoryType::Grindstone => {}
         InventoryType::Hopper => {}
         InventoryType::Lectern => {}
@@ -116,7 +125,6 @@ pub fn inventory_from_type(
         InventoryType::Merchant => {}
         InventoryType::ShulkerBox => {}
         InventoryType::SmithingTable => {}
-        InventoryType::Smoker => {}
         InventoryType::CartographyTable => {}
         InventoryType::Stonecutter => {}
         InventoryType::Horse => {}*/
@@ -354,7 +362,8 @@ impl InventoryContext {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum InventoryType {
     Internal, // For internal use only.
     Main,
@@ -382,7 +391,12 @@ pub enum InventoryType {
 
 impl InventoryType {
     /// Lookup a window type based on the inventory type strings used in 1.14+.
-    pub fn from_id(id: i32) -> Option<Self> {
+    pub fn from_id(version: Version, mut id: i32) -> Option<Self> {
+        // Before version 1.16, smithing tables didn't have a GUI.
+        if version < Version::V1_16 && id > 19 {
+            id += 1;
+        }
+
         Some(match id {
             // General-purpose n-row inventory. Used by chest, large chest,
             // minecart with chest, ender chest, and barrel
