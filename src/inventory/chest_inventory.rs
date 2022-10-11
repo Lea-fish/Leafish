@@ -144,6 +144,13 @@ impl Inventory for ChestInventory {
         );
 
         // Title text
+        let title = match self.name.as_str() {
+            "container.barrel" => "Barrel",
+            "container.chest" => "Chest",
+            "container.chestDouble" => "Large Chest",
+            "container.enderchest" => "Ender Chest",
+            name => name,
+        };
         basic_text_elements.push(
             ui::TextBuilder::new()
                 .alignment(VAttach::Top, HAttach::Left)
@@ -153,7 +160,7 @@ impl Inventory for ChestInventory {
                     (center.0 as i32 - total_width_scaled / 2 + icon_scale * 8) as f64,
                     (center.1 as i32 - total_height_scaled / 2 + icon_scale * 6) as f64,
                 )
-                .text(&self.name)
+                .text(title)
                 .colour((64, 64, 64, 255))
                 .shadow(false)
                 .create(ui_container),
