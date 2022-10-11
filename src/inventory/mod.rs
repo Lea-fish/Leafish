@@ -1,11 +1,13 @@
 pub mod chest_inventory;
 pub mod crafting_table_inventory;
+pub mod dropper_inventory;
 pub(crate) mod material;
 pub mod player_inventory;
 pub mod slot_mapping;
 
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::crafting_table_inventory::CraftingTableInventory;
+use crate::inventory::dropper_inventory::DropperInventory;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::slot_mapping::SlotMapping;
 use crate::render::hud::{Hud, HudContext};
@@ -94,8 +96,13 @@ pub fn inventory_from_type(
         InventoryType::CraftingTable => Some(Arc::new(RwLock::new(CraftingTableInventory::new(
             renderer, base_slots, id,
         )))),
+        InventoryType::Dropper => Some(Arc::new(RwLock::new(DropperInventory::new(
+            renderer,
+            base_slots,
+            title.to_string(),
+            id,
+        )))),
         /*
-        InventoryType::Dropper => {}
         InventoryType::Anvil => {}
         InventoryType::Beacon => {}
         InventoryType::BlastFurnace => {}
