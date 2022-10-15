@@ -632,11 +632,17 @@ impl Server {
                             server.on_player_info(player_info);
                         }
                         MappedPacket::ConfirmTransaction(transaction) => {
+                            server.on_confirm_transaction(
+                                transaction.id,
+                                transaction.action_number,
+                                transaction.accepted,
+                            );
+
                             read.write_packet(
                                 packet::play::serverbound::ConfirmTransactionServerbound {
-                                    id: 0, // TODO: Use current container id, if the id of the transaction is not 0.
+                                    id: transaction.id,
                                     action_number: transaction.action_number,
-                                    accepted: true,
+                                    accepted: transaction.accepted,
                                 },
                             )
                             .unwrap();
@@ -712,10 +718,13 @@ impl Server {
                                 .try_close_inventory(server.screen_sys.clone());
                         }
                         MappedPacket::WindowOpen(open) => {
-                            if open.ty_name.is_some() {
-                                print!("inv type name: {}", open.ty_name.as_ref().unwrap());
+                            let inv_type = if let Some(name) = &open.ty_name {
+                                InventoryType::from_name(name, open.slot_count.unwrap())
                             } else {
-                                let inv_type = InventoryType::from_id(open.ty.unwrap());
+                                InventoryType::from_id(open.ty.unwrap())
+                            };
+
+                            if let Some(inv_type) = inv_type {
                                 let inventory = inventory_from_type(
                                     inv_type,
                                     open.title,
@@ -887,6 +896,7 @@ impl Server {
             mapped_protocol_version,
             renderer.clone(),
             hud_context.clone(),
+            conn.clone(),
         )));
         let mut entities = Manager::default();
         let mut parallel = SystemStage::parallel();
@@ -1324,30 +1334,38 @@ impl Server {
         false
     }
 
-    #[allow(unused_must_use)]
-    pub fn on_left_click(&self) {
-        let mut entities = self.entities.write();
-        let mut mouse_buttons = entities
-            .world
-            .entity_mut(self.player.read().unwrap().1)
-            .get_mut::<MouseButtons>()
-            .unwrap();
-        mouse_buttons.left = true;
+    pub fn on_left_click(&self, focused: bool) {
+        if focused {
+            let mut entities = self.entities.write();
+            let mut mouse_buttons = entities
+                .world
+                .entity_mut(self.player.read().unwrap().1)
+                .get_mut::<MouseButtons>()
+                .unwrap();
+            mouse_buttons.left = true;
+        } else {
+            self.inventory_context
+                .write()
+                .on_click(self.renderer.clone())
+        }
     }
 
-    pub fn on_release_left_click(&self) {
-        let mut entities = self.entities.write();
-        let mut mouse_buttons = entities
-            .world
-            .entity_mut(self.player.read().unwrap().1)
-            .get_mut::<MouseButtons>()
-            .unwrap();
-        mouse_buttons.left = false;
+    pub fn on_release_left_click(&self, focused: bool) {
+        if focused {
+            let mut entities = self.entities.write();
+            let mut mouse_buttons = entities
+                .world
+                .entity_mut(self.player.read().unwrap().1)
+                .get_mut::<MouseButtons>()
+                .unwrap();
+            mouse_buttons.left = false;
+        }
+        // TODO: Pass events into inventory context when not focused
     }
 
     #[allow(unused_must_use)]
-    pub fn on_right_click(&self) {
-        if self.player.clone().read().is_some() {
+    pub fn on_right_click(&self, focused: bool) {
+        if self.player.clone().read().is_some() && focused {
             let world = self.world.clone();
             let gamemode = *self
                 .entities
@@ -1394,7 +1412,34 @@ impl Server {
                     .map_err(|_| self.disconnect_closed(None));
                 }
             }
+
+            let mut entities = self.entities.write();
+            let mut mouse_buttons = entities
+                .world
+                .entity_mut(self.player.read().unwrap().1)
+                .get_mut::<MouseButtons>()
+                .unwrap();
+            mouse_buttons.right = true;
         }
+        // TODO: Pass events into inventory context when not focused
+    }
+
+    pub fn on_release_right_click(&self, focused: bool) {
+        if focused {
+            let mut entities = self.entities.write();
+            let mut mouse_buttons = entities
+                .world
+                .entity_mut(self.player.read().unwrap().1)
+                .get_mut::<MouseButtons>()
+                .unwrap();
+            mouse_buttons.right = false;
+        }
+        // TODO: Pass events into inventory context when not focused
+    }
+
+    pub fn on_cursor_moved(&self, x: f64, y: f64) {
+        let mut inventory = self.inventory_context.write();
+        inventory.on_cursor_moved(x, y);
     }
 
     pub fn write_packet<T: protocol::PacketType>(&self, p: T) {
@@ -1585,6 +1630,12 @@ impl Server {
             });
             inventory.clone().write().set_item(slot as u16, item);
         }
+    }
+
+    fn on_confirm_transaction(&self, id: u8, action_number: i16, accepted: bool) {
+        self.inventory_context
+            .write()
+            .on_confirm_transaction(id, action_number, accepted);
     }
 
     #[allow(unused_must_use)]

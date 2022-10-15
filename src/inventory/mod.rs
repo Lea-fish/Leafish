@@ -6,28 +6,44 @@ pub mod player_inventory;
 use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::player_inventory::PlayerInventory;
-use crate::render::hud::HudContext;
+use crate::render::hud::{Hud, HudContext};
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::screen::ScreenSystem;
-use crate::ui::Container;
+use crate::ui::{Container, VAttach};
 use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
-use leafish_protocol::protocol::Version;
+use leafish_protocol::protocol::{packet, Conn, Version};
+use log::warn;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
 pub trait Inventory {
+    /// The number of item slots in this inventory.
     fn size(&self) -> u16;
 
+    /// The id of this inventory. This is either sent to the client by the open
+    /// open window packet, or 0 in the case of the player inventory.
     fn id(&self) -> i32;
 
-    fn name(&self) -> Option<&String>;
+    /// Get this inventory's current action number. This is a sequence number
+    /// sent with every window click packet to allow the server to determine if
+    /// any conflicts occurred.
+    fn get_client_state_id(&self) -> i16;
 
-    fn get_item(&self, slot: u16) -> Option<Item>;
+    /// Set this inventory's action number. This is normally only done when the
+    /// server sends a confirm transaction packet.
+    fn set_client_state_id(&mut self, client_state_id: i16);
 
-    fn set_item(&mut self, slot: u16, item: Option<Item>);
+    /// Get the item currently stored in a slot.
+    fn get_item(&self, slot_id: u16) -> Option<Item>;
+
+    /// Set the new item in a slot, replacing any item previous in the slot.
+    fn set_item(&mut self, slot_id: u16, item: Option<Item>);
+
+    /// Find the slot containing this position on the screen.
+    fn get_slot(&self, x: f64, y: f64) -> Option<u8>;
 
     fn init(
         &mut self,
@@ -42,10 +58,6 @@ pub trait Inventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     );
-
-    fn close(&mut self);
-
-    fn click_at(&self, cursor: (u32, u32)); // TODO: Pass mouse data (buttons, wheel etc and shift button state)
 
     fn resize(
         &mut self,
@@ -124,6 +136,13 @@ impl Slot {
         self.y = y;
         self.size = size;
     }
+
+    pub fn is_within(&self, x: f64, y: f64) -> bool {
+        (self.x - self.size / 2.0) <= x
+            && x <= (self.x + self.size / 2.0)
+            && self.y <= y
+            && y <= (self.y + self.size)
+    }
 }
 
 pub struct InventoryContext {
@@ -134,6 +153,9 @@ pub struct InventoryContext {
     pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
     pub base_inventory: Arc<RwLock<BaseInventory>>,
+    mouse_position: Option<(f64, f64)>,
+    conn: Arc<RwLock<Option<Conn>>>,
+    dirty: bool,
 }
 
 impl InventoryContext {
@@ -141,11 +163,11 @@ impl InventoryContext {
         version: Version,
         renderer: Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
+        conn: Arc<RwLock<Option<Conn>>>,
     ) -> Self {
-        let player_inventory = Arc::new(RwLock::new(PlayerInventory::new(
-            version,
+        let base_inventory = Arc::new(RwLock::new(BaseInventory::new(
+            hud_context,
             renderer.clone(),
-            hud_context.clone(),
         )));
         Self {
             cursor: None,
@@ -153,12 +175,15 @@ impl InventoryContext {
             inventory: None,
             safe_inventory: None,
             has_inv_open: false,
-            player_inventory: player_inventory.clone(),
-            base_inventory: Arc::new(RwLock::new(BaseInventory::new(
-                hud_context,
-                player_inventory,
+            player_inventory: Arc::new(RwLock::new(PlayerInventory::new(
+                version,
                 renderer,
+                base_inventory.clone(),
             ))),
+            base_inventory,
+            mouse_position: None,
+            conn,
+            dirty: false,
         }
     }
 
@@ -181,11 +206,124 @@ impl InventoryContext {
     pub fn try_close_inventory(&mut self, screen_sys: Arc<ScreenSystem>) -> bool {
         if self.has_inv_open {
             self.has_inv_open = false;
-            self.safe_inventory.take();
+            if let Some(inventory) = self.safe_inventory.take() {
+                let inventory_id = inventory.read().id() as u8;
+                let mut conn = self.conn.write();
+                let conn = conn.as_mut().unwrap();
+                packet::send_close_window(conn, inventory_id).unwrap();
+            }
             screen_sys.pop_screen();
             return true;
         }
         false
+    }
+
+    pub fn draw_cursor(
+        &mut self,
+        renderer: Arc<Renderer>,
+        ui_container: &mut Container,
+        inventory_window: &mut InventoryWindow,
+    ) {
+        if self.dirty {
+            self.dirty = false;
+            inventory_window.cursor_element.clear();
+            if let Some(item) = &self.cursor {
+                if let Some(mouse_position) = &self.mouse_position {
+                    let scale = Hud::icon_scale(renderer.clone());
+                    let (x, y) = *mouse_position;
+                    let x = x - (renderer.screen_data.read().safe_width / 2) as f64;
+                    let y = y - scale * 8.0;
+
+                    InventoryWindow::draw_item(
+                        item,
+                        x,
+                        y,
+                        &mut inventory_window.cursor_element,
+                        ui_container,
+                        renderer,
+                        VAttach::Top,
+                    );
+                }
+            }
+        }
+    }
+
+    pub fn on_click(&mut self, renderer: Arc<Renderer>) {
+        if let Some(inventory) = &self.safe_inventory {
+            let mut inventory = inventory.write();
+
+            if let Some((x, y)) = self.mouse_position {
+                let x = x - (renderer.screen_data.read().safe_width / 2) as f64;
+
+                if let Some(slot) = inventory.get_slot(x as f64, y as f64) {
+                    self.dirty = true;
+                    let mut item = inventory.get_item(slot as u16);
+                    let mut conn = self.conn.write();
+                    let conn = conn.as_mut().unwrap();
+
+                    // Send the update to the server
+                    packet::send_click_container(
+                        conn,
+                        inventory.id() as u8,
+                        slot as i16,
+                        packet::InventoryOperation::LeftClick,
+                        inventory.get_client_state_id() as u16,
+                        item.as_ref().map(|i| i.stack.clone()),
+                    )
+                    .unwrap();
+
+                    // Simulate the operation on the inventory screen.
+                    (self.cursor, item) = match (self.cursor.clone(), item) {
+                        (Some(mut cursor), Some(mut item)) => {
+                            // Merge the cursor into a slot stack of the same
+                            // material.
+                            if item.is_stackable(&cursor) {
+                                let max = item.material.get_stack_size(conn.get_version());
+                                let total = (item.stack.count + cursor.stack.count) as u8;
+                                item.stack.count = total.min(max) as isize;
+
+                                if total > max {
+                                    cursor.stack.count = (total - max) as isize;
+                                    (Some(cursor), Some(item))
+                                } else {
+                                    (None, Some(item))
+                                }
+                            } else {
+                                (Some(item), Some(cursor))
+                            }
+                        }
+                        (Some(cursor), None) => (None, Some(cursor)),
+                        (None, Some(item)) => (Some(item), None),
+                        (None, None) => (None, None),
+                    };
+                    inventory.set_item(slot as u16, item);
+                }
+            }
+        }
+    }
+
+    pub fn on_cursor_moved(&mut self, x: f64, y: f64) {
+        self.mouse_position = Some((x, y));
+        self.dirty = true;
+    }
+
+    pub fn on_confirm_transaction(&self, id: u8, action_number: i16, _accepted: bool) {
+        if id as i32 == self.player_inventory.read().id() {
+            self.player_inventory
+                .write()
+                .set_client_state_id(action_number);
+        } else if let Some(inventory) = &self.safe_inventory {
+            let mut inventory = inventory.write();
+            if id as i32 != inventory.id() {
+                warn!(
+                    "Expected inventory id {}, but instead got {id}",
+                    inventory.id()
+                );
+                return;
+            }
+
+            inventory.set_client_state_id(action_number);
+        }
     }
 }
 
@@ -216,9 +354,13 @@ pub enum InventoryType {
 }
 
 impl InventoryType {
-    pub fn from_id(id: i32) -> Self {
-        match id {
+    // Lookup a window type based on the inventory type strings used in 1.14+.
+    pub fn from_id(id: i32) -> Option<Self> {
+        Some(match id {
+            // General-purpose n-row inventory. Used by chest, large chest,
+            // minecart with chest, ender chest, and barrel
             0..=5 => InventoryType::Chest((1 + id) as u8),
+            // Used by dispenser or dropper
             6 => InventoryType::Dropper,
             7 => InventoryType::Anvil,
             8 => InventoryType::Beacon,
@@ -228,6 +370,7 @@ impl InventoryType {
             12 => InventoryType::EnchantingTable,
             13 => InventoryType::Furnace,
             14 => InventoryType::Grindstone,
+            // Used by hopper or minecart with hopper
             15 => InventoryType::Hopper,
             16 => InventoryType::Lectern,
             17 => InventoryType::Loom,
@@ -237,12 +380,39 @@ impl InventoryType {
             21 => InventoryType::Smoker,
             22 => InventoryType::CartographyTable,
             23 => InventoryType::Stonecutter,
-            _ => InventoryType::Chest(1),
-        }
+            _ => {
+                warn!("Unhandled inventory type {id}");
+                return None;
+            }
+        })
     }
 
-    pub fn from_name(_name: String) -> Self {
-        InventoryType::Chest(1)
+    // Lookup a window type based on the inventory type strings used between
+    // 1.8 and 1.13.
+    pub fn from_name(name: &str, slot_count: u8) -> Option<Self> {
+        Some(match name {
+            "minecraft:anvil" => InventoryType::Anvil,
+            "minecraft:beacon" => InventoryType::Beacon,
+            "minecraft:brewing_stand" => InventoryType::BrewingStand,
+            "minecraft:chest" => {
+                if slot_count % 9 != 0 {
+                    warn!("Chest slot count of {slot_count} wasn't divisible by 9");
+                    return None;
+                }
+                InventoryType::Chest(slot_count / 9)
+            }
+            "minecraft:crafting_table" => InventoryType::CraftingTable,
+            "minecraft:dispenser" => InventoryType::Dropper,
+            "minecraft:dropper" => InventoryType::Dropper,
+            "minecraft:enchanting_table" => InventoryType::EnchantingTable,
+            "minecraft:furnace" => InventoryType::Furnace,
+            "minecraft:hopper" => InventoryType::Hopper,
+            "minecraft:shulker_box" => InventoryType::ShulkerBox,
+            _ => {
+                warn!("Unhandled inventory type {name}");
+                return None;
+            }
+        })
     }
 }
 
@@ -252,7 +422,15 @@ pub struct Item {
     pub material: Material,
 }
 
-#[derive(Debug, Clone)]
+impl Item {
+    /// Check if this item stack matches another, allowing these to be merged
+    /// on an inventory slot.
+    pub fn is_stackable(&self, other: &Item) -> bool {
+        self.material == other.material && self.stack.damage == other.stack.damage
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Material {
     Air,                             // 1.7.10 (id: 0, stack: 0)| 1.13 (id: 9648)
     Stone,                           // 1.7.10 (id: 1)| 1.13 (id: 22948)
@@ -1737,5 +1915,9 @@ impl Material {
             Material::Shears => Some(Tool::Shears),
             _ => None,
         }
+    }
+
+    pub fn get_stack_size(&self, version: Version) -> u8 {
+        material::versions::get_stack_size(*self, version)
     }
 }

@@ -13,6 +13,7 @@ use std::sync::Arc;
 pub struct InventoryWindow {
     pub elements: Vec<Vec<ImageRef>>,
     pub text_elements: Vec<Vec<TextRef>>,
+    pub cursor_element: Vec<ImageRef>,
     pub inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
     base_inventory: Arc<RwLock<BaseInventory>>,
     inventory_context: Arc<RwLock<InventoryContext>>,
@@ -26,7 +27,6 @@ impl Screen for InventoryWindow {
         ui_container: &mut Container,
     ) {
         self.inventory_context
-            .clone()
             .write()
             .inventory
             .replace(self.inventory.clone());
@@ -47,8 +47,6 @@ impl Screen for InventoryWindow {
         _ui_container: &mut Container,
     ) {
         self.inventory_context.clone().write().inventory = None;
-        self.base_inventory.clone().write().close();
-        self.inventory.clone().write().close();
         self.clear_elements();
     }
 
@@ -82,7 +80,11 @@ impl Screen for InventoryWindow {
         self.inventory
             .clone()
             .write()
-            .tick(renderer, ui_container, self);
+            .tick(renderer.clone(), ui_container, self);
+        self.inventory_context
+            .clone()
+            .write()
+            .draw_cursor(renderer, ui_container, self);
     }
 
     fn on_resize(
@@ -111,7 +113,6 @@ impl Screen for InventoryWindow {
     fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
         if key == VirtualKeyCode::Escape && !down {
             self.inventory_context
-                .clone()
                 .write()
                 .try_close_inventory(game.screen_sys.clone());
         }
@@ -138,6 +139,7 @@ impl InventoryWindow {
             inventory,
             base_inventory,
             inventory_context,
+            cursor_element: vec![],
         }
     }
 }

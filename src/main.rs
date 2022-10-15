@@ -666,18 +666,23 @@ fn handle_window_event<T>(
                                 height,
                             );
                         }
-                        if game.focused && game.server.is_some() {
-                            game.server.as_ref().unwrap().on_release_left_click();
-                        }
-                    }
-                    (ElementState::Pressed, MouseButton::Right) => {
-                        if game.focused && game.server.is_some() {
-                            game.server.as_ref().unwrap().on_right_click();
+                        if let Some(server) = &game.server {
+                            server.on_release_left_click(game.focused);
                         }
                     }
                     (ElementState::Pressed, MouseButton::Left) => {
-                        if game.focused && game.server.is_some() {
-                            game.server.as_ref().unwrap().on_left_click();
+                        if let Some(server) = &game.server {
+                            server.on_left_click(game.focused);
+                        }
+                    }
+                    (ElementState::Released, MouseButton::Right) => {
+                        if let Some(server) = &game.server {
+                            server.on_release_right_click(game.focused);
+                        }
+                    }
+                    (ElementState::Pressed, MouseButton::Right) => {
+                        if let Some(server) = &game.server {
+                            server.on_right_click(game.focused);
                         }
                     }
                     (_, _) => (),
@@ -692,6 +697,9 @@ fn handle_window_event<T>(
                         let (width, height) =
                             physical_size.to_logical::<f64>(game.dpi_factor).into();
                         ui_container.hover_at(game, x, y, width, height);
+                        if let Some(server) = &game.server {
+                            server.on_cursor_moved(x, y);
+                        }
                     }
                 }
                 WindowEvent::MouseWheel { delta, .. } => {

@@ -5,40 +5,38 @@ use crate::render::Renderer;
 use crate::ui::{Container, VAttach};
 use std::sync::Arc;
 
-use crate::inventory::player_inventory::PlayerInventory;
+use crate::inventory::Slot;
 use parking_lot::RwLock;
 use std::sync::atomic::Ordering;
 
 pub struct BaseInventory {
+    slots: Vec<Slot>,
     dirty: bool,
     x_offset: f64,
     y_offset: f64,
-    custom_offset: bool,
     hud_context: Arc<RwLock<HudContext>>,
-    player_inventory: Arc<RwLock<PlayerInventory>>,
 }
 
 impl BaseInventory {
-    pub fn new(
-        hud_context: Arc<RwLock<HudContext>>,
-        player_inventory: Arc<RwLock<PlayerInventory>>,
-        renderer: Arc<Renderer>,
-    ) -> Self {
-        let icon_scale = Hud::icon_scale(renderer.clone());
-        let size = 16.0;
-        let hot_bar_offset = 6.0;
-        let slot_offset = size + size * 1.0 / 8.0;
-        Self {
-            dirty: false,
-            x_offset: -4.5,
-            y_offset: ((renderer.screen_data.read().safe_height as f64 / icon_scale + 166.0) / 2.0
-                - slot_offset
-                - hot_bar_offset)
-                / 16.0,
-            custom_offset: false,
-            hud_context,
-            player_inventory,
+    pub fn new(hud_context: Arc<RwLock<HudContext>>, renderer: Arc<Renderer>) -> Self {
+        let mut slots = vec![];
+        for _ in (0..3).rev() {
+            for _ in 0..9 {
+                slots.push(Slot::new(0.0, 0.0, 0.0));
+            }
         }
+        for _ in 0..9 {
+            slots.push(Slot::new(0.0, 0.0, 0.0));
+        }
+        let mut inv = Self {
+            slots,
+            dirty: false,
+            x_offset: 0.0,
+            y_offset: 0.0,
+            hud_context,
+        };
+        inv.update_icons(renderer);
+        inv
     }
 
     fn update_icons(&mut self, renderer: Arc<Renderer>) {
@@ -47,30 +45,18 @@ impl BaseInventory {
         let x_offset = size * self.x_offset;
         let y_offset = size * self.y_offset;
         let hot_bar_offset = scale * 4.0;
-        let slot_offset = size + size * 1.0 / 8.0;
+        let slot_offset = size + size / 8.0;
         for y in (0..3).rev() {
             for x in 0..9 {
-                self.player_inventory
-                    .clone()
-                    .write()
-                    .get_raw_slot_mut(9 + x + 9 * (2 - y))
-                    .update_position(
-                        x_offset + x as f64 * slot_offset,
-                        y_offset + -((y as f64) * slot_offset + hot_bar_offset + slot_offset),
-                        size,
-                    );
+                self.slots[x + y * 9].update_position(
+                    x_offset + x as f64 * slot_offset,
+                    y_offset + -((y as f64) * slot_offset + hot_bar_offset + slot_offset),
+                    size,
+                );
             }
         }
         for i in 0..9 {
-            self.player_inventory
-                .clone()
-                .write()
-                .get_raw_slot_mut(36 + i)
-                .update_position(
-                    x_offset + i as f64 * (size + size * 1.0 / 8.0),
-                    y_offset,
-                    size,
-                );
+            self.slots[27 + i].update_position(x_offset + i as f64 * slot_offset, y_offset, size);
         }
         self.dirty = true;
     }
@@ -78,7 +64,6 @@ impl BaseInventory {
     pub fn update_offset(&mut self, x_offset: f64, y_offset: f64, renderer: Arc<Renderer>) {
         self.x_offset = x_offset;
         self.y_offset = y_offset;
-        self.custom_offset = true;
         self.update_icons(renderer);
     }
 }
@@ -89,28 +74,29 @@ impl Inventory for BaseInventory {
     }
 
     fn id(&self) -> i32 {
-        -1
+        panic!("Base inventory doesn't have an id");
     }
 
-    fn name(&self) -> Option<&String> {
-        None
+    fn get_client_state_id(&self) -> i16 {
+        panic!("Base inventory doesn't have a state id number");
     }
 
-    fn get_item(&self, slot: u16) -> Option<Item> {
-        self.player_inventory
-            .clone()
-            .write()
-            .get_raw_slot_mut(9 + slot)
-            .item
-            .clone()
+    fn set_client_state_id(&mut self, _client_state_id: i16) {
+        panic!("Base inventory doesn't have a state id number");
     }
 
-    fn set_item(&mut self, slot: u16, item: Option<Item>) {
-        self.player_inventory
-            .clone()
-            .write()
-            .set_item(9 + slot, item);
+    fn get_item(&self, slot_id: u16) -> Option<Item> {
+        self.slots[slot_id as usize].item.clone()
+    }
+
+    fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
+        self.slots[slot_id as usize].item = item;
         self.dirty = true;
+        self.hud_context
+            .clone()
+            .read()
+            .dirty_slots
+            .store(true, Ordering::Relaxed);
     }
 
     fn init(
@@ -120,17 +106,6 @@ impl Inventory for BaseInventory {
         inventory_window: &mut InventoryWindow,
     ) {
         inventory_window.elements.push(vec![]);
-        if !self.custom_offset {
-            let icon_scale = Hud::icon_scale(renderer.clone());
-            let size = 16.0;
-            let hot_bar_offset = 6.0;
-            let slot_offset = size + size * 1.0 / 8.0;
-            self.y_offset = ((renderer.screen_data.read().safe_height as f64 / icon_scale + 166.0)
-                / 2.0
-                - slot_offset
-                - hot_bar_offset)
-                / 16.0;
-        }
         self.update_icons(renderer);
         self.hud_context
             .clone()
@@ -148,10 +123,7 @@ impl Inventory for BaseInventory {
         if self.dirty {
             self.dirty = false;
             inventory_window.elements.get_mut(0).unwrap().clear();
-            for slot in 9..45 {
-                let player_inventory = self.player_inventory.clone();
-                let mut player_inventory = player_inventory.write();
-                let slot = player_inventory.get_raw_slot_mut(slot);
+            for slot in &self.slots {
                 if slot.item.is_some() {
                     inventory_window.draw_item_internally(
                         slot.item.as_ref().unwrap(),
@@ -167,12 +139,13 @@ impl Inventory for BaseInventory {
         }
     }
 
-    fn close(&mut self) {
-        self.custom_offset = false;
-    }
-
-    fn click_at(&self, _cursor: (u32, u32)) {
-        // TODO
+    fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
+        for (i, slot) in self.slots.iter().enumerate() {
+            if slot.is_within(x, y) {
+                return Some(i as u8);
+            }
+        }
+        None
     }
 
     fn resize(

@@ -18,6 +18,7 @@ pub struct ChestInventory {
     name: String,
     slot_count: u16,
     id: i32,
+    client_state_id: i16,
 }
 
 impl ChestInventory {
@@ -61,6 +62,7 @@ impl ChestInventory {
             name,
             slot_count,
             id,
+            client_state_id: 0,
         }
     }
 
@@ -106,28 +108,30 @@ impl Inventory for ChestInventory {
         self.id
     }
 
-    fn name(&self) -> Option<&String> {
-        Some(&self.name)
+    fn get_client_state_id(&self) -> i16 {
+        self.client_state_id
     }
 
-    fn get_item(&self, slot: u16) -> Option<Item> {
-        self.slots[slot as usize].item.clone()
+    fn set_client_state_id(&mut self, client_state_id: i16) {
+        self.client_state_id = client_state_id;
     }
 
-    fn set_item(&mut self, slot: u16, item: Option<Item>) {
-        if self.slots.len() > slot as usize {
-            self.slots[slot as usize].item = item;
-            self.dirty = true;
-            self.hud_context
-                .clone()
-                .read()
-                .dirty_slots
-                .store(true, Ordering::Relaxed);
+    fn get_item(&self, slot_id: u16) -> Option<Item> {
+        if let Some(slot) = self.slots.get(slot_id as usize) {
+            slot.item.clone()
         } else {
-            self.inv_below
-                .clone()
-                .write()
-                .set_item(slot - self.slot_count, item);
+            let slot_id = slot_id - self.slots.len() as u16;
+            self.inv_below.read().get_item(slot_id)
+        }
+    }
+
+    fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
+        if let Some(slot) = self.slots.get_mut(slot_id as usize) {
+            slot.item = item;
+            self.dirty = true;
+        } else {
+            let slot_id = slot_id - self.slots.len() as u16;
+            self.inv_below.write().set_item(slot_id, item)
         }
     }
 
@@ -174,12 +178,10 @@ impl Inventory for ChestInventory {
             .scale_y(scale)
             .position(
                 icon_scale
-                    * -(176.0 / 2.0
-                        - 8.0
-                        - renderer.ui.lock().size_of_string(self.name().unwrap()) / 4.0),
+                    * -(176.0 / 2.0 - 8.0 - renderer.ui.lock().size_of_string(&self.name) / 4.0),
                 icon_scale * (6.0 + y),
             )
-            .text(self.name().unwrap())
+            .text(&self.name)
             .colour((64, 64, 64, 255))
             .shadow(false)
             .create(ui_container);
@@ -232,12 +234,16 @@ impl Inventory for ChestInventory {
         }
     }
 
-    fn close(&mut self) {
-        // TODO
-    }
-
-    fn click_at(&self, _cursor: (u32, u32)) {
-        // TODO
+    fn get_slot(&self, x: f64, y: f64) -> Option<u8> {
+        for (i, slot) in self.slots.iter().enumerate() {
+            if slot.is_within(x, y) {
+                return Some(i as u8);
+            }
+        }
+        self.inv_below
+            .read()
+            .get_slot(x, y)
+            .map(|i| i + self.slots.len() as u8)
     }
 
     fn resize(
