@@ -4,7 +4,8 @@ use crate::screen::{Screen, ScreenSystem};
 use crate::ui;
 use crate::ui::{Container, ImageRef};
 use leafish_protocol::protocol::packet::play::serverbound::ClientStatus;
-use leafish_protocol::protocol::{VarInt, Version};
+use leafish_protocol::protocol::VarInt;
+use shared::Version;
 use std::sync::Arc;
 
 pub struct Respawn {

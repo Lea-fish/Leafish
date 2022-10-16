@@ -303,17 +303,18 @@ impl Factory {
             }
         };
 
-        let file = match self
-            .resources
-            .read()
-            .open(plugin, &format!("models/block/{}.json", model_name))
-        {
+        let filename = if let Some((_, model_name)) = model_name.split_once(':') {
+            format!("models/{}.json", model_name)
+        } else if model_name.starts_with("block/") {
+            format!("models/{}.json", &model_name)
+        } else {
+            format!("models/block/{}.json", model_name)
+        };
+
+        let file = match self.resources.read().open(plugin, &filename) {
             Some(val) => val,
             None => {
-                error!(
-                    "Couldn't find model {}",
-                    format!("models/block/{}.json", model_name)
-                );
+                error!("Couldn't find model {}", filename);
                 return None;
             }
         };
@@ -322,10 +323,7 @@ impl Factory {
         let mut model = match self.parse_model(plugin, &block_model) {
             Some(val) => val,
             None => {
-                error!(
-                    "Failed to parse model {}",
-                    format!("models/block/{}.json", model_name)
-                );
+                error!("Failed to parse model {}", filename);
                 return None;
             }
         };
@@ -340,6 +338,10 @@ impl Factory {
     fn parse_model(&self, plugin: &str, v: &serde_json::Value) -> Option<RawModel> {
         let parent = v.get("parent").and_then(|v| v.as_str()).unwrap_or("");
         let mut model = if !parent.is_empty() && !parent.starts_with("builtin/") {
+            let parent = match parent.split_once(':') {
+                Some(parent) => parent.1,
+                None => parent,
+            };
             let file = match self
                 .resources
                 .read()
@@ -828,7 +830,7 @@ pub struct StateModel {
 
 impl StateModel {
     pub fn get_variants(&self, name: &str) -> Option<&Variants> {
-        self.variants.get(name)
+        self.variants.get(name).or_else(|| self.variants.get(""))
     }
 }
 
@@ -1005,6 +1007,8 @@ impl Model {
                             vert.z as i32,
                             &factory.foliage_colors,
                         ),
+                        // TODO: Choose water color based on biome
+                        TintType::Water => (63, 118, 228),
                     }
                 } else {
                     (255, 255, 255)

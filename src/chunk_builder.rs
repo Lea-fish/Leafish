@@ -212,7 +212,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
                 }
 
                 match block {
-                    block::Block::Water { .. } | block::Block::FlowingWater { .. } => {
+                    block::Block::Water { .. } => {
                         let tex = models.read().textures.clone();
                         trans_count += model::liquid::render_liquid(
                             tex,
@@ -225,7 +225,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
                         );
                         continue;
                     }
-                    block::Block::Lava { .. } | block::Block::FlowingLava { .. } => {
+                    block::Block::Lava { .. } => {
                         let tex = models.read().textures.clone();
                         solid_count += model::liquid::render_liquid(
                             tex,
@@ -237,6 +237,18 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
                             &mut solid_buffer,
                         );
                         continue;
+                    }
+                    b if b.is_waterlogged() => {
+                        let tex = models.read().textures.clone();
+                        trans_count += model::liquid::render_liquid(
+                            tex,
+                            false,
+                            &snapshot,
+                            x,
+                            y,
+                            z,
+                            &mut trans_buffer,
+                        );
                     }
                     _ => {}
                 }

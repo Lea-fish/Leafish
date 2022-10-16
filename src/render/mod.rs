@@ -1490,7 +1490,7 @@ impl TextureManager {
             if let Ok(img) = image::load_from_memory(&data) {
                 let (width, height) = img.dimensions();
                 // Might be animated
-                if (name.starts_with("blocks/") || name.starts_with("items/")) && width != height {
+                if (name.starts_with("block/") || name.starts_with("item/")) && width != height {
                     let id = img.to_rgba8().into_vec();
                     let frame = id[..(width * width * 4) as usize].to_owned();
                     if let Some(mut ani) = self.load_animation(plugin, name, &img, id) {

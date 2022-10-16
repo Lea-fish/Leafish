@@ -1,5 +1,5 @@
 use crate::inventory::Material;
-use leafish_protocol::protocol::Version;
+use shared::Version;
 
 mod mapping1_10_2;
 mod mapping1_11_2;
@@ -21,9 +21,11 @@ pub fn to_material(id: u16, version: Version) -> Material {
         Version::V1_11 => mapping1_11_2::to_material(id),
         Version::V1_12 => mapping1_12_2::to_material(id),
         Version::V1_13 => mapping1_13_2::to_material(id),
+        Version::V1_13_2 => mapping1_13_2::to_material(id),
         Version::V1_14 => mapping1_14_4::to_material(id),
         Version::V1_15 => mapping1_15_2::to_material(id),
         Version::V1_16 => mapping1_16_5::to_material(id),
+        Version::V1_16_2 => mapping1_16_5::to_material(id),
         _ => Material::Air,
     }
 }
@@ -38,9 +40,11 @@ pub fn to_id(material: Material, version: Version) -> u16 {
         Version::V1_11 => mapping1_11_2::to_id(material),
         Version::V1_12 => mapping1_12_2::to_id(material),
         Version::V1_13 => mapping1_13_2::to_id(material),
+        Version::V1_13_2 => mapping1_13_2::to_id(material),
         Version::V1_14 => mapping1_14_4::to_id(material),
         Version::V1_15 => mapping1_15_2::to_id(material),
         Version::V1_16 => mapping1_16_5::to_id(material),
+        Version::V1_16_2 => mapping1_16_5::to_id(material),
         _ => 0,
     }
 }
@@ -54,9 +58,11 @@ pub fn get_stack_size(material: Material, version: Version) -> u8 {
         Version::V1_11 => mapping1_11_2::get_stack_size(material),
         Version::V1_12 => mapping1_12_2::get_stack_size(material),
         Version::V1_13 => mapping1_13_2::get_stack_size(material),
+        Version::V1_13_2 => mapping1_13_2::get_stack_size(material),
         Version::V1_14 => mapping1_14_4::get_stack_size(material),
         Version::V1_15 => mapping1_15_2::get_stack_size(material),
         Version::V1_16 => mapping1_16_5::get_stack_size(material),
+        Version::V1_16_2 => mapping1_16_5::get_stack_size(material),
         _ => 64,
     }
 }

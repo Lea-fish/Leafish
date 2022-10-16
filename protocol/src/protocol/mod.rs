@@ -44,7 +44,7 @@ use trust_dns_resolver::Resolver;
 
 use crate::format;
 use crate::nbt;
-use crate::shared::Position;
+use crate::shared::{Position, Version};
 
 pub mod forge;
 pub mod login;
@@ -58,56 +58,6 @@ pub const SUPPORTED_PROTOCOLS: [i32; 21] = [
 
 static CURRENT_PROTOCOL_VERSION: AtomicI32 = AtomicI32::new(SUPPORTED_PROTOCOLS[0]);
 static NETWORK_DEBUG: AtomicBool = AtomicBool::new(false);
-
-/// A list of all supported versions
-#[derive(PartialOrd, PartialEq, Debug, Copy, Clone)]
-pub enum Version {
-    Other,
-    Old,
-    V1_7,
-    V1_8,
-    V1_9,
-    V1_10,
-    V1_11,
-    V1_12,
-    V1_13,
-    V1_14,
-    V1_15,
-    V1_16,
-    New,
-}
-
-impl Version {
-    const NEWEST: Version = Version::V1_16;
-    /// This is only the newest *supported* version
-
-    pub fn from_id(protocol_version: u32) -> Version {
-        match protocol_version {
-            0..=4 => Version::Old,
-            5 => Version::V1_7,
-            47 => Version::V1_8,
-            107..=110 => Version::V1_9,
-            210 => Version::V1_10,
-            315..=316 => Version::V1_11,
-            335..=340 => Version::V1_12,
-            393..=404 => Version::V1_13,
-            477..=498 => Version::V1_14,
-            573..=578 => Version::V1_15,
-            735..=754 => Version::V1_16,
-            755..=u32::MAX => Version::New,
-            _ => Version::Other,
-        }
-    }
-
-    pub fn is_supported(&self) -> bool {
-        match self {
-            Version::Old => false,
-            Version::New => false,
-            Version::Other => false,
-            _ => true,
-        }
-    }
-}
 
 pub fn current_protocol_version() -> i32 {
     CURRENT_PROTOCOL_VERSION.load(Ordering::Relaxed)
