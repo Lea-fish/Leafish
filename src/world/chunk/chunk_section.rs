@@ -8,6 +8,7 @@ use parking_lot::RwLock;
 use std::cmp::Ordering;
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct ChunkSection {
     pub cull_info: chunk_builder::CullInfo,
     pub render_buffer: Arc<RwLock<render::ChunkBuffer>>,
@@ -147,8 +148,8 @@ impl ChunkSectionSnapshotGroup {
         ];
         for xo in -1..2 {
             for zo in -1..2 {
-                let chunk = chunk_lookup.get(&CPos(x + xo, z + zo));
-                let chunk = chunk.as_ref();
+                let chunks = chunk_lookup.read();
+                let chunk = chunks.get(&CPos(x + xo, z + zo));
                 for yo in -1..2 {
                     let section = if let Some(chunk) = chunk {
                         if y + yo != (y + yo) & 15 {

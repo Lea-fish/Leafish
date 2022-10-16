@@ -13,9 +13,10 @@ use bevy_ecs::prelude::Entity;
 
 mod chunk_section;
 
-#[derive(PartialEq, Eq, Hash, Clone, Copy)]
+#[derive(PartialEq, Eq, Hash, Clone, Copy, PartialOrd, Ord)]
 pub struct CPos(pub i32, pub i32);
 
+#[derive(Clone)]
 pub struct Chunk {
     pub(crate) position: CPos,
 
