@@ -1,11 +1,17 @@
-pub mod base_inventory;
 pub mod chest_inventory;
+pub mod crafting_table_inventory;
+pub mod dropper_inventory;
+pub mod furnace_inventory;
 pub(crate) mod material;
 pub mod player_inventory;
+pub mod slot_mapping;
 
-use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::chest_inventory::ChestInventory;
+use crate::inventory::crafting_table_inventory::CraftingTableInventory;
+use crate::inventory::dropper_inventory::DropperInventory;
+use crate::inventory::furnace_inventory::FurnaceInventory;
 use crate::inventory::player_inventory::PlayerInventory;
+use crate::inventory::slot_mapping::SlotMapping;
 use crate::render::hud::{Hud, HudContext};
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
@@ -17,6 +23,7 @@ use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::{packet, Conn, Version};
 use log::warn;
 use parking_lot::RwLock;
+use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
 pub trait Inventory {
@@ -43,7 +50,7 @@ pub trait Inventory {
     fn set_item(&mut self, slot_id: u16, item: Option<Item>);
 
     /// Find the slot containing this position on the screen.
-    fn get_slot(&self, x: f64, y: f64) -> Option<u8>;
+    fn get_slot(&self, x: f64, y: f64) -> Option<u16>;
 
     fn init(
         &mut self,
@@ -75,8 +82,7 @@ pub fn inventory_from_type(
     ty: InventoryType,
     title: Component,
     renderer: Arc<Renderer>,
-    hud_context: Arc<RwLock<HudContext>>,
-    inv_below: Arc<RwLock<BaseInventory>>,
+    base_slots: Arc<RwLock<SlotMapping>>,
     id: i32,
 ) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
     match ty {
@@ -84,20 +90,34 @@ pub fn inventory_from_type(
         InventoryType::Main => {}*/
         InventoryType::Chest(rows) => Some(Arc::new(RwLock::new(ChestInventory::new(
             renderer,
-            hud_context,
-            inv_below,
-            rows as u16 * 9,
+            base_slots,
+            rows,
             title.to_string(),
             id,
         )))),
-        /*InventoryType::Dropper => {}
+        InventoryType::CraftingTable => Some(Arc::new(RwLock::new(CraftingTableInventory::new(
+            renderer, base_slots, id,
+        )))),
+        InventoryType::Dropper => Some(Arc::new(RwLock::new(DropperInventory::new(
+            renderer,
+            base_slots,
+            title.to_string(),
+            id,
+        )))),
+        InventoryType::Furnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
+        InventoryType::Smoker => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
+        InventoryType::BlastFurnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
+        /*
         InventoryType::Anvil => {}
         InventoryType::Beacon => {}
-        InventoryType::BlastFurnace => {}
         InventoryType::BrewingStand => {}
-        InventoryType::CraftingTable => {}
         InventoryType::EnchantingTable => {}
-        InventoryType::Furnace => {}
         InventoryType::Grindstone => {}
         InventoryType::Hopper => {}
         InventoryType::Lectern => {}
@@ -105,7 +125,6 @@ pub fn inventory_from_type(
         InventoryType::Merchant => {}
         InventoryType::ShulkerBox => {}
         InventoryType::SmithingTable => {}
-        InventoryType::Smoker => {}
         InventoryType::CartographyTable => {}
         InventoryType::Stonecutter => {}
         InventoryType::Horse => {}*/
@@ -113,6 +132,7 @@ pub fn inventory_from_type(
     }
 }
 
+#[derive(Debug)]
 pub struct Slot {
     pub x: f64,
     pub y: f64,
@@ -138,10 +158,7 @@ impl Slot {
     }
 
     pub fn is_within(&self, x: f64, y: f64) -> bool {
-        (self.x - self.size / 2.0) <= x
-            && x <= (self.x + self.size / 2.0)
-            && self.y <= y
-            && y <= (self.y + self.size)
+        self.x <= x && x <= (self.x + self.size) && self.y <= y && y <= (self.y + self.size)
     }
 }
 
@@ -152,7 +169,8 @@ pub struct InventoryContext {
     pub safe_inventory: Option<Arc<RwLock<dyn Inventory + Send + Sync>>>,
     pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
-    pub base_inventory: Arc<RwLock<BaseInventory>>,
+    pub base_slots: Arc<RwLock<SlotMapping>>,
+    hud_context: Arc<RwLock<HudContext>>,
     mouse_position: Option<(f64, f64)>,
     conn: Arc<RwLock<Option<Conn>>>,
     dirty: bool,
@@ -165,10 +183,23 @@ impl InventoryContext {
         hud_context: Arc<RwLock<HudContext>>,
         conn: Arc<RwLock<Option<Conn>>>,
     ) -> Self {
-        let base_inventory = Arc::new(RwLock::new(BaseInventory::new(
-            hud_context,
-            renderer.clone(),
-        )));
+        let base_slots = {
+            let mut slots = SlotMapping::new((160, 74));
+            // Main 9x3 grid
+            for x in 0..9 {
+                for y in 0..3 {
+                    slots.add_slot(x + y * 9, (x as i32 * 18, y as i32 * 18));
+                }
+            }
+
+            // Hotbar
+            for x in 0..9 {
+                slots.add_slot(x + 27, (x as i32 * 18, 58));
+            }
+
+            Arc::new(RwLock::new(slots))
+        };
+
         Self {
             cursor: None,
             hotbar_index: 0,
@@ -178,9 +209,10 @@ impl InventoryContext {
             player_inventory: Arc::new(RwLock::new(PlayerInventory::new(
                 version,
                 renderer,
-                base_inventory.clone(),
+                base_slots.clone(),
             ))),
-            base_inventory,
+            base_slots,
+            hud_context,
             mouse_position: None,
             conn,
             dirty: false,
@@ -194,11 +226,7 @@ impl InventoryContext {
         self_ref: Arc<RwLock<InventoryContext>>,
     ) {
         self.try_close_inventory(screen_sys.clone());
-        screen_sys.add_screen(Box::new(InventoryWindow::new(
-            inventory.clone(),
-            self_ref,
-            self.base_inventory.clone(),
-        )));
+        screen_sys.add_screen(Box::new(InventoryWindow::new(inventory.clone(), self_ref)));
         self.safe_inventory.replace(inventory.clone());
         self.has_inv_open = true;
     }
@@ -213,6 +241,10 @@ impl InventoryContext {
                 packet::send_close_window(conn, inventory_id).unwrap();
             }
             screen_sys.pop_screen();
+
+            // Closing an inventory causes any item being held to be thrown.
+            self.cursor = None;
+
             return true;
         }
         false
@@ -231,7 +263,8 @@ impl InventoryContext {
                 if let Some(mouse_position) = &self.mouse_position {
                     let scale = Hud::icon_scale(renderer.clone());
                     let (x, y) = *mouse_position;
-                    let x = x - (renderer.screen_data.read().safe_width / 2) as f64;
+                    // Center the icon on the mouse position
+                    let x = x - scale * 8.0;
                     let y = y - scale * 8.0;
 
                     InventoryWindow::draw_item(
@@ -248,14 +281,12 @@ impl InventoryContext {
         }
     }
 
-    pub fn on_click(&mut self, renderer: Arc<Renderer>) {
+    pub fn on_click(&mut self) {
         if let Some(inventory) = &self.safe_inventory {
             let mut inventory = inventory.write();
 
             if let Some((x, y)) = self.mouse_position {
-                let x = x - (renderer.screen_data.read().safe_width / 2) as f64;
-
-                if let Some(slot) = inventory.get_slot(x as f64, y as f64) {
+                if let Some(slot) = inventory.get_slot(x, y) {
                     self.dirty = true;
                     let mut item = inventory.get_item(slot as u16);
                     let mut conn = self.conn.write();
@@ -297,6 +328,10 @@ impl InventoryContext {
                         (None, None) => (None, None),
                     };
                     inventory.set_item(slot as u16, item);
+                    self.hud_context
+                        .write()
+                        .dirty_slots
+                        .store(true, Ordering::Relaxed);
                 }
             }
         }
@@ -327,7 +362,8 @@ impl InventoryContext {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub enum InventoryType {
     Internal, // For internal use only.
     Main,
@@ -354,8 +390,13 @@ pub enum InventoryType {
 }
 
 impl InventoryType {
-    // Lookup a window type based on the inventory type strings used in 1.14+.
-    pub fn from_id(id: i32) -> Option<Self> {
+    /// Lookup a window type based on the inventory type strings used in 1.14+.
+    pub fn from_id(version: Version, mut id: i32) -> Option<Self> {
+        // Before version 1.16, smithing tables didn't have a GUI.
+        if version < Version::V1_16 && id > 19 {
+            id += 1;
+        }
+
         Some(match id {
             // General-purpose n-row inventory. Used by chest, large chest,
             // minecart with chest, ender chest, and barrel
@@ -387,8 +428,8 @@ impl InventoryType {
         })
     }
 
-    // Lookup a window type based on the inventory type strings used between
-    // 1.8 and 1.13.
+    /// Lookup a window type based on the inventory type strings used between
+    /// 1.8 and 1.13.
     pub fn from_name(name: &str, slot_count: u8) -> Option<Self> {
         Some(match name {
             "minecraft:anvil" => InventoryType::Anvil,

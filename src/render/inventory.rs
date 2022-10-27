@@ -1,4 +1,3 @@
-use crate::inventory::base_inventory::BaseInventory;
 use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
@@ -15,7 +14,6 @@ pub struct InventoryWindow {
     pub text_elements: Vec<Vec<TextRef>>,
     pub cursor_element: Vec<ImageRef>,
     pub inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
-    base_inventory: Arc<RwLock<BaseInventory>>,
     inventory_context: Arc<RwLock<InventoryContext>>,
 }
 
@@ -30,10 +28,6 @@ impl Screen for InventoryWindow {
             .write()
             .inventory
             .replace(self.inventory.clone());
-        self.base_inventory
-            .clone()
-            .write()
-            .init(renderer.clone(), ui_container, self);
         self.inventory
             .clone()
             .write()
@@ -73,10 +67,6 @@ impl Screen for InventoryWindow {
         ui_container: &mut Container,
         _delta: f64,
     ) {
-        self.base_inventory
-            .clone()
-            .write()
-            .tick(renderer.clone(), ui_container, self);
         self.inventory
             .clone()
             .write()
@@ -94,13 +84,6 @@ impl Screen for InventoryWindow {
         ui_container: &mut Container,
     ) {
         self.clear_elements();
-        self.base_inventory.clone().write().resize(
-            renderer.screen_data.read().safe_width,
-            renderer.screen_data.read().safe_height,
-            renderer.clone(),
-            ui_container,
-            self,
-        );
         self.inventory.clone().write().resize(
             renderer.screen_data.read().safe_width,
             renderer.screen_data.read().safe_height,
@@ -131,13 +114,11 @@ impl InventoryWindow {
     pub fn new(
         inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
         inventory_context: Arc<RwLock<InventoryContext>>,
-        base_inventory: Arc<RwLock<BaseInventory>>,
     ) -> Self {
         Self {
             elements: vec![],
             text_elements: vec![],
             inventory,
-            base_inventory,
             inventory_context,
             cursor_element: vec![],
         }
@@ -169,7 +150,7 @@ impl InventoryWindow {
         let image = ui::ImageBuilder::new()
             .texture_coords((0.0, 0.0, 1.0, 1.0))
             .position(x, y)
-            .alignment(v_attach, ui::HAttach::Center)
+            .alignment(v_attach, ui::HAttach::Left)
             .size(icon_scale * 16.0, icon_scale * 16.0)
             .texture(format!("minecraft:{}", texture))
             .create(ui_container);

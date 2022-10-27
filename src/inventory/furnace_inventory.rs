@@ -10,52 +10,46 @@ use std::sync::Arc;
 use parking_lot::RwLock;
 
 const WINDOW_WIDTH: i32 = 176;
-const SLOT_SIZE: i32 = 18;
-const INVENTORY_HEIGHT: i32 = 96;
+const WINDOW_HEIGHT: i32 = 166;
 
-fn chest_height(rows: u8) -> i32 {
-    rows as i32 * SLOT_SIZE + 17
-}
-
-pub struct ChestInventory {
+pub struct FurnaceInventory {
     slots: SlotMapping,
-    name: String,
-    rows: u8,
-    id: i32,
     client_state_id: i16,
+    ty: InventoryType,
+    id: i32,
 }
 
-impl ChestInventory {
+impl FurnaceInventory {
     pub fn new(
         renderer: Arc<Renderer>,
         base_slots: Arc<RwLock<SlotMapping>>,
-        rows: u8,
-        name: String,
+        ty: InventoryType,
         id: i32,
     ) -> Self {
-        let mut slots = SlotMapping::new((WINDOW_WIDTH, chest_height(rows) + INVENTORY_HEIGHT));
-        let child_range = ((rows as u16 * 9)..(rows as u16 * 9 + 36)).collect();
-        slots.set_child(base_slots, (8, chest_height(rows) + 14), child_range);
+        let mut slots = SlotMapping::new((WINDOW_WIDTH, WINDOW_HEIGHT));
+        slots.set_child(base_slots, (8, 84), (3..39).collect());
 
-        for y in 0..rows as i32 {
-            for x in 0..9 {
-                slots.add_slot((x + y * 9) as u16, (8 + x * SLOT_SIZE, (y + 1) * SLOT_SIZE));
-            }
-        }
+        // Ingredient slot
+        slots.add_slot(0, (56, 17));
+
+        // Fuel slot
+        slots.add_slot(1, (56, 53));
+
+        // Output slot
+        slots.add_slot(2, (116, 35));
 
         slots.update_icons(renderer, (0, 0), None);
 
         Self {
             slots,
-            rows,
-            name,
-            id,
             client_state_id: 0,
+            ty,
+            id,
         }
     }
 }
 
-impl Inventory for ChestInventory {
+impl Inventory for FurnaceInventory {
     fn size(&self) -> u16 {
         self.slots.size()
     }
@@ -91,76 +85,56 @@ impl Inventory for ChestInventory {
         inventory_window: &mut InventoryWindow,
     ) {
         inventory_window.elements.push(vec![]); // Window texture
-        inventory_window.elements.push(vec![]); // Chest slots
+        inventory_window.elements.push(vec![]); // Furnace slots
         inventory_window.elements.push(vec![]); // Base slots
         inventory_window.text_elements.push(vec![]);
 
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
 
-        let icon_scale = Hud::icon_scale(renderer.clone()) as i32;
-        let chest_height_scaled = icon_scale * chest_height(self.rows);
-        let inventory_height_scaled = icon_scale * INVENTORY_HEIGHT;
-        let total_height_scaled = chest_height_scaled + inventory_height_scaled;
-        let total_width_scaled = icon_scale * WINDOW_WIDTH;
         let center = renderer.screen_data.read().center();
+        let icon_scale = Hud::icon_scale(renderer.clone());
 
-        // Chest section
+        // Furnace texture
         basic_elements.push(
             ui::ImageBuilder::new()
                 .texture_coords((
                     0.0 / 256.0,
                     0.0 / 256.0,
                     WINDOW_WIDTH as f64 / 256.0,
-                    chest_height(self.rows) as f64 / 256.0,
+                    WINDOW_HEIGHT as f64 / 256.0,
                 ))
                 .position(
-                    (center.0 as i32 - total_width_scaled / 2) as f64,
-                    (center.1 as i32 - total_height_scaled / 2) as f64,
+                    center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0,
+                    center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0,
                 )
-                .alignment(VAttach::Top, HAttach::Left)
-                .size(total_width_scaled as f64, chest_height_scaled as f64)
-                .texture("minecraft:gui/container/generic_54")
-                .create(ui_container),
-        );
-
-        // Player inventory
-        basic_elements.push(
-            ui::ImageBuilder::new()
-                .texture_coords((
-                    0.0 / 256.0,
-                    (chest_height(6) + 1) as f64 / 256.0,
-                    WINDOW_WIDTH as f64 / 256.0,
-                    INVENTORY_HEIGHT as f64 / 256.0,
-                ))
-                .position(
-                    (center.0 as i32 - total_width_scaled / 2) as f64,
-                    (center.1 as i32 - total_height_scaled / 2 + chest_height_scaled) as f64,
+                .alignment(ui::VAttach::Top, ui::HAttach::Left)
+                .size(
+                    icon_scale * WINDOW_WIDTH as f64,
+                    icon_scale * WINDOW_HEIGHT as f64,
                 )
-                .alignment(VAttach::Top, HAttach::Left)
-                .size(total_width_scaled as f64, inventory_height_scaled as f64)
-                .texture("minecraft:gui/container/generic_54")
+                .texture("minecraft:gui/container/furnace")
                 .create(ui_container),
         );
 
         // Title text
-        let title = match self.name.as_str() {
-            "container.barrel" => "Barrel",
-            "container.chest" => "Chest",
-            "container.chestDouble" => "Large Chest",
-            "container.enderchest" => "Ender Chest",
-            name => name,
+        let name = match self.ty {
+            InventoryType::Furnace => "Furnace",
+            InventoryType::BlastFurnace => "Blast Furnace",
+            InventoryType::Smoker => "Smoker",
+            _ => unreachable!(),
         };
+        let title_offset = renderer.ui.lock().size_of_string(name) / 4.0;
         basic_text_elements.push(
             ui::TextBuilder::new()
                 .alignment(VAttach::Top, HAttach::Left)
-                .scale_x(icon_scale as f64 / 2.0)
-                .scale_y(icon_scale as f64 / 2.0)
+                .scale_x(icon_scale / 2.0)
+                .scale_y(icon_scale / 2.0)
                 .position(
-                    (center.0 as i32 - total_width_scaled / 2 + icon_scale * 8) as f64,
-                    (center.1 as i32 - total_height_scaled / 2 + icon_scale * 6) as f64,
+                    center.0 as f64 - icon_scale * title_offset.ceil(),
+                    center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 6.0),
                 )
-                .text(title)
+                .text(name)
                 .colour((64, 64, 64, 255))
                 .shadow(false)
                 .create(ui_container),
@@ -170,13 +144,11 @@ impl Inventory for ChestInventory {
         basic_text_elements.push(
             ui::TextBuilder::new()
                 .alignment(VAttach::Top, HAttach::Left)
-                .scale_x(icon_scale as f64 / 2.0)
-                .scale_y(icon_scale as f64 / 2.0)
+                .scale_x(icon_scale / 2.0)
+                .scale_y(icon_scale / 2.0)
                 .position(
-                    (center.0 as i32 - total_width_scaled / 2 + icon_scale * 8) as f64,
-                    (center.1 as i32 - total_height_scaled / 2
-                        + icon_scale * 3
-                        + chest_height_scaled) as f64,
+                    center.0 as f64 - icon_scale * (WINDOW_WIDTH as f64 / 2.0 - 8.0),
+                    center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 72.0),
                 )
                 .text("Inventory")
                 .colour((64, 64, 64, 255))
@@ -193,6 +165,7 @@ impl Inventory for ChestInventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
+        // TODO: Render fuel level and smelting progress
         self.slots.tick(renderer, ui_container, inventory_window, 1);
     }
 
@@ -208,6 +181,6 @@ impl Inventory for ChestInventory {
     }
 
     fn ty(&self) -> InventoryType {
-        InventoryType::Chest(self.rows)
+        self.ty
     }
 }

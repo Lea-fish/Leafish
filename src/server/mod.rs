@@ -18,7 +18,7 @@ use crate::entity::player::{create_local, PlayerModel, PlayerMovement};
 use crate::entity::{EntityType, GameInfo, Gravity, MouseButtons, TargetPosition, TargetRotation};
 use crate::format;
 use crate::inventory::material::versions::to_material;
-use crate::inventory::{inventory_from_type, Inventory, InventoryContext, InventoryType, Item};
+use crate::inventory::{inventory_from_type, InventoryContext, InventoryType, Item};
 use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::protocol::{self, forge, mapped_packet, packet};
 use crate::render;
@@ -721,7 +721,8 @@ impl Server {
                             let inv_type = if let Some(name) = &open.ty_name {
                                 InventoryType::from_name(name, open.slot_count.unwrap())
                             } else {
-                                InventoryType::from_id(open.ty.unwrap())
+                                let version = server.mapped_protocol_version;
+                                InventoryType::from_id(version, open.ty.unwrap())
                             };
 
                             if let Some(inv_type) = inv_type {
@@ -729,8 +730,7 @@ impl Server {
                                     inv_type,
                                     open.title,
                                     server.renderer.clone(),
-                                    server.hud_context.clone(),
-                                    server.inventory_context.read().base_inventory.clone(),
+                                    server.inventory_context.read().base_slots.clone(),
                                     open.id,
                                 );
                                 if let Some(inventory) = inventory {
@@ -921,8 +921,7 @@ impl Server {
             .write()
             .add_stage("entity", entity_sched);
 
-        hud_context.write().player_inventory =
-            Some(inventory_context.read().player_inventory.clone());
+        hud_context.write().slots = Some(inventory_context.read().base_slots.clone());
 
         let version = resources.read().version();
         Server {
@@ -1344,9 +1343,7 @@ impl Server {
                 .unwrap();
             mouse_buttons.left = true;
         } else {
-            self.inventory_context
-                .write()
-                .on_click(self.renderer.clone())
+            self.inventory_context.write().on_click()
         }
     }
 
@@ -1394,12 +1391,12 @@ impl Server {
                             hud_context
                                 .clone()
                                 .read()
-                                .player_inventory
+                                .slots
                                 .as_ref()
                                 .unwrap()
                                 .clone()
                                 .read()
-                                .get_item((36 + hud_context.clone().read().get_slot_index()) as u16)
+                                .get_item((27 + hud_context.clone().read().get_slot_index()) as u16)
                                 .as_ref()
                                 .map(|item| item.stack.clone())
                         }),
@@ -1629,6 +1626,10 @@ impl Server {
                 }
             });
             inventory.clone().write().set_item(slot as u16, item);
+            self.hud_context
+                .write()
+                .dirty_slots
+                .store(true, Ordering::Relaxed);
         }
     }
 

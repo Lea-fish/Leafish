@@ -125,7 +125,6 @@ pub fn apply_digging(
     mut query: Query<(&MouseButtons, &mut Digging)>,
     mut effect_query: Query<&mut BlockBreakEffect>,
 ) {
-    use crate::inventory::Inventory;
     use crate::server::target::{test_block, trace_ray};
     use cgmath::EuclideanSpace;
 
@@ -140,8 +139,8 @@ pub fn apply_digging(
     let tool = {
         let inventory = inventory.read();
         let hotbar_index = inventory.hotbar_index;
-        let inventory = inventory.player_inventory.read();
-        let item = inventory.get_item(36 + hotbar_index as u16);
+        let inventory = inventory.base_slots.read();
+        let item = inventory.get_item(27 + hotbar_index as u16);
         item.and_then(|i| i.material.as_tool())
     };
 
