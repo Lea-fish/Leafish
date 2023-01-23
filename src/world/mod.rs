@@ -24,17 +24,14 @@ use byteorder::ReadBytesExt;
 use cgmath::InnerSpace;
 use collision::Frustum;
 use crossbeam_channel::{unbounded, Receiver, Sender};
-use dashmap::DashMap;
 use flate2::read::ZlibDecoder;
 use instant::Instant;
 use leafish_protocol::protocol;
-use leafish_protocol::types::hash::FNVHash;
 use leafish_protocol::types::nibble;
 use leafish_shared::direction::Direction;
 use log::warn;
 use parking_lot::RwLock;
-use std::collections::{HashMap, VecDeque};
-use std::hash::BuildHasherDefault;
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::io::{BufRead, Cursor, Read};
 use std::sync::Arc;
 
@@ -64,8 +61,8 @@ pub enum BlockEntityAction {
 }
 
 pub struct World {
-    pub chunks: Arc<DashMap<CPos, Chunk, BuildHasherDefault<FNVHash>>>,
-    pub lighting_cache: Arc<RwLock<HashMap<CPos, LightData, BuildHasherDefault<FNVHash>>>>,
+    pub chunks: Arc<RwLock<BTreeMap<CPos, Chunk>>>,
+    pub lighting_cache: Arc<RwLock<BTreeMap<CPos, LightData>>>,
 
     pub render_list: Arc<RwLock<Vec<(i32, i32, i32)>>>,
 
@@ -104,7 +101,7 @@ impl World {
     }
 
     pub fn is_chunk_loaded(&self, x: i32, z: i32) -> bool {
-        self.chunks.clone().contains_key(&CPos(x, z))
+        self.chunks.read().contains_key(&CPos(x, z))
     }
 
     pub fn set_block(&self, pos: Position, b: block::Block) {
@@ -115,8 +112,8 @@ impl World {
 
     fn set_block_raw(&self, pos: Position, b: block::Block) -> bool {
         let cpos = CPos(pos.x >> 4, pos.z >> 4);
-        let chunks = self.chunks.clone();
-        let mut chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
+        let mut chunks = self.chunks.write();
+        let chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         if chunk.set_block(pos.x & 0xF, pos.y, pos.z & 0xF, b) {
             if chunk.block_entities.contains_key(&pos) {
                 self.block_entity_actions
@@ -175,7 +172,7 @@ impl World {
     }
 
     pub fn get_block(&self, pos: Position) -> block::Block {
-        match self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
+        match self.chunks.read().get(&CPos(pos.x >> 4, pos.z >> 4)) {
             Some(chunk) => chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF),
             None => block::Missing {},
         }
@@ -183,13 +180,13 @@ impl World {
 
     pub(crate) fn set_block_light(&self, pos: Position, light: u8) {
         let cpos = CPos(pos.x >> 4, pos.z >> 4);
-        let chunks = self.chunks.clone();
-        let mut chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
+        let mut chunks = self.chunks.write();
+        let chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         chunk.set_block_light(pos.x & 0xF, pos.y, pos.z & 0xF, light);
     }
 
     pub fn get_block_light(&self, pos: Position) -> u8 {
-        match self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
+        match self.chunks.read().get(&CPos(pos.x >> 4, pos.z >> 4)) {
             Some(chunk) => chunk.get_block_light(pos.x & 0xF, pos.y, pos.z & 0xF),
             None => 0,
         }
@@ -197,13 +194,13 @@ impl World {
 
     pub(crate) fn set_sky_light(&self, pos: Position, light: u8) {
         let cpos = CPos(pos.x >> 4, pos.z >> 4);
-        let chunks = self.chunks.clone();
-        let mut chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
+        let mut chunks = self.chunks.write();
+        let chunk = chunks.entry(cpos).or_insert_with(|| Chunk::new(cpos));
         chunk.set_sky_light(pos.x & 0xF, pos.y, pos.z & 0xF, light);
     }
 
     pub fn get_sky_light(&self, pos: Position) -> u8 {
-        match self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
+        match self.chunks.read().get(&CPos(pos.x >> 4, pos.z >> 4)) {
             Some(chunk) => chunk.get_sky_light(pos.x & 0xF, pos.y, pos.z & 0xF),
             None => 15,
         }
@@ -222,8 +219,7 @@ impl World {
         while let Ok(action) = self.block_entity_actions.1.try_recv() {
             match action {
                 BlockEntityAction::Remove(pos) => {
-                    if let Some(mut chunk) =
-                        self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
+                    if let Some(chunk) = self.chunks.write().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
                     {
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
                             m.world.despawn(entity);
@@ -231,8 +227,7 @@ impl World {
                     }
                 }
                 BlockEntityAction::Create(pos) => {
-                    if let Some(mut chunk) =
-                        self.chunks.clone().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
+                    if let Some(chunk) = self.chunks.write().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
                     {
                         // Remove existing entity
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
@@ -249,7 +244,7 @@ impl World {
                 }
                 BlockEntityAction::UpdateSignText(bx) => {
                     let (pos, line1, line2, line3, line4) = *bx;
-                    if let Some(chunk) = self.chunks.clone().get(&CPos(pos.x >> 4, pos.z >> 4)) {
+                    if let Some(chunk) = self.chunks.write().get(&CPos(pos.x >> 4, pos.z >> 4)) {
                         if let Some(entity) = chunk.block_entities.get(&pos) {
                             if let Some(mut sign) = m
                                 .world
@@ -326,7 +321,7 @@ impl World {
 
     pub fn copy_cloud_heightmap(&self, data: &mut [u8]) -> bool {
         let mut dirty = false;
-        for mut c in self.chunks.clone().iter_mut() {
+        for mut c in self.chunks.write().values_mut() {
             if c.heightmap_dirty {
                 dirty = true;
                 c.heightmap_dirty = false;
@@ -363,7 +358,7 @@ impl World {
         drop(camera);
 
         let render_queue = Arc::new(RwLock::new(Vec::new()));
-        let mut process_queue = VecDeque::with_capacity(self.chunks.clone().len() * 16);
+        let mut process_queue = VecDeque::with_capacity(self.chunks.read().len() * 16);
         // debug!("processqueue size {}", self.chunks.len() * 16);
         process_queue.push_front((Direction::Invalid, start));
         let _diff = Instant::now().duration_since(start_rec);
@@ -511,7 +506,7 @@ impl World {
                 if rendered_on == frame_id {
                     return;
                 }
-                if let Some(mut chunk) = self.chunks.clone().get_mut(&CPos(pos.0, pos.2)) {
+                if let Some(mut chunk) = self.chunks.write().get_mut(&CPos(pos.0, pos.2)) {
                     chunk.sections_rendered_on[pos.1 as usize] = frame_id;
                 }
 
@@ -568,7 +563,7 @@ impl World {
             .iter()
             // .par_iter()
             .filter_map(|v| {
-                let chunks = self.chunks.clone();
+                let chunks = self.chunks.read();
                 let chunk = chunks.get(&CPos(v.0, v.2));
                 if let Some(chunk) = chunk {
                     if let Some(sec) = chunk.sections[v.1 as usize].as_ref() {
@@ -712,7 +707,7 @@ impl World {
         if !(0..=15).contains(&y) {
             return None;
         }
-        if let Some(chunk) = self.chunks.clone().get(&CPos(x, z)) {
+        if let Some(chunk) = self.chunks.read().get(&CPos(x, z)) {
             let rendered = &chunk.sections_rendered_on[y as usize];
             if let Some(sec) = chunk.sections[y as usize].as_ref() {
                 return Some((Some(sec.cull_info), *rendered));
@@ -724,7 +719,7 @@ impl World {
 
     pub fn get_dirty_chunk_sections(&self) -> Vec<(i32, i32, i32)> {
         let mut out = vec![];
-        for chunk in self.chunks.clone().iter() {
+        for chunk in self.chunks.read().values() {
             for sec in &chunk.sections {
                 if let Some(sec) = sec.as_ref() {
                     if !sec.building && sec.dirty {
@@ -737,7 +732,7 @@ impl World {
     }
 
     fn set_dirty(&self, x: i32, y: i32, z: i32) {
-        if let Some(mut chunk) = self.chunks.clone().get_mut(&CPos(x, z)) {
+        if let Some(chunk) = self.chunks.write().get_mut(&CPos(x, z)) {
             if let Some(mut sec) = chunk.sections.get_mut(y as usize).and_then(|v| v.as_mut()) {
                 sec.dirty = true;
             }
@@ -745,7 +740,7 @@ impl World {
     }
 
     pub fn is_section_dirty(&self, pos: (i32, i32, i32)) -> bool {
-        if let Some(chunk) = self.chunks.clone().get(&CPos(pos.0, pos.2)) {
+        if let Some(chunk) = self.chunks.read().get(&CPos(pos.0, pos.2)) {
             if let Some(sec) = chunk.sections[pos.1 as usize].as_ref() {
                 return sec.dirty && !sec.building;
             }
@@ -754,7 +749,7 @@ impl World {
     }
 
     pub fn set_building_flag(&self, pos: (i32, i32, i32)) {
-        if let Some(mut chunk) = self.chunks.clone().get_mut(&CPos(pos.0, pos.2)) {
+        if let Some(chunk) = self.chunks.write().get_mut(&CPos(pos.0, pos.2)) {
             if let Some(mut sec) = chunk.sections[pos.1 as usize].as_mut() {
                 sec.building = true;
                 sec.dirty = false;
@@ -763,7 +758,7 @@ impl World {
     }
 
     pub fn reset_building_flag(&self, pos: (i32, i32, i32)) {
-        if let Some(mut chunk) = self.chunks.clone().get_mut(&CPos(pos.0, pos.2)) {
+        if let Some(chunk) = self.chunks.write().get_mut(&CPos(pos.0, pos.2)) {
             if let Some(section) = chunk.sections[pos.1 as usize].as_mut() {
                 section.building = false;
             }
@@ -771,7 +766,7 @@ impl World {
     }
 
     pub fn flag_dirty_all(&self) {
-        for mut chunk in self.chunks.clone().iter_mut() {
+        for chunk in self.chunks.write().values_mut() {
             for sec in &mut chunk.sections {
                 if let Some(sec) = sec.as_mut() {
                     sec.dirty = true;
@@ -785,7 +780,7 @@ impl World {
         let cx = x >> 4;
         let cy = y >> 4;
         let cz = z >> 4;
-        let chunks = self.chunks.clone();
+        let chunks = self.chunks.read();
         let chunk = match chunks.get(&CPos(cx, cz)) {
             Some(val) => val,
             None => {
@@ -800,8 +795,8 @@ impl World {
     }
 
     pub fn unload_chunk(&self, x: i32, z: i32, m: &mut ecs::Manager) {
-        if let Some(chunk) = self.chunks.clone().remove(&CPos(x, z)) {
-            for entity in chunk.1.block_entities.values() {
+        if let Some(chunk) = self.chunks.write().remove(&CPos(x, z)) {
+            for entity in chunk.block_entities.values() {
                 m.world.despawn(*entity);
             }
         }
@@ -823,14 +818,15 @@ impl World {
         let has_add_light = additional_light_data.is_some();
         let cpos = CPos(x, z);
         {
-            if new {
+            let mut chunk = if new {
                 // TODO: Improve lighting with something similar to bixilon's light accessor!
-                self.chunks.clone().insert(cpos, Chunk::new(cpos));
-            } else if !self.chunks.clone().contains_key(&cpos) {
-                return Ok(());
-            }
-            let chunks = self.chunks.clone();
-            let chunk = &mut chunks.get_mut(&cpos).unwrap();
+                Chunk::new(cpos)
+            } else {
+                match self.chunks.read().get(&cpos) {
+                    Some(chunk) => chunk.clone(),
+                    None => return Ok(()),
+                }
+            };
 
             // Block type array - whole byte per block  // 17
             let mut block_types: [[u8; 4096]; 16] = [[0u8; 4096]; 16]; // 17
@@ -850,21 +846,21 @@ impl World {
                 if version == 17 {
                     data.read_exact(block_type)?;
                 } else if version == 18 {
-                    self.prep_section_18(chunk, data, i);
+                    self.prep_section_18(&mut chunk, data, i);
                 } else if version == 19 {
-                    self.prep_section_19(chunk, data, i, skylight);
+                    self.prep_section_19(&mut chunk, data, i, skylight);
                 }
                 let mut section = chunk.sections[i as usize].as_mut().unwrap();
                 section.dirty = true;
             }
             if version == 17 {
-                self.finish_17(chunk, mask, mask_add, skylight, data, block_types);
+                self.finish_17(&mut chunk, mask, mask_add, skylight, data, block_types);
             } else if version != 19 {
-                self.read_light(chunk, mask, skylight, data);
+                self.read_light(&mut chunk, mask, skylight, data);
             } else if has_add_light {
                 let mut additional_light_data = additional_light_data.unwrap();
                 self.load_light(
-                    chunk,
+                    &mut chunk,
                     additional_light_data.block_light_mask,
                     true,
                     additional_light_data.sky_light_mask,
@@ -878,6 +874,8 @@ impl World {
             }
 
             chunk.calculate_heightmap();
+
+            self.chunks.write().insert(cpos, chunk);
         }
 
         self.dirty_chunks_by_bitmask(x, z, mask);
@@ -900,8 +898,7 @@ impl World {
         let section = chunk.sections[section_id].as_mut().unwrap();
 
         let mut bit_size = data.read_u8().unwrap();
-        let mut mappings: HashMap<usize, block::Block, BuildHasherDefault<FNVHash>> =
-            HashMap::with_hasher(BuildHasherDefault::default());
+        let mut mappings: BTreeMap<usize, block::Block> = BTreeMap::new();
 
         if bit_size == 0 {
             bit_size = 13;
@@ -1395,7 +1392,7 @@ impl World {
             return;
         }
         let cpos = CPos(x, z);
-        if let Some(mut chunk) = self.chunks.clone().get_mut(&cpos) {
+        if let Some(chunk) = self.chunks.write().get_mut(&cpos) {
             if let Some(sec) = chunk.sections[y as usize].as_mut() {
                 sec.dirty = true;
             }

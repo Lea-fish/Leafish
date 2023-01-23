@@ -62,11 +62,9 @@ impl ChunkBuilder {
         while let Ok((id, mut val)) = self.built_recv.try_recv() {
             world.clone().reset_building_flag(val.position);
 
-            let world = world.clone();
-            let chunks = world.chunks.clone();
+            let mut chunks = world.chunks.write();
             let chunk = chunks.get_mut(&CPos(val.position.0, val.position.2));
-            if chunk.as_ref().is_some() {
-                let mut chunk = chunk.unwrap();
+            if let Some(chunk) = chunk {
                 let section = chunk.sections[val.position.1 as usize].as_mut();
 
                 if let Some(sec) = section {
