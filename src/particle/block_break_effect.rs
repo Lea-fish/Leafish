@@ -103,7 +103,7 @@ fn readd_model(renderer: Arc<Renderer>, effect: &mut BlockBreakEffect) {
         let mut model = vec![];
         let tex = render::Renderer::get_texture(
             renderer.get_textures_ref(),
-            &format!("blocks/destroy_stage_{}", effect.status - 1),
+            &format!("block/destroy_stage_{}", effect.status - 1),
         );
         model::append_box(
             &mut model,

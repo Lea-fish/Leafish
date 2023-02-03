@@ -95,8 +95,17 @@ fn add_sign(
     use cgmath::{Decomposed, Matrix4, Quaternion, Rad, Rotation3, Vector3};
     use std::f64::consts::PI;
     info.dirty = false;
-    match world.get_block(*position) {
-        Block::WallSign { facing, .. } => {
+    let block = world.get_block(*position);
+    match block {
+        Block::OakWallSign { facing, .. }
+        | Block::SpruceWallSign { facing, .. }
+        | Block::BirchWallSign { facing, .. }
+        | Block::AcaciaWallSign { facing, .. }
+        | Block::JungleWallSign { facing, .. }
+        | Block::DarkOakWallSign { facing, .. }
+        | Block::MangroveWallSign { facing, .. }
+        | Block::CrimsonWallSign { facing, .. }
+        | Block::WarpedWallSign { facing, .. } => {
             info.offset_z = 7.5 / 16.0;
             match facing {
                 Direction::North => {}
@@ -106,14 +115,37 @@ fn add_sign(
                 _ => unreachable!(),
             }
         }
-        Block::StandingSign { rotation, .. } => {
+        Block::OakSign { rotation, .. }
+        | Block::SpruceSign { rotation, .. }
+        | Block::BirchSign { rotation, .. }
+        | Block::AcaciaSign { rotation, .. }
+        | Block::JungleSign { rotation, .. }
+        | Block::DarkOakSign { rotation, .. }
+        | Block::MangroveSign { rotation, .. }
+        | Block::CrimsonSign { rotation, .. }
+        | Block::WarpedSign { rotation, .. } => {
             info.offset_y = 5.0 / 16.0;
             info.has_stand = true;
-            info.rotation = -(rotation.data() as f64 / 16.0) * PI * 2.0 + PI;
+            info.rotation = -(rotation as f64 / 16.0) * PI * 2.0 + PI;
         }
         _ => return,
     }
-    let tex = render::Renderer::get_texture(renderer.get_textures_ref(), "entity/sign");
+
+    let wood_type = match block {
+        Block::OakWallSign { .. } | Block::OakSign { .. } => "oak",
+        Block::SpruceWallSign { .. } | Block::SpruceSign { .. } => "spruce",
+        Block::BirchWallSign { .. } | Block::BirchSign { .. } => "birch",
+        Block::AcaciaWallSign { .. } | Block::AcaciaSign { .. } => "acacia",
+        Block::JungleWallSign { .. } | Block::JungleSign { .. } => "jungle",
+        Block::DarkOakWallSign { .. } | Block::DarkOakSign { .. } => "dark_oak",
+        Block::MangroveWallSign { .. } | Block::MangroveSign { .. } => "mangrove",
+        Block::CrimsonWallSign { .. } | Block::CrimsonSign { .. } => "crimson",
+        Block::WarpedWallSign { .. } | Block::WarpedSign { .. } => "warped",
+        _ => "oak",
+    };
+
+    let path = format!("entity/signs/{wood_type}");
+    let tex = render::Renderer::get_texture(renderer.get_textures_ref(), &path);
 
     macro_rules! rel {
         ($x:expr, $y:expr, $w:expr, $h:expr) => {

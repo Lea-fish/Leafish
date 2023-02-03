@@ -24,6 +24,7 @@ use copypasta::ClipboardProvider;
 use glutin::platform::unix::EventLoopWindowTargetExtUnix;
 use instant::{Duration, Instant};
 use log::{debug, error, info, warn};
+use shared::Version;
 use std::fs;
 extern crate leafish_shared as shared;
 
@@ -56,7 +57,7 @@ pub mod world;
 use crate::entity::Rotation;
 use crate::render::hud::HudContext;
 use leafish_protocol::protocol::login::Account;
-use leafish_protocol::protocol::{Error, Version};
+use leafish_protocol::protocol::Error;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use std::cell::RefCell;

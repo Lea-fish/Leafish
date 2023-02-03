@@ -34,18 +34,22 @@ pub fn render_liquid<W: Write>(
         )
     };
 
+    let (cr, cg, cb) = if lava {
+        (255, 255, 255)
+    } else {
+        // TODO: Choose water color based on biome
+        (63, 118, 228)
+    };
+
     let tex = match snapshot.get_block(x, y, z) {
         block::Block::Water { .. } => {
-            render::Renderer::get_texture(&textures, "minecraft:blocks/water_still")
-        }
-        block::Block::FlowingWater { .. } => {
-            render::Renderer::get_texture(&textures, "minecraft:blocks/water_flow")
+            render::Renderer::get_texture(&textures, "minecraft:block/water_still")
         }
         block::Block::Lava { .. } => {
-            render::Renderer::get_texture(&textures, "minecraft:blocks/lava_still")
+            render::Renderer::get_texture(&textures, "minecraft:block/lava_still")
         }
-        block::Block::FlowingLava { .. } => {
-            render::Renderer::get_texture(&textures, "minecraft:blocks/lava_flow")
+        b if b.is_waterlogged() => {
+            render::Renderer::get_texture(&textures, "minecraft:block/water_still")
         }
         _ => unreachable!(),
     };
@@ -71,9 +75,9 @@ pub fn render_liquid<W: Write>(
                 vert.tw = tex.get_width() as u16;
                 vert.th = tex.get_height() as u16;
                 vert.tatlas = tex.atlas as i16;
-                vert.r = 255;
-                vert.g = 255;
-                vert.b = 255;
+                vert.r = cr;
+                vert.g = cg;
+                vert.b = cb;
 
                 if vert.y == 0.0 {
                     vert.y = y as f32;
@@ -157,7 +161,8 @@ fn get_water_level(
     z: i32,
 ) -> Option<i32> {
     match snapshot.get_block(x, y, z) {
-        block::Block::Water { level } | block::Block::FlowingWater { level } => Some(level as i32),
+        block::Block::Water { level } => Some(level as i32),
+        b if b.is_waterlogged() => Some(15),
         _ => None,
     }
 }
@@ -169,7 +174,7 @@ fn get_lava_level(
     z: i32,
 ) -> Option<i32> {
     match snapshot.get_block(x, y, z) {
-        block::Block::Lava { level } | block::Block::FlowingLava { level } => Some(level as i32),
+        block::Block::Lava { level } => Some(level as i32),
         _ => None,
     }
 }

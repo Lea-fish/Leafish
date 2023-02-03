@@ -69,7 +69,7 @@ impl Logo {
                     .attach(&mut *shadow_batch.borrow_mut());
 
                 ui::ImageBuilder::new()
-                    .texture("minecraft:blocks/planks_oak")
+                    .texture("minecraft:block/oak_planks")
                     .position(x as f64, y as f64)
                     .size(4.0, 8.0)
                     .texture_coords((

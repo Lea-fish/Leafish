@@ -7,8 +7,8 @@ use crate::ui;
 use crate::ui::{Container, HAttach, VAttach};
 use std::sync::Arc;
 
-use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
+use shared::Version;
 
 const WINDOW_WIDTH: i32 = 176;
 const WINDOW_HEIGHT: i32 = 166;

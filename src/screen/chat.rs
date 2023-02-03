@@ -24,8 +24,8 @@ use crate::Game;
 use core::cmp;
 use glutin::event::VirtualKeyCode;
 use leafish_protocol::format::Component;
-use leafish_protocol::protocol::Version;
 use parking_lot::RwLock;
+use shared::Version;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 pub const MAX_MESSAGES: usize = 200;

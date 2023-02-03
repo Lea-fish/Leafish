@@ -1,5 +1,5 @@
 use crate::entity::EntityType;
-use leafish_protocol::protocol::Version;
+use shared::Version;
 
 mod mapping1_10_2;
 mod mapping1_11_2;
@@ -21,9 +21,11 @@ pub fn to_id(entity_type: EntityType, version: Version) -> i16 {
         Version::V1_11 => mapping1_11_2::to_id(entity_type),
         Version::V1_12 => mapping1_12_2::to_id(entity_type),
         Version::V1_13 => mapping1_13_2::to_id(entity_type),
+        Version::V1_13_2 => mapping1_13_2::to_id(entity_type),
         Version::V1_14 => mapping1_14_4::to_id(entity_type),
         Version::V1_15 => mapping1_15_2::to_id(entity_type),
         Version::V1_16 => mapping1_16_5::to_id(entity_type),
+        Version::V1_16_2 => mapping1_16_5::to_id(entity_type),
         _ => -1,
     }
 }
@@ -40,6 +42,7 @@ pub fn to_entity_type(id: i16, version: Version) -> EntityType {
         Version::V1_14 => mapping1_14_4::to_entity_type(id),
         Version::V1_15 => mapping1_15_2::to_entity_type(id),
         Version::V1_16 => mapping1_16_5::to_entity_type(id),
+        Version::V1_16_2 => mapping1_16_5::to_entity_type(id),
         _ => EntityType::Unknown,
     }
 }

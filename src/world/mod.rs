@@ -134,37 +134,58 @@ impl World {
     }
 
     pub fn update_block(&self, pos: Position) {
-        for yy in -1..2 {
-            for zz in -1..2 {
-                for xx in -1..2 {
-                    let bp = pos + (xx, yy, zz);
-                    let current = self.get_block(bp);
-                    let new = current.update_state(self, bp);
-                    if current != new {
-                        self.set_block_raw(bp, new);
+        // Before the flatterning, the client was expected to make changes to
+        // blocks itself. For example, with doors, the server would only send
+        // updates for one half when it was opened or closed, and the client
+        // was responsible for updating the other half locally. After the
+        // flatterning, the server sends updates for both halves of the door,
+        // so we don't need to update the block around it locally.
+        if self.protocol_version < 404 {
+            for yy in -1..2 {
+                for zz in -1..2 {
+                    for xx in -1..2 {
+                        let bp = pos + (xx, yy, zz);
+                        let current = self.get_block(bp);
+                        let new = current.update_state(self, bp);
+                        if current != new {
+                            self.set_block_raw(bp, new);
+                        }
+                        self.set_dirty(bp.x >> 4, bp.y >> 4, bp.z >> 4);
+                        self.update_light(bp, LightType::Block);
+                        self.update_light(bp, LightType::Sky);
                     }
-                    self.set_dirty(bp.x >> 4, bp.y >> 4, bp.z >> 4);
-                    self.update_light(bp, LightType::Block);
-                    self.update_light(bp, LightType::Sky);
                 }
             }
         }
     }
 
     fn update_range(&self, x1: i32, y1: i32, z1: i32, x2: i32, y2: i32, z2: i32) {
-        for by in y1..y2 {
-            for bz in z1..z2 {
-                for bx in x1..x2 {
-                    let bp = Position::new(bx, by, bz);
-                    let current = self.get_block(bp);
-                    let new = current.update_state(self, bp);
-                    let sky_light = self.get_sky_light(bp);
-                    let block_light = self.get_block_light(bp);
-                    if current != new {
-                        self.set_block_raw(bp, new);
-                        // Restore old lighting
-                        self.set_sky_light(bp, sky_light);
-                        self.set_block_light(bp, block_light);
+        // Before the flatterning, the client was expected to make changes to
+        // blocks itself. For example, with doors, the server would only send
+        // updates for one half when it was opened or closed, and the client
+        // was responsible for updating the other half locally. After the
+        // flatterning, the server sends updates for both halves of the door,
+        // so we don't need to update the block around it locally.
+        if self.protocol_version < 404 {
+            for by in y1..y2 {
+                for bz in z1..z2 {
+                    for bx in x1..x2 {
+                        let bp = Position::new(bx, by, bz);
+                        let current = self.get_block(bp);
+                        let new = current.update_state(self, bp);
+                        if current != new {
+                            self.set_block_raw(bp, new);
+                        }
+                        let current = self.get_block(bp);
+                        let new = current.update_state(self, bp);
+                        let sky_light = self.get_sky_light(bp);
+                        let block_light = self.get_block_light(bp);
+                        if current != new {
+                            self.set_block_raw(bp, new);
+                            // Restore old lighting
+                            self.set_sky_light(bp, sky_light);
+                            self.set_block_light(bp, block_light);
+                        }
                     }
                 }
             }
