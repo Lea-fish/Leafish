@@ -5,4 +5,4 @@ authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>" ]
 edition = "2018"
 
 [dependencies]
-bevy_ecs = { git = "https://github.com/terrarier2111/bevy" }
+bevy_ecs = { git = "https://github.com/terrarier2111/bevy", rev = "a58b4936d0e1ccd241dca74bceae78a1b6d4f949" }
