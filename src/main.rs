@@ -515,11 +515,11 @@ fn tick_all(
         .clone()
         .tick(delta, game.renderer.clone(), ui_container, window)
     {
-        window.set_cursor_grab(false).unwrap();
+        window.set_cursor_grab(winit::window::CursorGrabMode::None).unwrap();
         window.set_cursor_visible(true);
         game.focused = false;
     } else {
-        window.set_cursor_grab(true).unwrap();
+        window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
         window.set_cursor_visible(false);
         game.focused = true;
     }
@@ -593,7 +593,7 @@ fn handle_window_event<T>(
             use std::f64::consts::PI;
 
             if game.focused {
-                window.set_cursor_grab(true).unwrap();
+                window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
                 window.set_cursor_visible(false);
                 if game.server.is_some()
                     && !game
@@ -624,7 +624,7 @@ fn handle_window_event<T>(
                     }
                 }
             } else {
-                window.set_cursor_grab(false).unwrap();
+                window.set_cursor_grab(winit::window::CursorGrabMode::None).unwrap();
                 window.set_cursor_visible(true);
             }
         }
