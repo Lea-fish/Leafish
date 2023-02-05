@@ -23,7 +23,7 @@ split-debuginfo = "unpacked"
 opt-level = 1
 
 [dependencies]
-winit = "0.25.0"
+winit = "0.27.0"
 glow = "0.10.0"
 byteorder = "1.4.3"
 serde = { version = "1.0.127", features = ["derive"] }
@@ -58,7 +58,7 @@ rfd = "0.5.0"
 bevy_ecs = { git = "https://github.com/terrarier2111/bevy", rev = "a58b4936d0e1ccd241dca74bceae78a1b6d4f949" }
 
 reqwest = { version = "0.11.4", features = [ "blocking" ]}
-glutin = "0.27.0"
+glutin = "0.29.0"
 
 [dependencies.leafish_resources]
 path = "./resources"
