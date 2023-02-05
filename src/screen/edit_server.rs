@@ -125,6 +125,13 @@ impl super::Screen for EditServerEntry {
             .position(0.0, -18.0)
             .attach(&mut *server_address.borrow_mut());
 
+        let save_server_error = ui::TextBuilder::new()
+            .text("")
+            .position(0.0, 150.0)
+            .colour((255, 50, 50, 255))
+            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+            .create(ui_container);
+
         // Done
         let done = ui::ButtonBuilder::new()
             .position(110.0, 100.0)
@@ -142,14 +149,18 @@ impl super::Screen for EditServerEntry {
             let server_name = server_name.clone();
             let server_address = server_address.clone();
             done.add_click_func(move |_, game| {
-                Self::save_servers(
-                    index,
-                    &server_name.borrow().input,
-                    &server_address.borrow().input,
-                );
-                game.screen_sys
-                    .clone()
-                    .replace_screen(Box::new(super::ServerList::new(None)));
+                if &server_address.borrow().input == "" {
+                    save_server_error.borrow_mut().text = format!("Please enter a Server Address");
+                } else {
+                    Self::save_servers(
+                        index,
+                        &server_name.borrow().input,
+                        &server_address.borrow().input,
+                    );
+                    game.screen_sys
+                        .clone()
+                        .replace_screen(Box::new(super::ServerList::new(None)));
+                }
                 true
             });
         }
