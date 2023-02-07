@@ -153,14 +153,14 @@ impl super::Screen for EditServerEntry {
                     save_server_error.borrow_mut().text = format!("Please enter a Server Address");
                     return false;
                 }
-                    Self::save_servers(
-                        index,
-                        &server_name.borrow().input,
-                        &server_address.borrow().input,
-                    );
-                    game.screen_sys
-                        .clone()
-                        .replace_screen(Box::new(super::ServerList::new(None)));
+                Self::save_servers(
+                    index,
+                    &server_name.borrow().input,
+                    &server_address.borrow().input,
+                );
+                game.screen_sys
+                    .clone()
+                    .replace_screen(Box::new(super::ServerList::new(None)));
                 true
             });
         }
