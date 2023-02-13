@@ -1861,7 +1861,7 @@ impl UIElement for Slider {
     }
 
     fn is_dirty(&self) -> bool {
-        self.last_disabled != self.disabled 
+        self.last_disabled != self.disabled
     }
 
     fn post_init(s: Rc<RefCell<Self>>) {
