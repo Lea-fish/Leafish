@@ -96,6 +96,24 @@ impl Var for CVar<i64> {
     }
 }
 
+impl Var for CVar<f64> {
+    fn serialize(&self, val: &Box<dyn Any>) -> String {
+        val.downcast_ref::<f64>().unwrap().to_string()
+    }
+
+    fn deserialize(&self, input: &str) -> Box<dyn Any> {
+        Box::new(input.parse::<f64>().unwrap())
+    }
+
+    fn description(&self) -> &'static str {
+        self.description
+    }
+
+    fn can_serialize(&self) -> bool {
+        self.serializable
+    }
+}
+
 impl Var for CVar<bool> {
     fn serialize(&self, val: &Box<dyn Any>) -> String {
         val.downcast_ref::<bool>().unwrap().to_string()

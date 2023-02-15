@@ -10,6 +10,7 @@ use std::sync::Arc;
 pub struct UIElements {
     background: ui::ImageRef,
     _buttons: Vec<ui::ButtonRef>,
+    _sliders: Vec<ui::SliderRef>,
 }
 
 pub struct SettingsMenu {
@@ -109,6 +110,12 @@ impl super::Screen for SettingsMenu {
                 .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                 .attach(&mut *controls_settings);
             controls_settings.add_text(txt);
+            controls_settings.add_click_func(|_, game| {
+                game.screen_sys
+                    .clone()
+                    .add_screen(Box::new(ControlsMenu::new(game.vars.clone())));
+                true
+            });
         }
         buttons.push(controls_settings);
 
@@ -196,6 +203,7 @@ impl super::Screen for SettingsMenu {
         self.elements = Some(UIElements {
             background,
             _buttons: buttons,
+            _sliders: vec![],
         });
     }
 
@@ -380,6 +388,7 @@ impl super::Screen for VideoSettingsMenu {
         self.elements = Some(UIElements {
             background,
             _buttons: buttons,
+            _sliders: vec![],
         });
     }
     fn on_deactive(
@@ -489,6 +498,7 @@ impl super::Screen for AudioSettingsMenu {
         self.elements = Some(UIElements {
             background,
             _buttons: buttons,
+            _sliders: vec![],
         });
     }
     fn on_deactive(
@@ -688,8 +698,158 @@ impl super::Screen for SkinSettingsMenu {
         self.elements = Some(UIElements {
             background,
             _buttons: buttons,
+            _sliders: vec![],
         });
     }
+    fn on_deactive(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        _ui_container: &mut ui::Container,
+    ) {
+        self.elements = None;
+    }
+
+    // Called every frame the screen is active
+    fn tick(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+        _delta: f64,
+    ) {
+        let elements = self.elements.as_mut().unwrap();
+        {
+            let mode = ui_container.mode;
+            let mut background = elements.background.borrow_mut();
+            background.width = match mode {
+                ui::Mode::Unscaled(scale) => 854.0 / scale,
+                ui::Mode::Scaled => renderer.screen_data.read().width as f64,
+            };
+            background.height = match mode {
+                ui::Mode::Unscaled(scale) => 480.0 / scale,
+                ui::Mode::Scaled => renderer.screen_data.read().height as f64,
+            };
+        }
+    }
+
+    // Events
+    fn on_scroll(&mut self, _x: f64, _y: f64) {}
+
+    fn is_closable(&self) -> bool {
+        true
+    }
+
+    fn clone_screen(&self) -> Box<dyn Screen> {
+        Box::new(self.clone())
+    }
+}
+
+pub struct ControlsMenu {
+    vars: Rc<console::Vars>,
+    elements: Option<UIElements>,
+}
+
+impl Clone for ControlsMenu {
+    fn clone(&self) -> Self {
+        ControlsMenu {
+            vars: self.vars.clone(),
+            elements: None,
+        }
+    }
+}
+
+impl ControlsMenu {
+    pub fn new(vars: Rc<console::Vars>) -> Self {
+        ControlsMenu {
+            vars,
+            elements: None,
+        }
+    }
+}
+
+impl super::Screen for ControlsMenu {
+    fn on_active(
+        &mut self,
+        _screen_sys: &ScreenSystem,
+        _renderer: Arc<render::Renderer>,
+        ui_container: &mut ui::Container,
+    ) {
+        let mut buttons = vec![];
+        let mut sliders = vec![];
+        let r_mouse_sens = *self.vars.get(settings::R_MOUSE_SENS);
+
+        let background = ui::ImageBuilder::new()
+            .texture("leafish:solid")
+            .position(0.0, 0.0)
+            .size(854.0, 480.0)
+            .colour((0, 0, 0, 100))
+            .create(ui_container);
+
+        let done_button = ui::ButtonBuilder::new()
+            .position(0.0, 50.0)
+            .size(300.0, 40.0)
+            .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
+            .create(ui_container);
+        {
+            let mut done_button = done_button.borrow_mut();
+            let txt = ui::TextBuilder::new()
+                .text("Done")
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .attach(&mut *done_button);
+            done_button.add_text(txt);
+            done_button.add_click_func(|_, game| {
+                game.screen_sys.clone().pop_screen();
+                true
+            });
+        }
+        buttons.push(done_button);
+
+        let slider = ui::SliderBuilder::new()
+            .position(160.0, -50.0)
+            .size(300.0, 40.0)
+            .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+            .create(ui_container);
+        {
+            let mut slider = slider.borrow_mut();
+            let txt = ui::TextBuilder::new()
+                .text(format!("Mouse Sensetivity: {:.2}x", r_mouse_sens))
+                .alignment(ui::VAttach::Middle, ui::HAttach::Center)
+                .attach(&mut *slider);
+            slider.add_text(txt);
+            slider.button.as_mut().unwrap().borrow_mut().x = r_mouse_sens * 30.0 - 150.0;
+            slider.add_click_func(|this, game| {
+                let screen_width = game.screen_sys.screens.read().last().unwrap().last_width as f64;
+                let slider_btn = this.button.as_mut().expect("Slider had no button");
+                //update button position
+                slider_btn.borrow_mut().x = (game.last_mouse_x) - screen_width / 2.0 - this.x;
+                //update game setting based on button position
+                game.vars.set(
+                    settings::R_MOUSE_SENS,
+                    (slider_btn.borrow().x + 150.0) / 30.0,
+                );
+                //update text in button
+                this.text
+                    .as_mut()
+                    .expect("Slider had no text")
+                    .borrow_mut()
+                    .text = format!(
+                    "Mouse Sensetivity: {:.2}x",
+                    *game.vars.get(settings::R_MOUSE_SENS)
+                );
+                true
+            });
+        }
+
+        sliders.push(slider);
+
+        self.elements = Some(UIElements {
+            background,
+            _buttons: buttons,
+            _sliders: sliders,
+        });
+    }
+
     fn on_deactive(
         &mut self,
         _screen_sys: &ScreenSystem,

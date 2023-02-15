@@ -515,11 +515,15 @@ fn tick_all(
         .clone()
         .tick(delta, game.renderer.clone(), ui_container, window)
     {
-        window.set_cursor_grab(winit::window::CursorGrabMode::None).unwrap();
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::None)
+            .unwrap();
         window.set_cursor_visible(true);
         game.focused = false;
     } else {
-        window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+            .unwrap();
         window.set_cursor_visible(false);
         game.focused = true;
     }
@@ -578,13 +582,15 @@ fn handle_window_event<T>(
                 // Note SDL2 had a hint to handle this scenario:
                 // sdl2::hint::set_with_priority("SDL_MOUSE_RELATIVE_MODE_WARP", "1", &sdl2::hint::Hint::Override);
                 let s = 8000.0 + 0.01;
+                let mouse_sens: f64 = *game.vars.get(settings::R_MOUSE_SENS);
                 (
-                    (xrel - game.last_mouse_xrel) / s,
-                    (yrel - game.last_mouse_yrel) / s,
+                    ((xrel - game.last_mouse_xrel) / s) * mouse_sens,
+                    ((yrel - game.last_mouse_yrel) / s) * mouse_sens,
                 )
             } else {
                 let s = 2000.0 + 0.01;
-                (xrel / s, yrel / s)
+                let mouse_sens: f64 = *game.vars.get(settings::R_MOUSE_SENS);
+                ((xrel / s) * mouse_sens, (yrel / s) * mouse_sens)
             };
 
             game.last_mouse_xrel = xrel;
@@ -593,7 +599,9 @@ fn handle_window_event<T>(
             use std::f64::consts::PI;
 
             if game.focused {
-                window.set_cursor_grab(winit::window::CursorGrabMode::Locked).unwrap();
+                window
+                    .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+                    .unwrap();
                 window.set_cursor_visible(false);
                 if game.server.is_some()
                     && !game
@@ -624,7 +632,9 @@ fn handle_window_event<T>(
                     }
                 }
             } else {
-                window.set_cursor_grab(winit::window::CursorGrabMode::None).unwrap();
+                window
+                    .set_cursor_grab(winit::window::CursorGrabMode::None)
+                    .unwrap();
                 window.set_cursor_visible(true);
             }
         }

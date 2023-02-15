@@ -30,6 +30,15 @@ pub const R_VSYNC: console::CVar<bool> = console::CVar {
     default: &|| false,
 };
 
+pub const R_MOUSE_SENS: console::CVar<f64> = console::CVar {
+    ty: PhantomData,
+    name: "r_mouse_sens",
+    description: "Mouse Sensitivity",
+    mutable: true,
+    serializable: true,
+    default: &|| 1.0,
+};
+
 pub const CL_MASTER_VOLUME: console::CVar<i64> = console::CVar {
     ty: PhantomData,
     name: "cl_master_volume",
@@ -175,6 +184,7 @@ pub fn register_vars(vars: &mut console::Vars) {
     vars.register(R_MAX_FPS);
     vars.register(R_FOV);
     vars.register(R_VSYNC);
+    vars.register(R_MOUSE_SENS);
     vars.register(CL_MASTER_VOLUME);
     vars.register(CL_KEYBIND_FORWARD);
     vars.register(CL_KEYBIND_BACKWARD);
