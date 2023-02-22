@@ -708,6 +708,22 @@ impl Server {
                                 server.on_set_slot(items.id as i16, item.0 as i16, item.1);
                             }
                         }
+                        MappedPacket::WindowProperty(data) => {
+                            let win_id: i32 = data.id as i32;
+                            let inv = server
+                                .inventory_context
+                                .read()
+                                .safe_inventory
+                                .clone()
+                                .unwrap();
+
+                            if inv.read().id() == win_id {
+                                inv.write()
+                                    .handle_property_packet(data.property, data.value);
+                            } else {
+                                warn!("The server has send information about a inventory that is not open. Did it try to crash you?");
+                            }
+                        }
                         MappedPacket::WindowSetSlot(set_slot) => {
                             server.on_set_slot(set_slot.id as i16, set_slot.slot, set_slot.item);
                         }

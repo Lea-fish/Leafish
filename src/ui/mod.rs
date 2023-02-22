@@ -698,7 +698,7 @@ macro_rules! element {
             }
         }
 
-        #[derive(Default)]
+        #[derive(Default, Clone)]
         pub struct $builder {
             $(
                 $sname: Option<$sty>,
