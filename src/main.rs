@@ -521,6 +521,8 @@ fn tick_all(
         window.set_cursor_visible(true);
         game.focused = false;
     } else {
+        // see https://docs.rs/winit/latest/winit/window/enum.CursorGrabMode.html
+        // fix for https://github.com/Lea-fish/Leafish/issues/265
         let cursor_grab_mode = if cfg!(target_os = "macos") {
             winit::window::CursorGrabMode::Locked
         } else {
