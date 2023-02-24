@@ -207,8 +207,6 @@ impl Inventory for AnvilInventory {
         self.slots
             .tick(renderer.clone(), ui_container, inventory_window, 1);
         if self.dirty {
-            self.dirty = false;
-
             let mut cost_text = inventory_window
                 .text_elements
                 .last()
@@ -262,43 +260,44 @@ impl Inventory for AnvilInventory {
                     }
                 }
             }
+        }
 
-            let mut anvil_bar = inventory_window
-                .elements
+        let mut anvil_bar = inventory_window
+            .elements
+            .get_mut(0)
+            .unwrap()
+            .get_mut(1)
+            .unwrap()
+            .borrow_mut();
+
+        if self.slots.get_item(0).is_some() {
+            // show anvil rename bar
+            anvil_bar.colour.3 = 0;
+            // send name packet to server
+            let current_textbox_content = inventory_window
+                .text_box
                 .get_mut(0)
                 .unwrap()
-                .get_mut(1)
-                .unwrap()
-                .borrow_mut();
-
-            if self.slots.get_item(0).is_some() {
-                // show anvil rename bar
-                anvil_bar.colour.3 = 0;
-                // send name packet to server
-                let current_textbox_content = inventory_window
-                    .text_box
-                    .get_mut(0)
-                    .unwrap()
-                    .borrow_mut()
-                    .input
-                    .clone();
-                if current_textbox_content != self.last_name {
-                    self.last_name = current_textbox_content;
-                    inventory_window
-                        .inventory_context
-                        .write()
-                        .get_conn()
-                        .write_packet(packet::play::serverbound::NameItem {
-                            item_name: self.last_name.clone(),
-                        })
-                        .expect("couldnt send anvil rename packet");
-                }
-            } else {
-                // hide anvil rename bar
-                anvil_bar.colour.3 = 255;
-                inventory_window.text_box.last().unwrap().borrow_mut().input = "".to_string();
+                .borrow_mut()
+                .input
+                .clone();
+            if current_textbox_content != self.last_name {
+                self.last_name = current_textbox_content;
+                inventory_window
+                    .inventory_context
+                    .write()
+                    .get_conn()
+                    .write_packet(packet::play::serverbound::NameItem {
+                        item_name: self.last_name.clone(),
+                    })
+                    .expect("couldnt send anvil rename packet");
             }
+        } else {
+            // hide anvil rename bar
+            anvil_bar.colour.3 = 255;
+            inventory_window.text_box.last().unwrap().borrow_mut().input = "".to_string();
         }
+        self.dirty = false;
     }
 
     fn ty(&self) -> InventoryType {
