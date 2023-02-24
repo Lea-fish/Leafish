@@ -22,6 +22,7 @@ pub struct AnvilInventory {
     last_name: String,
     repair_cost: Option<u8>,
     enough_level: bool,
+    dirty: bool,
 }
 
 impl AnvilInventory {
@@ -42,6 +43,7 @@ impl AnvilInventory {
             last_name: "".to_string(),
             repair_cost: None,
             enough_level: false,
+            dirty: true,
         }
     }
 }
@@ -61,6 +63,7 @@ impl Inventory for AnvilInventory {
         } else {
             warn!("Server sent invalid data for anvil");
         }
+        self.dirty = true;
     }
 
     fn id(&self) -> i32 {
@@ -72,6 +75,7 @@ impl Inventory for AnvilInventory {
     }
 
     fn set_client_state_id(&mut self, client_state_id: i16) {
+        self.dirty = true;
         self.client_state_id = client_state_id;
     }
 
@@ -83,6 +87,7 @@ impl Inventory for AnvilInventory {
         // TODO: actually lock the slot without sending a packet
         // if we dont have enough level
         self.slots.set_item(slot_id, item);
+        self.dirty = true;
     }
 
     fn get_slot(&self, x: f64, y: f64) -> Option<u16> {
@@ -201,6 +206,8 @@ impl Inventory for AnvilInventory {
     ) {
         self.slots
             .tick(renderer.clone(), ui_container, inventory_window, 1);
+        if self.dirty {
+            self.dirty = false;
 
         let mut cost_text = inventory_window
             .text_elements
@@ -283,13 +290,13 @@ impl Inventory for AnvilInventory {
                     .get_conn()
                     .write_packet(packet::play::serverbound::NameItem {
                         item_name: self.last_name.clone(),
-                    })
-                    .unwrap();
+                    }).expect("couldnt send anvil rename packet");
             }
         } else {
             // hide anvil rename bar
             anvil_bar.colour.3 = 255;
             inventory_window.text_box.last().unwrap().borrow_mut().input = "".to_string();
+        }
         }
     }
 
