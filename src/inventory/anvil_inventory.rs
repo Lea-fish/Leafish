@@ -209,94 +209,95 @@ impl Inventory for AnvilInventory {
         if self.dirty {
             self.dirty = false;
 
-        let mut cost_text = inventory_window
-            .text_elements
-            .last()
-            .unwrap()
-            .last()
-            .unwrap()
-            .borrow_mut();
-        // display the cost
-        cost_text.text = if let Some(cost) = self.repair_cost {
-            format!("Cost: {cost}")
-        } else {
-            format!("")
-        };
+            let mut cost_text = inventory_window
+                .text_elements
+                .last()
+                .unwrap()
+                .last()
+                .unwrap()
+                .borrow_mut();
+            // display the cost
+            cost_text.text = if let Some(cost) = self.repair_cost {
+                format!("Cost: {cost}")
+            } else {
+                format!("")
+            };
 
-        let creative_mode = inventory_window
-            .inventory_context
-            .read()
-            .hud_context
-            .read()
-            .game_mode
-            == GameMode::Creative;
+            let creative_mode = inventory_window
+                .inventory_context
+                .read()
+                .hud_context
+                .read()
+                .game_mode
+                == GameMode::Creative;
 
-        self.enough_level = inventory_window
-            .inventory_context
-            .read()
-            .hud_context
-            .read()
-            .exp_level
-            >= self.repair_cost.unwrap_or(0) as i32;
+            self.enough_level = inventory_window
+                .inventory_context
+                .read()
+                .hud_context
+                .read()
+                .exp_level
+                >= self.repair_cost.unwrap_or(0) as i32;
 
-        {
-            let mut arrow_crossed = inventory_window
+            {
+                let mut arrow_crossed = inventory_window
+                    .elements
+                    .get_mut(0)
+                    .unwrap()
+                    .get_mut(2)
+                    .unwrap()
+                    .borrow_mut();
+
+                if self.enough_level || creative_mode {
+                    cost_text.colour = (104, 176, 60, 255);
+                    if self.slots.get_item(2).is_some() {
+                        arrow_crossed.colour.3 = 0;
+                    } else {
+                        arrow_crossed.colour.3 = 255;
+                    }
+                } else {
+                    cost_text.colour = (255, 50, 50, 255);
+                    if self.slots.get_item(2).is_some() {
+                        arrow_crossed.colour.3 = 255;
+                    }
+                }
+            }
+
+            let mut anvil_bar = inventory_window
                 .elements
                 .get_mut(0)
                 .unwrap()
-                .get_mut(2)
+                .get_mut(1)
                 .unwrap()
                 .borrow_mut();
 
-            if self.enough_level || creative_mode {
-                cost_text.colour = (104, 176, 60, 255);
-                if self.slots.get_item(2).is_some() {
-                    arrow_crossed.colour.3 = 0;
-                } else {
-                    arrow_crossed.colour.3 = 255;
+            if self.slots.get_item(0).is_some() {
+                // show anvil rename bar
+                anvil_bar.colour.3 = 0;
+                // send name packet to server
+                let current_textbox_content = inventory_window
+                    .text_box
+                    .get_mut(0)
+                    .unwrap()
+                    .borrow_mut()
+                    .input
+                    .clone();
+                if current_textbox_content != self.last_name {
+                    self.last_name = current_textbox_content;
+                    inventory_window
+                        .inventory_context
+                        .write()
+                        .get_conn()
+                        .write_packet(packet::play::serverbound::NameItem {
+                            item_name: self.last_name.clone(),
+                        })
+                        .expect("couldnt send anvil rename packet");
                 }
             } else {
-                cost_text.colour = (255, 50, 50, 255);
-                if self.slots.get_item(2).is_some() {
-                    arrow_crossed.colour.3 = 255;
-                }
+                // hide anvil rename bar
+                anvil_bar.colour.3 = 255;
+                inventory_window.text_box.last().unwrap().borrow_mut().input = "".to_string();
             }
-        }
-
-        let mut anvil_bar = inventory_window
-            .elements
-            .get_mut(0)
-            .unwrap()
-            .get_mut(1)
-            .unwrap()
-            .borrow_mut();
-
-        if self.slots.get_item(0).is_some() {
-            // show anvil rename bar
-            anvil_bar.colour.3 = 0;
-            // send name packet to server
-            let current_textbox_content = inventory_window
-                .text_box
-                .get_mut(0)
-                .unwrap()
-                .borrow_mut()
-                .input
-                .clone();
-            if current_textbox_content != self.last_name {
-                self.last_name = current_textbox_content;
-                inventory_window
-                    .inventory_context
-                    .write()
-                    .get_conn()
-                    .write_packet(packet::play::serverbound::NameItem {
-                        item_name: self.last_name.clone(),
-                    }).expect("couldnt send anvil rename packet");
-            }
-        } else {
-            // hide anvil rename bar
-            anvil_bar.colour.3 = 255;
-            inventory_window.text_box.last().unwrap().borrow_mut().input = "".to_string();
-        }
         }
     }
 
