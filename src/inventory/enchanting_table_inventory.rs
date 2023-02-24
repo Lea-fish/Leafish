@@ -7,6 +7,7 @@ use crate::ui;
 use crate::ui::{Container, HAttach, VAttach};
 use core::fmt;
 use leafish_protocol::protocol::packet;
+use leafish_protocol::types::GameMode;
 use std::convert::TryFrom;
 use std::sync::Arc;
 
@@ -17,6 +18,14 @@ use super::Material;
 
 const WINDOW_WIDTH: i32 = 176;
 const WINDOW_HEIGHT: i32 = 166;
+
+//textur coords for the buttons
+const BUTTON_ACTIVE: (f64, f64, f64, f64) =
+    (0.0 / 256.0, 166.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
+const BUTTON_INACTIVE: (f64, f64, f64, f64) =
+    (0.0 / 256.0, 185.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
+const BUTTON_FOCUSED: (f64, f64, f64, f64) =
+    (0.0 / 256.0, 204.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
 
 pub struct EnchantmentTableInventory {
     slots: SlotMapping,
@@ -31,7 +40,7 @@ pub struct EnchantmentTableInventory {
 #[derive(Clone, Copy, Debug, Default)]
 struct EnchantmentButton {
     level_required: Option<u8>,
-    enchanmtment_hover: Option<Enchantment>,
+    enchanmtment_hint: Option<Enchantment>,
     enchantment_level: Option<u8>,
 }
 
@@ -72,71 +81,46 @@ impl Inventory for EnchantmentTableInventory {
         //the server will send -1 to reset the value
         let option_value = if value == -1 { None } else { Some(value as u8) };
 
+        let update_level_required = |i: usize, this: &mut EnchantmentTableInventory| {
+            this.button_data[i] = EnchantmentButton {
+                level_required: option_value,
+                ..this.button_data[i]
+            }
+        };
+        let update_enchantment_hint = |i: usize, this: &mut EnchantmentTableInventory| {
+            this.button_data[i] = EnchantmentButton {
+                enchanmtment_hint: Enchantment::try_from(value).ok(),
+                ..this.button_data[i]
+            }
+        };
+        let update_enchantment_level = |i: usize, this: &mut EnchantmentTableInventory| {
+            this.button_data[i] = EnchantmentButton {
+                enchantment_level: option_value,
+                ..this.button_data[i]
+            }
+        };
+
         match property {
-            0 => {
-                self.button_data[0] = EnchantmentButton {
-                    level_required: option_value,
-                    ..self.button_data[0]
-                }
-            }
-            1 => {
-                self.button_data[1] = EnchantmentButton {
-                    level_required: option_value,
-                    ..self.button_data[1]
-                }
-            }
-            2 => {
-                self.button_data[2] = EnchantmentButton {
-                    level_required: option_value,
-                    ..self.button_data[2]
-                }
-            }
+            0 => update_level_required(0, self),
+            1 => update_level_required(1, self),
+            2 => update_level_required(2, self),
             3 => (),
-            4 => {
-                self.button_data[0] = EnchantmentButton {
-                    enchanmtment_hover: Enchantment::try_from(value).ok(),
-                    ..self.button_data[0]
-                }
-            }
-            5 => {
-                self.button_data[1] = EnchantmentButton {
-                    enchanmtment_hover: Enchantment::try_from(value).ok(),
-                    ..self.button_data[1]
-                }
-            }
-            6 => {
-                self.button_data[2] = EnchantmentButton {
-                    enchanmtment_hover: Enchantment::try_from(value).ok(),
-                    ..self.button_data[2]
-                }
-            }
-            7 => {
-                self.button_data[0] = EnchantmentButton {
-                    enchantment_level: option_value,
-                    ..self.button_data[0]
-                }
-            }
-            8 => {
-                self.button_data[1] = EnchantmentButton {
-                    enchantment_level: option_value,
-                    ..self.button_data[1]
-                }
-            }
-            9 => {
-                self.button_data[2] = EnchantmentButton {
-                    enchantment_level: option_value,
-                    ..self.button_data[2]
-                }
-            }
+            4 => update_enchantment_hint(0, self),
+            5 => update_enchantment_hint(1, self),
+            6 => update_enchantment_hint(2, self),
+            7 => update_enchantment_level(0, self),
+            8 => update_enchantment_level(1, self),
+            9 => update_enchantment_level(2, self),
             _ => warn!("the server sent invalid data for the enchanting table"),
         }
 
-        // fixes a bug in mc protocol
+        // this fixes a bug in mc protocol
         for i in 0..3 {
             if self.button_data[i].level_required == Some(0) {
                 self.button_data[i].level_required = None
             }
         }
+
         self.dirty = true;
     }
 
@@ -158,8 +142,16 @@ impl Inventory for EnchantmentTableInventory {
     }
 
     fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
-        self.slots.set_item(slot_id, item);
-        self.dirty = true;
+        // TODO: actually lock the slot without sending packet
+        // if we attempt to put no lapis into the slot
+        let is_lapis_or_none = |item: &Option<Item>| {
+            item.is_none() || item.clone().unwrap_or_default().material == Material::LapisLazuli
+        };
+
+        if (slot_id == 1 && is_lapis_or_none(&item)) || slot_id != 1 {
+            self.slots.set_item(slot_id, item);
+            self.dirty = true;
+        }
     }
 
     fn get_slot(&self, x: f64, y: f64) -> Option<u16> {
@@ -180,17 +172,17 @@ impl Inventory for EnchantmentTableInventory {
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
 
-        let center = renderer.screen_data.read().center();
         let icon_scale = Hud::icon_scale(renderer.clone());
+        let top_left_x =
+            renderer.screen_data.read().center().0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0;
+        let top_left_y =
+            renderer.screen_data.read().center().1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0;
 
         // enchantment table texture
         basic_elements.push(
             ui::ImageBuilder::new()
                 .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, 166.0 / 256.0))
-                .position(
-                    center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0,
-                    center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0,
-                )
+                .position(top_left_x, top_left_y)
                 .alignment(ui::VAttach::Top, ui::HAttach::Left)
                 .size(icon_scale * 176.0, icon_scale * 166.0)
                 .texture("minecraft:gui/container/enchanting_table")
@@ -202,10 +194,7 @@ impl Inventory for EnchantmentTableInventory {
                 .alignment(VAttach::Top, HAttach::Left)
                 .scale_x(icon_scale / 2.0)
                 .scale_y(icon_scale / 2.0)
-                .position(
-                    center.0 as f64 - icon_scale * (WINDOW_WIDTH as f64 / 2.0 - 5.0 * icon_scale),
-                    center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 3.0 * icon_scale),
-                )
+                .position(top_left_x + 8.0 * icon_scale, top_left_y + 8.0 * icon_scale)
                 .text(if self.name.as_str() == "container.enchant" {
                     "Enchant"
                 } else {
@@ -217,7 +206,7 @@ impl Inventory for EnchantmentTableInventory {
         );
 
         let ench_button = ui::ImageBuilder::new()
-            .texture_coords((0.0 / 256.0, 185.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0))
+            .texture_coords(BUTTON_INACTIVE)
             .alignment(ui::VAttach::Top, ui::HAttach::Left)
             .size(icon_scale * 109.0, icon_scale * 20.0)
             .texture("minecraft:gui/container/enchanting_table");
@@ -227,11 +216,8 @@ impl Inventory for EnchantmentTableInventory {
                 ench_button
                     .clone()
                     .position(
-                        center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0
-                            + 59.0 * icon_scale,
-                        center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0
-                            + 13.0 * icon_scale
-                            + 19.0 * i as f64 * icon_scale,
+                        top_left_x + 59.0 * icon_scale,
+                        top_left_y + 13.0 * icon_scale + 19.0 * i as f64 * icon_scale,
                     )
                     .create(ui_container),
             );
@@ -240,16 +226,13 @@ impl Inventory for EnchantmentTableInventory {
                 .unwrap()
                 .borrow_mut()
                 .add_hover_func(|this, hover, _| {
-                    // this colors the buttons purple if hovered, the logic is really absurd
-                    if this.texture_coords.1 == 166.0 / 256.0
-                        || this.texture_coords.1 == 204.0 / 256.0
+                    // this colors the buttons purple if hovered
+                    if this.texture_coords == BUTTON_ACTIVE || this.texture_coords == BUTTON_FOCUSED
                     {
                         if hover {
-                            this.texture_coords =
-                                (0.0 / 256.0, 204.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
+                            this.texture_coords = BUTTON_FOCUSED
                         } else {
-                            this.texture_coords =
-                                (0.0 / 256.0, 166.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
+                            this.texture_coords = BUTTON_ACTIVE
                         }
                     }
                     true
@@ -260,20 +243,10 @@ impl Inventory for EnchantmentTableInventory {
                 .unwrap()
                 .borrow_mut()
                 .add_click_func(move |this, game| {
-                    if this.texture_coords.1 == 204.0 / 256.0 {
-                        game.server
-                            .clone()
-                            .unwrap()
-                            .conn
-                            .write()
-                            .clone()
-                            .unwrap()
-                            .write_packet(packet::play::serverbound::ClickWindowButton {
-                                id,
-                                button: i,
-                            })
-                            .unwrap();
-                        dbg!("send packet");
+                    if this.texture_coords == BUTTON_FOCUSED {
+                        game.server.clone().unwrap().write_packet(
+                            packet::play::serverbound::ClickWindowButton { id, button: i },
+                        );
                     }
                     true
                 })
@@ -296,11 +269,8 @@ impl Inventory for EnchantmentTableInventory {
                         11.0 / 256.0,
                     ))
                     .position(
-                        center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0
-                            + 62.0 * icon_scale,
-                        center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0
-                            + 17.0 * icon_scale
-                            + 19.0 * i as f64 * icon_scale,
+                        top_left_x + 62.0 * icon_scale,
+                        top_left_y + 17.0 * icon_scale + 19.0 * i as f64 * icon_scale,
                     )
                     .create(ui_container),
             );
@@ -320,11 +290,8 @@ impl Inventory for EnchantmentTableInventory {
                     .colour((104, 176, 60, 255))
                     .shadow(true)
                     .position(
-                        center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0
-                            + 79.0 * icon_scale,
-                        center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0
-                            + 23.0 * icon_scale
-                            + 19.0 * i as f64 * icon_scale,
+                        top_left_x + 79.0 * icon_scale,
+                        top_left_y + 23.0 * icon_scale + 19.0 * i as f64 * icon_scale,
                     )
                     .create(ui_container),
             );
@@ -338,11 +305,8 @@ impl Inventory for EnchantmentTableInventory {
                     .colour((80, 80, 80, 255))
                     .shadow(false)
                     .position(
-                        center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0
-                            + 79.0 * icon_scale,
-                        center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0
-                            + 15.0 * icon_scale
-                            + 19.0 * i as f64 * icon_scale,
+                        top_left_x + 79.0 * icon_scale,
+                        top_left_y + 15.0 * icon_scale + 19.0 * i as f64 * icon_scale,
                     )
                     .create(ui_container),
             );
@@ -359,20 +323,52 @@ impl Inventory for EnchantmentTableInventory {
         inventory_window: &mut InventoryWindow,
     ) {
         self.slots.tick(renderer, ui_container, inventory_window, 1);
-        //TODO show the button
         if self.dirty {
             for i in 0..3 {
                 if self.button_data[i].level_required.is_some()
                     || self.button_data[i].enchantment_level.is_some()
-                    || self.button_data[i].enchanmtment_hover.is_some()
+                    || self.button_data[i].enchanmtment_hint.is_some()
                 {
-                    // show button with information
                     let basic_elements = inventory_window.elements.get_mut(0).unwrap();
                     let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
                     let len_el = basic_elements.len();
                     let len_t_el = basic_text_elements.len();
 
-                    // the level requirement indicators
+                    // this just makes the following if statement more readable
+                    let is_lapis_enough = self.get_item(1).unwrap_or_default().material
+                        == Material::LapisLazuli
+                        && self.get_item(1).unwrap_or_default().stack.count >= i as isize + 1;
+                    let enough_xp = inventory_window
+                        .inventory_context
+                        .read()
+                        .hud_context
+                        .read()
+                        .exp_level
+                        >= self.button_data[i].level_required.unwrap_or_default() as i32;
+                    let is_creative_mode = inventory_window
+                        .inventory_context
+                        .read()
+                        .hud_context
+                        .read()
+                        .game_mode
+                        == GameMode::Creative;
+
+                    // the actual buttons to click on
+                    if (is_lapis_enough && enough_xp) || is_creative_mode {
+                        basic_elements
+                            .get_mut(len_el - (6 - i))
+                            .unwrap()
+                            .borrow_mut()
+                            .texture_coords = BUTTON_ACTIVE
+                    } else {
+                        basic_elements
+                            .get_mut(len_el - (6 - i))
+                            .unwrap()
+                            .borrow_mut()
+                            .texture_coords = BUTTON_INACTIVE
+                    }
+
+                    // the level requirement indicators (1, 2, 3)
                     basic_elements
                         .get_mut(len_el - (3 - i))
                         .unwrap()
@@ -384,23 +380,12 @@ impl Inventory for EnchantmentTableInventory {
                         11.0 / 256.0,
                     );
 
-                    // the actual buttons to click on
-                    if self.get_item(1).unwrap_or_default().material == Material::LapisLazuli {
-                        // TODO: check that you have the required xp level before enabling buttons
-                        basic_elements
-                            .get_mut(len_el - (6 - i))
-                            .unwrap()
-                            .borrow_mut()
-                            .texture_coords =
-                            (0.0 / 256.0, 166.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
-                    }
-
                     // name of the enchantment and level
                     basic_text_elements
                         .get_mut(len_t_el - (3 - i))
                         .unwrap()
                         .borrow_mut()
-                        .text = if let Some(ench) = self.button_data[i].enchanmtment_hover {
+                        .text = if let Some(ench) = self.button_data[i].enchanmtment_hint {
                         // in theory we dont need this, but it catches errors if the server sends
                         // invalid enchantment data
                         format!(
@@ -421,21 +406,21 @@ impl Inventory for EnchantmentTableInventory {
                         .unwrap()
                         .borrow_mut()
                         .text = format!(
-                        "cost: {}",
+                        "lvl required: {}",
                         if let Some(cost) = self.button_data[i].level_required {
                             cost.to_string()
                         } else {
-                            "cost unknown".to_string()
+                            "lvl required: unknown".to_string()
                         }
                     );
                 } else {
                     // deactivate button and clear text
                     let basic_elements = inventory_window.elements.get_mut(0).unwrap();
                     let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
-
                     let len_el = basic_elements.len();
                     let len_t_el = basic_text_elements.len();
 
+                    // the enchantment cost indicator
                     basic_elements
                         .get_mut(len_el - (3 - i))
                         .unwrap()
@@ -447,18 +432,21 @@ impl Inventory for EnchantmentTableInventory {
                         11.0 / 256.0,
                     );
 
+                    // the buttons
                     basic_elements
                         .get_mut(len_el - (6 - i))
                         .unwrap()
                         .borrow_mut()
-                        .texture_coords = (0.0 / 256.0, 185.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
+                        .texture_coords = BUTTON_INACTIVE;
 
+                    // the required xp levl
                     basic_text_elements
                         .get_mut(len_t_el - (6 - i))
                         .unwrap()
                         .borrow_mut()
                         .text = "".to_string();
 
+                    // name of suggested enchantment
                     basic_text_elements
                         .get_mut(len_t_el - (3 - i))
                         .unwrap()

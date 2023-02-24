@@ -73,12 +73,14 @@ pub trait Inventory {
 
     fn resize(
         &mut self,
-        width: u32,
-        height: u32,
+        _width: u32,
+        _height: u32,
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
-    );
+    ) {
+        self.init(renderer, ui_container, inventory_window);
+    }
 
     fn ty(&self) -> InventoryType;
 
@@ -182,13 +184,17 @@ pub struct InventoryContext {
     pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
     pub base_slots: Arc<RwLock<SlotMapping>>,
-    hud_context: Arc<RwLock<HudContext>>,
+    pub hud_context: Arc<RwLock<HudContext>>,
     mouse_position: Option<(f64, f64)>,
     conn: Arc<RwLock<Option<Conn>>>,
     dirty: bool,
 }
 
 impl InventoryContext {
+    pub fn get_conn(&self) -> Conn {
+        self.conn.clone().write().clone().unwrap()
+    }
+
     pub fn new(
         version: Version,
         renderer: Arc<Renderer>,
@@ -486,7 +492,7 @@ impl Item {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Material {
     #[default]
-    Air,                             // 1.7.10 (id: 0, stack: 0)| 1.13 (id: 9648)
+    Air, // 1.7.10 (id: 0, stack: 0)| 1.13 (id: 9648)
     Stone,                           // 1.7.10 (id: 1)| 1.13 (id: 22948)
     Grass,                           // 1.7.10 (id: 2)| 1.13 (id: 6155)
     Dirt,                            // 1.7.10 (id: 3)| 1.13 (id: 10580)

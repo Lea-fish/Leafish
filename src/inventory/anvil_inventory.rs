@@ -5,6 +5,7 @@ use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::ui;
 use crate::ui::{Container, HAttach, VAttach};
+use leafish_protocol::types::GameMode;
 use log::warn;
 use std::sync::Arc;
 
@@ -20,6 +21,7 @@ pub struct AnvilInventory {
     id: i32,
     last_name: String,
     repair_cost: Option<u8>,
+    enough_level: bool,
 }
 
 impl AnvilInventory {
@@ -39,6 +41,7 @@ impl AnvilInventory {
             id,
             last_name: "".to_string(),
             repair_cost: None,
+            enough_level: false,
         }
     }
 }
@@ -77,6 +80,8 @@ impl Inventory for AnvilInventory {
     }
 
     fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
+        // TODO: actually lock the slot without sending a packet
+        // if we dont have enough level
         self.slots.set_item(slot_id, item);
     }
 
@@ -97,17 +102,16 @@ impl Inventory for AnvilInventory {
 
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
-
-        let center = renderer.screen_data.read().center();
         let icon_scale = Hud::icon_scale(renderer.clone());
 
+        let top_left_x =
+            renderer.screen_data.read().center().0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0;
+        let top_left_y =
+            renderer.screen_data.read().center().1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0;
         basic_elements.push(
             ui::ImageBuilder::new()
                 .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, 166.0 / 256.0))
-                .position(
-                    center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0,
-                    center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0,
-                )
+                .position(top_left_x, top_left_y)
                 .alignment(ui::VAttach::Top, ui::HAttach::Left)
                 .size(icon_scale * 176.0, icon_scale * 166.0)
                 .texture("minecraft:gui/container/anvil")
@@ -121,28 +125,27 @@ impl Inventory for AnvilInventory {
                 .texture("minecraft:gui/container/anvil")
                 .texture_coords((0.0 / 256.0, 182.0 / 256.0, 110.0 / 256.0, 16.0 / 256.0))
                 .position(
-                    center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0 + 59.0 * icon_scale,
-                    center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0 + 20.0 * icon_scale,
+                    top_left_x + 59.0 * icon_scale,
+                    top_left_y + 20.0 * icon_scale,
                 )
                 .alignment(ui::VAttach::Top, ui::HAttach::Left)
                 .size(icon_scale * 110.0, icon_scale * 16.0)
                 .create(ui_container),
         );
 
-        // the name bar of anvil active
-        // basic_elements.push(
-        //     ui::ImageBuilder::new()
-        //         .draw_index(0)
-        //         .texture("minecraft:gui/container/anvil")
-        //         .texture_coords((0.0 / 256.0, 166.0 / 256.0, 110.0 / 256.0, 16.0 / 256.0))
-        //         .position(
-        //             center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0 + 59.0 * icon_scale,
-        //             center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0 + 20.0 * icon_scale,
-        //         )
-        //         .alignment(ui::VAttach::Top, ui::HAttach::Left)
-        //         .size(icon_scale * 110.0, icon_scale * 16.0)
-        //         .create(ui_container),
-        // );
+        // anvil arrow with red cross
+        basic_elements.push(
+            ui::ImageBuilder::new()
+                .texture("minecraft:gui/container/anvil")
+                .texture_coords((176.0 / 256.0, 0.0 / 256.0, 28.0 / 256.0, 21.0 / 256.0))
+                .position(
+                    top_left_x + 98.0 * icon_scale,
+                    top_left_y + 44.0 * icon_scale,
+                )
+                .alignment(ui::VAttach::Top, ui::HAttach::Left)
+                .size(icon_scale * 28.0, icon_scale * 21.0)
+                .create(ui_container),
+        );
 
         basic_text_elements.push(
             ui::TextBuilder::new()
@@ -150,8 +153,8 @@ impl Inventory for AnvilInventory {
                 .scale_x(icon_scale / 2.0)
                 .scale_y(icon_scale / 2.0)
                 .position(
-                    center.0 as f64 - icon_scale * (WINDOW_WIDTH as f64 / 2.0 - 68.0),
-                    center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 6.0),
+                    top_left_x + 60.0 * icon_scale,
+                    top_left_y + 6.0 * icon_scale,
                 )
                 .text("Repair & Name")
                 .colour((64, 64, 64, 255))
@@ -165,8 +168,8 @@ impl Inventory for AnvilInventory {
                 .scale_x(icon_scale / 2.0)
                 .scale_y(icon_scale / 2.0)
                 .position(
-                    center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0 + 70.0 * icon_scale,
-                    center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0 + 73.0 * icon_scale,
+                    top_left_x + 70.0 * icon_scale,
+                    top_left_y + 73.0 * icon_scale,
                 )
                 .text("")
                 .colour((104, 176, 60, 255))
@@ -177,8 +180,8 @@ impl Inventory for AnvilInventory {
         inventory_window.text_box.push(
             ui::TextBoxBuilder::new()
                 .position(
-                    center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0 + 59.0 * icon_scale,
-                    center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0 + 20.0 * icon_scale,
+                    top_left_x + 59.0 * icon_scale,
+                    top_left_y + 20.0 * icon_scale,
                 )
                 .size(icon_scale * 110.0, icon_scale * 16.0)
                 .alignment(ui::VAttach::Top, ui::HAttach::Left)
@@ -199,24 +202,58 @@ impl Inventory for AnvilInventory {
         self.slots
             .tick(renderer.clone(), ui_container, inventory_window, 1);
 
-        if let Some(cost) = self.repair_cost {
-            inventory_window
-                .text_elements
-                .last()
-                .unwrap()
-                .last()
-                .unwrap()
-                .borrow_mut()
-                .text = format!("Cost: {cost}");
+        let mut cost_text = inventory_window
+            .text_elements
+            .last()
+            .unwrap()
+            .last()
+            .unwrap()
+            .borrow_mut();
+        // display the cost
+        cost_text.text = if let Some(cost) = self.repair_cost {
+            format!("Cost: {cost}")
         } else {
-            inventory_window
-                .text_elements
-                .last()
+            format!("")
+        };
+
+        let creative_mode = inventory_window
+            .inventory_context
+            .read()
+            .hud_context
+            .read()
+            .game_mode
+            == GameMode::Creative;
+
+        self.enough_level = inventory_window
+            .inventory_context
+            .read()
+            .hud_context
+            .read()
+            .exp_level
+            >= self.repair_cost.unwrap_or(0) as i32;
+
+        {
+            let mut arrow_crossed = inventory_window
+                .elements
+                .get_mut(0)
                 .unwrap()
-                .last()
+                .get_mut(2)
                 .unwrap()
-                .borrow_mut()
-                .text = format!("");
+                .borrow_mut();
+
+            if self.enough_level || creative_mode {
+                cost_text.colour = (104, 176, 60, 255);
+                if self.slots.get_item(2).is_some() {
+                    arrow_crossed.colour.3 = 0;
+                } else {
+                    arrow_crossed.colour.3 = 255;
+                }
+            } else {
+                cost_text.colour = (255, 50, 50, 255);
+                if self.slots.get_item(2).is_some() {
+                    arrow_crossed.colour.3 = 255;
+                }
+            }
         }
 
         let mut anvil_bar = inventory_window
@@ -243,18 +280,9 @@ impl Inventory for AnvilInventory {
                 inventory_window
                     .inventory_context
                     .write()
-                    .conn
-                    .write()
-                    .clone()
-                    .unwrap()
+                    .get_conn()
                     .write_packet(packet::play::serverbound::NameItem {
-                        item_name: inventory_window
-                            .text_box
-                            .last()
-                            .unwrap()
-                            .borrow_mut()
-                            .input
-                            .clone(),
+                        item_name: self.last_name.clone(),
                     })
                     .unwrap();
             }
@@ -263,17 +291,6 @@ impl Inventory for AnvilInventory {
             anvil_bar.colour.3 = 255;
             inventory_window.text_box.last().unwrap().borrow_mut().input = "".to_string();
         }
-    }
-
-    fn resize(
-        &mut self,
-        _width: u32,
-        _height: u32,
-        renderer: Arc<Renderer>,
-        ui_container: &mut Container,
-        inventory_window: &mut InventoryWindow,
-    ) {
-        self.init(renderer, ui_container, inventory_window);
     }
 
     fn ty(&self) -> InventoryType {

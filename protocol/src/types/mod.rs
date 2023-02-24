@@ -21,7 +21,7 @@ pub mod nibble;
 
 use bevy_ecs::prelude::*;
 
-#[derive(Component, Clone, Copy, Debug)]
+#[derive(Component, Clone, Copy, Debug, PartialEq)]
 pub enum GameMode {
     NotSet = -1,
     Survival = 0,

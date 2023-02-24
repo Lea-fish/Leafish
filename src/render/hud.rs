@@ -66,8 +66,8 @@ pub struct HudContext {
     dirty_food: bool,
     armor: u8, // TODO: Update this!
     dirty_armor: bool,
-    exp: f32,
-    exp_level: i32,
+    pub exp: f32,
+    pub exp_level: i32,
     dirty_exp: bool,
     breath: i16, // TODO: Update this!
     dirty_breath: bool,
@@ -76,7 +76,7 @@ pub struct HudContext {
     pub dirty_slots: AtomicBool,
     slot_index: u8,
     dirty_slot_index: bool,
-    game_mode: GameMode,
+    pub game_mode: GameMode,
     dirty_game_mode: bool,
 }
 
