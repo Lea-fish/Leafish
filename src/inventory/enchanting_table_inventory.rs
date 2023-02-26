@@ -104,7 +104,7 @@ impl Inventory for EnchantmentTableInventory {
             0 => update_level_required(0, self),
             1 => update_level_required(1, self),
             2 => update_level_required(2, self),
-            3 => (),
+            3 => (), // this is a random seed, usually used for the SGA text
             4 => update_enchantment_hint(0, self),
             5 => update_enchantment_hint(1, self),
             6 => update_enchantment_hint(2, self),
@@ -114,7 +114,8 @@ impl Inventory for EnchantmentTableInventory {
             _ => warn!("the server sent invalid data for the enchanting table"),
         }
 
-        // this fixes a bug in mc protocol
+        // if there is no level requirement, the server will sometimes send no data,
+        // and sometimes send a level requirement of 0 to indicate that
         for i in 0..3 {
             if self.button_data[i].level_required == Some(0) {
                 self.button_data[i].level_required = None
