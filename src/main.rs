@@ -604,6 +604,8 @@ fn handle_window_event<T>(
             use std::f64::consts::PI;
 
             if game.focused {
+                // see https://docs.rs/winit/latest/winit/window/enum.CursorGrabMode.html
+                // fix for https://github.com/Lea-fish/Leafish/issues/265
                 let cursor_grab_mode = if cfg!(target_os = "macos") {
                     winit::window::CursorGrabMode::Locked
                 } else {
