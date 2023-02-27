@@ -1,14 +1,18 @@
+pub mod anvil_inventory;
 pub mod chest_inventory;
 pub mod crafting_table_inventory;
 pub mod dropper_inventory;
+pub mod enchanting_table_inventory;
 pub mod furnace_inventory;
 pub(crate) mod material;
 pub mod player_inventory;
 pub mod slot_mapping;
 
+use crate::inventory::anvil_inventory::AnvilInventory;
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::crafting_table_inventory::CraftingTableInventory;
 use crate::inventory::dropper_inventory::DropperInventory;
+use crate::inventory::enchanting_table_inventory::EnchantmentTableInventory;
 use crate::inventory::furnace_inventory::FurnaceInventory;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::slot_mapping::SlotMapping;
@@ -69,14 +73,19 @@ pub trait Inventory {
 
     fn resize(
         &mut self,
-        width: u32,
-        height: u32,
+        _width: u32,
+        _height: u32,
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
-    );
+    ) {
+        self.init(renderer, ui_container, inventory_window);
+    }
 
     fn ty(&self) -> InventoryType;
+
+    // for handeling the WindowProperty packet in inventorys that need it
+    fn handle_property_packet(&mut self, _property: i16, _value: i16) {}
 }
 
 pub fn inventory_from_type(
@@ -114,11 +123,15 @@ pub fn inventory_from_type(
         InventoryType::BlastFurnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
             renderer, base_slots, ty, id,
         )))),
+        InventoryType::EnchantingTable => Some(Arc::new(RwLock::new(
+            EnchantmentTableInventory::new(renderer, base_slots, title.to_string(), id),
+        ))),
+        InventoryType::Anvil => Some(Arc::new(RwLock::new(AnvilInventory::new(
+            renderer, base_slots, id,
+        )))),
         /*
-        InventoryType::Anvil => {}
         InventoryType::Beacon => {}
         InventoryType::BrewingStand => {}
-        InventoryType::EnchantingTable => {}
         InventoryType::Grindstone => {}
         InventoryType::Hopper => {}
         InventoryType::Lectern => {}
@@ -171,13 +184,17 @@ pub struct InventoryContext {
     pub has_inv_open: bool,
     pub player_inventory: Arc<RwLock<PlayerInventory>>,
     pub base_slots: Arc<RwLock<SlotMapping>>,
-    hud_context: Arc<RwLock<HudContext>>,
+    pub hud_context: Arc<RwLock<HudContext>>,
     mouse_position: Option<(f64, f64)>,
     conn: Arc<RwLock<Option<Conn>>>,
     dirty: bool,
 }
 
 impl InventoryContext {
+    pub fn get_conn(&self) -> Conn {
+        self.conn.clone().write().clone().unwrap()
+    }
+
     pub fn new(
         version: Version,
         renderer: Arc<Renderer>,
@@ -363,7 +380,7 @@ impl InventoryContext {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 #[allow(dead_code)]
 pub enum InventoryType {
     Internal, // For internal use only.
@@ -458,7 +475,7 @@ impl InventoryType {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct Item {
     pub stack: Stack,
     pub material: Material,
@@ -472,9 +489,10 @@ impl Item {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Material {
-    Air,                             // 1.7.10 (id: 0, stack: 0)| 1.13 (id: 9648)
+    #[default]
+    Air, // 1.7.10 (id: 0, stack: 0)| 1.13 (id: 9648)
     Stone,                           // 1.7.10 (id: 1)| 1.13 (id: 22948)
     Grass,                           // 1.7.10 (id: 2)| 1.13 (id: 6155)
     Dirt,                            // 1.7.10 (id: 3)| 1.13 (id: 10580)

@@ -169,17 +169,6 @@ impl Inventory for FurnaceInventory {
         self.slots.tick(renderer, ui_container, inventory_window, 1);
     }
 
-    fn resize(
-        &mut self,
-        _width: u32,
-        _height: u32,
-        renderer: Arc<Renderer>,
-        ui_container: &mut Container,
-        inventory_window: &mut InventoryWindow,
-    ) {
-        self.init(renderer, ui_container, inventory_window);
-    }
-
     fn ty(&self) -> InventoryType {
         self.ty
     }

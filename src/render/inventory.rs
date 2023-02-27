@@ -2,7 +2,7 @@ use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
-use crate::ui::{Container, ImageRef, TextRef, VAttach};
+use crate::ui::{Container, ImageRef, TextBoxRef, TextRef, VAttach};
 use crate::{ui, Game};
 use glutin::event::VirtualKeyCode;
 use parking_lot::RwLock;
@@ -13,8 +13,9 @@ pub struct InventoryWindow {
     pub elements: Vec<Vec<ImageRef>>,
     pub text_elements: Vec<Vec<TextRef>>,
     pub cursor_element: Vec<ImageRef>,
+    pub text_box: Vec<TextBoxRef>,
     pub inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
-    inventory_context: Arc<RwLock<InventoryContext>>,
+    pub inventory_context: Arc<RwLock<InventoryContext>>,
 }
 
 impl Screen for InventoryWindow {
@@ -121,6 +122,7 @@ impl InventoryWindow {
             inventory,
             inventory_context,
             cursor_element: vec![],
+            text_box: vec![],
         }
     }
 }
@@ -187,5 +189,9 @@ impl InventoryWindow {
             element.clear();
         }
         self.text_elements.clear();
+        // for element in &mut self.text_box {
+        //     element.clear();
+        // }
+        self.text_box.clear();
     }
 }
