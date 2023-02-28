@@ -521,9 +521,14 @@ fn tick_all(
         window.set_cursor_visible(true);
         game.focused = false;
     } else {
-        window
-            .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-            .unwrap();
+        // see https://docs.rs/winit/latest/winit/window/enum.CursorGrabMode.html
+        // fix for https://github.com/Lea-fish/Leafish/issues/265
+        let cursor_grab_mode = if cfg!(target_os = "macos") {
+            winit::window::CursorGrabMode::Locked
+        } else {
+            winit::window::CursorGrabMode::Confined
+        };
+        window.set_cursor_grab(cursor_grab_mode).unwrap();
         window.set_cursor_visible(false);
         game.focused = true;
     }
@@ -599,9 +604,14 @@ fn handle_window_event<T>(
             use std::f64::consts::PI;
 
             if game.focused {
-                window
-                    .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-                    .unwrap();
+                // see https://docs.rs/winit/latest/winit/window/enum.CursorGrabMode.html
+                // fix for https://github.com/Lea-fish/Leafish/issues/265
+                let cursor_grab_mode = if cfg!(target_os = "macos") {
+                    winit::window::CursorGrabMode::Locked
+                } else {
+                    winit::window::CursorGrabMode::Confined
+                };
+                window.set_cursor_grab(cursor_grab_mode).unwrap();
                 window.set_cursor_visible(false);
                 if game.server.is_some()
                     && !game
