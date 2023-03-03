@@ -547,11 +547,11 @@ impl Hud {
         let updated_offset = if updated_health { 9.0 } else { 0.0 };
         let hardcore_offset = if hud_context.hardcore { 5.0 } else { 0.0 };
         let texture_offset = if hud_context.poison {
-            16 + 36
+            16.0 + 36.0
         } else if hud_context.wither {
-            16 + 72
+            16.0 + 72.0
         } else {
-            16
+            16.0
         };
         drop(hud_context);
         let mut redirty_health = false;
@@ -574,12 +574,7 @@ impl Hud {
 
             let image = ui::ImageBuilder::new()
                 .draw_index(HUD_PRIORITY)
-                .texture_coords((
-                    (16.0 + updated_offset) as f64 / 256.0,
-                    (9.0 * hardcore_offset) as f64 / 256.0,
-                    9.0 / 256.0,
-                    9.0 / 256.0,
-                ))
+                .texture_coords((16.0 + updated_offset, 9.0 * hardcore_offset, 9.0, 9.0))
                 .position(x, y)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                 .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -591,12 +586,7 @@ impl Hud {
                 if heart as f32 * 2.0 + 1.0 < last_health {
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((
-                            (texture_offset + 54) as f64 / 256.0,
-                            (9.0 * hardcore_offset) as f64 / 256.0,
-                            9.0 / 256.0,
-                            9.0 / 256.0,
-                        ))
+                        .texture_coords((texture_offset + 54.0, 9.0 * hardcore_offset, 9.0, 9.0))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -606,12 +596,7 @@ impl Hud {
                 } else if heart as f32 * 2.0 + 1.0 == last_health {
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((
-                            (texture_offset + 63) as f64 / 256.0,
-                            (9.0 * hardcore_offset) as f64 / 256.0,
-                            9.0 / 256.0,
-                            9.0 / 256.0,
-                        ))
+                        .texture_coords((texture_offset + 63.0, 9.0 * hardcore_offset, 9.0, 9.0))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -625,12 +610,7 @@ impl Hud {
                 if tmp_absorbtion == absorbtion && absorbtion % 2.0 == 1.0 {
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((
-                            (texture_offset + 153) as f64 / 256.0,
-                            (9.0 * hardcore_offset) as f64 / 256.0,
-                            9.0 / 256.0,
-                            9.0 / 256.0,
-                        ))
+                        .texture_coords((texture_offset + 153.0, 9.0 * hardcore_offset, 9.0, 9.0))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -640,12 +620,7 @@ impl Hud {
                 } else {
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((
-                            (texture_offset + 144) as f64 / 256.0,
-                            (9.0 * hardcore_offset) as f64 / 256.0,
-                            9.0 / 256.0,
-                            9.0 / 256.0,
-                        ))
+                        .texture_coords((texture_offset + 144.0, 9.0 * hardcore_offset, 9.0, 9.0))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -659,12 +634,7 @@ impl Hud {
                 if heart * 2 + 1 < hp as isize {
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((
-                            (texture_offset + 36) as f64 / 256.0,
-                            (9.0 * hardcore_offset) as f64 / 256.0,
-                            9.0 / 256.0,
-                            9.0 / 256.0,
-                        ))
+                        .texture_coords((texture_offset + 36.0, 9.0 * hardcore_offset, 9.0, 9.0))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -676,12 +646,7 @@ impl Hud {
                 if heart * 2 + 1 == hp as isize {
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((
-                            (texture_offset + 45) as f64 / 256.0,
-                            (9.0 * hardcore_offset) as f64 / 256.0,
-                            9.0 / 256.0,
-                            9.0 / 256.0,
-                        ))
+                        .texture_coords((texture_offset + 45.0, 9.0 * hardcore_offset, 9.0, 9.0))
                         .position(x, y)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -716,12 +681,7 @@ impl Hud {
                 };
                 let image = ui::ImageBuilder::new()
                     .draw_index(HUD_PRIORITY)
-                    .texture_coords((
-                        texture_offset / 256.0,
-                        9.0 / 256.0,
-                        9.0 / 256.0,
-                        9.0 / 256.0,
-                    ))
+                    .texture_coords((texture_offset, 9.0, 9.0, 9.0))
                     .position(x, y)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                     .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -756,12 +716,7 @@ impl Hud {
             let x = x_offset - i as f64 * (icon_scale * 8.0) - icon_scale * 9.0;
             let image = ui::ImageBuilder::new()
                 .draw_index(HUD_PRIORITY)
-                .texture_coords((
-                    (16.0 + j8 * 9.0) / 256.0,
-                    27.0 / 256.0,
-                    9.0 / 256.0,
-                    9.0 / 256.0,
-                ))
+                .texture_coords(((16.0 + j8 * 9.0), 27.0, 9.0, 9.0))
                 .position(x, y_offset)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                 .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -773,12 +728,7 @@ impl Hud {
                 Ordering::Less => {
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((
-                            (l7 + 36.0) / 256.0,
-                            27.0 / 256.0,
-                            9.0 / 256.0,
-                            9.0 / 256.0,
-                        ))
+                        .texture_coords(((l7 + 36.0), 27.0, 9.0, 9.0))
                         .position(x, y_offset)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -789,12 +739,7 @@ impl Hud {
                 Ordering::Equal => {
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((
-                            (l7 + 45.0) / 256.0,
-                            27.0 / 256.0,
-                            9.0 / 256.0,
-                            9.0 / 256.0,
-                        ))
+                        .texture_coords(((l7 + 45.0), 27.0, 9.0, 9.0))
                         .position(x, y_offset)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -823,7 +768,7 @@ impl Hud {
         if max_exp > 0 {
             let image = ui::ImageBuilder::new()
                 .draw_index(HUD_PRIORITY)
-                .texture_coords((0.0 / 256.0, 64.0 / 256.0, 182.0 / 256.0, 5.0 / 256.0))
+                .texture_coords((0.0, 64.0, 182.0, 5.0))
                 .position(0.0, y_offset)
                 .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                 .size(icon_scale * 182.0, icon_scale * 5.0)
@@ -836,12 +781,7 @@ impl Hud {
                 let shift = icon_scale * (((182.0) - scaled_length as f64) / 2.0);
                 let image = ui::ImageBuilder::new()
                     .draw_index(HUD_PRIORITY)
-                    .texture_coords((
-                        0.0 / 256.0,
-                        69.0 / 256.0,
-                        scaled_length as f64 / 256.0,
-                        5.0 / 256.0,
-                    ))
+                    .texture_coords((0.0, 69.0, scaled_length as f64, 5.0))
                     .position(shift * -1.0, y_offset)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                     .size(icon_scale * scaled_length as f64, icon_scale * 5.0)
@@ -923,7 +863,7 @@ impl Hud {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
-            .texture_coords((0.0 / 256.0, 0.0 / 256.0, 182.0 / 256.0, 22.0 / 256.0))
+            .texture_coords((0.0, 0.0, 182.0, 22.0))
             .position(0.0, 0.0)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
             .size(icon_scale * 182.0, icon_scale * 22.0)
@@ -971,7 +911,7 @@ impl Hud {
         let slot = self.hud_context.clone().read().slot_index as f64;
         let image = ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
-            .texture_coords((0.0 / 256.0, 22.0 / 256.0, 24.0 / 256.0, 22.0 / 256.0))
+            .texture_coords((0.0, 22.0, 24.0, 22.0))
             .position(
                 (icon_scale) * -1.0
                     + -(icon_scale * 90.0)
@@ -995,7 +935,7 @@ impl Hud {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
-            .texture_coords((0.0 / 256.0, 0.0 / 256.0, 16.0 / 256.0, 16.0 / 256.0))
+            .texture_coords((0.0, 0.0, 16.0, 16.0))
             .position(0.0, 0.0)
             .alignment(ui::VAttach::Middle, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)
@@ -1025,7 +965,7 @@ impl Hud {
                     // normal bubble
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((16.0 / 256.0, 18.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                        .texture_coords((16.0, 18.0, 9.0, 9.0))
                         .position(x, y_offset)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -1036,7 +976,7 @@ impl Hud {
                     // broken bubble
                     let image = ui::ImageBuilder::new()
                         .draw_index(HUD_PRIORITY)
-                        .texture_coords((25.0 / 256.0, 18.0 / 256.0, 9.0 / 256.0, 9.0 / 256.0))
+                        .texture_coords((25.0, 18.0, 9.0, 9.0))
                         .position(x, y_offset)
                         .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                         .size(icon_scale * 9.0, icon_scale * 9.0)
@@ -1163,7 +1103,7 @@ impl Hud {
             };
         ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
-            .texture_coords((0.0, 0.0, 1.0, 1.0))
+            .texture_coords((0.0, 0.0, 256.0, 256.0))
             .position(x, y)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)

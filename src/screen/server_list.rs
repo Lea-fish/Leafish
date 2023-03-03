@@ -202,7 +202,7 @@ impl ServerList {
                 .texture("gui/icons")
                 .position(5.0, 5.0)
                 .size(20.0, 16.0)
-                .texture_coords((0.0, 56.0 / 256.0, 10.0 / 256.0, 8.0 / 256.0))
+                .texture_coords((0.0, 56.0, 10.0, 8.0))
                 .alignment(ui::VAttach::Top, ui::HAttach::Right)
                 .attach(&mut *back.borrow_mut());
 
@@ -587,12 +587,12 @@ impl super::Screen for ServerList {
                         let ping_ms = (res.ping.subsec_nanos() as f64) / 1000000.0
                             + (res.ping.as_secs() as f64) * 1000.0;
                         let y = match ping_ms.round() as u64 {
-                            _x @ 0..=75 => 16.0 / 256.0,
-                            _x @ 76..=150 => 24.0 / 256.0,
-                            _x @ 151..=225 => 32.0 / 256.0,
-                            _x @ 226..=350 => 40.0 / 256.0,
-                            _x @ 351..=999 => 48.0 / 256.0,
-                            _ => 56.0 / 256.0,
+                            _x @ 0..=75 => 16.0,
+                            _x @ 76..=150 => 24.0,
+                            _x @ 151..=225 => 32.0,
+                            _x @ 226..=350 => 40.0,
+                            _x @ 351..=999 => 48.0,
+                            _ => 56.0,
                         };
                         s.ping.borrow_mut().texture_coords.1 = y;
                         if res.exists {

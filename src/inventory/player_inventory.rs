@@ -111,12 +111,7 @@ impl Inventory for PlayerInventory {
         // Inventory window
         basic_elements.push(
             ui::ImageBuilder::new()
-                .texture_coords((
-                    0.0 / 256.0,
-                    0.0 / 256.0,
-                    WINDOW_WIDTH as f64 / 256.0,
-                    WINDOW_HEIGHT as f64 / 256.0,
-                ))
+                .texture_coords((0.0, 0.0, WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64))
                 .position(
                     center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0,
                     center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0,
@@ -135,12 +130,7 @@ impl Inventory for PlayerInventory {
         if self.version < Version::V1_9 {
             basic_elements.push(
                 ui::ImageBuilder::new()
-                    .texture_coords((
-                        (WINDOW_WIDTH as f64 / 2.0 - 9.0) / 256.0,
-                        10.0 / 256.0,
-                        18.0 / 256.0,
-                        18.0 / 256.0,
-                    ))
+                    .texture_coords(((WINDOW_WIDTH as f64 / 2.0 - 9.0), 10.0, 18.0, 18.0))
                     .position(
                         center.0 as f64 - icon_scale * (WINDOW_WIDTH as f64 / 2.0 - 76.0),
                         center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 61.0),

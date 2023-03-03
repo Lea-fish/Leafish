@@ -150,7 +150,7 @@ impl InventoryWindow {
                 textures.1
             };
         let image = ui::ImageBuilder::new()
-            .texture_coords((0.0, 0.0, 1.0, 1.0))
+            .texture_coords((0.0, 0.0, 256.0, 256.0))
             .position(x, y)
             .alignment(v_attach, ui::HAttach::Left)
             .size(icon_scale * 16.0, icon_scale * 16.0)
