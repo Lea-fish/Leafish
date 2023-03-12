@@ -109,7 +109,7 @@ checksum = "904dfeac50f3cdaba28fc6f57fdcddb75f49ed61346676a78c4ffe55877802fd"
 [[package]]
 name = "bevy_derive"
 version = "0.5.0"
-source = "git+https://github.com/terrarier2111/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
+source = "git+https://github.com/Lea-fish/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
 dependencies = [
  "Inflector",
  "bevy_macro_utils",
@@ -120,7 +120,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs"
 version = "0.5.0"
-source = "git+https://github.com/terrarier2111/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
+source = "git+https://github.com/Lea-fish/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
 dependencies = [
  "async-channel",
  "bevy_ecs_macros",
@@ -137,7 +137,7 @@ dependencies = [
 [[package]]
 name = "bevy_ecs_macros"
 version = "0.5.0"
-source = "git+https://github.com/terrarier2111/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
+source = "git+https://github.com/Lea-fish/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -148,7 +148,7 @@ dependencies = [
 [[package]]
 name = "bevy_macro_utils"
 version = "0.5.0"
-source = "git+https://github.com/terrarier2111/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
+source = "git+https://github.com/Lea-fish/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
 dependencies = [
  "cargo-manifest",
  "syn",
@@ -157,7 +157,7 @@ dependencies = [
 [[package]]
 name = "bevy_reflect"
 version = "0.5.0"
-source = "git+https://github.com/terrarier2111/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
+source = "git+https://github.com/Lea-fish/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
 dependencies = [
  "bevy_reflect_derive",
  "bevy_utils",
@@ -171,7 +171,7 @@ dependencies = [
 [[package]]
 name = "bevy_reflect_derive"
 version = "0.5.0"
-source = "git+https://github.com/terrarier2111/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
+source = "git+https://github.com/Lea-fish/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
 dependencies = [
  "bevy_macro_utils",
  "proc-macro2",
@@ -183,7 +183,7 @@ dependencies = [
 [[package]]
 name = "bevy_tasks"
 version = "0.5.0"
-source = "git+https://github.com/terrarier2111/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
+source = "git+https://github.com/Lea-fish/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
 dependencies = [
  "async-channel",
  "async-executor",
@@ -196,7 +196,7 @@ dependencies = [
 [[package]]
 name = "bevy_utils"
 version = "0.5.0"
-source = "git+https://github.com/terrarier2111/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
+source = "git+https://github.com/Lea-fish/bevy?rev=a58b4936d0e1ccd241dca74bceae78a1b6d4f949#a58b4936d0e1ccd241dca74bceae78a1b6d4f949"
 dependencies = [
  "ahash",
  "bevy_derive",
