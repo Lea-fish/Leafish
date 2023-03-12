@@ -214,6 +214,7 @@ pub struct Hud {
     exp_elements: Vec<ImageRef>,
     exp_text_elements: Vec<TextRef>,
     slot_elements: Vec<ImageRef>,
+    slot_text_elements: Vec<TextRef>,
     slot_index_elements: Vec<ImageRef>,
     debug_elements: Vec<TextRef>,
     chat_elements: Vec<FormattedRef>,
@@ -237,6 +238,7 @@ impl Hud {
             exp_elements: vec![],
             exp_text_elements: vec![],
             slot_elements: vec![],
+            slot_text_elements: vec![],
             slot_index_elements: vec![],
             debug_elements: vec![],
             chat_elements: vec![],
@@ -287,6 +289,7 @@ impl Screen for Hud {
         self.armor_elements.clear();
         self.breath_elements.clear();
         self.slot_elements.clear();
+        self.slot_text_elements.clear();
         self.slot_index_elements.clear();
         self.debug_elements.clear();
         self.chat_elements.clear();
@@ -386,6 +389,7 @@ impl Screen for Hud {
             .load(AtomicOrdering::Relaxed)
         {
             self.slot_elements.clear();
+            self.slot_text_elements.clear();
             self.render_slots_items(renderer.clone(), ui_container);
         }
         if self.hud_context.clone().read().dirty_slot_index {
@@ -885,7 +889,7 @@ impl Hud {
         for i in 0..9 {
             if let Some(inventory) = &self.hud_context.clone().read().slots {
                 if let Some(item) = inventory.clone().read().get_item(27 + i as u16) {
-                    let slot = self.draw_item(
+                    let (slot_item, stack_count) = self.draw_item(
                         &item,
                         (icon_scale) * -1.0
                             + -(icon_scale * 90.0)
@@ -895,7 +899,10 @@ impl Hud {
                         ui_container,
                         renderer.clone(),
                     );
-                    self.slot_elements.push(slot);
+                    self.slot_elements.push(slot_item);
+                    if let Some(stack_count) = stack_count {
+                        self.slot_text_elements.push(stack_count);
+                    }
                 }
             }
         }
@@ -1088,7 +1095,7 @@ impl Hud {
         y: f64,
         ui_container: &mut Container,
         renderer: Arc<Renderer>,
-    ) -> ImageRef {
+    ) -> (ImageRef, Option<TextRef>) {
         let icon_scale = Hud::icon_scale(renderer.clone());
         let textures = item.material.texture_locations();
         let texture =
@@ -1101,14 +1108,32 @@ impl Hud {
             } else {
                 textures.1
             };
-        ui::ImageBuilder::new()
+        let item_image = ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
             .texture_coords((0.0, 0.0, 256.0, 256.0))
             .position(x, y)
             .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
             .size(icon_scale * 16.0, icon_scale * 16.0)
             .texture(format!("minecraft:{}", texture))
-            .create(ui_container)
+            .create(ui_container);
+
+        let text;
+        if item.stack.count != 1 {
+            text = Some(
+                ui::TextBuilder::new()
+                    .scale_x(icon_scale / 2.0)
+                    .scale_y(icon_scale / 2.0)
+                    .text(item.stack.count.to_string())
+                    .position(x - icon_scale * 2.0, y + icon_scale * 5.0)
+                    .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
+                    .colour((255, 255, 255, 255))
+                    .shadow(true)
+                    .create(ui_container),
+            );
+        } else {
+            text = None;
+        }
+        (item_image, text)
     }
 }
 

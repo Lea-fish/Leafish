@@ -25,6 +25,9 @@ impl Screen for InventoryWindow {
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
+        self.text_elements.push(vec![]); // numbers of items in inventory
+        self.text_elements.push(vec![]); // number for item in child inventory
+        self.text_elements.push(vec![]); // number for item under cursor
         self.inventory_context
             .write()
             .inventory
@@ -133,6 +136,7 @@ impl InventoryWindow {
         x: f64,
         y: f64,
         elements: &mut Vec<ImageRef>,
+        text_elements: &mut Vec<TextRef>,
         ui_container: &mut Container,
         renderer: Arc<Renderer>,
         v_attach: VAttach,
@@ -157,6 +161,19 @@ impl InventoryWindow {
             .texture(format!("minecraft:{}", texture))
             .create(ui_container);
         elements.push(image);
+
+        if item.stack.count != 1 {
+            let text = ui::TextBuilder::new()
+                .scale_x(icon_scale / 2.0)
+                .scale_y(icon_scale / 2.0)
+                .text(item.stack.count.to_string())
+                .position(x, y)
+                .alignment(v_attach, ui::HAttach::Left)
+                .colour((255, 255, 255, 255))
+                .shadow(true)
+                .create(ui_container);
+            text_elements.push(text);
+        }
     }
 
     pub fn draw_item_internally(
@@ -174,6 +191,7 @@ impl InventoryWindow {
             x,
             y,
             self.elements.get_mut(elements_idx).unwrap(),
+            &mut self.text_elements.get_mut(elements_idx).unwrap(),
             ui_container,
             renderer,
             v_attach,
@@ -188,10 +206,6 @@ impl InventoryWindow {
         for element in &mut self.text_elements {
             element.clear();
         }
-        self.text_elements.clear();
-        // for element in &mut self.text_box {
-        //     element.clear();
-        // }
         self.text_box.clear();
     }
 }

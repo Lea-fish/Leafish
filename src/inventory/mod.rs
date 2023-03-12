@@ -1,4 +1,5 @@
 pub mod anvil_inventory;
+pub mod beacon_inventory;
 pub mod chest_inventory;
 pub mod crafting_table_inventory;
 pub mod dropper_inventory;
@@ -9,6 +10,7 @@ pub mod player_inventory;
 pub mod slot_mapping;
 
 use crate::inventory::anvil_inventory::AnvilInventory;
+use crate::inventory::beacon_inventory::BeaconInventory;
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::crafting_table_inventory::CraftingTableInventory;
 use crate::inventory::dropper_inventory::DropperInventory;
@@ -129,8 +131,11 @@ pub fn inventory_from_type(
         InventoryType::Anvil => Some(Arc::new(RwLock::new(AnvilInventory::new(
             renderer, base_slots, id,
         )))),
+        InventoryType::Beacon => Some(Arc::new(RwLock::new(BeaconInventory::new(
+            renderer, base_slots, id,
+        )))),
+
         /*
-        InventoryType::Beacon => {}
         InventoryType::BrewingStand => {}
         InventoryType::Grindstone => {}
         InventoryType::Hopper => {}
@@ -277,6 +282,7 @@ impl InventoryContext {
         if self.dirty {
             self.dirty = false;
             inventory_window.cursor_element.clear();
+            inventory_window.text_elements.get_mut(3).unwrap().clear();
             if let Some(item) = &self.cursor {
                 if let Some(mouse_position) = &self.mouse_position {
                     let scale = Hud::icon_scale(renderer.clone());
@@ -290,6 +296,7 @@ impl InventoryContext {
                         x,
                         y,
                         &mut inventory_window.cursor_element,
+                        &mut inventory_window.text_elements.get_mut(3).unwrap(),
                         ui_container,
                         renderer,
                         VAttach::Top,

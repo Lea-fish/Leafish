@@ -180,6 +180,14 @@ impl SlotMapping {
                 .get_mut(element_idx)
                 .unwrap()
                 .clear();
+            inventory_window
+                .text_elements
+                .get_mut(element_idx)
+                .unwrap()
+                .clear();
+            if let Some(child) = &self.child {
+                child.slots.write().dirty = true;
+            }
             for (_, slot) in self.slots.values() {
                 if let Some(item) = &slot.item {
                     inventory_window.draw_item_internally(
