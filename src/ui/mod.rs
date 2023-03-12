@@ -841,7 +841,7 @@ element! {
         hardcode last_texture_coords = (0.0, 0.0, 0.0, 0.0),
         simple texture: String,
         optional colour: (u8, u8, u8, u8) = (255, 255, 255, 255),
-        optional texture_coords: (f64, f64, f64, f64) = (0.0, 0.0, 1.0, 1.0),
+        optional texture_coords: (f64, f64, f64, f64) = (0.0, 0.0, 256.0, 256.0),
         noset width: f64 = |b| b.width.expect("Missing required field width"),
         noset height: f64 = |b| b.height.expect("Missing required field height"),
     }
@@ -875,10 +875,10 @@ impl UIElement for Image {
                 r.y,
                 r.w,
                 r.h,
-                self.texture_coords.0,
-                self.texture_coords.1,
-                self.texture_coords.2,
-                self.texture_coords.3,
+                self.texture_coords.0 / 256.0,
+                self.texture_coords.1 / 256.0,
+                self.texture_coords.2 / 256.0,
+                self.texture_coords.3 / 256.0,
             );
             element.r = self.colour.0;
             element.g = self.colour.1;

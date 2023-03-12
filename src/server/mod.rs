@@ -710,18 +710,15 @@ impl Server {
                         }
                         MappedPacket::WindowProperty(data) => {
                             let win_id: i32 = data.id as i32;
-                            let inv = server
-                                .inventory_context
-                                .read()
-                                .safe_inventory
-                                .clone()
-                                .unwrap();
-
-                            if inv.read().id() == win_id {
-                                inv.write()
-                                    .handle_property_packet(data.property, data.value);
-                            } else {
-                                warn!("The server has send information about a inventory that is not open. Did it try to crash you?");
+                            if let Some(inv) =
+                                server.inventory_context.read().safe_inventory.clone()
+                            {
+                                if inv.read().id() == win_id {
+                                    inv.write()
+                                        .handle_property_packet(data.property, data.value);
+                                } else {
+                                    warn!("The server has send information about a inventory that is not open. Did it try to crash you?");
+                                }
                             }
                         }
                         MappedPacket::WindowSetSlot(set_slot) => {

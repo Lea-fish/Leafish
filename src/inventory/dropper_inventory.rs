@@ -97,12 +97,7 @@ impl Inventory for DropperInventory {
         // Dropper texture
         basic_elements.push(
             ui::ImageBuilder::new()
-                .texture_coords((
-                    0.0 / 256.0,
-                    0.0 / 256.0,
-                    WINDOW_WIDTH as f64 / 256.0,
-                    WINDOW_HEIGHT as f64 / 256.0,
-                ))
+                .texture_coords((0.0, 0.0, WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64))
                 .position(
                     center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0,
                     center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0,

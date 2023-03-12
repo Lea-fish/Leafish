@@ -109,10 +109,10 @@ impl Inventory for ChestInventory {
         basic_elements.push(
             ui::ImageBuilder::new()
                 .texture_coords((
-                    0.0 / 256.0,
-                    0.0 / 256.0,
-                    WINDOW_WIDTH as f64 / 256.0,
-                    chest_height(self.rows) as f64 / 256.0,
+                    0.0,
+                    0.0,
+                    WINDOW_WIDTH as f64,
+                    chest_height(self.rows) as f64,
                 ))
                 .position(
                     (center.0 as i32 - total_width_scaled / 2) as f64,
@@ -128,10 +128,10 @@ impl Inventory for ChestInventory {
         basic_elements.push(
             ui::ImageBuilder::new()
                 .texture_coords((
-                    0.0 / 256.0,
-                    (chest_height(6) + 1) as f64 / 256.0,
-                    WINDOW_WIDTH as f64 / 256.0,
-                    INVENTORY_HEIGHT as f64 / 256.0,
+                    0.0,
+                    (chest_height(6) + 1) as f64,
+                    WINDOW_WIDTH as f64,
+                    INVENTORY_HEIGHT as f64,
                 ))
                 .position(
                     (center.0 as i32 - total_width_scaled / 2) as f64,

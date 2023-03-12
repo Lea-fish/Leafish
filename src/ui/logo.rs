@@ -73,10 +73,10 @@ impl Logo {
                     .position(x as f64, y as f64)
                     .size(4.0, 8.0)
                     .texture_coords((
-                        (x % 16) as f64 / 16.0,
-                        (y % 16) as f64 / 16.0,
-                        4.0 / 16.0,
-                        8.0 / 16.0,
+                        (x % 16) as f64 / 16.0 * 256.0,
+                        (y % 16) as f64 / 16.0 * 256.0,
+                        4.0 / 16.0 * 256.0,
+                        8.0 / 16.0 * 256.0,
                     ))
                     .colour((r, g, b, 255))
                     .attach(&mut *layer0.borrow_mut());

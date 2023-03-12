@@ -115,7 +115,7 @@ impl Inventory for AnvilInventory {
             renderer.screen_data.read().center().1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0;
         basic_elements.push(
             ui::ImageBuilder::new()
-                .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, 166.0 / 256.0))
+                .texture_coords((0.0, 0.0, 176.0, 166.0))
                 .position(top_left_x, top_left_y)
                 .alignment(ui::VAttach::Top, ui::HAttach::Left)
                 .size(icon_scale * 176.0, icon_scale * 166.0)
@@ -128,7 +128,7 @@ impl Inventory for AnvilInventory {
             ui::ImageBuilder::new()
                 .draw_index(5)
                 .texture("minecraft:gui/container/anvil")
-                .texture_coords((0.0 / 256.0, 182.0 / 256.0, 110.0 / 256.0, 16.0 / 256.0))
+                .texture_coords((0.0, 182.0, 110.0, 16.0))
                 .position(
                     top_left_x + 59.0 * icon_scale,
                     top_left_y + 20.0 * icon_scale,
@@ -142,7 +142,7 @@ impl Inventory for AnvilInventory {
         basic_elements.push(
             ui::ImageBuilder::new()
                 .texture("minecraft:gui/container/anvil")
-                .texture_coords((176.0 / 256.0, 0.0 / 256.0, 28.0 / 256.0, 21.0 / 256.0))
+                .texture_coords((176.0, 0.0, 28.0, 21.0))
                 .position(
                     top_left_x + 98.0 * icon_scale,
                     top_left_y + 44.0 * icon_scale,

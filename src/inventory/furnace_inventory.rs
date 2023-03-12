@@ -5,6 +5,7 @@ use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::ui;
 use crate::ui::{Container, HAttach, VAttach};
+use log::warn;
 use std::sync::Arc;
 
 use parking_lot::RwLock;
@@ -17,6 +18,26 @@ pub struct FurnaceInventory {
     client_state_id: i16,
     ty: InventoryType,
     id: i32,
+    smelting_state: SmeltingState,
+}
+
+struct SmeltingState {
+    // all of these are in ticks
+    remaining_burn_time: i16,
+    max_burn_time: i16,
+    current_progress: i16,
+    max_progress: i16,
+}
+
+impl SmeltingState {
+    pub fn new() -> Self {
+        SmeltingState {
+            remaining_burn_time: 0,
+            max_burn_time: 0,
+            current_progress: 0,
+            max_progress: 0,
+        }
+    }
 }
 
 impl FurnaceInventory {
@@ -45,6 +66,7 @@ impl FurnaceInventory {
             client_state_id: 0,
             ty,
             id,
+            smelting_state: SmeltingState::new(),
         }
     }
 }
@@ -52,6 +74,16 @@ impl FurnaceInventory {
 impl Inventory for FurnaceInventory {
     fn size(&self) -> u16 {
         self.slots.size()
+    }
+
+    fn handle_property_packet(&mut self, property: i16, value: i16) {
+        match property {
+            0 => self.smelting_state.remaining_burn_time = value,
+            1 => self.smelting_state.max_burn_time = value,
+            2 => self.smelting_state.current_progress = value,
+            3 => self.smelting_state.max_progress = value,
+            _ => warn!("server sent invalid furnace property: {property}"),
+        }
     }
 
     fn id(&self) -> i32 {
@@ -95,19 +127,16 @@ impl Inventory for FurnaceInventory {
         let center = renderer.screen_data.read().center();
         let icon_scale = Hud::icon_scale(renderer.clone());
 
+        let top_left_x =
+            renderer.screen_data.read().center().0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0;
+        let top_left_y =
+            renderer.screen_data.read().center().1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0;
+
         // Furnace texture
         basic_elements.push(
             ui::ImageBuilder::new()
-                .texture_coords((
-                    0.0 / 256.0,
-                    0.0 / 256.0,
-                    WINDOW_WIDTH as f64 / 256.0,
-                    WINDOW_HEIGHT as f64 / 256.0,
-                ))
-                .position(
-                    center.0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0,
-                    center.1 as f64 - icon_scale * WINDOW_HEIGHT as f64 / 2.0,
-                )
+                .texture_coords((0.0, 0.0, WINDOW_WIDTH as f64, WINDOW_HEIGHT as f64))
+                .position(top_left_x, top_left_y)
                 .alignment(ui::VAttach::Top, ui::HAttach::Left)
                 .size(
                     icon_scale * WINDOW_WIDTH as f64,
@@ -132,7 +161,7 @@ impl Inventory for FurnaceInventory {
                 .scale_y(icon_scale / 2.0)
                 .position(
                     center.0 as f64 - icon_scale * title_offset.ceil(),
-                    center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 6.0),
+                    top_left_y + 6.0 * icon_scale,
                 )
                 .text(name)
                 .colour((64, 64, 64, 255))
@@ -140,19 +169,31 @@ impl Inventory for FurnaceInventory {
                 .create(ui_container),
         );
 
-        // Inventory text
-        basic_text_elements.push(
-            ui::TextBuilder::new()
-                .alignment(VAttach::Top, HAttach::Left)
-                .scale_x(icon_scale / 2.0)
-                .scale_y(icon_scale / 2.0)
+        // arrow texture
+        basic_elements.push(
+            ui::ImageBuilder::new()
+                .texture_coords((176.0, 14.0, 0.0, 17.0))
+                .texture("minecraft:gui/container/furnace")
+                .size(icon_scale * 0.0, icon_scale * 17.0)
                 .position(
-                    center.0 as f64 - icon_scale * (WINDOW_WIDTH as f64 / 2.0 - 8.0),
-                    center.1 as f64 - icon_scale * (WINDOW_HEIGHT as f64 / 2.0 - 72.0),
+                    top_left_x + 79.0 * icon_scale,
+                    top_left_y + 35.0 * icon_scale,
                 )
-                .text("Inventory")
-                .colour((64, 64, 64, 255))
-                .shadow(false)
+                .alignment(ui::VAttach::Top, ui::HAttach::Left)
+                .create(ui_container),
+        );
+
+        // fire texture
+        basic_elements.push(
+            ui::ImageBuilder::new()
+                .texture_coords((176.0, 0.0, 14.0, 0.0))
+                .texture("minecraft:gui/container/furnace")
+                .size(icon_scale * 14.0, icon_scale * 0.0)
+                .position(
+                    top_left_x + 57.0 * icon_scale,
+                    top_left_y + 115.0 * icon_scale,
+                )
+                .alignment(ui::VAttach::Bottom, ui::HAttach::Left)
                 .create(ui_container),
         );
 
@@ -165,7 +206,25 @@ impl Inventory for FurnaceInventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
-        // TODO: Render fuel level and smelting progress
+        let icon_scale = Hud::icon_scale(renderer.clone());
+        let basic_elements = inventory_window.elements.get_mut(0).unwrap();
+        let cp = self.smelting_state.current_progress as f64;
+        let mp = self.smelting_state.max_progress as f64;
+        let mb = self.smelting_state.max_burn_time as f64;
+        let rb = self.smelting_state.remaining_burn_time as f64;
+        if cp != 0.0 {
+            let mut arrow = basic_elements.get_mut(1).unwrap().borrow_mut();
+            let arrow_ratio = (1.0 / (mp / cp) * 100.0).trunc() * 24.0 / 100.0;
+            arrow.texture_coords = (176.0, 14.0, arrow_ratio, 17.0);
+            arrow.width = arrow_ratio * icon_scale;
+        }
+        if rb != 0.0 {
+            let mut fire = basic_elements.get_mut(2).unwrap().borrow_mut();
+            let fire_ratio = (1.0 / (mb / rb) * 100.0).trunc() * 14.0 / 100.0;
+            fire.texture_coords = (176.0, 14.0 - fire_ratio, 14.0, fire_ratio);
+            fire.height = fire_ratio * icon_scale;
+        }
+
         self.slots.tick(renderer, ui_container, inventory_window, 1);
     }
 

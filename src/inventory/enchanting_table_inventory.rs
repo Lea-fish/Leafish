@@ -20,12 +20,9 @@ const WINDOW_WIDTH: i32 = 176;
 const WINDOW_HEIGHT: i32 = 166;
 
 //textur coords for the buttons
-const BUTTON_ACTIVE: (f64, f64, f64, f64) =
-    (0.0 / 256.0, 166.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
-const BUTTON_INACTIVE: (f64, f64, f64, f64) =
-    (0.0 / 256.0, 185.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
-const BUTTON_FOCUSED: (f64, f64, f64, f64) =
-    (0.0 / 256.0, 204.0 / 256.0, 108.0 / 256.0, 19.0 / 256.0);
+const BUTTON_ACTIVE: (f64, f64, f64, f64) = (0.0, 166.0, 108.0, 19.0);
+const BUTTON_INACTIVE: (f64, f64, f64, f64) = (0.0, 185.0, 108.0, 19.0);
+const BUTTON_FOCUSED: (f64, f64, f64, f64) = (0.0, 204.0, 108.0, 19.0);
 
 pub struct EnchantmentTableInventory {
     slots: SlotMapping,
@@ -182,7 +179,7 @@ impl Inventory for EnchantmentTableInventory {
         // enchantment table texture
         basic_elements.push(
             ui::ImageBuilder::new()
-                .texture_coords((0.0 / 256.0, 0.0 / 256.0, 176.0 / 256.0, 166.0 / 256.0))
+                .texture_coords((0.0, 0.0, 176.0, 166.0))
                 .position(top_left_x, top_left_y)
                 .alignment(ui::VAttach::Top, ui::HAttach::Left)
                 .size(icon_scale * 176.0, icon_scale * 166.0)
@@ -263,12 +260,7 @@ impl Inventory for EnchantmentTableInventory {
             basic_elements.push(
                 level_requ
                     .clone()
-                    .texture_coords((
-                        (2.0 + 16.0 * i as f64) / 256.0,
-                        225.0 / 256.0,
-                        13.0 / 256.0,
-                        11.0 / 256.0,
-                    ))
+                    .texture_coords(((2.0 + 16.0 * i as f64), 225.0, 13.0, 11.0))
                     .position(
                         top_left_x + 62.0 * icon_scale,
                         top_left_y + 17.0 * icon_scale + 19.0 * i as f64 * icon_scale,
@@ -374,12 +366,7 @@ impl Inventory for EnchantmentTableInventory {
                         .get_mut(len_el - (3 - i))
                         .unwrap()
                         .borrow_mut()
-                        .texture_coords = (
-                        (2.0 + 16.0 * i as f64) / 256.0,
-                        225.0 / 256.0,
-                        13.0 / 256.0,
-                        11.0 / 256.0,
-                    );
+                        .texture_coords = ((2.0 + 16.0 * i as f64), 225.0, 13.0, 11.0);
 
                     // name of the enchantment and level
                     basic_text_elements
@@ -426,12 +413,7 @@ impl Inventory for EnchantmentTableInventory {
                         .get_mut(len_el - (3 - i))
                         .unwrap()
                         .borrow_mut()
-                        .texture_coords = (
-                        (2.0 + 16.0 * i as f64) / 256.0,
-                        241.0 / 256.0,
-                        13.0 / 256.0,
-                        11.0 / 256.0,
-                    );
+                        .texture_coords = ((2.0 + 16.0 * i as f64), 241.0, 13.0, 11.0);
 
                     // the buttons
                     basic_elements
