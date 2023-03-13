@@ -144,17 +144,17 @@ impl Inventory for BeaconInventory {
             (164.0, 107.0, ""),
         ];
 
-        for i in 0..8 {
-            pos[i].0 = top_left_x + pos[i].0 * icon_scale;
-            pos[i].1 = top_left_y + pos[i].1 * icon_scale;
+        for icon in &mut pos {
+            icon.0 = top_left_x + icon.0 * icon_scale;
+            icon.1 = top_left_y + icon.1 * icon_scale;
         }
         // buttons
-        for i in 0..8 {
+        for (i, icon) in pos.iter().enumerate() {
             basic_elements.push(
                 ui::ImageBuilder::new()
                     .texture("minecraft:gui/container/beacon")
                     .texture_coords(BUTTON_INACTIVE)
-                    .position(pos[i].0, pos[i].1)
+                    .position(icon.0, icon.1)
                     .alignment(VAttach::Top, HAttach::Left)
                     .size(21.0 * icon_scale, 21.0 * icon_scale)
                     .create(ui_container),
@@ -187,11 +187,11 @@ impl Inventory for BeaconInventory {
         }
 
         // effect images
-        for i in 0..7 {
+        for icon in pos.iter().take(7) {
             basic_elements.push(
                 ui::ImageBuilder::new()
-                    .texture(pos[i].2)
-                    .position(pos[i].0 + 2.0 * icon_scale, pos[i].1 + 2.0 * icon_scale)
+                    .texture(icon.2)
+                    .position(icon.0 + 2.0 * icon_scale, icon.1 + 2.0 * icon_scale)
                     .alignment(VAttach::Top, HAttach::Left)
                     .size(18.0 * icon_scale, 18.0 * icon_scale)
                     .create(ui_container),
@@ -217,10 +217,10 @@ impl Inventory for BeaconInventory {
             "minecraft:item/gold_ingot",
             "minecraft:item/iron_ingot",
         ];
-        for i in 0..5 {
+        for (i, payment) in payments.iter().enumerate() {
             basic_elements.push(
                 ui::ImageBuilder::new()
-                    .texture(payments[i])
+                    .texture(*payment)
                     .position(
                         top_left_x + 20.0 * icon_scale + 22.0 * i as f64 * icon_scale,
                         top_left_y + 108.0 * icon_scale,
@@ -254,19 +254,17 @@ impl Inventory for BeaconInventory {
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
 
         for i in 0..5 {
-            if get_button_state(i + 1, &basic_elements) == Pressed
-                && get_texture(i + 9, &basic_elements) != get_texture(15, &basic_elements)
-            {
-                self.dirty = true;
-            } else if get_button_state(6, &basic_elements) == Pressed
-                && get_button_state(7, &basic_elements) == Pressed
+            if (get_button_state(i + 1, basic_elements) == Pressed
+                && get_texture(i + 9, basic_elements) != get_texture(15, basic_elements))
+                || (get_button_state(6, basic_elements) == Pressed
+                    && get_button_state(7, basic_elements) == Pressed)
             {
                 self.dirty = true;
             }
         }
 
         // send beacon info packet if payed and effect set
-        if get_button_state(8, &basic_elements) == Pressed {
+        if get_button_state(8, basic_elements) == Pressed {
             set_button_state(Active, 8, basic_elements);
             inventory_window
                 .inventory_context
@@ -289,14 +287,14 @@ impl Inventory for BeaconInventory {
 
             // activate all buttons for the beacon power level
             for i in 0..n.min(7) {
-                if get_button_state(i + 1, &basic_elements) == Inactive {
+                if get_button_state(i + 1, basic_elements) == Inactive {
                     set_button_state(Active, i + 1, basic_elements);
                 }
             }
 
             // setup the 2 buttons on the right
             if let Some(effect) = self.info.effect1 {
-                if self.info.power_level == 4 && get_button_state(7, &basic_elements) == Inactive {
+                if self.info.power_level == 4 && get_button_state(7, basic_elements) == Inactive {
                     set_button_state(Active, 7, basic_elements);
                 }
                 set_secondary_power(effect.get_texture(), basic_elements);
@@ -321,18 +319,18 @@ impl Inventory for BeaconInventory {
                 })
                 .ok();
 
-                if get_texture(i + 9, &basic_elements) == get_texture(15, &basic_elements) {
+                if get_texture(i + 9, basic_elements) == get_texture(15, basic_elements) {
                     set_button_state(Pressed, i + 1, basic_elements);
                 }
-                if get_button_state(i + 1, &basic_elements) == Pressed
-                    && get_texture(15, &basic_elements) != get_texture(i + 9, &basic_elements)
+                if get_button_state(i + 1, basic_elements) == Pressed
+                    && get_texture(15, basic_elements) != get_texture(i + 9, basic_elements)
                 {
                     // if the button is pressed and not already set
                     self.info.effect1 = this_btn_effect;
                     if self.info.power_level == 4 {
                         set_button_state(Active, 7, basic_elements);
                     }
-                    set_secondary_power(get_texture(i + 9, &basic_elements), basic_elements);
+                    set_secondary_power(get_texture(i + 9, basic_elements), basic_elements);
 
                     //reset previously pressed buttons
                     for j in 0..n.min(5) {
@@ -343,14 +341,14 @@ impl Inventory for BeaconInventory {
                 }
 
                 // choose effect level 2  or regen
-                if self.info.power_level == 4 && get_button_state(i + 1, &basic_elements) == Pressed
+                if self.info.power_level == 4 && get_button_state(i + 1, basic_elements) == Pressed
                 {
-                    if get_button_state(6, &basic_elements) == Pressed
+                    if get_button_state(6, basic_elements) == Pressed
                         && self.info.effect2 != Some(Effect::Regeneration)
                     {
                         set_button_state(Active, 7, basic_elements);
                         self.info.effect2 = Some(Effect::Regeneration);
-                    } else if get_button_state(7, &basic_elements) == Pressed
+                    } else if get_button_state(7, basic_elements) == Pressed
                         && self.info.effect2 != this_btn_effect
                     {
                         set_button_state(Active, 6, basic_elements);
@@ -382,13 +380,13 @@ impl Inventory for BeaconInventory {
     }
 }
 
-fn set_secondary_power(texture: String, basic_elements: &mut Vec<ui::ImageRef>) {
+fn set_secondary_power(texture: String, basic_elements: &mut [ui::ImageRef]) {
     basic_elements.get_mut(15).unwrap().borrow_mut().texture = texture;
     basic_elements.get_mut(15).unwrap().borrow_mut().colour.3 = 255;
     basic_elements.get_mut(7).unwrap().borrow_mut().colour.3 = 255;
 }
 
-fn get_texture(element: usize, basic_elements: &Vec<ui::ImageRef>) -> String {
+fn get_texture(element: usize, basic_elements: &[ui::ImageRef]) -> String {
     basic_elements
         .get(element)
         .unwrap()
@@ -397,7 +395,7 @@ fn get_texture(element: usize, basic_elements: &Vec<ui::ImageRef>) -> String {
         .clone()
 }
 
-fn get_button_state(btn: usize, basic_elements: &Vec<ui::ImageRef>) -> ButtonState {
+fn get_button_state(btn: usize, basic_elements: &[ui::ImageRef]) -> ButtonState {
     use ButtonState::*;
     match basic_elements.get(btn).unwrap().borrow().texture_coords {
         x if x == (0.0, 219.0, 22.0, 22.0) => Active,
@@ -408,7 +406,7 @@ fn get_button_state(btn: usize, basic_elements: &Vec<ui::ImageRef>) -> ButtonSta
     }
 }
 
-fn set_button_state(state: ButtonState, btn: usize, basic_elements: &mut Vec<ui::ImageRef>) {
+fn set_button_state(state: ButtonState, btn: usize, basic_elements: &mut [ui::ImageRef]) {
     use ButtonState::*;
     let mut change_texture = |texture: (f64, f64, f64, f64)| {
         if let Some(button) = basic_elements.get_mut(btn) {
@@ -508,8 +506,8 @@ impl TryFrom<i16> for Effect {
     }
 }
 
-impl Into<u8> for Effect {
-    fn into(self) -> u8 {
-        self as u8 + 1
+impl From<Effect> for u8 {
+    fn from(val: Effect) -> Self {
+        val as u8 + 1
     }
 }

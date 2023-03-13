@@ -1366,7 +1366,7 @@ impl TextureManager {
                     (width, height, img.to_rgba8().into_vec())
                 };
                 let new_tex =
-                    self.put_texture("leafish-dynamic", n, width as u32, height as u32, data);
+                    self.put_texture("leafish-dynamic", n, width, height, data);
                 self.dynamic_textures.get_mut(n).unwrap().0 = new_tex;
             } else if !self.textures.contains_key(name) {
                 self.load_texture(name);

@@ -149,8 +149,8 @@ impl super::Screen for EditServerEntry {
             let server_name = server_name.clone();
             let server_address = server_address.clone();
             done.add_click_func(move |_, game| {
-                if &server_address.borrow().input == "" {
-                    save_server_error.borrow_mut().text = format!("Please enter a Server Address");
+                if server_address.borrow().input.is_empty() {
+                    save_server_error.borrow_mut().text = "Please enter a Server Address".into();
                     return false;
                 }
                 Self::save_servers(

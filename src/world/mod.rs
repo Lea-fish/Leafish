@@ -871,7 +871,7 @@ impl World {
                 } else if version == 19 {
                     self.prep_section_19(&mut chunk, data, i, skylight);
                 }
-                let mut section = chunk.sections[i as usize].as_mut().unwrap();
+                let mut section = chunk.sections[i].as_mut().unwrap();
                 section.dirty = true;
             }
             if version == 17 {
@@ -1122,7 +1122,7 @@ impl World {
                 continue;
             }
 
-            let section = chunk.sections[i as usize].as_mut().unwrap();
+            let section = chunk.sections[i].as_mut().unwrap();
 
             for bi in 0..4096 {
                 let id = ((block_add[i].get(bi) as u16) << 12)
@@ -1208,7 +1208,7 @@ impl World {
             ]
             .iter()
             {
-                self.flag_section_dirty(x + pos.0, i as i32 + pos.1, z + pos.2);
+                self.flag_section_dirty(x + pos.0, i + pos.1, z + pos.2);
             }
             self.update_range(
                 (x << 4) - 1,

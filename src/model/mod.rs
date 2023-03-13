@@ -192,7 +192,7 @@ impl Factory {
         if !missing_variant {
             // Whole model not loaded, try and load
             let mut m = models.write();
-            if !m.models.contains_key(&key) && !m.load_model(&plugin, &name) {
+            if !m.models.contains_key(&key) && !m.load_model(plugin, name) {
                 error!("Error loading model {}:{}", plugin, name);
             }
             match m.get_model(key.clone(), block, rng, snapshot, x, y, z, buf) {

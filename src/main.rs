@@ -540,8 +540,8 @@ fn tick_all(
     game.renderer.clone().tick(
         world,
         delta,
-        width as u32,
-        height as u32,
+        width,
+        height,
         physical_width,
         physical_height,
     );

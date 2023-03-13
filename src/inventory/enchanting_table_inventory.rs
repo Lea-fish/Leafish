@@ -146,7 +146,7 @@ impl Inventory for EnchantmentTableInventory {
             item.is_none() || item.clone().unwrap_or_default().material == Material::LapisLazuli
         };
 
-        if (slot_id == 1 && is_lapis_or_none(&item)) || slot_id != 1 {
+        if slot_id == 1 && is_lapis_or_none(&item) {
             self.slots.set_item(slot_id, item);
             self.dirty = true;
         }
@@ -330,7 +330,7 @@ impl Inventory for EnchantmentTableInventory {
                     // this just makes the following if statement more readable
                     let is_lapis_enough = self.get_item(1).unwrap_or_default().material
                         == Material::LapisLazuli
-                        && self.get_item(1).unwrap_or_default().stack.count >= i as isize + 1;
+                        && self.get_item(1).unwrap_or_default().stack.count > i as isize;
                     let enough_xp = inventory_window
                         .inventory_context
                         .read()
