@@ -204,8 +204,7 @@ impl Inventory for AnvilInventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
-        self.slots
-            .tick(renderer, ui_container, inventory_window, 1);
+        self.slots.tick(renderer, ui_container, inventory_window, 1);
         if self.dirty {
             let mut cost_text = inventory_window
                 .text_elements
