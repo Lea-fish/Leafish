@@ -237,9 +237,11 @@ impl Inventory for BeaconInventory {
 
     // buttons:
     // 0 = bg texture
-    // 1-8 = buttons
-    // 9-15 = effect images, last one need set texture
-    // 16 = tick
+    // 1-5 = buttons on left
+    // 6-7 = buttons on right
+    // 8 = tick button
+    // 9-15 = effect images, (last one need set texture)
+    // 16 = tick image
     // 17-21 = accepted payments
     fn tick(
         &mut self,
@@ -247,24 +249,25 @@ impl Inventory for BeaconInventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
+        use ButtonState::*;
         self.slots.tick(renderer, ui_container, inventory_window, 1);
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
+
         for i in 0..5 {
-            if get_button_read(i + 1, &basic_elements).texture_coords == BUTTON_PRESSED
-                && get_button_read(i + 9, &basic_elements).texture
-                    != get_button_read(15, &basic_elements).texture
+            if get_button_state(i + 1, &basic_elements) == Pressed
+                && get_texture(i + 9, &basic_elements) != get_texture(15, &basic_elements)
             {
                 self.dirty = true;
-            } else if get_button_read(6, &basic_elements).texture_coords == BUTTON_PRESSED
-                && get_button_read(7, &basic_elements).texture_coords == BUTTON_PRESSED
+            } else if get_button_state(6, &basic_elements) == Pressed
+                && get_button_state(7, &basic_elements) == Pressed
             {
                 self.dirty = true;
             }
         }
 
         // send beacon info packet if payed and effect set
-        if get_button_read(8, &basic_elements).texture_coords == BUTTON_PRESSED {
-            get_button(8, basic_elements).texture_coords = BUTTON_ACTIVE;
+        if get_button_state(8, &basic_elements) == Pressed {
+            set_button_state(Active, 8, basic_elements);
             inventory_window
                 .inventory_context
                 .write()
@@ -286,33 +289,28 @@ impl Inventory for BeaconInventory {
 
             // activate all buttons for the beacon power level
             for i in 0..n.min(7) {
-                if get_button_read(i + 1, &basic_elements).texture_coords == BUTTON_INACTIVE {
-                    get_button(i + 1, basic_elements).texture_coords = BUTTON_ACTIVE;
+                if get_button_state(i + 1, &basic_elements) == Inactive {
+                    set_button_state(Active, i + 1, basic_elements);
                 }
             }
 
             // setup the 2 buttons on the right
             if let Some(effect) = self.info.effect1 {
-                if self.info.power_level == 4
-                    && get_button_read(7, &basic_elements).texture_coords == BUTTON_INACTIVE
-                {
-                    get_button(7, basic_elements).texture_coords = BUTTON_ACTIVE;
+                if self.info.power_level == 4 && get_button_state(7, &basic_elements) == Inactive {
+                    set_button_state(Active, 7, basic_elements);
                 }
-                get_button(15, basic_elements).texture = effect.get_texture();
-                get_button(15, basic_elements).colour.3 = 255;
-                get_button(7, basic_elements).colour.3 = 255;
+                set_secondary_power(effect.get_texture(), basic_elements);
             }
             if let Some(effect) = self.info.effect2 {
                 if effect == Effect::Regeneration {
-                    get_button(6, basic_elements).texture_coords = BUTTON_PRESSED;
+                    set_button_state(Pressed, 6, basic_elements);
                 } else {
-                    get_button(7, basic_elements).texture_coords = BUTTON_PRESSED;
+                    set_button_state(Pressed, 7, basic_elements);
                 }
             }
 
             // set pressed button on left to button on right
             for i in 0..n.min(5) {
-                let current_btn_image = get_button_read(i + 9, &basic_elements).texture.clone();
                 let this_btn_effect = Effect::try_from(match i {
                     0 => 1,
                     1 => 3,
@@ -323,44 +321,39 @@ impl Inventory for BeaconInventory {
                 })
                 .ok();
 
-                if get_button_read(i + 9, &basic_elements).texture
-                    == get_button_read(15, &basic_elements).texture
-                {
-                    get_button(i + 1, basic_elements).texture_coords = BUTTON_PRESSED;
+                if get_texture(i + 9, &basic_elements) == get_texture(15, &basic_elements) {
+                    set_button_state(Pressed, i + 1, basic_elements);
                 }
-                if get_button_read(i + 1, &basic_elements).texture_coords == BUTTON_PRESSED
-                    && get_button_read(15, &basic_elements).texture != current_btn_image
+                if get_button_state(i + 1, &basic_elements) == Pressed
+                    && get_texture(15, &basic_elements) != get_texture(i + 9, &basic_elements)
                 {
                     // if the button is pressed and not already set
                     self.info.effect1 = this_btn_effect;
                     if self.info.power_level == 4 {
-                        get_button(7, basic_elements).texture_coords = BUTTON_ACTIVE;
+                        set_button_state(Active, 7, basic_elements);
                     }
-                    get_button(15, basic_elements).texture = current_btn_image;
-                    get_button(15, basic_elements).colour.3 = 255;
-                    get_button(7, basic_elements).colour.3 = 255;
+                    set_secondary_power(get_texture(i + 9, &basic_elements), basic_elements);
 
                     //reset previously pressed buttons
                     for j in 0..n.min(5) {
                         if j != i {
-                            get_button(j + 1, basic_elements).texture_coords = BUTTON_ACTIVE;
+                            set_button_state(Active, j + 1, basic_elements);
                         }
                     }
                 }
 
                 // choose effect level 2  or regen
-                if self.info.power_level == 4
-                    && get_button_read(i + 1, &basic_elements).texture_coords == BUTTON_PRESSED
+                if self.info.power_level == 4 && get_button_state(i + 1, &basic_elements) == Pressed
                 {
-                    if get_button_read(6, &basic_elements).texture_coords == BUTTON_PRESSED
+                    if get_button_state(6, &basic_elements) == Pressed
                         && self.info.effect2 != Some(Effect::Regeneration)
                     {
-                        get_button(7, basic_elements).texture_coords = BUTTON_ACTIVE;
+                        set_button_state(Active, 7, basic_elements);
                         self.info.effect2 = Some(Effect::Regeneration);
-                    } else if get_button_read(7, &basic_elements).texture_coords == BUTTON_PRESSED
+                    } else if get_button_state(7, &basic_elements) == Pressed
                         && self.info.effect2 != this_btn_effect
                     {
-                        get_button(6, basic_elements).texture_coords = BUTTON_ACTIVE;
+                        set_button_state(Active, 6, basic_elements);
                         self.info.effect2 = this_btn_effect;
                     }
                 }
@@ -373,12 +366,12 @@ impl Inventory for BeaconInventory {
                         || item.material == Material::Emerald
                         || item.material == Material::NetheriteIngot
                     {
-                        get_button(8, basic_elements).texture_coords = BUTTON_ACTIVE;
+                        set_button_state(Active, 8, basic_elements)
                     } else {
-                        get_button(8, basic_elements).texture_coords = BUTTON_INACTIVE;
+                        set_button_state(Inactive, 8, basic_elements)
                     }
                 } else {
-                    get_button(8, basic_elements).texture_coords = BUTTON_INACTIVE;
+                    set_button_state(Inactive, 8, basic_elements)
                 }
             }
         }
@@ -389,15 +382,57 @@ impl Inventory for BeaconInventory {
     }
 }
 
-fn get_button(i: usize, basic_elements: &mut Vec<ui::ImageRef>) -> std::cell::RefMut<ui::Image> {
-    basic_elements.get_mut(i).unwrap().borrow_mut()
+fn set_secondary_power(texture: String, basic_elements: &mut Vec<ui::ImageRef>) {
+    basic_elements.get_mut(15).unwrap().borrow_mut().texture = texture;
+    basic_elements.get_mut(15).unwrap().borrow_mut().colour.3 = 255;
+    basic_elements.get_mut(7).unwrap().borrow_mut().colour.3 = 255;
 }
 
-fn get_button_read<'a>(
-    i: usize,
-    basic_elements: &'a &'a mut Vec<ui::ImageRef>,
-) -> std::cell::Ref<'a, ui::Image> {
-    basic_elements.get(i).unwrap().borrow()
+fn get_texture(element: usize, basic_elements: &Vec<ui::ImageRef>) -> String {
+    if let Some(el) = basic_elements.get(element) {
+        el.borrow().texture.clone()
+    } else {
+        unreachable!()
+    }
+}
+
+fn get_button_state(btn: usize, basic_elements: &Vec<ui::ImageRef>) -> ButtonState {
+    use ButtonState::*;
+    if let Some(button) = basic_elements.get(btn) {
+        match button.borrow().texture_coords {
+            x if x == (0.0, 219.0, 22.0, 22.0) => Active,
+            x if x == (22.0, 219.0, 22.0, 22.0) => Pressed,
+            x if x == (44.0, 219.0, 22.0, 22.0) => Inactive,
+            x if x == (66.0, 219.0, 22.0, 22.0) => Focused,
+            _ => unreachable!(),
+        }
+    } else {
+        unreachable!()
+    }
+}
+
+fn set_button_state(state: ButtonState, btn: usize, basic_elements: &mut Vec<ui::ImageRef>) {
+    use ButtonState::*;
+    let mut change_texture = |texture: (f64, f64, f64, f64)| {
+        if let Some(button) = basic_elements.get_mut(btn) {
+            button.borrow_mut().texture_coords = texture;
+        }
+    };
+    match state {
+        Active => change_texture((0.0, 219.0, 22.0, 22.0)),
+        Pressed => change_texture((22.0, 219.0, 22.0, 22.0)),
+        Inactive => change_texture((44.0, 219.0, 22.0, 22.0)),
+        Focused => change_texture((66.0, 219.0, 22.0, 22.0)),
+    }
+}
+
+#[allow(dead_code)]
+#[derive(PartialEq)]
+enum ButtonState {
+    Active,
+    Pressed,
+    Inactive,
+    Focused,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
