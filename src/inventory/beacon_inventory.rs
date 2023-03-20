@@ -389,25 +389,22 @@ fn set_secondary_power(texture: String, basic_elements: &mut Vec<ui::ImageRef>) 
 }
 
 fn get_texture(element: usize, basic_elements: &Vec<ui::ImageRef>) -> String {
-    if let Some(el) = basic_elements.get(element) {
-        el.borrow().texture.clone()
-    } else {
-        unreachable!()
-    }
+    basic_elements
+        .get(element)
+        .unwrap()
+        .borrow()
+        .texture
+        .clone()
 }
 
 fn get_button_state(btn: usize, basic_elements: &Vec<ui::ImageRef>) -> ButtonState {
     use ButtonState::*;
-    if let Some(button) = basic_elements.get(btn) {
-        match button.borrow().texture_coords {
-            x if x == (0.0, 219.0, 22.0, 22.0) => Active,
-            x if x == (22.0, 219.0, 22.0, 22.0) => Pressed,
-            x if x == (44.0, 219.0, 22.0, 22.0) => Inactive,
-            x if x == (66.0, 219.0, 22.0, 22.0) => Focused,
-            _ => unreachable!(),
-        }
-    } else {
-        unreachable!()
+    match basic_elements.get(btn).unwrap().borrow().texture_coords {
+        x if x == (0.0, 219.0, 22.0, 22.0) => Active,
+        x if x == (22.0, 219.0, 22.0, 22.0) => Pressed,
+        x if x == (44.0, 219.0, 22.0, 22.0) => Inactive,
+        x if x == (66.0, 219.0, 22.0, 22.0) => Focused,
+        _ => unreachable!(),
     }
 }
 
@@ -499,6 +496,8 @@ impl Effect {
 impl TryFrom<i16> for Effect {
     type Error = &'static str;
     fn try_from(value: i16) -> Result<Self, Self::Error> {
+        // only allow the 34 IDs that map to the 34 effects
+        // if more effects are added this number should be increased
         if (0..34).contains(&value) {
             Ok(unsafe { std::mem::transmute::<u8, Effect>(value as u8 - 1) })
         } else if value == -1 {
@@ -511,6 +510,6 @@ impl TryFrom<i16> for Effect {
 
 impl Into<u8> for Effect {
     fn into(self) -> u8 {
-        unsafe { std::mem::transmute::<Effect, u8>(self) + 1 }
+        self as u8 + 1
     }
 }
