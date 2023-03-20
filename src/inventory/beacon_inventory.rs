@@ -496,9 +496,9 @@ impl Effect {
 impl TryFrom<i16> for Effect {
     type Error = &'static str;
     fn try_from(value: i16) -> Result<Self, Self::Error> {
-        // only allow the 34 IDs that map to the 34 effects
+        // only allow the 33 IDs that map to the 33 effects
         // if more effects are added this number should be increased
-        if (0..34).contains(&value) {
+        if (1..34).contains(&value) {
             Ok(unsafe { std::mem::transmute::<u8, Effect>(value as u8 - 1) })
         } else if value == -1 {
             Err("no effect")
