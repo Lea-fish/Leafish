@@ -11,9 +11,8 @@ use std::collections::HashMap;
 
 pub mod material;
 pub use self::material::Material;
-mod blocks;
-#[rustfmt::skip]
-mod versions;
+#[rustfmt::skip] mod blocks;
+#[rustfmt::skip] mod versions;
 
 pub use self::blocks::Block::*;
 pub use self::blocks::*;
@@ -78,298 +77,6 @@ impl VanillaIDMap {
             }
         }
     }
-}
-
-#[macro_export]
-macro_rules! define_blocks {
-    (
-        $(
-            $name:ident {
-                $(modid $modid:expr,)?
-                props {
-                    $(
-                        $fname:ident : $ftype:ty = [$($val:expr),+],
-                    )*
-                },
-                $(offset $offset:expr,)?
-                $(material $mat:expr,)?
-                model $model:expr,
-                $(variant $variant:expr,)?
-                $(multipart ($mkey:ident, $mval:ident) => $multipart:expr,)?
-                $(tint $tint:expr,)?
-                $(collision {
-                    $($collision_offset:pat => [
-                        $((
-                            ($($collision_start:expr),+),
-                            ($($collision_end:expr),+)
-                        ),)*
-                    ],)*
-                },)?
-                $(update_state ($world:ident, $pos:ident) => $update_state:expr,)?
-                $(hardness $hardness:expr,)?
-                $(harvest_tools [ $($harvest_tools:pat,)+ ],)?
-                $(best_tools [ $($best_tools:pat,)+ ],)?
-                $(is_waterlogged $is_waterlogged:expr,)?
-            }
-        )+
-    ) => (
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-        pub enum Block {
-            $(
-                $name {
-                    $(
-                        $fname : $ftype,
-                    )?
-                },
-            )+
-        }
-
-        impl Block {
-            #[allow(unused_variables, unreachable_code)]
-            pub fn get_modid(&self) -> Option<&str> {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            $(
-                                return Some($modid);
-                            )?
-                            None
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn get_material(&self) -> Material {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            $(return $mat;)?
-                            material::SOLID
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables)]
-            pub fn get_model(&self) -> (String, String) {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            let parts = $model;
-                            (String::from(parts.0), String::from(parts.1))
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn get_model_variant(&self) -> String {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            $(return String::from($variant);)?
-                            "normal".to_owned()
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn get_tint(&self) -> TintType {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            $(return $tint;)?
-                            TintType::Default
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code, unused_parens, unreachable_patterns)]
-            pub fn get_collision_boxes(&self) -> Vec<Aabb3<f64>> {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            let offset = 0;
-                            $(let offset = $offset;)?
-                            $(return match offset {
-                                $(
-                                    $collision_offset => vec![
-                                        $(
-                                            Aabb3::new(
-                                                Point3::new($($collision_start, )+),
-                                                Point3::new($($collision_end, )+),
-                                            ),
-                                        )*
-                                    ],
-                                )*
-                                _ => unreachable!(),
-                            };)?
-                            vec![Aabb3::new(
-                                Point3::new(0.0, 0.0, 0.0),
-                                Point3::new(1.0, 1.0, 1.0)
-                            )]
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn get_hardness(&self) -> Option<f64> {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            $(return Some($hardness);)?
-                            None
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn update_state<W: WorldAccess>(&self, world: &W, pos: Position) -> Block {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            $(
-                                let $world = world;
-                                let $pos = pos;
-                                return $update_state;
-                            )?
-                            Block::$name {
-                                $($fname,)?
-                            }
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn match_multipart(&self, key: &str, val: &str) -> bool {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            $(
-                                let $mkey = key;
-                                let $mval = val;
-                                return $multipart;
-                            )?
-                            false
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn is_best_tool(&self, tool: &Option<Tool>) -> bool {
-                match *self {
-                    $(
-                        Block::$name { .. } => {
-                            $(
-                                return match tool {
-                                    $(Some($best_tools) => true,)+
-                                    _ => false,
-                                };
-                            )?
-                            true
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn can_harvest(&self, tool: &Option<Tool>) -> bool {
-                match *self {
-                    $(
-                        Block::$name { .. } => {
-                            $(return match *tool {
-                                $(Some($harvest_tools) => true,)+
-                                _ =>  false,
-                            };)?
-                            true
-                        }
-                    )+
-                }
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn get_mining_time(&self, tool: &Option<Tool>) -> Option<std::time::Duration> {
-                let mut speed_multiplier = 1.0;
-
-                let tool_multiplier = tool.map(|t| t.get_multiplier()).unwrap_or(1.0);
-
-                let is_best_tool = self.is_best_tool(tool);
-                let can_harvest: bool = self.can_harvest(tool);
-
-                if is_best_tool {
-                    speed_multiplier = tool_multiplier;
-                }
-
-                // TODO: Apply tool efficiency
-                // TODO: Apply haste effect
-                // TODO: Apply mining fatigue effect
-                // TODO: Apply in water multiplier
-                // TODO: Apply on ground multiplier
-
-                let mut damage = match self.get_hardness() {
-                    // Instant mine
-                    Some(n) if n == 0.0 => return Some(std::time::Duration::from_secs_f64(0.05)),
-                    // Impossible to mine
-                    None => return None,
-                    Some(n) => speed_multiplier / n,
-                };
-
-                if can_harvest {
-                    damage /= 30.0;
-                } else {
-                    damage /= 100.0;
-                }
-
-                // Instant breaking
-                if damage > 1.0 {
-                    return Some(std::time::Duration::from_secs_f64(0.05));
-                }
-
-                let ticks = (1.0 / damage).ceil();
-                let seconds = ticks / 20.0;
-                Some(std::time::Duration::from_secs_f64(seconds))
-            }
-
-            #[allow(unused_variables, unreachable_code)]
-            pub fn is_waterlogged(&self) -> bool {
-                match *self {
-                    $(
-                        Block::$name {
-                            $($fname,)?
-                        } => {
-                            $(return $is_waterlogged;)?
-                            false
-                        }
-                    )+
-                }
-            }
-        }
-    );
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -688,6 +395,48 @@ mod tests {
             }
         }
     }
+}
+
+pub fn get_mining_time(block: &Block, tool: &Option<Tool>) -> Option<std::time::Duration> {
+    let mut speed_multiplier = 1.0;
+
+    let tool_multiplier = tool.map(|t| t.get_multiplier()).unwrap_or(1.0);
+
+    let is_best_tool = block.is_best_tool(tool);
+    let can_harvest: bool = block.can_harvest(tool);
+
+    if is_best_tool {
+        speed_multiplier = tool_multiplier;
+    }
+
+    // TODO: Apply tool efficiency
+    // TODO: Apply haste effect
+    // TODO: Apply mining fatigue effect
+    // TODO: Apply in water multiplier
+    // TODO: Apply on ground multiplier
+
+    let mut damage = match block.get_hardness() {
+        // Instant mine
+        Some(n) if n == 0.0 => return Some(std::time::Duration::from_secs_f64(0.05)),
+        // Impossible to mine
+        None => return None,
+        Some(n) => speed_multiplier / n,
+    };
+
+    if can_harvest {
+        damage /= 30.0;
+    } else {
+        damage /= 100.0;
+    }
+
+    // Instant breaking
+    if damage > 1.0 {
+        return Some(std::time::Duration::from_secs_f64(0.05));
+    }
+
+    let ticks = (1.0 / damage).ceil();
+    let seconds = ticks / 20.0;
+    Some(std::time::Duration::from_secs_f64(seconds))
 }
 
 fn can_burn<W: WorldAccess>(world: &W, pos: Position) -> bool {
