@@ -209,7 +209,7 @@ impl Inventory for AnvilInventory {
         if self.dirty {
             let mut cost_text = inventory_window
                 .text_elements
-                .last()
+                .first()
                 .unwrap()
                 .last()
                 .unwrap()
