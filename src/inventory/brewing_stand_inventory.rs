@@ -1,7 +1,3 @@
-// SPDX-FileCopyrightText: 2023 The Developers of Leafish
-//
-// SPDX-License-Identifier: GPL-3.0-or-later
-
 use crate::inventory::slot_mapping::SlotMapping;
 use crate::inventory::{Inventory, InventoryType, Item};
 use crate::render::hud::Hud;
