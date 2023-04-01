@@ -1,5 +1,6 @@
 pub mod anvil_inventory;
 pub mod beacon_inventory;
+pub mod brewing_stand_inventory;
 pub mod chest_inventory;
 pub mod crafting_table_inventory;
 pub mod dropper_inventory;
@@ -11,6 +12,7 @@ pub mod slot_mapping;
 
 use crate::inventory::anvil_inventory::AnvilInventory;
 use crate::inventory::beacon_inventory::BeaconInventory;
+use crate::inventory::brewing_stand_inventory::BrewingStandInventory;
 use crate::inventory::chest_inventory::ChestInventory;
 use crate::inventory::crafting_table_inventory::CraftingTableInventory;
 use crate::inventory::dropper_inventory::DropperInventory;
@@ -134,9 +136,13 @@ pub fn inventory_from_type(
         InventoryType::Beacon => Some(Arc::new(RwLock::new(BeaconInventory::new(
             renderer, base_slots, id,
         )))),
-
+        InventoryType::BrewingStand => Some(Arc::new(RwLock::new(BrewingStandInventory::new(
+            renderer,
+            base_slots,
+            title.to_string(),
+            id,
+        )))),
         /*
-        InventoryType::BrewingStand => {}
         InventoryType::Grindstone => {}
         InventoryType::Hopper => {}
         InventoryType::Lectern => {}
