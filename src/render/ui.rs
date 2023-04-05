@@ -562,8 +562,8 @@ impl UIElement {
         width: f64,
         height: f64,
     ) {
-        let mut dx = x as f64;
-        let mut dy = y as f64;
+        let mut dx = x;
+        let mut dy = y;
         if self.rotation != 0.0 {
             let c = self.rotation.cos();
             let s = self.rotation.sin();

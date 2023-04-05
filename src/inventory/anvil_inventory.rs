@@ -204,8 +204,7 @@ impl Inventory for AnvilInventory {
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
-        self.slots
-            .tick(renderer.clone(), ui_container, inventory_window, 1);
+        self.slots.tick(renderer, ui_container, inventory_window, 1);
         if self.dirty {
             let mut cost_text = inventory_window
                 .text_elements
@@ -218,7 +217,7 @@ impl Inventory for AnvilInventory {
             cost_text.text = if let Some(cost) = self.repair_cost {
                 format!("Cost: {cost}")
             } else {
-                format!("")
+                String::new()
             };
 
             let creative_mode = inventory_window

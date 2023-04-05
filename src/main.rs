@@ -537,14 +537,9 @@ fn tick_all(
         .tick(ui_container, game.renderer.clone(), delta, width as f64);
     ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
     let world = game.server.as_ref().map(|server| server.world.clone());
-    game.renderer.clone().tick(
-        world,
-        delta,
-        width as u32,
-        height as u32,
-        physical_width,
-        physical_height,
-    );
+    game.renderer
+        .clone()
+        .tick(world, delta, width, height, physical_width, physical_height);
     if game.server.is_some() {
         game.server
             .as_ref()

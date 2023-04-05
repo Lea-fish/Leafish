@@ -290,7 +290,7 @@ impl Manager {
 
     fn load_vanilla(&mut self) {
         let loc = format!("resources-{}", RESOURCES_VERSION);
-        let location = paths::get_data_dir().join(&loc);
+        let location = paths::get_data_dir().join(loc);
         self.packs.insert(1, Box::new(DirPack { root: location }));
         self.version += 1;
     }
@@ -493,7 +493,7 @@ impl Manager {
             .filter(|v| v.task_file == file)
             .filter(|v| v.task_name == name)
         {
-            task.progress += prog as u64;
+            task.progress += prog;
         }
     }
 }
@@ -553,7 +553,7 @@ impl Pack for ObjectPack {
         if let Some(hash) = self.objects.get(name) {
             let root_location = path::Path::new("./objects/");
             let hash_path = format!("{}/{}", &hash[..2], hash);
-            let location = root_location.join(&hash_path);
+            let location = root_location.join(hash_path);
             match fs::File::open(location) {
                 Ok(val) => Some(Box::new(val)),
                 Err(_) => None,

@@ -2561,7 +2561,7 @@ impl Server {
                     record.y as i32,
                     oz + (record.xz & 0xF) as i32,
                 ),
-                record.block_id as i32,
+                record.block_id,
             );
         }
     }

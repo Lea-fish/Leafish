@@ -191,7 +191,7 @@ impl InventoryWindow {
             x,
             y,
             self.elements.get_mut(elements_idx).unwrap(),
-            &mut self.text_elements.get_mut(elements_idx).unwrap(),
+            self.text_elements.get_mut(elements_idx).unwrap(),
             ui_container,
             renderer,
             v_attach,

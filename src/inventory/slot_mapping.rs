@@ -124,7 +124,7 @@ impl SlotMapping {
                 .slots
                 .read()
                 .get_slot(x, y)
-                .map(|i| child.range[i as usize] as u16);
+                .map(|i| child.range[i as usize]);
         }
 
         None

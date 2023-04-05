@@ -283,31 +283,31 @@ impl std::fmt::Display for CollisionInfo {
         match self {
             CollisionInfo::Single(shapes) => {
                 if shapes.is_empty() {
-                    return write!(f, "{{ _ => [], }}");
+                    return write!(f, "vec![]");
                 }
 
-                writeln!(f, "{{")?;
-                writeln!(f, "            _ => [")?;
+                writeln!(f, "vec![")?;
                 for shape in shapes {
-                    write!(f, "                (")?;
-                    write!(f, "({:?}, {:?}, {:?}), ", shape[0], shape[1], shape[2])?;
-                    writeln!(f, "({:?}, {:?}, {:?})),", shape[3], shape[4], shape[5])?;
+                    write!(f, "                Aabb3::new(")?;
+                    write!(f, "Point3::new({:?}, {:?}, {:?}), ", shape[0], shape[1], shape[2])?;
+                    writeln!(f, "Point3::new({:?}, {:?}, {:?})),", shape[3], shape[4], shape[5])?;
                 }
-                writeln!(f, "            ],")?;
-                write!(f, "        }}")
+                return write!(f, "            ]");
             }
             CollisionInfo::Multiple(shapes_variants) => {
-                writeln!(f, "{{")?;
+                writeln!(f, "match self.get_offset() {{")?;
                 for (i, shapes) in shapes_variants.iter().enumerate() {
-                    writeln!(f, "            {} => [", i)?;
+                    writeln!(f, "                {} => vec![", i)?;
                     for shape in shapes {
-                        write!(f, "                (")?;
-                        write!(f, "({:?}, {:?}, {:?}), ", shape[0], shape[1], shape[2])?;
-                        writeln!(f, "({:?}, {:?}, {:?})),", shape[3], shape[4], shape[5])?;
+                        write!(f, "                    Aabb3::new(")?;
+                        write!(f, "Point3::new({:?}, {:?}, {:?}), ", shape[0], shape[1], shape[2])?;
+                        writeln!(f, "Point3::new({:?}, {:?}, {:?})),", shape[3], shape[4], shape[5])?;
                     }
-                    writeln!(f, "            ],")?;
+                    writeln!(f, "                ],")?;
                 }
-                write!(f, "        }}")
+                writeln!(f, "                _ => unreachable!(),")?;
+                write!(f, "            }}")?;
+                return Ok(());
             }
         }
     }
@@ -329,15 +329,15 @@ impl std::fmt::Display for TintVariant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             TintVariant::Constant(tint) => {
-                write!(f, "        tint TintType::{tint},")
+                write!(f, "TintType::{tint}")
             }
             TintVariant::Conditional(var, tints) => {
-                writeln!(f, "        tint match {var} {{")?;
+                writeln!(f, "match {var} {{")?;
                 for (key, tint) in tints {
-                    writeln!(f, "            {key} => TintType::{tint},")?;
+                    writeln!(f, "                {key} => TintType::{tint},")?;
                 }
-                writeln!(f, "            _ => unreachable!(),")?;
-                write!(f, "        }},")
+                writeln!(f, "                _ => unreachable!(),")?;
+                write!(f, "            }}")
             }
         }
     }
@@ -367,19 +367,19 @@ impl std::fmt::Display for ModelVariant {
                     .collect::<Vec<String>>()
                     .join(", ");
 
-                write!(f, "variant format!(\"{fmt}\", {vars})")
+                write!(f, "format!(\"{fmt}\", {vars})")
             }
             ModelVariant::Multipart(props) => {
-                writeln!(f, "multipart (key, val) => match key {{")?;
+                writeln!(f, "match key {{")?;
                 for prop in props {
                     let var = match prop.state_type {
                         block::StateType::Enum => format!("{}.as_string()", prop.get_safe_name()),
                         _ => format!("&{}.to_string()", prop.get_safe_name()),
                     };
-                    writeln!(f, "            \"{}\" => val.contains({var}),", prop.name)?;
+                    writeln!(f, "                \"{}\" => val.contains({var}),", prop.name)?;
                 }
-                writeln!(f, "            _ => false,")?;
-                write!(f, "        }}")
+                writeln!(f, "                _ => false,")?;
+                write!(f, "            }}")
             }
         }
     }
@@ -444,14 +444,14 @@ impl BlockStateInfo {
         }
 
         if result.len() == 1 {
-            Some(result[0].replace('\n', "\n        "))
+            Some(result[0].replace('\n', "\n            "))
         } else {
             let result = result
                 .into_iter()
-                .map(|s| s.replace('\n', "\n            "))
+                .map(|s| s.replace('\n', "\n                "))
                 .collect::<Vec<String>>()
-                .join(" +\n            ");
-            Some(format!("(\n            {}\n        )", result))
+                .join(" +\n                ");
+            Some(format!("(\n                {}\n            )", result))
         }
     }
 
@@ -671,15 +671,15 @@ impl BlockMetaInfo {
 
     fn get_material(block: &block::Block, collision: &Option<CollisionInfo>) -> String {
         const AIR_MATERIAL: &str = "Material {
-            renderable: false,
-            should_cull_against: false,
-            never_cull: false,
-            force_shade: false,
-            transparent: false,
-            absorbed_light: 0,
-            emitted_light: 0,
-            collidable: false,
-        }";
+                renderable: false,
+                should_cull_against: false,
+                never_cull: false,
+                force_shade: false,
+                transparent: false,
+                absorbed_light: 0,
+                emitted_light: 0,
+                collidable: false,
+            }";
 
         if block.name == "air" {
             return AIR_MATERIAL.into();
@@ -722,15 +722,15 @@ impl BlockMetaInfo {
 
         format!(
             "Material {{
-            renderable: {renderable},
-            should_cull_against: {should_cull_against},
-            never_cull: {never_cull},
-            force_shade: {force_shade},
-            transparent: {transparent},
-            absorbed_light: {absorbed_light},
-            emitted_light: {emitted_light},
-            collidable: {collidable},
-        }}"
+                renderable: {renderable},
+                should_cull_against: {should_cull_against},
+                never_cull: {never_cull},
+                force_shade: {force_shade},
+                transparent: {transparent},
+                absorbed_light: {absorbed_light},
+                emitted_light: {emitted_light},
+                collidable: {collidable},
+            }}"
         )
     }
 
@@ -1055,6 +1055,146 @@ impl BlockMetaInfo {
             _ => None,
         }
     }
+
+
+    fn to_enum(&self) -> String {
+        let info = &self.block_info;
+        let mut str = format!("    {} {{", info.get_variant_name());
+        if !info.props.is_empty() {
+            str += "\n";
+            for prop in &info.props {
+                str += &format!("        {}: {},\n", prop.get_safe_name(), prop.get_state_type(info.name.as_str()))
+            }
+            str += "    ";
+        }
+        str += "},";
+        str
+    }
+
+    fn to_match_base(&self) -> String {
+        let info = &self.block_info;
+        let mut str = format!("            Block::{} {{ ", info.get_variant_name());
+        if !info.props.is_empty() {
+            let props: Vec<String> = info.props.iter().map(|prop| prop.get_safe_name()).collect();
+            str += &props.join(", ");
+            str += " ";
+        }
+        str += "} => ";
+        str
+    }
+
+    fn to_material(&self) -> String {
+        let str = self.to_match_base();
+        str + &format!("{},", self.material)
+    }
+
+    fn to_model(&self) -> String {
+        let str = self.to_match_base();
+        format!("{}(\"{}\", \"{}\"),", str, self.model.0, self.model.1)
+    }
+
+    fn to_model_variant(&self) -> Option<String> {
+        if let Some(variant) = &self.model_variant {
+            let str = self.to_match_base();
+            match variant {
+                ModelVariant::Single(_) => Some(format!("{}{},", str, variant)),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn to_tint(&self) -> Option<String> {
+        let str = self.to_match_base();
+        match &self.tint {
+            TintVariant::Constant(v) if v == "Default" => None,
+            tint => Some(format!("{}{},", str, tint)),
+        }
+    }
+
+    fn to_offset(&self) -> Option<String> {
+        let str = self.to_match_base();
+        self.block_info.get_offset_str().map(|offset_str| format!("{}{},", str, offset_str))
+    }
+
+    fn to_collision_boxes(&self) -> Option<String> {
+        let str = self.to_match_base();
+        if let Some(collision) = &self.collision {
+            Some(format!("{}{},", str, collision))
+        } else {
+            None
+        }
+    }
+
+    fn to_hardness(&self) -> Option<String> {
+        let str = self.to_match_base();
+        if let Some(hardness) = &self.hardness {
+            Some(format!("{}Some({:?}),", str, hardness))
+        } else {
+            None
+        }
+    }
+
+    fn to_update_state(&self) -> Option<String> {
+        let str = self.to_match_base();
+        if let Some(update_state) = &self.get_update_state() {
+            Some(format!("{}{},", str, update_state.replace("                ", "            ")))
+        } else {
+            None
+        }
+    }
+
+    fn to_match_multipart(&self) -> Option<String> {
+        if let Some(variant) = &self.model_variant {
+            let str = self.to_match_base();
+            match variant {
+                ModelVariant::Multipart(_) => Some(format!("{}{},", str, variant)),
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    fn to_is_best_tool(&self) -> Option<String> {
+        if self.best_tools.len() > 0 {
+            let mut str = self.to_match_base();
+            str += "match tool {\n";
+            for tool in &self.best_tools {
+                str += &format!("                Some({}) => true,\n", tool);
+            }
+            str += "                _ => false,\n";
+            str += "            },";
+            Some(str)
+        } else {
+            None
+        }
+    }
+
+    fn to_can_harvest(&self) -> Option<String> {
+        if self.harvest_tools.len() > 0 {
+            let mut str = self.to_match_base();
+            str += "match tool {\n";
+            for tool in &self.harvest_tools {
+                str += &format!("                Some({}) => true,\n", tool);
+            }
+            str += "                _ => false,\n";
+            str += "            },";
+            Some(str)
+        } else {
+            None
+        }
+    }
+
+    fn to_is_waterlogged(&self) -> Option<String> {
+        if self.is_waterlogged != "false" {
+            let str = self.to_match_base();
+            Some(format!("{}{},", str, self.is_waterlogged))
+        } else {
+            None
+        }
+    }
 }
 
 impl std::fmt::Display for BlockMetaInfo {
@@ -1162,47 +1302,177 @@ fn main() -> std::io::Result<()> {
     let target_blocks = api.blocks.blocks_array().unwrap();
     let target_items = api.items.items().unwrap();
     let collision_shapes = api.blocks.block_collision_shapes().unwrap();
+    let block_meta_list: Vec<BlockMetaInfo> = target_blocks.iter().map(|block| {
+        let collision = CollisionInfo::new(block, &collision_shapes);
+        let blockstate_path = blockstate_dir.join(format!("{}.json", block.name));
+        let blockstate = std::fs::read_to_string(blockstate_path).unwrap();
+        let blockstate = serde_json::from_str(blockstate.as_str()).unwrap();
+        BlockMetaInfo::new(block, collision, blockstate, &target_items)
+    }).collect();
 
     // Write data to the blocks.rs file
     {
+        println!("Building blocks.rs");
         let mut blocks_file = File::create(output_dir.join("blocks.rs")).unwrap();
 
-        writeln!(blocks_file, "use crate::*;\n")?;
-        writeln!(blocks_file, "define_blocks! {{")?;
-
-        for block in &target_blocks {
-            let collision = CollisionInfo::new(block, &collision_shapes);
-            let blockstate_path = blockstate_dir.join(format!("{}.json", block.name));
-            let blockstate = std::fs::read_to_string(blockstate_path).unwrap();
-            let blockstate = serde_json::from_str(blockstate.as_str()).unwrap();
-            writeln!(
-                blocks_file,
-                "{}",
-                BlockMetaInfo::new(block, collision, blockstate, &target_items)
-            )?;
+        writeln!(blocks_file, "use crate::material::Material;")?;
+        writeln!(blocks_file, "use crate::*;")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]")?;
+        writeln!(blocks_file, "pub enum Block {{")?;
+        for meta in &block_meta_list {
+            writeln!(blocks_file, "{}", meta.to_enum())?;
         }
-
-        writeln!(
-            blocks_file,
-            "{}\n}}",
-            BlockMetaInfo {
-                block_info: BlockStateInfo {
-                    name: "missing".into(),
-                    props: vec![],
-                    min_state_id: usize::MAX,
-                    max_state_id: usize::MAX,
-                },
-                material: "SOLID".into(),
-                model: ("leafish".into(), "missing_block".into()),
-                model_variant: None,
-                tint: TintVariant::Constant("Default".into()),
-                collision: None,
-                hardness: None,
-                harvest_tools: vec![],
-                best_tools: vec![],
-                is_waterlogged: "false",
+        writeln!(blocks_file, "    Missing {{}},")?;
+        writeln!(blocks_file, "}}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "impl Block {{")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code)]")?;
+        writeln!(blocks_file, "    pub fn get_material(&self) -> Material {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            writeln!(blocks_file, "{}", meta.to_material())?;
+        }
+        writeln!(blocks_file, "            Block::Missing {{ }} => material::SOLID,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables)]")?;
+        writeln!(blocks_file, "    pub fn get_model(&self) -> (&str, &str) {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            writeln!(blocks_file, "{}", meta.to_model())?;
+        }
+        writeln!(blocks_file, "            Block::Missing {{ }} => (\"leafish\", \"missing_block\"),")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables)]")?;
+        writeln!(blocks_file, "    pub fn get_model_variant(&self) -> String {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_model_variant() {
+                writeln!(blocks_file, "{}", str)?;
             }
-        )?;
+        }
+        writeln!(blocks_file, "            _ => \"normal\".into(),")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code)]")?;
+        writeln!(blocks_file, "    pub fn get_tint(&self) -> TintType {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_tint() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => TintType::Default,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_parens)]")?;
+        writeln!(blocks_file, "    pub fn get_offset(&self) -> usize {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_offset() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => 0,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code, unused_parens, unreachable_patterns)]")?;
+        writeln!(blocks_file, "    pub fn get_collision_boxes(&self) -> Vec<Aabb3<f64>> {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_collision_boxes() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => vec![")?;
+        writeln!(blocks_file, "                Aabb3::new(Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 1.0, 1.0)),")?;
+        writeln!(blocks_file, "            ],")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code)]")?;
+        writeln!(blocks_file, "    pub fn get_hardness(&self) -> Option<f64> {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_hardness() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => None,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code)]")?;
+        writeln!(blocks_file, "    pub fn update_state<W: WorldAccess>(&self, world: &W, pos: Position) -> Block {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_update_state() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => *self,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code)]")?;
+        writeln!(blocks_file, "    pub fn match_multipart(&self, key: &str, val: &str) -> bool {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_match_multipart() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => false,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code)]")?;
+        writeln!(blocks_file, "    pub fn is_best_tool(&self, tool: &Option<Tool>) -> bool {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_is_best_tool() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => false,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code)]")?;
+        writeln!(blocks_file, "    pub fn can_harvest(&self, tool: &Option<Tool>) -> bool {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_can_harvest() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => true,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    pub fn get_mining_time(&self, tool: &Option<Tool>) -> Option<std::time::Duration> {{")?;
+        writeln!(blocks_file, "        get_mining_time(self, tool)")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "")?;
+        writeln!(blocks_file, "    #[allow(unused_variables, unreachable_code)]")?;
+        writeln!(blocks_file, "    pub fn is_waterlogged(&self) -> bool {{")?;
+        writeln!(blocks_file, "        match *self {{")?;
+        for meta in &block_meta_list {
+            if let Some(str) = meta.to_is_waterlogged() {
+                writeln!(blocks_file, "{}", str)?;
+            }
+        }
+        writeln!(blocks_file, "            _ => false,")?;
+        writeln!(blocks_file, "        }}")?;
+        writeln!(blocks_file, "    }}")?;
+        writeln!(blocks_file, "}}")?;
     }
 
     let supported_versions = [
@@ -1227,8 +1497,9 @@ fn main() -> std::io::Result<()> {
             .collect();
         let mut current_state_id = 0;
 
-        let mapping_path =
-            output_dir.join(format!("versions/v{}.rs", version_str.replace('.', "_")));
+        let mapping_path = format!("versions/v{}.rs", version_str.replace('.', "_"));
+        println!("Building {}", mapping_path);
+        let mapping_path = output_dir.join(mapping_path);
         let mut mapping_file = File::create(mapping_path).unwrap();
 
         writeln!(
@@ -1273,6 +1544,7 @@ fn main() -> std::io::Result<()> {
     }
 
     {
+        println!("Building versions/mod.rs");
         let mut versions_file = File::create(output_dir.join("versions/mod.rs")).unwrap();
         writeln!(
             versions_file,

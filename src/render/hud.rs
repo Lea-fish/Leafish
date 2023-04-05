@@ -677,7 +677,7 @@ impl Hud {
         if armor > 0 {
             for i in 0..10 {
                 let x = x_offset + i as f64 * (icon_scale * 8.0);
-                let y = y_offset + (icon_bars as f64 * (icon_scale * 9.0 + (icon_scale * 1.0)));
+                let y = y_offset + (icon_bars * (icon_scale * 9.0 + (icon_scale * 1.0)));
                 let texture_offset = match (i * 2 + 1).cmp(&armor) {
                     Ordering::Greater => 16.0,
                     Ordering::Equal => 25.0,
@@ -1117,9 +1117,8 @@ impl Hud {
             .texture(format!("minecraft:{}", texture))
             .create(ui_container);
 
-        let text;
-        if item.stack.count != 1 {
-            text = Some(
+        let text = if item.stack.count != 1 {
+            Some(
                 ui::TextBuilder::new()
                     .scale_x(icon_scale / 2.0)
                     .scale_y(icon_scale / 2.0)
@@ -1129,10 +1128,10 @@ impl Hud {
                     .colour((255, 255, 255, 255))
                     .shadow(true)
                     .create(ui_container),
-            );
+            )
         } else {
-            text = None;
-        }
+            None
+        };
         (item_image, text)
     }
 }

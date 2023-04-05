@@ -77,7 +77,7 @@ impl Chunk {
             self.sections[s_idx] = Some(ChunkSection::new(s_idx as u8, fill_sky));
         }
         {
-            let section = self.sections[s_idx as usize].as_mut().unwrap();
+            let section = self.sections[s_idx].as_mut().unwrap();
             if !section.set_block(x, y & 0xF, z, b) {
                 return false;
             }
@@ -169,7 +169,7 @@ impl Chunk {
             let fill_sky = self.sections.iter().skip(s_idx).all(|v| v.is_none());
             self.sections[s_idx] = Some(ChunkSection::new(s_idx as u8, fill_sky));
         }
-        if let Some(sec) = self.sections[s_idx as usize].as_mut() {
+        if let Some(sec) = self.sections[s_idx].as_mut() {
             sec.set_sky_light(x, y & 0xF, z, light)
         }
     }

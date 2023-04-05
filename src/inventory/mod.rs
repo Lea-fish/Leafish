@@ -302,7 +302,7 @@ impl InventoryContext {
                         x,
                         y,
                         &mut inventory_window.cursor_element,
-                        &mut inventory_window.text_elements.get_mut(3).unwrap(),
+                        inventory_window.text_elements.get_mut(3).unwrap(),
                         ui_container,
                         renderer,
                         VAttach::Top,
@@ -319,7 +319,7 @@ impl InventoryContext {
             if let Some((x, y)) = self.mouse_position {
                 if let Some(slot) = inventory.get_slot(x, y) {
                     self.dirty = true;
-                    let mut item = inventory.get_item(slot as u16);
+                    let mut item = inventory.get_item(slot);
                     let mut conn = self.conn.write();
                     let conn = conn.as_mut().unwrap();
 
@@ -358,7 +358,7 @@ impl InventoryContext {
                         (None, Some(item)) => (Some(item), None),
                         (None, None) => (None, None),
                     };
-                    inventory.set_item(slot as u16, item);
+                    inventory.set_item(slot, item);
                     self.hud_context
                         .write()
                         .dirty_slots
