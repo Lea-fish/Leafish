@@ -237,6 +237,8 @@ fn main() {
         .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0))
         .with_maximized(true); // Why are we using this particular value here?
 
+    let xdg_session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_default();
+
     let (context, shader_version, dpi_factor, glutin_window) = {
         let glutin_window = glutin::ContextBuilder::new()
             .with_stencil_buffer(0)
@@ -246,7 +248,11 @@ fn main() {
                 opengles_version: (3, 0),
             })
             .with_gl_profile(glutin::GlProfile::Core)
-            .with_vsync(vsync)
+            .with_vsync(if xdg_session_type.to_uppercase() == "WAYLAND" {
+                false
+            } else {
+                vsync
+            })
             .build_windowed(window_builder, &events_loop)
             .expect("Could not create glutin window.");
         let dpi_factor = glutin_window.window().scale_factor();
