@@ -278,7 +278,7 @@ impl Inventory for BeaconInventory {
                         VarInt(-1)
                     },
                 })
-                .expect("couldnt send beacon set effect packet");
+                .expect("couldn't send beacon set effect packet");
         }
 
         if self.dirty {

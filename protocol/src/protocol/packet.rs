@@ -31,7 +31,7 @@ state_packets!(
             /// Some modified servers/proxies use the handshake field
             /// differently, packing information into the field other
             /// than the hostname due to the protocol not providing
-            /// any system for custom information to be transfered
+            /// any system for custom information to be transferred
             /// by the client to the server until after login.
             packet Handshake {
                 /// The protocol version of the connecting client
@@ -323,7 +323,7 @@ state_packets!(
                 field z: i32 =,
                 field face: u8 =,
             }
-            /// PlayerAction is sent when a player preforms various actions.
+            /// PlayerAction is sent when a player performs various actions.
             packet PlayerAction {
                 field entity_id: VarInt =,
                 field action_id: VarInt =,
@@ -334,7 +334,7 @@ state_packets!(
                 field action_id: i8 =,
                 field jump_boost: i32 =,
             }
-            /// SteerVehicle is sent by the client when steers or preforms an action
+            /// SteerVehicle is sent by the client when steers or performs an action
             /// on a vehicle.
             packet SteerVehicle {
                 field sideways: f32 =,
@@ -1014,7 +1014,7 @@ state_packets!(
             packet Disconnect {
                 field reason: format::Component =,
             }
-            /// EntityAction causes an entity to preform an action based on the passed
+            /// EntityAction causes an entity to perform an action based on the passed
             /// id.
             packet EntityAction {
                 field entity_id: i32 =,
@@ -2121,7 +2121,7 @@ state_packets!(
     }
     login Login {
         serverbound Serverbound {
-            /// LoginStart is sent immeditately after switching into the login
+            /// LoginStart is sent immediately after switching into the login
             /// state. The passed username is used by the server to authenticate
             /// the player in online mode.
             packet LoginStart {
@@ -2207,9 +2207,9 @@ state_packets!(
             packet StatusRequest {
                 field empty: () =,
             }
-            /// StatusPing is sent by the client after recieving a
+            /// StatusPing is sent by the client after receiving a
             /// StatusResponse. The client uses the time from sending
-            /// the ping until the time of recieving a pong to measure
+            /// the ping until the time of receiving a pong to measure
             /// the latency between the client and the server.
             packet StatusPing {
                 field ping: i64 =,

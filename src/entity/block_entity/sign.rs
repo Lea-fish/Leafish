@@ -234,7 +234,7 @@ fn add_sign(
         info.offset_z as f32,
     ));
     drop(models); // if we don't do this, we would get a deadlock
-                  // FIXME: Cleanup all the manual drops with seperate spans
+                  // FIXME: Cleanup all the manual drops with separate spans
 
     info.model.replace(model); // TODO: This can cause a deadlock, check why!
 }
