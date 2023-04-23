@@ -239,7 +239,7 @@ impl super::Screen for Launcher {
                             .add_screen(Box::new(ServerList::new(None)));
                     } else {
                         println!(
-                            "An error occoured while attempting to login {}",
+                            "An error occurred while attempting to login {}",
                             result.err().unwrap()
                         );
                         game.screen_sys.clone().add_screen(Box::new(
@@ -268,7 +268,7 @@ impl super::Screen for Launcher {
                                         }
                                         Err(err) => {
                                             println!(
-                                                "An error occoured while modifying the account! {}",
+                                                "An error occurred while modifying the account! {}",
                                                 err
                                             );
                                             // TODO: Display this!
@@ -394,7 +394,7 @@ impl super::Screen for Launcher {
                                     }
                                     Err(err) => {
                                         println!(
-                                            "An error occoured while modifying the account! {}",
+                                            "An error occurred while modifying the account! {}",
                                             err
                                         );
                                         // TODO: Display this!

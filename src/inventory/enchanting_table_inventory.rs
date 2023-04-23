@@ -374,7 +374,7 @@ impl Inventory for EnchantmentTableInventory {
                         .unwrap()
                         .borrow_mut()
                         .text = if let Some(ench) = self.button_data[i].enchanmtment_hint {
-                        // in theory we dont need this, but it catches errors if the server sends
+                        // in theory we don't need this, but it catches errors if the server sends
                         // invalid enchantment data
                         format!(
                             "{ench} {}",
@@ -422,7 +422,7 @@ impl Inventory for EnchantmentTableInventory {
                         .borrow_mut()
                         .texture_coords = BUTTON_INACTIVE;
 
-                    // the required xp levl
+                    // the required xp level
                     basic_text_elements
                         .get_mut(len_t_el - (6 - i))
                         .unwrap()

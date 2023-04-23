@@ -112,7 +112,7 @@ pub fn depth_mask(f: bool) {
     }
 }
 
-/// `Func` is a function to be preformed on two values.
+/// `Func` is a function to be performed on two values.
 pub type Func = u32;
 
 pub const NEVER: Func = gl::NEVER;
@@ -700,7 +700,7 @@ pub const DYNAMIC_DRAW: BufferUsage = gl::DYNAMIC_DRAW;
 /// rendered by the gpu.
 pub const STREAM_DRAW: BufferUsage = gl::STREAM_DRAW;
 
-/// Access states how a value will be accesed by the program.
+/// Access states how a value will be accessed by the program.
 pub type Access = u32;
 
 /// States that the returned value will only be read.

@@ -85,7 +85,7 @@ impl Inventory for AnvilInventory {
 
     fn set_item(&mut self, slot_id: u16, item: Option<Item>) {
         // TODO: actually lock the slot without sending a packet
-        // if we dont have enough level
+        // if we don't have enough level
         self.slots.set_item(slot_id, item);
         self.dirty = true;
     }
@@ -289,7 +289,7 @@ impl Inventory for AnvilInventory {
                     .write_packet(packet::play::serverbound::NameItem {
                         item_name: self.last_name.clone(),
                     })
-                    .expect("couldnt send anvil rename packet");
+                    .expect("couldn't send anvil rename packet");
             }
         } else {
             // hide anvil rename bar

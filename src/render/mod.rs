@@ -100,7 +100,7 @@ struct TextureData {
 }
 
 pub struct LightData {
-    // Light renderering
+    // Light rendering
     pub light_level: f32,
     pub sky_offset: f32,
 }
