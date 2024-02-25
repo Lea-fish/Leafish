@@ -11,4 +11,4 @@ last-packet
 .vscode/*
 
 # this is only temporary (until the installer is completely finished)
-install/resources/*
+# install/resources/*
