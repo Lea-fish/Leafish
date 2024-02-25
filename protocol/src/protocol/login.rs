@@ -1,4 +1,4 @@
-use super::mojang::MojangAccount;
+use super::{mojang::MojangAccount, UUID};
 use super::offline_acc::OfflineAccount;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
@@ -23,14 +23,14 @@ pub trait AccountImpl {
 #[derive(Serialize, Deserialize)]
 pub struct Account {
     pub name: String,
-    pub uuid: Option<String>,
+    pub uuid: Option<UUID>,
     pub verification_tokens: Vec<String>, // this represents the verification tokens used to verify the account, such as hashed passwords, actual tokens, etc
     pub head_img_data: Option<Vec<u8>>,
     pub account_type: AccountType,
 }
 
 impl Account {
-    pub fn new(name: String, uuid: Option<String>, account_type: AccountType) -> Self {
+    pub fn new(name: String, uuid: Option<UUID>, account_type: AccountType) -> Self {
         Account {
             name,
             uuid,
@@ -119,7 +119,7 @@ lazy_static! {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub enum AccountType {
-    Mojang,
+    Mojang, // FIXME: this has been deprecated, remove it
     Microsoft,
     Custom(String), // Not implemented yet, this will enable us to support other auth services without implementing every single one specifically
     None,           // aka. unverified or "offline account" (for offline mode servers)
