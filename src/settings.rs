@@ -112,15 +112,6 @@ pub const S_HAT: console::CVar<bool> = console::CVar {
     default: &|| false,
 };
 
-pub const L_AUTOMATIC_OFFLINE_ACCOUNTS: console::CVar<bool> = console::CVar {
-    ty: PhantomData,
-    name: "l_automatic_offline_accounts",
-    description: "Enables using no password in the login screen for creating offline accounts",
-    mutable: true,
-    serializable: true,
-    default: &|| false,
-};
-
 macro_rules! create_keybind {
     ($keycode:ident, $name:expr, $description:expr) => {
         console::CVar {
@@ -204,7 +195,6 @@ pub fn register_vars(vars: &mut console::Vars) {
     vars.register(S_LEFT_PANTS);
     vars.register(S_RIGHT_PANTS);
     vars.register(S_HAT);
-    vars.register(L_AUTOMATIC_OFFLINE_ACCOUNTS);
     vars.register(BACKGROUND_IMAGE);
 }
 

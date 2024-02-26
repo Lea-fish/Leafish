@@ -48,7 +48,7 @@ use crate::shared::{Position, Version};
 
 pub mod forge;
 pub mod login;
-pub mod mojang;
+pub mod microsoft;
 pub mod offline_acc;
 
 pub const SUPPORTED_PROTOCOLS: [i32; 21] = [

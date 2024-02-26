@@ -298,7 +298,6 @@ impl super::Screen for Launcher {
                 .attach(&mut *back.borrow_mut());
             let text_account_type = match account_type {
                 AccountType::Microsoft => "Microsoft account".to_string(),
-                AccountType::Mojang => "Mojang account".to_string(),
                 AccountType::None => "Offline account".to_string(),
                 AccountType::Custom(ref str) => str.clone(),
             };

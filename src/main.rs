@@ -197,7 +197,7 @@ struct Opt {
     #[structopt(short = "p", long = "default-protocol-version")]
     default_protocol_version: Option<String>,
     #[structopt(long)]
-    uuid: Option<UUID>,
+    uuid: Option<String>,
     #[structopt(long)]
     name: Option<String>,
     #[structopt(long)]
