@@ -196,11 +196,11 @@ struct Opt {
     /// Protocol version to use in the autodetection ping
     #[structopt(short = "p", long = "default-protocol-version")]
     default_protocol_version: Option<String>,
-    #[structopt(short = "uuid", long = "player-uuid")]
+    #[structopt(long)]
     uuid: Option<UUID>,
-    #[structopt(short = "name", long = "player-name")]
+    #[structopt(long)]
     name: Option<String>,
-    #[structopt(short = "token", long = "access-token")]
+    #[structopt(long)]
     token: Option<String>,
 }
 
