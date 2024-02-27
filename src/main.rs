@@ -296,6 +296,7 @@ fn main() {
     )));
     let mut accounts = screen::launcher::load_accounts().unwrap_or_default();
     if let Some((name, uuid, token)) = opt.name.clone().map(|name| opt.uuid.clone().map(|uuid| opt.token.clone().map(|token| (name, uuid, token)))).flatten().flatten() {
+        println!("Got microsoft credentials, adding account...");
         accounts.push(Account {
             name: name.clone(),
             uuid: Some(uuid),

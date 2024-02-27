@@ -14,18 +14,21 @@ const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap";
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
-    let mut cmd = vec!["--uuid".to_string(), String::new(), "--name".to_string(), String::new(), "--token".to_string(), String::new()];
+    let mut cmd = vec![];
     for (idx, arg) in args.iter().enumerate() {
         if arg == "--uuid" {
-            cmd[1] = args[idx + 1].clone();
+            cmd.push("--uuid".to_string());
+            cmd.push(args[idx + 1].clone());
             continue;
         }
         if arg == "--username" {
-            cmd[3] = args[idx + 1].clone();
+            cmd.push("--name".to_string());
+            cmd.push(args[idx + 1].clone());
             continue;
         }
-        if arg == "--token" {
-            cmd[5] = args[idx + 1].clone();
+        if arg == "--accessToken" {
+            cmd.push("--token".to_string());
+            cmd.push(args[idx + 1].clone());
             continue;
         }
     }
