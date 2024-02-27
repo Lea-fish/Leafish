@@ -8,7 +8,8 @@ const URL: &str = "https://api.github.com/repos/Lea-fish/Releases/releases/lates
 const MAIN_BINARY_NAME: &str = "leafish";
 const BOOTSTRAP_BINARY_NAME: &str = "bootstrap";
 const MAIN_BINARY_PATH: &str = "./leafish";
-const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap_new";
+const UPDATED_BOOTSTRAP_BINARY_PATH: &str = "./bootstrap_new";
+const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap";
 
 #[tokio::main]
 async fn main() {
@@ -34,29 +35,31 @@ async fn main() {
 }
 
 async fn try_update() -> anyhow::Result<()> {
-    println!("start try update!");
+    println!("[INFO] Checking for updates....");
     let latest = Client::builder().user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1").build()?.get(URL).send().await?.text().await?;
-    println!("got response {latest}");
     let latest: LatestResponse = serde_json::from_str(&latest).unwrap();
-    println!("acquired info");
     let mut performed_update = false;
     let (update_main, update_bootstrap) = do_update(&latest.published_at, time_stamp_binary(MAIN_BINARY_PATH), time_stamp_binary(BOOTSTRAP_BINARY_PATH))?;
-    println!("main: {} bootstrap: {}", time_stamp_binary(MAIN_BINARY_PATH), time_stamp_binary(BOOTSTRAP_BINARY_PATH));
     if update_main || update_bootstrap {
-        println!("try update!");
+        println!("[INFO] Looking for update files...");
         for asset in latest.assets {
             if &asset.name == MAIN_BINARY_NAME && update_main {
+                println!("[INFO] Downloading update for leafish binary...");
                 let new_binary = reqwest::get(&asset.browser_download_url).await?.bytes().await?;
                 fs::write(MAIN_BINARY_PATH, &new_binary)?;
                 adjust_binary_perms()?;
+                println!("[INFO] Successfully updated leafish binary");
             } else if &asset.name == BOOTSTRAP_BINARY_NAME && update_bootstrap {
+                println!("[INFO] Downloading update for bootstrap...");
                 let new_binary = reqwest::get(&asset.browser_download_url).await?.bytes().await?;
-                fs::write(BOOTSTRAP_BINARY_PATH, &new_binary)?;
+                fs::write(UPDATED_BOOTSTRAP_BINARY_PATH, &new_binary)?;
                 performed_update = true;
+                println!("[INFO] Successfully downloaded bootstrap update");
             }
         }
     }
     if performed_update {
+        println!("[INFO] Restarting bootstrap...");
         // shut down the process if we performed an update and let our parent bootstrap restart us, running a new version
         exit(0);
     }

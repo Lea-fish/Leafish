@@ -1,5 +1,6 @@
 use std::{collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Seek, Write}, path::Path};
 
+use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
 
 // all of these are expected to be prepended with ".minecraft"
@@ -84,29 +85,29 @@ pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
     let json_path = format!("{}{}", prefix, DESC_JSON_PATH);
     let jar_path = format!("{}{}", prefix, JAR_PATH);
     if Path::new(&json_path).exists() && Path::new(&jar_path).exists() {
-        println!("Leafish is already installed");
+        println!("[INFO] Leafish is already installed");
         return Ok(false);
     }
     // cleanup old files
     if Path::new(&json_path).exists() {
-        println!("Removing old json...");
+        println!("[INFO] Removing old json...");
         fs::remove_file(&json_path)?;
     }
     if Path::new(&jar_path).exists() {
-        println!("Removing old jar...");
+        println!("[INFO] Removing old jar...");
         fs::remove_file(&jar_path)?;
     }
 
-    println!("Removing old json...");
+    println!("[INFO] Removing old json...");
     let dir_path = format!("{}{}", prefix, DIR_PATH);
     if !Path::new(&dir_path).exists() {
-        println!("Creating version directory...");
+        println!("[INFO] Creating version directory...");
         // create directory if necessary
         fs::create_dir(&dir_path)?;
     }
 
     // write files
-    println!("Creating json...");
+    println!("[INFO] Creating json...");
     let mut json = File::create_new(&json_path)?;
     json.write_all(serde_json::to_string_pretty(&Description {
         id: "Leafish".to_string(),
@@ -122,24 +123,24 @@ pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
     // FIXME: download the latest jar from github
     let raw_jar = include_bytes!("../resources/wrapper.jar");
 
-    println!("Copying version jar...");
+    println!("[INFO] Copying version jar...");
     let mut jar = File::create_new(&jar_path)?;
     jar.write_all(raw_jar)?;
 
     let lib_dir = format!("{}{}", prefix, LIBRARY_DIR_PATH);
     if !Path::new(&lib_dir).exists() {
-        println!("Copying library...");
+        println!("[INFO] Copying library...");
         fs::create_dir_all(&lib_dir)?;
         let mut file = File::create_new(format!("{}{}", prefix, LIBRARY_PATH))?;
         file.write_all(raw_jar)?;
     }
 
-    println!("Installation successful!");
-
-    /*let profiles_path = format!("{}{}", prefix, PROFILES_JSON_PATH);
+    let profiles_path = format!("{}{}", prefix, PROFILES_JSON_PATH);
     if !Path::new(&profiles_path).exists() {
-        // FIXME: error
+        println!("[WARN] Couldn't create profile as the file {} doesn't exist", profiles_path);
+        return Ok(true);
     }
+    println!("[INFO] Installing profile...");
     let mut profiles_json_file = OpenOptions::new().append(false).write(true).read(true).open(&profiles_path)?;
     let mut profiles = String::new();
     profiles_json_file.read_to_string(&mut profiles)?;
@@ -158,7 +159,9 @@ pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
 
     profiles_json_file.set_len(0)?;
     profiles_json_file.seek(std::io::SeekFrom::Start(0))?;
-    profiles_json_file.write_all(serde_json::to_string_pretty(&profiles)?.as_bytes())?;*/
+    profiles_json_file.write_all(serde_json::to_string_pretty(&profiles)?.as_bytes())?;
+
+    println!("[INFO] Installation successful");
 
     Ok(true)
 }
