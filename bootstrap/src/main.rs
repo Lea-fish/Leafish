@@ -29,16 +29,21 @@ async fn main() {
             continue;
         }
     }
-    let _ = try_update().await;
-
-    Command::new(MAIN_BINARY_PATH).args(cmd).stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap();
+    if args[args.len() - 1] == "noupdate" {
+        Command::new(MAIN_BINARY_PATH).args(cmd).stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap().wait().unwrap();
+    } else {
+        let _ = try_update().await;
+        println!("[INFO] Restarting bootstrap...");
+        // shut down the process if we performed an update and let our parent bootstrap restart us, running a new version
+        // otherwise we also have to shutdown in order not to restart leafish as soon as it is closed
+        exit(0);
+    }
 }
 
 async fn try_update() -> anyhow::Result<()> {
     println!("[INFO] Checking for updates....");
     let latest = Client::builder().user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1").build()?.get(URL).send().await?.text().await?;
     let latest: LatestResponse = serde_json::from_str(&latest).unwrap();
-    let mut performed_update = false;
     let (update_main, update_bootstrap) = do_update(&latest.published_at, time_stamp_binary(MAIN_BINARY_PATH), time_stamp_binary(BOOTSTRAP_BINARY_PATH))?;
     if update_main || update_bootstrap {
         println!("[INFO] Looking for update files...");
@@ -53,15 +58,9 @@ async fn try_update() -> anyhow::Result<()> {
                 println!("[INFO] Downloading update for bootstrap...");
                 let new_binary = reqwest::get(&asset.browser_download_url).await?.bytes().await?;
                 fs::write(UPDATED_BOOTSTRAP_BINARY_PATH, &new_binary)?;
-                performed_update = true;
                 println!("[INFO] Successfully downloaded bootstrap update");
             }
         }
-    }
-    if performed_update {
-        println!("[INFO] Restarting bootstrap...");
-        // shut down the process if we performed an update and let our parent bootstrap restart us, running a new version
-        exit(0);
     }
     Ok(())
 }
