@@ -2,6 +2,7 @@ use std::{collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Seek, 
 
 use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
+use serde_with::skip_serializing_none;
 
 // all of these are expected to be prepended with ".minecraft"
 const DIR_PATH: &str = "/versions/Leafish/";
@@ -42,6 +43,7 @@ struct Profiles {
     version: usize,
 }
 
+#[skip_serializing_none]
 #[derive(Serialize, Deserialize)]
 struct Profile {
     created: String,
@@ -49,7 +51,7 @@ struct Profile {
     #[serde(rename = "lastUsed")]
     last_used: String,
     #[serde(rename = "lastVersionId")]
-    last_version_id: String,
+    last_version_id: Option<String>,
     name: String,
     #[serde(rename = "type")]
     ty: String,
@@ -152,7 +154,7 @@ pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
         created: now.to_string(),
         icon: "Furnace".to_string(), // TODO: look for a cool block we could use ;)
         last_used: now.to_string(),
-        last_version_id: "Leafish".to_string(), // FIXME: choose a better default
+        last_version_id: Some("Leafish".to_string()),
         name: "Leafish".to_string(),
         ty: "custom".to_string(),
     });
