@@ -56,6 +56,7 @@ pub mod ui;
 pub mod world;
 
 use crate::entity::Rotation;
+use crate::protocol::UUID;
 use crate::render::hud::HudContext;
 use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::Error;
@@ -67,7 +68,6 @@ use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
-use crate::protocol::UUID;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
@@ -295,7 +295,17 @@ fn main() {
         screen_sys.clone(),
     )));
     let mut accounts = screen::launcher::load_accounts().unwrap_or_default();
-    if let Some((name, uuid, token)) = opt.name.clone().map(|name| opt.uuid.clone().map(|uuid| opt.token.clone().map(|token| (name, uuid, token)))).flatten().flatten() {
+    if let Some((name, uuid, token)) = opt
+        .name
+        .clone()
+        .map(|name| {
+            opt.uuid
+                .clone()
+                .map(|uuid| opt.token.clone().map(|token| (name, uuid, token)))
+        })
+        .flatten()
+        .flatten()
+    {
         println!("Got microsoft credentials, adding account...");
         accounts.push(Account {
             name: name.clone(),

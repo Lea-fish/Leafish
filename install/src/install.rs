@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fs::{self, File, OpenOptions}, io::{Read, Seek, Write}, path::Path};
+use std::{
+    collections::HashMap,
+    fs::{self, File, OpenOptions},
+    io::{Read, Seek, Write},
+    path::Path,
+};
 
 use chrono::Utc;
 use serde_derive::{Deserialize, Serialize};
@@ -143,25 +148,35 @@ pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
 
     let profiles_path = format!("{}{}", prefix, PROFILES_JSON_PATH);
     if !Path::new(&profiles_path).exists() {
-        println!("[WARN] Couldn't create profile as the file {} doesn't exist", profiles_path);
+        println!(
+            "[WARN] Couldn't create profile as the file {} doesn't exist",
+            profiles_path
+        );
         return Ok(true);
     }
     println!("[INFO] Installing profile...");
-    let mut profiles_json_file = OpenOptions::new().append(false).write(true).read(true).open(&profiles_path)?;
+    let mut profiles_json_file = OpenOptions::new()
+        .append(false)
+        .write(true)
+        .read(true)
+        .open(&profiles_path)?;
     let mut profiles = String::new();
     profiles_json_file.read_to_string(&mut profiles)?;
     let mut profiles: Profiles = serde_json::from_str(&profiles)?;
     let now = Utc::now();
     let now = now.format("%Y-%m-%dT%H:%M:%S.000Z");
-    
-    profiles.profiles.insert("Leafish".to_string(), Profile {
-        created: Some(now.to_string()),
-        icon: include_str!("./icon.txt").to_string(),
-        last_used: now.to_string(),
-        last_version_id: Some("Leafish".to_string()),
-        name: "Leafish".to_string(),
-        ty: "custom".to_string(),
-    });
+
+    profiles.profiles.insert(
+        "Leafish".to_string(),
+        Profile {
+            created: Some(now.to_string()),
+            icon: include_str!("./icon.txt").to_string(),
+            last_used: now.to_string(),
+            last_version_id: Some("Leafish".to_string()),
+            name: "Leafish".to_string(),
+            ty: "custom".to_string(),
+        },
+    );
 
     profiles_json_file.set_len(0)?;
     profiles_json_file.seek(std::io::SeekFrom::Start(0))?;
