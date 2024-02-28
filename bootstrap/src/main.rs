@@ -31,7 +31,7 @@ async fn main() {
         }
     }
     if args[args.len() - 1] == "noupdate" {
-        Command::new(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX)).args(cmd).stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap().wait().unwrap();
+        Command::new(format!("{}{}", fs::canonicalize(MAIN_BINARY_PATH).unwrap().as_path().to_str().unwrap(), env::consts::EXE_SUFFIX)).args(cmd).stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap().wait().unwrap();
     } else {
         let _ = try_update().await;
         println!("[INFO] Restarting bootstrap...");
