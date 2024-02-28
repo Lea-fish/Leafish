@@ -46,7 +46,7 @@ struct Profiles {
 #[skip_serializing_none]
 #[derive(Serialize, Deserialize)]
 struct Profile {
-    created: String,
+    created: Option<String>,
     icon: String,
     #[serde(rename = "lastUsed")]
     last_used: String,
@@ -151,7 +151,7 @@ pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
     let now = now.format("%Y-%m-%dT%H:%M:%S.000Z");
     
     profiles.profiles.insert("Leafish".to_string(), Profile {
-        created: now.to_string(),
+        created: Some(now.to_string()),
         icon: "Furnace".to_string(), // TODO: look for a cool block we could use ;)
         last_used: now.to_string(),
         last_version_id: Some("Leafish".to_string()),
