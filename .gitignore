@@ -9,6 +9,7 @@
 last-packet
 
 .vscode/*
+Leafish.code-workspace
 
-# this is only temporary (until the installer is completely finished)
-# install/resources/*
+# this is part of compiling the installer (but we don't want to upload it)
+install/resources/*

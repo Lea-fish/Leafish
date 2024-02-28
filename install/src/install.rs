@@ -84,6 +84,11 @@ struct Settings {
 }
 
 pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
+    if !Path::new(prefix).exists() {
+        println!("[INFO] Couldn't find .minecraft directory");
+        return Ok(false);
+    }
+
     let json_path = format!("{}{}", prefix, DESC_JSON_PATH);
     let jar_path = format!("{}{}", prefix, JAR_PATH);
     if Path::new(&json_path).exists() && Path::new(&jar_path).exists() {
@@ -100,7 +105,6 @@ pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
         fs::remove_file(&jar_path)?;
     }
 
-    println!("[INFO] Removing old json...");
     let dir_path = format!("{}{}", prefix, DIR_PATH);
     if !Path::new(&dir_path).exists() {
         println!("[INFO] Creating version directory...");
@@ -152,7 +156,7 @@ pub fn setup_launcher_wrapper(prefix: &str) -> anyhow::Result<bool> {
     
     profiles.profiles.insert("Leafish".to_string(), Profile {
         created: Some(now.to_string()),
-        icon: "Furnace".to_string(), // TODO: look for a cool block we could use ;)
+        icon: include_str!("./icon.txt").to_string(),
         last_used: now.to_string(),
         last_version_id: Some("Leafish".to_string()),
         name: "Leafish".to_string(),

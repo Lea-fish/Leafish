@@ -31,7 +31,7 @@ async fn main() {
         }
     }
     if args[args.len() - 1] == "noupdate" {
-        Command::new(format!("{}{}", fs::canonicalize(MAIN_BINARY_PATH).unwrap().as_path().to_str().unwrap(), env::consts::EXE_SUFFIX)).args(cmd).stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap().wait().unwrap();
+        Command::new(fs::canonicalize(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX)).unwrap().as_path().to_str().unwrap()).args(cmd).stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap().wait().unwrap();
     } else {
         let _ = try_update().await;
         println!("[INFO] Restarting bootstrap...");
@@ -45,19 +45,20 @@ async fn try_update() -> anyhow::Result<()> {
     println!("[INFO] Checking for updates....");
     let latest = Client::builder().user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1").build()?.get(URL).send().await?.text().await?;
     let latest: LatestResponse = serde_json::from_str(&latest).unwrap();
-    let (update_main, update_bootstrap) = do_update(&latest.published_at, time_stamp_binary(MAIN_BINARY_PATH), time_stamp_binary(BOOTSTRAP_BINARY_PATH))?;
-    if update_main || update_bootstrap {
-        println!("[INFO] Looking for update files...");
-        let bootstrap_binary_name = format!("bootstrap_{}_{}{}", env::consts::ARCH, env::consts::OS, env::consts::EXE_SUFFIX);
-        let main_binary_name = format!("leafish_{}_{}{}", env::consts::ARCH, env::consts::OS, env::consts::EXE_SUFFIX);
-        for asset in latest.assets {
-            if &asset.name == &main_binary_name && update_main {
+    println!("[INFO] Looking for update files...");
+    let bootstrap_binary_name = format!("bootstrap_{}_{}{}", env::consts::ARCH, env::consts::OS, env::consts::EXE_SUFFIX);
+    let main_binary_name = format!("leafish_{}_{}{}", env::consts::ARCH, env::consts::OS, env::consts::EXE_SUFFIX);
+    for asset in latest.assets {
+        if &asset.name == &main_binary_name {
+            if do_update(&latest.published_at, &asset.updated_at, time_stamp_binary(MAIN_BINARY_PATH))? {
                 println!("[INFO] Downloading update for leafish binary...");
                 let new_binary = reqwest::get(&asset.browser_download_url).await?.bytes().await?;
                 fs::write(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX), &new_binary)?;
                 adjust_binary_perms()?;
                 println!("[INFO] Successfully updated leafish binary");
-            } else if &asset.name == &bootstrap_binary_name && update_bootstrap {
+            }
+        } else if &asset.name == &bootstrap_binary_name {
+            if do_update(&latest.published_at, &asset.updated_at, time_stamp_binary(BOOTSTRAP_BINARY_PATH))? {
                 println!("[INFO] Downloading update for bootstrap...");
                 let new_binary = reqwest::get(&asset.browser_download_url).await?.bytes().await?;
                 fs::write(format!("{}{}", UPDATED_BOOTSTRAP_BINARY_PATH, env::consts::EXE_SUFFIX), &new_binary)?;
@@ -76,9 +77,9 @@ fn time_stamp_binary(path: &str) -> u64 {
     }).unwrap_or(0)
 }
 
-fn do_update(published_date: &str, last_modified_main: u64, last_modified_bootstrap: u64) -> anyhow::Result<(bool, bool)> {
+fn parse_date(date: &str) -> anyhow::Result<i64> {
     // FIXME: get rid of all the unwraps
-    let (date, time) = (&published_date[0..(published_date.len() - 2)]).split_once('T').unwrap();
+    let (date, time) = (&date[0..(date.len() - 2)]).split_once('T').unwrap();
     let mut date_parts = date.split('-');
     let years = date_parts.next().unwrap();
     let months = date_parts.next().unwrap();
@@ -87,19 +88,27 @@ fn do_update(published_date: &str, last_modified_main: u64, last_modified_bootst
     let hours = time_parts.next().unwrap();
     let minutes = time_parts.next().unwrap();
     let seconds = time_parts.next().unwrap();
-    let published = Utc.with_ymd_and_hms(years.parse::<u32>()? as i32, months.parse::<u32>()?,
+    let time = Utc.with_ymd_and_hms(years.parse::<u32>()? as i32, months.parse::<u32>()?,
     days.parse::<u32>()?, hours.parse::<u32>()?, minutes.parse::<u32>()?, seconds.parse::<u32>()?).unwrap();
-    let date_millis = published.timestamp_millis();
-    if date_millis <= 0 {
-        return Ok((false, false));
+    let date_millis = time.timestamp_millis();
+    Ok(date_millis)
+}
+
+fn do_update(published_date: &str, curr_updated_date: &str, last_modified: u64) -> anyhow::Result<bool> {
+    let published_millis = parse_date(published_date)?;
+    let curr_millis = parse_date(curr_updated_date)?;
+    if published_millis <= 0 || curr_millis <= 0 {
+        return Ok(false);
     }
-    Ok(((date_millis as u64 > last_modified_main), (date_millis as u64 > last_modified_bootstrap)))
+    let curr_millis = curr_millis.max(published_millis);
+    Ok(curr_millis as u64 > last_modified)
 }
 
 // FIXME: should we do this for mac as well?
 #[cfg(target_os = "linux")]
 fn adjust_binary_perms() -> anyhow::Result<()> {
-    Command::new("chmod").args(&["777", fs::canonicalize(MAIN_BINARY_PATH)?.to_str().unwrap()]).spawn()?.wait()?; // FIXME: check for exit status!
+    let file_name = fs::canonicalize(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX)).unwrap();
+    Command::new("chmod").args(&["777", file_name.as_path().to_str().unwrap()]).spawn()?.wait()?; // FIXME: check for exit status!
     Ok(())
 }
 
@@ -118,4 +127,5 @@ struct LatestResponse {
 struct Asset {
     browser_download_url: String,
     name: String,
+    updated_at: String,
 }
