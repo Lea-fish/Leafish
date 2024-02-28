@@ -5,8 +5,6 @@ use reqwest::Client;
 use serde_derive::Deserialize;
 
 const URL: &str = "https://api.github.com/repos/Lea-fish/Releases/releases/latest";
-const MAIN_BINARY_NAME: &str = "leafish";
-const BOOTSTRAP_BINARY_NAME: &str = "bootstrap";
 const MAIN_BINARY_PATH: &str = "./leafish";
 const UPDATED_BOOTSTRAP_BINARY_PATH: &str = "./bootstrap_new";
 const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap";
@@ -33,7 +31,7 @@ async fn main() {
         }
     }
     if args[args.len() - 1] == "noupdate" {
-        Command::new(MAIN_BINARY_PATH).args(cmd).stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap().wait().unwrap();
+        Command::new(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX)).args(cmd).stdout(Stdio::inherit()).stderr(Stdio::inherit()).spawn().unwrap().wait().unwrap();
     } else {
         let _ = try_update().await;
         println!("[INFO] Restarting bootstrap...");
@@ -50,17 +48,19 @@ async fn try_update() -> anyhow::Result<()> {
     let (update_main, update_bootstrap) = do_update(&latest.published_at, time_stamp_binary(MAIN_BINARY_PATH), time_stamp_binary(BOOTSTRAP_BINARY_PATH))?;
     if update_main || update_bootstrap {
         println!("[INFO] Looking for update files...");
+        let bootstrap_binary_name = format!("bootstrap_{}_{}{}", env::consts::ARCH, env::consts::OS, env::consts::EXE_SUFFIX);
+        let main_binary_name = format!("leafish_{}_{}{}", env::consts::ARCH, env::consts::OS, env::consts::EXE_SUFFIX);
         for asset in latest.assets {
-            if &asset.name == MAIN_BINARY_NAME && update_main {
+            if &asset.name == &main_binary_name && update_main {
                 println!("[INFO] Downloading update for leafish binary...");
                 let new_binary = reqwest::get(&asset.browser_download_url).await?.bytes().await?;
-                fs::write(MAIN_BINARY_PATH, &new_binary)?;
+                fs::write(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX), &new_binary)?;
                 adjust_binary_perms()?;
                 println!("[INFO] Successfully updated leafish binary");
-            } else if &asset.name == BOOTSTRAP_BINARY_NAME && update_bootstrap {
+            } else if &asset.name == &bootstrap_binary_name && update_bootstrap {
                 println!("[INFO] Downloading update for bootstrap...");
                 let new_binary = reqwest::get(&asset.browser_download_url).await?.bytes().await?;
-                fs::write(UPDATED_BOOTSTRAP_BINARY_PATH, &new_binary)?;
+                fs::write(format!("{}{}", UPDATED_BOOTSTRAP_BINARY_PATH, env::consts::EXE_SUFFIX), &new_binary)?;
                 println!("[INFO] Successfully downloaded bootstrap update");
             }
         }
@@ -104,7 +104,7 @@ fn adjust_binary_perms() -> anyhow::Result<()> {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn adjust_bootstrap_perms() -> anyhow::Result<()> {
+fn adjust_binary_perms() -> anyhow::Result<()> {
     Ok(())
 }
 
