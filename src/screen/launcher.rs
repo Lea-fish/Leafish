@@ -298,7 +298,6 @@ impl super::Screen for Launcher {
                 .attach(&mut *back.borrow_mut());
             let text_account_type = match account_type {
                 AccountType::Microsoft => "Microsoft account".to_string(),
-                AccountType::Mojang => "Mojang account".to_string(),
                 AccountType::None => "Offline account".to_string(),
                 AccountType::Custom(ref str) => str.clone(),
             };
@@ -479,7 +478,13 @@ impl super::Screen for Launcher {
 
 fn save_accounts(accounts: &[Account]) {
     let mut file = File::create(paths::get_config_dir().join("accounts.cfg")).unwrap();
-    let json = serde_json::to_string(accounts).unwrap();
+    // filter out microsoft accounts as these will become invalid after ~1 day, so the launcher has to
+    // provide us with a fresh token on startup
+    let accounts = accounts
+        .iter()
+        .filter(|account| account.account_type != AccountType::Microsoft)
+        .collect::<Vec<_>>();
+    let json = serde_json::to_string(&accounts).unwrap();
     file.write_all(json.as_bytes()).unwrap();
 }
 

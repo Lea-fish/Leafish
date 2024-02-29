@@ -8,7 +8,7 @@ use crate::world::{block, CPos, ChunkSectionSnapshotGroup, World};
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, Sender};
 use parking_lot::RwLock;
-use rand::{self, Rng, SeedableRng};
+use rand::{Rng, SeedableRng};
 use std::sync::Arc;
 use std::thread;
 

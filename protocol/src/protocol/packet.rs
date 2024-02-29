@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::format;
 use cgmath::Vector3;
 
 state_packets!(

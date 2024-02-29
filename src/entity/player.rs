@@ -17,7 +17,7 @@ use crate::types::hash::FNVHash;
 use crate::types::GameMode;
 use crate::world;
 use bevy_ecs::prelude::*;
-use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
+use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::{Aabb, Aabb3};
 use instant::Instant;
 use parking_lot::Mutex;

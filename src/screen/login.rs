@@ -17,7 +17,7 @@ use std::rc::Rc;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-use rand::{self, Rng};
+use rand::Rng;
 
 use crate::auth;
 use crate::console;
@@ -227,35 +227,22 @@ impl super::Screen for Login {
             let username = elements.username_txt.borrow().input.clone();
             let password = elements.password_txt.borrow().input.clone();
             let refresh = elements.refresh;
-            let automatic_offline_accounts =
-                *self.vars.get(crate::settings::L_AUTOMATIC_OFFLINE_ACCOUNTS);
 
             thread::spawn(move || {
-                if automatic_offline_accounts && password.is_empty() {
-                    tx.send(try_login(
-                        refresh,
-                        if username.is_empty() {
-                            format!("Player{}", rand::thread_rng().gen::<u8>())
-                        } else {
-                            username
-                        },
-                        None,
-                        password,
-                        AccountType::None,
-                        client_token,
-                    ))
-                    .unwrap();
-                } else {
-                    tx.send(try_login(
-                        refresh,
-                        username,
-                        None,
-                        password,
-                        AccountType::Mojang,
-                        client_token,
-                    ))
-                    .unwrap();
-                }
+                // FIXME: at some point we might want to introduce an option to log into custom auth accounts
+                tx.send(try_login(
+                    refresh,
+                    if username.is_empty() {
+                        format!("Player{}", rand::thread_rng().gen::<u8>())
+                    } else {
+                        username
+                    },
+                    None,
+                    password,
+                    AccountType::None,
+                    client_token,
+                ))
+                .unwrap();
             });
         }
         let mut done = false;

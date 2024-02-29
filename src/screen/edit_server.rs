@@ -19,7 +19,7 @@ use crate::ui;
 use crate::{paths, render};
 
 use crate::screen::{Screen, ScreenSystem};
-use serde_json::{self, Value};
+use serde_json::Value;
 use std::sync::Arc;
 
 pub struct EditServerEntry {

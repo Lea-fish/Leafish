@@ -23,6 +23,7 @@ use copypasta::ClipboardProvider;
 #[cfg(target_os = "linux")]
 use glutin::platform::unix::EventLoopWindowTargetExtUnix;
 use instant::{Duration, Instant};
+use leafish_protocol::protocol::login::AccountType;
 use log::{debug, error, info, warn};
 use shared::Version;
 use std::fs;
@@ -194,6 +195,12 @@ struct Opt {
     /// Protocol version to use in the autodetection ping
     #[structopt(short = "p", long = "default-protocol-version")]
     default_protocol_version: Option<String>,
+    #[structopt(long)]
+    uuid: Option<String>,
+    #[structopt(long)]
+    name: Option<String>,
+    #[structopt(long)]
+    token: Option<String>,
 }
 
 // TODO: Hide own character and show only the right hand. (with an item)
@@ -286,10 +293,29 @@ fn main() {
         vars.clone(),
         screen_sys.clone(),
     )));
+    let mut accounts = screen::launcher::load_accounts().unwrap_or_default();
+    if let Some((name, uuid, token)) = opt
+        .name
+        .clone()
+        .map(|name| {
+            opt.uuid
+                .clone()
+                .map(|uuid| opt.token.clone().map(|token| (name, uuid, token)))
+        })
+        .flatten()
+        .flatten()
+    {
+        println!("Got microsoft credentials, adding account...");
+        accounts.push(Account {
+            name: name.clone(),
+            uuid: Some(uuid),
+            verification_tokens: vec![name, "".to_string(), token],
+            head_img_data: None,
+            account_type: AccountType::Microsoft,
+        });
+    }
     screen_sys.add_screen(Box::new(screen::launcher::Launcher::new(
-        Arc::new(Mutex::new(
-            screen::launcher::load_accounts().unwrap_or_default(),
-        )),
+        Arc::new(Mutex::new(accounts)),
         screen_sys.clone(),
         active_account.clone(),
     )));

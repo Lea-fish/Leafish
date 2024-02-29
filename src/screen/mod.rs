@@ -292,7 +292,7 @@ impl ScreenSystem {
                         );
                     }
                 }
-                let mut current = screens.last_mut().unwrap();
+                let current = screens.last_mut().unwrap();
                 current
                     .screen
                     .clone()

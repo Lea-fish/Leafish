@@ -3,7 +3,7 @@ use crate::resources;
 use crate::ui;
 use instant::Instant;
 use parking_lot::RwLock;
-use rand::{self, seq::SliceRandom};
+use rand::seq::SliceRandom;
 use std::f64::consts;
 use std::sync::Arc;
 

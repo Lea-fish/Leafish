@@ -1,4 +1,5 @@
-use super::mojang::MojangAccount;
+use crate::protocol::microsoft::MicrosoftAccount;
+
 use super::offline_acc::OfflineAccount;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
@@ -111,7 +112,7 @@ lazy_static! {
         Arc::new({
             let map: DashMap<AccountType, Arc<dyn AccountImpl + Send + Sync>> = DashMap::new();
             // FIXME: These shouldn't be active all the time - someone might wanna disable them in a config file or something
-            map.insert(AccountType::Mojang, Arc::new(MojangAccount {}));
+            map.insert(AccountType::Microsoft, Arc::new(MicrosoftAccount {}));
             map.insert(AccountType::None, Arc::new(OfflineAccount {}));
             map
         });
@@ -119,7 +120,6 @@ lazy_static! {
 
 #[derive(Serialize, Deserialize, PartialEq, Eq, Hash, Clone)]
 pub enum AccountType {
-    Mojang,
     Microsoft,
     Custom(String), // Not implemented yet, this will enable us to support other auth services without implementing every single one specifically
     None,           // aka. unverified or "offline account" (for offline mode servers)

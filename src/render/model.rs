@@ -8,7 +8,7 @@ use crate::shared::Direction;
 use crate::types::hash::FNVHash;
 use byteorder::{NativeEndian, WriteBytesExt};
 use cgmath::{Matrix4, Point3, SquareMatrix};
-use collision::{self, Frustum, Sphere};
+use collision::{Frustum, Sphere};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;

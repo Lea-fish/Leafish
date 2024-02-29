@@ -3,7 +3,7 @@ use crate::render::model;
 use crate::shared::{Direction, Position};
 use crate::world;
 use crate::world::block;
-use collision::{self, Aabb};
+use collision::Aabb;
 use std::sync::Arc;
 
 pub struct Info {
