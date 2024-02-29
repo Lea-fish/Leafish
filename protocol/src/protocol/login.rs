@@ -1,6 +1,5 @@
 use crate::protocol::microsoft::MicrosoftAccount;
 
-use super::UUID;
 use super::offline_acc::OfflineAccount;
 use dashmap::DashMap;
 use lazy_static::lazy_static;
