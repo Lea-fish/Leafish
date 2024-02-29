@@ -17,7 +17,7 @@ use std::rc::Rc;
 use std::sync::{mpsc, Arc};
 use std::thread;
 
-use rand::{self, Rng};
+use rand::Rng;
 
 use crate::auth;
 use crate::console;

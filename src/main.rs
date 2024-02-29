@@ -56,7 +56,6 @@ pub mod ui;
 pub mod world;
 
 use crate::entity::Rotation;
-use crate::protocol::UUID;
 use crate::render::hud::HudContext;
 use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::Error;

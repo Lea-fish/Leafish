@@ -3,7 +3,7 @@ use crate::entity::player_like::{compute_player_model_components, PlayerLikeMode
 use crate::render::model;
 use crate::render::Renderer;
 use bevy_ecs::prelude::*;
-use cgmath::{self, Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
+use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::Aabb3;
 use std::sync::Arc;
 

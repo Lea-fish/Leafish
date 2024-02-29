@@ -2,7 +2,6 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 
-use leafish_blocks as block;
 use leafish_protocol::types::hash::FNVHash;
 use leafish_shared::position::Position;
 

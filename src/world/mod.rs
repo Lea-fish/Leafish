@@ -342,7 +342,7 @@ impl World {
 
     pub fn copy_cloud_heightmap(&self, data: &mut [u8]) -> bool {
         let mut dirty = false;
-        for mut c in self.chunks.write().values_mut() {
+        for c in self.chunks.write().values_mut() {
             if c.heightmap_dirty {
                 dirty = true;
                 c.heightmap_dirty = false;
@@ -527,7 +527,7 @@ impl World {
                 if rendered_on == frame_id {
                     return;
                 }
-                if let Some(mut chunk) = self.chunks.write().get_mut(&CPos(pos.0, pos.2)) {
+                if let Some(chunk) = self.chunks.write().get_mut(&CPos(pos.0, pos.2)) {
                     chunk.sections_rendered_on[pos.1 as usize] = frame_id;
                 }
 
@@ -754,7 +754,7 @@ impl World {
 
     fn set_dirty(&self, x: i32, y: i32, z: i32) {
         if let Some(chunk) = self.chunks.write().get_mut(&CPos(x, z)) {
-            if let Some(mut sec) = chunk.sections.get_mut(y as usize).and_then(|v| v.as_mut()) {
+            if let Some(sec) = chunk.sections.get_mut(y as usize).and_then(|v| v.as_mut()) {
                 sec.dirty = true;
             }
         }
@@ -771,7 +771,7 @@ impl World {
 
     pub fn set_building_flag(&self, pos: (i32, i32, i32)) {
         if let Some(chunk) = self.chunks.write().get_mut(&CPos(pos.0, pos.2)) {
-            if let Some(mut sec) = chunk.sections[pos.1 as usize].as_mut() {
+            if let Some(sec) = chunk.sections[pos.1 as usize].as_mut() {
                 sec.building = true;
                 sec.dirty = false;
             }
@@ -871,7 +871,7 @@ impl World {
                 } else if version == 19 {
                     self.prep_section_19(&mut chunk, data, i, skylight);
                 }
-                let mut section = chunk.sections[i].as_mut().unwrap();
+                let section = chunk.sections[i].as_mut().unwrap();
                 section.dirty = true;
             }
             if version == 17 {

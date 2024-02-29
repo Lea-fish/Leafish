@@ -53,7 +53,7 @@ use leafish_protocol::protocol::Conn;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
 use parking_lot::RwLock;
-use rand::{self, Rng};
+use rand::Rng;
 use rayon::ThreadPoolBuilder;
 use shared::Version;
 use std::collections::HashMap;
