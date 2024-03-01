@@ -38,7 +38,6 @@ use leafish_protocol::protocol::login::AccountType;
 use log::{debug, error, info, warn};
 use raw_window_handle::HasRawWindowHandle;
 use shared::Version;
-use winit::window::Icon;
 use std::fs;
 use std::num::NonZeroU32;
 use winit::keyboard::Key;
@@ -47,6 +46,7 @@ use winit::keyboard::NamedKey;
 use winit::keyboard::SmolStr;
 use winit::raw_window_handle::HasDisplayHandle;
 use winit::raw_window_handle::RawDisplayHandle;
+use winit::window::Icon;
 extern crate leafish_shared as shared;
 
 use structopt::StructOpt;
@@ -262,7 +262,17 @@ fn main() {
 
     let window_builder = winit::window::WindowBuilder::new()
         .with_title("Leafish")
-        .with_window_icon(Some(Icon::from_rgba(image::load_from_memory(include_bytes!("../resources/icon32x32.png")).unwrap().into_rgba8().into_vec(), 32, 32).unwrap()))
+        .with_window_icon(Some(
+            Icon::from_rgba(
+                image::load_from_memory(include_bytes!("../resources/icon32x32.png"))
+                    .unwrap()
+                    .into_rgba8()
+                    .into_vec(),
+                32,
+                32,
+            )
+            .unwrap(),
+        ))
         .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)) // FIXME: Why are we using this particular value here?
         .with_maximized(true);
 
@@ -583,8 +593,7 @@ fn tick_all(
     }
 
     if game.server.is_some() {
-        game.renderer
-            .update_camera(physical_width, physical_height);
+        game.renderer.update_camera(physical_width, physical_height);
         game.chunk_builder.tick(
             game.server.as_ref().unwrap().world.clone(),
             game.renderer.clone(),
@@ -695,12 +704,7 @@ fn handle_window_event<T>(
                 window.set_cursor_grab(cursor_grab_mode).unwrap();
                 window.set_cursor_visible(false);
                 if game.server.is_some()
-                    && !game
-                        .server
-                        .as_ref()
-                        .unwrap()
-                        .dead
-                        .load(Ordering::Acquire)
+                    && !game.server.as_ref().unwrap().dead.load(Ordering::Acquire)
                 {
                     if let Some(player) = *game.server.as_ref().unwrap().player.write() {
                         let server = game.server.as_ref().unwrap();
