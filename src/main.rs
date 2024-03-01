@@ -46,7 +46,6 @@ use winit::keyboard::NamedKey;
 use winit::keyboard::SmolStr;
 use winit::raw_window_handle::HasDisplayHandle;
 use winit::raw_window_handle::RawDisplayHandle;
-use winit::window::Icon;
 extern crate leafish_shared as shared;
 
 use structopt::StructOpt;
