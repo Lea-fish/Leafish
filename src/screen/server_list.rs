@@ -29,6 +29,8 @@ use crate::render::hud::{Hud, HudContext};
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
 use crate::ui::Container;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use crossbeam_channel::unbounded;
 use crossbeam_channel::{Receiver, TryRecvError};
 use instant::Duration;
@@ -241,7 +243,6 @@ impl ServerList {
                     .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                     .attach(&mut *btn);
                 btn.add_text(txt);
-                let index = index;
                 let sname = name.clone();
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
@@ -275,7 +276,6 @@ impl ServerList {
                     .alignment(ui::VAttach::Middle, ui::HAttach::Center)
                     .attach(&mut *btn);
                 btn.add_text(txt);
-                let index = index;
                 let sname = name.clone();
                 let saddr = address.clone();
                 btn.add_click_func(move |_, game| {
@@ -320,7 +320,7 @@ impl ServerList {
                             let data_base64 = &icon["data:image/png;base64,".len()..];
                             let data_base64: String =
                                 data_base64.chars().filter(|c| !c.is_whitespace()).collect();
-                            let data = base64::decode(data_base64).unwrap();
+                            let data = STANDARD.decode(data_base64).unwrap();
                             Some(image::load_from_memory(&data).unwrap())
                         } else {
                             None

@@ -20,13 +20,32 @@
 use copypasta::nop_clipboard;
 use copypasta::ClipboardContext;
 use copypasta::ClipboardProvider;
+use glutin::config::Api;
+use glutin::config::ConfigTemplateBuilder;
+use glutin::context::ContextApi;
+use glutin::context::ContextAttributesBuilder;
+use glutin::context::GlContext;
+use glutin::context::NotCurrentGlContext;
+use glutin::display::GetGlDisplay;
+use glutin::display::GlDisplay;
+use glutin::surface::GlSurface;
+use glutin::surface::SwapInterval;
+use glutin_winit::DisplayBuilder;
+use glutin_winit::GlWindow;
 #[cfg(target_os = "linux")]
-use glutin::platform::unix::EventLoopWindowTargetExtUnix;
 use instant::{Duration, Instant};
 use leafish_protocol::protocol::login::AccountType;
 use log::{debug, error, info, warn};
+use raw_window_handle::HasRawWindowHandle;
 use shared::Version;
 use std::fs;
+use std::num::NonZeroU32;
+use winit::keyboard::Key;
+use winit::keyboard::ModifiersKeyState;
+use winit::keyboard::NamedKey;
+use winit::keyboard::SmolStr;
+use winit::raw_window_handle::HasDisplayHandle;
+use winit::raw_window_handle::RawDisplayHandle;
 extern crate leafish_shared as shared;
 
 use structopt::StructOpt;
@@ -84,7 +103,7 @@ pub struct Game {
     renderer: Arc<render::Renderer>,
     screen_sys: Arc<screen::ScreenSystem>,
     resource_manager: Arc<RwLock<resources::Manager>>,
-    clipboard_provider: Arc<RwLock<Box<dyn copypasta::ClipboardProvider>>>,
+    clipboard_provider: Mutex<Box<dyn copypasta::ClipboardProvider>>,
     console: Arc<Mutex<console::Console>>,
     vars: Rc<console::Vars>,
     should_close: bool,
@@ -213,6 +232,7 @@ struct Opt {
 // TODO: Fix pistons.
 fn main() {
     let opt = Opt::from_args();
+    #[allow(clippy::arc_with_non_send_sync)]
     let con = Arc::new(Mutex::new(console::Console::new()));
     let proxy = console::ConsoleProxy::new(con.clone());
 
@@ -237,49 +257,82 @@ fn main() {
     let (res, mut resui) = resources::Manager::new();
     let resource_manager = Arc::new(RwLock::new(res));
 
-    let events_loop = winit::event_loop::EventLoop::new();
+    let events_loop = winit::event_loop::EventLoop::new().unwrap();
 
     let window_builder = winit::window::WindowBuilder::new()
         .with_title("Leafish")
-        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0))
-        .with_maximized(true); // Why are we using this particular value here?
+        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)) // Why are we using this particular value here?
+        .with_maximized(true);
 
-    let (context, shader_version, dpi_factor, glutin_window) = {
-        let glutin_window = glutin::ContextBuilder::new()
-            .with_stencil_buffer(0)
-            .with_depth_buffer(24)
-            .with_gl(glutin::GlRequest::GlThenGles {
-                opengl_version: (3, 2),
-                opengles_version: (3, 0),
+    let (context, shader_version, dpi_factor, window, surface, display) = {
+        let template = ConfigTemplateBuilder::new()
+            .with_stencil_size(0)
+            .with_depth_size(24)
+            .with_api(Api::GLES3.union(Api::OPENGL));
+        let display_builder = DisplayBuilder::new().with_window_builder(Some(window_builder));
+
+        let (window, gl_config) = display_builder
+            .build(&events_loop, template, |mut configs| {
+                configs.next().unwrap()
             })
-            .with_gl_profile(glutin::GlProfile::Core)
-            .with_vsync(vsync)
-            .build_windowed(window_builder, &events_loop)
-            .expect("Could not create glutin window.");
-        let dpi_factor = glutin_window.window().scale_factor();
+            .unwrap();
 
-        let glutin_window = unsafe {
-            glutin_window
-                .make_current()
-                .expect("Could not set current context.")
+        let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
+        let gl_display = gl_config.display();
+        let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
+
+        let fallback_context_attributes = ContextAttributesBuilder::new()
+            .with_context_api(ContextApi::Gles(None))
+            .build(raw_window_handle);
+
+        let not_current_gl_context = unsafe {
+            gl_display
+                .create_context(&gl_config, &context_attributes)
+                .unwrap_or_else(|_| {
+                    gl_display
+                        .create_context(&gl_config, &fallback_context_attributes)
+                        .expect("failed to create context")
+                })
         };
 
-        let context = unsafe {
-            glow::Context::from_loader_function(|s| glutin_window.get_proc_address(s) as *const _)
+        let shader_version = match not_current_gl_context.context_api() {
+            ContextApi::OpenGl(_) => "#version 150",  // OpenGL 3.2
+            ContextApi::Gles(_) => "#version 300 es", // OpenGL ES 3.0 (similar to WebGL 2)
         };
 
-        let shader_version = match glutin_window.get_api() {
-            glutin::Api::OpenGl => "#version 150",      // OpenGL 3.2
-            glutin::Api::OpenGlEs => "#version 300 es", // OpenGL ES 3.0 (similar to WebGL 2)
-            glutin::Api::WebGl => {
-                panic!("unexpectedly received WebGl API with glutin, expected to use glow codepath")
+        let window = window.unwrap();
+
+        let attrs = window.build_surface_attributes(Default::default());
+        let gl_surface = unsafe {
+            gl_config
+                .display()
+                .create_window_surface(&gl_config, &attrs)
+                .unwrap()
+        };
+
+        // Make it current.
+        let gl_context = not_current_gl_context.make_current(&gl_surface).unwrap();
+
+        if vsync {
+            // Try setting vsync.
+            if let Err(res) = gl_surface
+                .set_swap_interval(&gl_context, SwapInterval::Wait(NonZeroU32::new(1).unwrap()))
+            {
+                eprintln!("Error setting vsync: {res:?}");
             }
-        };
+        }
 
-        (context, shader_version, dpi_factor, glutin_window)
+        (
+            gl_context,
+            shader_version,
+            window.scale_factor(),
+            window,
+            gl_surface,
+            gl_display,
+        )
     };
 
-    gl::init(context);
+    gl::init(&display);
     info!("Shader version: {}", shader_version);
 
     let renderer = render::Renderer::new(resource_manager.clone(), shader_version);
@@ -297,12 +350,11 @@ fn main() {
     if let Some((name, uuid, token)) = opt
         .name
         .clone()
-        .map(|name| {
+        .and_then(|name| {
             opt.uuid
                 .clone()
                 .map(|uuid| opt.token.clone().map(|token| (name, uuid, token)))
         })
-        .flatten()
         .flatten()
     {
         println!("Got microsoft credentials, adding account...");
@@ -326,15 +378,25 @@ fn main() {
     );
 
     #[cfg(target_os = "linux")]
-    let clipboard: Box<dyn ClipboardProvider> = match events_loop.wayland_display() {
-        Some(display) => {
-            debug!("Configured with wayland clipboard");
-            // NOTE: Since this takes a pointer to the winit event loop, it MUST be dropped first.
-            unsafe {
-                Box::new(copypasta::wayland_clipboard::create_clipboards_from_external(display).1)
+    let clipboard: Box<dyn ClipboardProvider> = match events_loop.display_handle() {
+        Ok(display) => {
+            match display.as_raw() {
+                RawDisplayHandle::Wayland(wayland) => {
+                    debug!("Configured with wayland clipboard");
+                    // NOTE: Since this takes a pointer to the winit event loop, it MUST be dropped first.
+                    unsafe {
+                        Box::new(
+                            copypasta::wayland_clipboard::create_clipboards_from_external(
+                                wayland.display.as_ptr(),
+                            )
+                            .1,
+                        )
+                    }
+                }
+                _ => create_clipboard(),
             }
         }
-        None => create_clipboard(),
+        Err(_) => create_clipboard(),
     };
 
     #[cfg(not(target_os = "linux"))]
@@ -360,7 +422,7 @@ fn main() {
         is_logo_pressed: false,
         is_fullscreen: false,
         default_protocol_version,
-        clipboard_provider: Arc::new(RwLock::new(clipboard)),
+        clipboard_provider: Mutex::new(clipboard),
         current_account: active_account,
     };
     game.renderer.camera.lock().pos = cgmath::Point3::new(0.5, 13.2, 0.5);
@@ -381,47 +443,51 @@ fn main() {
 
     let game = Rc::clone(&game);
     let ui_container = Rc::clone(&ui_container);
-    events_loop.run(move |event, _event_loop, control_flow| {
-        let winit_window = glutin_window.window();
+    events_loop
+        .run(move |event, event_loop| {
+            let mut game = game.borrow_mut();
+            let mut ui_container = ui_container.borrow_mut();
+            event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
-        let mut game = game.borrow_mut();
-        let mut ui_container = ui_container.borrow_mut();
-        *control_flow = winit::event_loop::ControlFlow::Poll;
+            if let winit::event::Event::WindowEvent {
+                event: winit::event::WindowEvent::Resized(physical_size),
+                ..
+            } = event
+            {
+                surface.resize(
+                    &context,
+                    NonZeroU32::new(physical_size.width).unwrap(),
+                    NonZeroU32::new(physical_size.height).unwrap(),
+                );
+            }
 
-        if let winit::event::Event::WindowEvent {
-            event: winit::event::WindowEvent::Resized(physical_size),
-            ..
-        } = event
-        {
-            glutin_window.resize(physical_size);
-        }
+            if !handle_window_event(&window, &mut game, &mut ui_container, event) {
+                return;
+            }
 
-        if !handle_window_event(winit_window, &mut game, &mut ui_container, event) {
-            return;
-        }
+            let start = Instant::now();
+            tick_all(
+                &window,
+                &mut game,
+                &mut ui_container,
+                &mut last_frame,
+                &mut resui,
+                &mut last_resource_version,
+                &mut vsync,
+            );
+            if DEBUG {
+                let dist = Instant::now().checked_duration_since(start);
+                debug!("Ticking took {}", dist.unwrap().as_millis());
+            }
+            surface
+                .swap_buffers(&context)
+                .expect("Failed to swap GL buffers");
 
-        let start = Instant::now();
-        tick_all(
-            winit_window,
-            &mut game,
-            &mut ui_container,
-            &mut last_frame,
-            &mut resui,
-            &mut last_resource_version,
-            &mut vsync,
-        );
-        if DEBUG {
-            let dist = Instant::now().checked_duration_since(start);
-            debug!("Ticking took {}", dist.unwrap().as_millis());
-        }
-        glutin_window
-            .swap_buffers()
-            .expect("Failed to swap GL buffers");
-
-        if game.should_close {
-            *control_flow = winit::event_loop::ControlFlow::Exit;
-        }
-    });
+            if game.should_close {
+                event_loop.exit();
+            }
+        })
+        .unwrap();
 }
 
 const DEBUG: bool = false;
@@ -595,7 +661,7 @@ fn handle_window_event<T>(
 ) -> bool {
     use winit::event::*;
     match event {
-        Event::MainEventsCleared => return true,
+        Event::AboutToWait => return true,
         Event::DeviceEvent {
             event: DeviceEvent::MouseMotion {
                 delta: (xrel, yrel),
@@ -673,24 +739,16 @@ fn handle_window_event<T>(
         Event::WindowEvent { event, .. } => {
             match event {
                 WindowEvent::ModifiersChanged(modifiers_state) => {
-                    game.is_ctrl_pressed = modifiers_state.ctrl();
-                    game.is_logo_pressed = modifiers_state.logo();
+                    game.is_ctrl_pressed = modifiers_state.lcontrol_state()
+                        == ModifiersKeyState::Pressed
+                        || modifiers_state.rcontrol_state() == ModifiersKeyState::Pressed;
+                    game.is_logo_pressed = modifiers_state.lsuper_state()
+                        == ModifiersKeyState::Pressed
+                        || modifiers_state.rsuper_state() == ModifiersKeyState::Pressed;
                 }
                 WindowEvent::CloseRequested => game.should_close = true,
                 WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
                     game.dpi_factor = scale_factor;
-                }
-
-                WindowEvent::ReceivedCharacter(codepoint) => {
-                    if !game.focused && !game.is_ctrl_pressed && !game.is_logo_pressed {
-                        ui_container.key_type(game, codepoint);
-                        game.screen_sys.clone().receive_char(codepoint, game);
-                    }
-
-                    #[cfg(target_os = "macos")]
-                    if game.is_logo_pressed && codepoint == 'q' {
-                        game.should_close = true;
-                    }
                 }
 
                 WindowEvent::MouseInput { state, button, .. } => match (state, button) {
@@ -756,39 +814,54 @@ fn handle_window_event<T>(
                         }
                     }
                 }
-                WindowEvent::KeyboardInput { input, .. } => {
-                    match (input.state, input.virtual_keycode) {
-                        (ElementState::Pressed, Some(VirtualKeyCode::Grave)) => {
-                            game.console.lock().toggle();
-                        }
-                        (ElementState::Pressed, Some(VirtualKeyCode::F11)) => {
-                            if !game.is_fullscreen {
-                                // TODO: support options for exclusive and simple fullscreen
-                                // see https://docs.rs/glutin/0.22.0-alpha5/glutin/window/struct.Window.html#method.set_fullscreen
-                                window.set_fullscreen(Some(winit::window::Fullscreen::Borderless(
-                                    window.current_monitor(),
-                                )));
-                            } else {
-                                window.set_fullscreen(None);
-                            }
+                WindowEvent::KeyboardInput { event, .. } => {
+                    const SEMICOLON: Key = Key::Character(SmolStr::new_inline(";"));
+                    if event.state == ElementState::Pressed && event.logical_key == SEMICOLON {
+                        game.console.lock().toggle();
+                    } else {
+                        match (event.state, event.logical_key) {
+                            (ElementState::Pressed, Key::Named(NamedKey::F11)) => {
+                                if !game.is_fullscreen {
+                                    // TODO: support options for exclusive and simple fullscreen
+                                    // see https://docs.rs/glutin/0.22.0-alpha5/glutin/window/struct.Window.html#method.set_fullscreen
+                                    window.set_fullscreen(Some(
+                                        winit::window::Fullscreen::Borderless(
+                                            window.current_monitor(),
+                                        ),
+                                    ));
+                                } else {
+                                    window.set_fullscreen(None);
+                                }
 
-                            game.is_fullscreen = !game.is_fullscreen;
-                        }
-                        (ElementState::Pressed, Some(key)) => {
-                            if !game.focused {
-                                let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
-                                ui_container.key_press(game, key, true, ctrl_pressed);
+                                game.is_fullscreen = !game.is_fullscreen;
                             }
-                            game.screen_sys.clone().press_key(key, true, game);
-                        }
-                        (ElementState::Released, Some(key)) => {
-                            if !game.focused {
-                                let ctrl_pressed = game.is_ctrl_pressed;
-                                ui_container.key_press(game, key, false, ctrl_pressed);
+                            (ElementState::Pressed, key) => {
+                                #[cfg(target_os = "macos")]
+                                if game.is_logo_pressed && key.eq_ignore_case('q') {
+                                    game.should_close = true;
+                                }
+                                if !game.focused {
+                                    let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
+                                    ui_container.key_press(game, key.clone(), true, ctrl_pressed);
+                                }
+                                game.screen_sys.clone().press_key(
+                                    (key, event.physical_key),
+                                    true,
+                                    game,
+                                );
                             }
-                            game.screen_sys.clone().press_key(key, false, game);
+                            (ElementState::Released, key) => {
+                                if !game.focused {
+                                    let ctrl_pressed = game.is_ctrl_pressed;
+                                    ui_container.key_press(game, key.clone(), false, ctrl_pressed);
+                                }
+                                game.screen_sys.clone().press_key(
+                                    (key, event.physical_key),
+                                    false,
+                                    game,
+                                );
+                            }
                         }
-                        (_, None) => (),
                     }
                 }
                 _ => (),
@@ -813,6 +886,28 @@ fn create_clipboard() -> Box<dyn ClipboardProvider> {
                 nop_clipboard::NopClipboardContext::new()
                     .expect("no operation clipboard can never fail"),
             )
+        }
+    }
+}
+
+pub trait KeyCmp {
+    fn eq_ignore_case(&self, other: char) -> bool;
+}
+
+impl KeyCmp for Key {
+    fn eq_ignore_case(&self, other: char) -> bool {
+        match self {
+            Key::Character(content) => {
+                if content.as_str().len() != 1 {
+                    return false;
+                }
+                let chr = content.as_str().chars().next().unwrap();
+                if !other.is_alphabetic() {
+                    return chr == other;
+                }
+                chr.to_ascii_lowercase() == other || chr.to_ascii_uppercase() == other
+            }
+            _ => false,
         }
     }
 }

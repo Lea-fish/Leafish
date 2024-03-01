@@ -5,10 +5,10 @@ authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>" ]
 edition = "2018"
 
 [dependencies]
-lazy_static = "1.4.0"
-cgmath = "0.17.0"
-collision = "0.20.1"
-parking_lot = "0.11.1"
+lazy_static = "1.4.0" # TODO: get rid of this and use OnceCell instead
+cgmath = "0.17"
+collision = "0.20"
+parking_lot = "0.12"
 
 
 [dependencies.leafish_shared]

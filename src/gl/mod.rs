@@ -12,19 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use gl::Context;
 use glow as gl;
 use glow::{HasContext, PixelPackData, PixelUnpackData};
+use glutin::display::GlDisplay;
 use log::error;
 use std::mem;
 use std::ops::BitOr;
 use std::ops::{Deref, DerefMut};
+use std::ptr::null_mut;
 
-static mut CONTEXT: *mut glow::Context = 0 as *mut glow::Context;
+static mut CONTEXT: *mut glow::Context = null_mut();
 
 /// Inits the gl library. This should be called once a context is ready.
-pub fn init(context: glow::Context) {
+pub fn init<D: GlDisplay>(gl_display: &D) {
     unsafe {
-        CONTEXT = Box::into_raw(Box::new(context));
+        CONTEXT = Box::into_raw(Box::new(Context::from_loader_function_cstr(|symbol| {
+            gl_display.get_proc_address(symbol)
+        })));
     }
 }
 
@@ -259,11 +264,11 @@ pub const NEAREST_MIPMAP_LINEAR: TextureValue = gl::NEAREST_MIPMAP_LINEAR as Tex
 pub const CLAMP_TO_EDGE: TextureValue = gl::CLAMP_TO_EDGE as TextureValue;
 
 /// `Texture` is a buffer of data used by fragment shaders.
-#[derive(Default)]
 pub struct Texture(glow::Texture);
 
 impl Texture {
-    // Allocates a new texture.
+    /// Allocates a new texture.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Texture {
         Texture(unsafe {
             glow_context()
@@ -459,10 +464,10 @@ pub type ShaderParameter = u32;
 pub const COMPILE_STATUS: ShaderParameter = gl::COMPILE_STATUS;
 pub const INFO_LOG_LENGTH: ShaderParameter = gl::INFO_LOG_LENGTH;
 
-#[derive(Default)]
 pub struct Program(glow::Program);
 
 impl Program {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Program {
         Program(unsafe {
             glow_context()
@@ -646,14 +651,14 @@ impl Attribute {
     }
 }
 
-// VertexArray is used to store state needed to render vertices.
-// This includes buffers, the format of the buffers and enabled
-// attributes.
-#[derive(Default)]
+/// VertexArray is used to store state needed to render vertices.
+/// This includes buffers, the format of the buffers and enabled
+/// attributes.
 pub struct VertexArray(glow::VertexArray);
 
 impl VertexArray {
     /// Allocates a new `VertexArray`.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> VertexArray {
         VertexArray(unsafe {
             glow_context()
@@ -677,7 +682,6 @@ impl Drop for VertexArray {
         unsafe {
             glow_context().delete_vertex_array(self.0);
         }
-        self.0 = glow::VertexArray::default();
     }
 }
 
@@ -710,11 +714,11 @@ pub const READ_ONLY: Access = gl::READ_ONLY;
 pub const WRITE_ONLY: Access = gl::WRITE_ONLY;
 
 /// `Buffer` is a storage for vertex data.
-#[derive(Default)]
 pub struct Buffer(glow::Buffer);
 
 impl Buffer {
     /// Allocates a new Buffer.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Buffer {
         Buffer(unsafe {
             glow_context()
@@ -755,7 +759,7 @@ impl Buffer {
         unsafe {
             MappedBuffer {
                 inner: Vec::from_raw_parts(
-                    glow_context().map_buffer_range(target, 0, length as i32, access) as *mut u8,
+                    glow_context().map_buffer_range(target, 0, length as i32, access),
                     0,
                     length,
                 ),
@@ -809,7 +813,6 @@ pub const COLOR_ATTACHMENT_1: Attachment = gl::COLOR_ATTACHMENT1;
 pub const COLOR_ATTACHMENT_2: Attachment = gl::COLOR_ATTACHMENT2;
 pub const DEPTH_ATTACHMENT: Attachment = gl::DEPTH_ATTACHMENT;
 
-#[derive(Default)]
 pub struct Framebuffer(glow::Framebuffer);
 
 pub fn check_framebuffer_status() {
@@ -855,6 +858,7 @@ pub fn check_gl_error() {
 }
 
 impl Framebuffer {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Framebuffer {
         Framebuffer(unsafe {
             glow_context()

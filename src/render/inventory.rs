@@ -4,9 +4,9 @@ use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
 use crate::ui::{Container, ImageRef, TextBoxRef, TextRef, VAttach};
 use crate::{ui, Game};
-use glutin::event::VirtualKeyCode;
 use parking_lot::RwLock;
 use std::sync::Arc;
+use winit::keyboard::{Key, NamedKey, PhysicalKey};
 
 #[derive(Clone)]
 pub struct InventoryWindow {
@@ -97,8 +97,8 @@ impl Screen for InventoryWindow {
         );
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
-        if key == VirtualKeyCode::Escape && !down {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
+        if key.0 == Key::Named(NamedKey::Escape) && !down {
             self.inventory_context
                 .write()
                 .try_close_inventory(game.screen_sys.clone());

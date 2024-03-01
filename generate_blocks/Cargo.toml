@@ -6,7 +6,7 @@ edition = "2018"
 [dependencies]
 minecraft-data-rs = { version = "0.6.0", path = "../../minecraft-data-rs" }
 convert_case = "0.6.0"
-serde_json = "1.0.66"
+serde_json = "1.0"
 
 [dependencies.leafish_shared]
 path = "../shared"

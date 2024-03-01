@@ -21,6 +21,7 @@ use log::debug;
 use parking_lot::RwLock;
 use rand::rngs::ThreadRng;
 use rand::Rng;
+use winit::keyboard::{Key, NamedKey, PhysicalKey};
 
 use crate::inventory::slot_mapping::SlotMapping;
 use crate::inventory::Item;
@@ -35,7 +36,6 @@ use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
 use std::sync::atomic::AtomicBool;
 
-use glutin::event::VirtualKeyCode;
 use instant::Instant;
 use std::sync::atomic::Ordering as AtomicOrdering;
 
@@ -492,17 +492,23 @@ impl Screen for Hud {
         }
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
-        if key == VirtualKeyCode::Escape && !down && game.focused {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
+        if key.0 == Key::Named(NamedKey::Escape) && !down && game.focused {
             game.screen_sys
                 .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
             return;
         }
-        if let Some(action_key) = settings::Actionkey::get_by_keycode(key, &game.vars) {
-            game.server
-                .as_ref()
-                .unwrap()
-                .key_press(down, action_key, &mut game.focused.clone());
+        match key.1 {
+            PhysicalKey::Code(code) => {
+                if let Some(action_key) = settings::Actionkey::get_by_keycode(code, &game.vars) {
+                    game.server.as_ref().unwrap().key_press(
+                        down,
+                        action_key,
+                        &mut game.focused.clone(),
+                    );
+                }
+            }
+            PhysicalKey::Unidentified(_) => {}
         }
     }
 

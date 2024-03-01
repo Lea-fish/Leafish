@@ -36,6 +36,8 @@ use crate::world;
 use crate::world::{CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
 use atomic_float::AtomicF64;
+use base64::engine::general_purpose::STANDARD;
+use base64::Engine;
 use bevy_ecs::prelude::{Entity, Stage, SystemStage};
 use cgmath::prelude::*;
 use cgmath::Vector3;
@@ -2246,7 +2248,7 @@ impl Server {
                         // authlib. We could download authlib on startup and extract
                         // the key but this seems like overkill compared to just
                         // whitelisting Mojang's texture servers instead.
-                        let skin_blob_result = &base64::decode(&prop.value);
+                        let skin_blob_result = &STANDARD.decode(&prop.value);
                         let skin_blob = match skin_blob_result {
                             Ok(val) => val,
                             Err(err) => {
