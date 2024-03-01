@@ -46,6 +46,7 @@ use winit::keyboard::NamedKey;
 use winit::keyboard::SmolStr;
 use winit::raw_window_handle::HasDisplayHandle;
 use winit::raw_window_handle::RawDisplayHandle;
+use winit::window::Icon;
 extern crate leafish_shared as shared;
 
 use structopt::StructOpt;
@@ -169,7 +170,7 @@ impl Game {
         let result = thread::spawn(move || {
             server::Server::connect(
                 resources,
-                account.clone().lock().as_ref().unwrap(),
+                account.lock().as_ref().unwrap(),
                 &address,
                 protocol_version,
                 forge_mods,
@@ -261,7 +262,18 @@ fn main() {
 
     let window_builder = winit::window::WindowBuilder::new()
         .with_title("Leafish")
-        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)) // Why are we using this particular value here?
+        .with_window_icon(Some(
+            Icon::from_rgba(
+                image::load_from_memory(include_bytes!("../resources/icon32x32.png"))
+                    .unwrap()
+                    .into_rgba8()
+                    .into_vec(),
+                32,
+                32,
+            )
+            .unwrap(),
+        ))
+        .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)) // FIXME: Why are we using this particular value here?
         .with_maximized(true);
 
     let (context, shader_version, dpi_factor, window, surface, display) = {
@@ -425,7 +437,6 @@ fn main() {
         clipboard_provider: Mutex::new(clipboard),
         current_account: active_account,
     };
-    game.renderer.camera.lock().pos = cgmath::Point3::new(0.5, 13.2, 0.5);
     if opt.network_debug {
         protocol::enable_network_debug();
     }
@@ -508,16 +519,14 @@ fn tick_all(
                 .as_ref()
                 .unwrap()
                 .disconnect_data
-                .clone()
                 .write()
                 .disconnect_reason
                 .take();
             game.screen_sys.close_closable_screens();
             game.screen_sys
-                .clone()
                 .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
             game.server = None;
-            game.renderer.clone().reset();
+            game.renderer.reset();
         } else if game
             .server
             .as_ref()
@@ -531,16 +540,14 @@ fn tick_all(
                 .as_ref()
                 .unwrap()
                 .disconnect_data
-                .clone()
                 .write()
                 .disconnect_reason
                 .take();
             game.screen_sys.close_closable_screens();
             game.screen_sys
-                .clone()
                 .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
             game.server = None;
-            game.renderer.clone().reset();
+            game.renderer.reset();
         }
     } else {
         game.chunk_builder.reset();
@@ -586,25 +593,22 @@ fn tick_all(
     }
 
     if game.server.is_some() {
-        game.renderer
-            .clone()
-            .update_camera(physical_width, physical_height);
+        game.renderer.update_camera(physical_width, physical_height);
         game.chunk_builder.tick(
             game.server.as_ref().unwrap().world.clone(),
             game.renderer.clone(),
             version,
         );
-    } else if game.renderer.clone().screen_data.read().safe_width != physical_width
-        || game.renderer.clone().screen_data.read().safe_height != physical_height
+    } else if game.renderer.screen_data.read().safe_width != physical_width
+        || game.renderer.screen_data.read().safe_height != physical_height
     {
-        game.renderer.clone().screen_data.write().safe_width = physical_width;
-        game.renderer.clone().screen_data.write().safe_height = physical_height;
+        game.renderer.screen_data.write().safe_width = physical_width;
+        game.renderer.screen_data.write().safe_height = physical_height;
         gl::viewport(0, 0, physical_width as i32, physical_height as i32);
     }
 
     if game
         .screen_sys
-        .clone()
         .tick(delta, game.renderer.clone(), ui_container, window)
     {
         window
@@ -636,7 +640,6 @@ fn tick_all(
         game.server
             .as_ref()
             .unwrap()
-            .clone()
             .render_list_computer
             .send(true)
             .unwrap();
@@ -701,15 +704,9 @@ fn handle_window_event<T>(
                 window.set_cursor_grab(cursor_grab_mode).unwrap();
                 window.set_cursor_visible(false);
                 if game.server.is_some()
-                    && !game
-                        .server
-                        .as_ref()
-                        .unwrap()
-                        .clone()
-                        .dead
-                        .load(Ordering::Acquire)
+                    && !game.server.as_ref().unwrap().dead.load(Ordering::Acquire)
                 {
-                    if let Some(player) = *game.server.as_ref().unwrap().player.clone().write() {
+                    if let Some(player) = *game.server.as_ref().unwrap().player.write() {
                         let server = game.server.as_ref().unwrap();
                         let entities = server.entities.clone();
                         let mut entities = entities.write();
@@ -806,11 +803,11 @@ fn handle_window_event<T>(
                     // TODO: line vs pixel delta? does pixel scrolling (e.g. touchpad) need scaling?
                     match delta {
                         MouseScrollDelta::LineDelta(x, y) => {
-                            game.screen_sys.clone().on_scroll(x.into(), y.into());
+                            game.screen_sys.on_scroll(x.into(), y.into());
                         }
                         MouseScrollDelta::PixelDelta(position) => {
                             let (x, y) = position.into();
-                            game.screen_sys.clone().on_scroll(x, y);
+                            game.screen_sys.on_scroll(x, y);
                         }
                     }
                 }
