@@ -39,7 +39,9 @@ use parking_lot::{Mutex, RwLock};
 use std::sync::atomic::{AtomicIsize, Ordering};
 use std::sync::Arc;
 use winit::dpi::{PhysicalPosition, Position};
-use winit::event::VirtualKeyCode;
+use winit::keyboard::Key;
+use winit::keyboard::NamedKey;
+use winit::keyboard::PhysicalKey;
 use winit::window::Window;
 
 pub trait Screen {
@@ -93,13 +95,11 @@ pub trait Screen {
     ) {
     } // TODO: make non-optional!
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
-        if key == VirtualKeyCode::Escape && !down && self.is_closable() {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
+        if key.0 == Key::Named(NamedKey::Escape) && !down && self.is_closable() {
             game.screen_sys.pop_screen();
         }
     }
-
-    fn on_char_receive(&mut self, _received: char, _game: &mut Game) {}
 
     fn is_closable(&self) -> bool {
         false
@@ -215,13 +215,7 @@ impl ScreenSystem {
         ScreenType::Other(String::new())
     }
 
-    pub fn receive_char(&self, received: char, game: &mut Game) {
-        if let Some(screen) = self.screens.clone().read().last() {
-            screen.screen.clone().lock().on_char_receive(received, game);
-        }
-    }
-
-    pub fn press_key(&self, key: VirtualKeyCode, down: bool, game: &mut Game) {
+    pub fn press_key(&self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
         if let Some(screen) = self.screens.clone().read().last() {
             screen.screen.clone().lock().on_key_press(key, down, game);
         }

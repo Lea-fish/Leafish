@@ -18,15 +18,15 @@ use crate::protocol::packet;
 use crate::render::hud::{Hud, START_TICKS};
 use crate::render::{hud, Renderer};
 use crate::screen::{Screen, ScreenSystem, ScreenType};
-use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextBuilder, TextRef, VAttach};
 use crate::Game;
+use crate::{ui, KeyCmp};
 use core::cmp;
-use glutin::event::VirtualKeyCode;
 use leafish_protocol::format::Component;
 use parking_lot::RwLock;
 use shared::Version;
 use std::sync::atomic::{AtomicBool, Ordering};
+use winit::keyboard::{Key, NamedKey, PhysicalKey};
 
 pub const MAX_MESSAGES: usize = 200;
 const MAX_MESSAGE_LENGTH_PRE_1_11: usize = 100;
@@ -259,12 +259,12 @@ impl super::Screen for Chat {
         self.on_active(screen_sys, renderer, ui_container);
     }
 
-    fn on_key_press(&mut self, key: VirtualKeyCode, down: bool, game: &mut Game) {
-        if key == VirtualKeyCode::Escape && !down {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
+        if key.0 == Key::Named(NamedKey::Escape) && !down {
             game.screen_sys.clone().pop_screen();
             return;
         }
-        if key == VirtualKeyCode::Return && !down {
+        if key.0 == Key::Named(NamedKey::Enter) && !down {
             if !self.written.is_empty() {
                 game.server.as_ref().unwrap().clone().write_packet(
                     packet::play::serverbound::ChatMessage {
@@ -275,7 +275,7 @@ impl super::Screen for Chat {
             game.screen_sys.clone().pop_screen();
             return;
         }
-        if key == VirtualKeyCode::V && game.is_ctrl_pressed {
+        if key.0.eq_ignore_case('v') && game.is_ctrl_pressed {
             if let Ok(clipboard) = game.clipboard_provider.clone().write().get_contents() {
                 for c in clipboard.chars() {
                     if self.written.len()
@@ -298,42 +298,47 @@ impl super::Screen for Chat {
                 }
                 self.dirty_written = true;
             }
+            return;
         }
-    }
-
-    fn on_char_receive(&mut self, received: char, game: &mut Game) {
-        if received != 13 as char
-            && received != 127 as char
-            && received != 167 as char
-            && received != '§'
-            && received <= 255 as char
-        {
-            if received == 8 as char {
-                // Handle backspace
-                if !self.written.is_empty() {
-                    self.written.pop();
-                    self.dirty_written = true;
-                }
-                return;
+        if key.0 == Key::Named(NamedKey::Backspace) {
+            // Handle backspace
+            if !self.written.is_empty() {
+                self.written.pop();
+                self.dirty_written = true;
             }
-            if self.written.len()
-                >= if game
-                    .server
-                    .as_ref()
-                    .unwrap()
-                    .clone()
-                    .mapped_protocol_version
-                    >= Version::V1_11
+            return;
+        }
+        if let Some(str) = key.0.to_text() {
+            if str.len() != 1 {
+                panic!("weird input!");
+            }
+            const ILLEGAL_CHARS: &[&str] = &[
+                unsafe { std::str::from_utf8_unchecked(&[13 as u8]) },
+                unsafe { std::str::from_utf8_unchecked(&[127 as u8]) },
+                unsafe { std::str::from_utf8_unchecked(&[167 as u8]) },
+                unsafe { std::str::from_utf8_unchecked(&['§' as u8]) },
+                unsafe { std::str::from_utf8_unchecked(&[255 as u8]) },
+            ];
+            if !ILLEGAL_CHARS.iter().any(|illegal| illegal == &str) {
+                if self.written.len()
+                    >= if game
+                        .server
+                        .as_ref()
+                        .unwrap()
+                        .clone()
+                        .mapped_protocol_version
+                        >= Version::V1_11
+                    {
+                        MAX_MESSAGE_LENGTH_SINCE_1_11
+                    } else {
+                        MAX_MESSAGE_LENGTH_PRE_1_11
+                    }
                 {
-                    MAX_MESSAGE_LENGTH_SINCE_1_11
-                } else {
-                    MAX_MESSAGE_LENGTH_PRE_1_11
+                    return;
                 }
-            {
-                return;
+                self.written.push_str(str);
+                self.dirty_written = true;
             }
-            self.written.push(received);
-            self.dirty_written = true;
         }
     }
 

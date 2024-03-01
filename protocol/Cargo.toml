@@ -5,28 +5,28 @@ authors = [ "Thinkofdeath <thinkofdeath@spigotmc.org>", "iceiix <ice_ix@protonma
 edition = "2018"
 
 [dependencies]
-serde = { version = "1.0.127", features = ["derive"] }
-serde_json = "1.0.64"
-hex = "0.4.3"
-sha-1 = "0.9.7"
-aes = "0.7.4"
-cfb8 = "0.7.1"
-byteorder = "1.4.3"
-log = { version = "0.4.14", features = ["std"] }
-flate2 = { version = "1.0.20", features = ["rust_backend"], default-features = false }
-num-traits = "0.2.14"
-instant = "0.1.9"
-cgmath = "0.17.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+hex = "0.4"
+sha-1 = "0.10"
+aes = "0.7"
+cfb8 = "0.7"
+byteorder = "1.4"
+log = { version = "0.4", features = ["std"] }
+flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
+num-traits = "0.2"
+instant = "0.1"
+cgmath = "0.17"
 
 lazy_static = "1.4.0"
-trust-dns-resolver = "0.20.3"
+trust-dns-resolver = "0.23"
 # srv-rs = { version = "0.2.0", features = ["libresolv"] }
 
-dashmap = "4.0.2"
+dashmap = "5.5"
 
 bevy_ecs = { git = "https://github.com/Lea-fish/bevy", rev = "a58b4936d0e1ccd241dca74bceae78a1b6d4f949" }
 
-reqwest = { version = "0.11.3", features = [ "blocking" ]}
+reqwest = { version = "0.11", features = [ "blocking" ]}
 
 [dependencies.leafish_shared]
 path = "../shared"

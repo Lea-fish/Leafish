@@ -12,19 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use gl::Context;
 use glow as gl;
 use glow::{HasContext, PixelPackData, PixelUnpackData};
+use glutin::display::GlDisplay;
 use log::error;
 use std::mem;
 use std::ops::BitOr;
 use std::ops::{Deref, DerefMut};
+use std::ptr::null_mut;
 
-static mut CONTEXT: *mut glow::Context = 0 as *mut glow::Context;
+static mut CONTEXT: *mut glow::Context = null_mut();
 
 /// Inits the gl library. This should be called once a context is ready.
-pub fn init(context: glow::Context) {
+pub fn init<D: GlDisplay>(gl_display: &D) {
     unsafe {
-        CONTEXT = Box::into_raw(Box::new(context));
+        CONTEXT = Box::into_raw(Box::new(Context::from_loader_function_cstr(|symbol| {
+            gl_display.get_proc_address(symbol)
+        })));
     }
 }
 
@@ -259,7 +264,6 @@ pub const NEAREST_MIPMAP_LINEAR: TextureValue = gl::NEAREST_MIPMAP_LINEAR as Tex
 pub const CLAMP_TO_EDGE: TextureValue = gl::CLAMP_TO_EDGE as TextureValue;
 
 /// `Texture` is a buffer of data used by fragment shaders.
-#[derive(Default)]
 pub struct Texture(glow::Texture);
 
 impl Texture {
@@ -459,7 +463,6 @@ pub type ShaderParameter = u32;
 pub const COMPILE_STATUS: ShaderParameter = gl::COMPILE_STATUS;
 pub const INFO_LOG_LENGTH: ShaderParameter = gl::INFO_LOG_LENGTH;
 
-#[derive(Default)]
 pub struct Program(glow::Program);
 
 impl Program {
@@ -649,7 +652,6 @@ impl Attribute {
 // VertexArray is used to store state needed to render vertices.
 // This includes buffers, the format of the buffers and enabled
 // attributes.
-#[derive(Default)]
 pub struct VertexArray(glow::VertexArray);
 
 impl VertexArray {
@@ -677,7 +679,6 @@ impl Drop for VertexArray {
         unsafe {
             glow_context().delete_vertex_array(self.0);
         }
-        self.0 = glow::VertexArray::default();
     }
 }
 
@@ -710,7 +711,6 @@ pub const READ_ONLY: Access = gl::READ_ONLY;
 pub const WRITE_ONLY: Access = gl::WRITE_ONLY;
 
 /// `Buffer` is a storage for vertex data.
-#[derive(Default)]
 pub struct Buffer(glow::Buffer);
 
 impl Buffer {
@@ -809,7 +809,6 @@ pub const COLOR_ATTACHMENT_1: Attachment = gl::COLOR_ATTACHMENT1;
 pub const COLOR_ATTACHMENT_2: Attachment = gl::COLOR_ATTACHMENT2;
 pub const DEPTH_ATTACHMENT: Attachment = gl::DEPTH_ATTACHMENT;
 
-#[derive(Default)]
 pub struct Framebuffer(glow::Framebuffer);
 
 pub fn check_framebuffer_status() {

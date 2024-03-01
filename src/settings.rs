@@ -1,7 +1,8 @@
+use winit::keyboard::KeyCode;
+
 use crate::console;
 use crate::console::CVar;
 use std::marker::PhantomData;
-use winit::event::VirtualKeyCode;
 
 pub const R_MAX_FPS: console::CVar<i64> = console::CVar {
     ty: PhantomData,
@@ -120,28 +121,34 @@ macro_rules! create_keybind {
             description: $description,
             mutable: true,
             serializable: true,
-            default: &|| VirtualKeyCode::$keycode as i64,
+            default: &|| KeyCode::$keycode as i64,
         }
     };
 }
 
 pub const CL_KEYBIND_FORWARD: console::CVar<i64> =
-    create_keybind!(W, "cl_keybind_forward", "Keybinding for moving forward");
-pub const CL_KEYBIND_BACKWARD: console::CVar<i64> =
-    create_keybind!(S, "cl_keybind_backward", "Keybinding for moving backward");
+    create_keybind!(KeyW, "cl_keybind_forward", "Keybinding for moving forward");
+pub const CL_KEYBIND_BACKWARD: console::CVar<i64> = create_keybind!(
+    KeyS,
+    "cl_keybind_backward",
+    "Keybinding for moving backward"
+);
 pub const CL_KEYBIND_LEFT: console::CVar<i64> =
-    create_keybind!(A, "cl_keybind_left", "Keybinding for moving the left");
-pub const CL_KEYBIND_RIGHT: console::CVar<i64> =
-    create_keybind!(D, "cl_keybind_right", "Keybinding for moving to the right");
+    create_keybind!(KeyA, "cl_keybind_left", "Keybinding for moving the left");
+pub const CL_KEYBIND_RIGHT: console::CVar<i64> = create_keybind!(
+    KeyD,
+    "cl_keybind_right",
+    "Keybinding for moving to the right"
+);
 pub const CL_KEYBIND_OPEN_INV: console::CVar<i64> = create_keybind!(
-    E,
+    KeyE,
     "cl_keybind_open_inv",
     "Keybinding for opening the inventory"
 );
 pub const CL_KEYBIND_SNEAK: console::CVar<i64> =
-    create_keybind!(LShift, "cl_keybind_sneak", "Keybinding for sneaking");
+    create_keybind!(ShiftLeft, "cl_keybind_sneak", "Keybinding for sneaking");
 pub const CL_KEYBIND_SPRINT: console::CVar<i64> =
-    create_keybind!(LControl, "cl_keybind_sprint", "Keybinding for sprinting");
+    create_keybind!(ControlLeft, "cl_keybind_sprint", "Keybinding for sprinting");
 pub const CL_KEYBIND_JUMP: console::CVar<i64> =
     create_keybind!(Space, "cl_keybind_jump", "Keybinding for jumping");
 pub const CL_KEYBIND_TOGGLE_HUD: console::CVar<i64> = create_keybind!(
@@ -155,7 +162,7 @@ pub const CL_KEYBIND_TOGGLE_DEBUG: console::CVar<i64> = create_keybind!(
     "Keybinding for toggling the debug info"
 );
 pub const CL_KEYBIND_TOGGLE_CHAT: console::CVar<i64> = create_keybind!(
-    T,
+    KeyT,
     "cl_keybind_toggle_chat",
     "Keybinding for toggling the chat"
 );
@@ -233,7 +240,7 @@ impl Actionkey {
         &Self::VALUES
     }
 
-    pub fn get_by_keycode(keycode: VirtualKeyCode, vars: &console::Vars) -> Option<Actionkey> {
+    pub fn get_by_keycode(keycode: KeyCode, vars: &console::Vars) -> Option<Actionkey> {
         for action_key in Actionkey::values() {
             if keycode as i64 == *vars.get(action_key.get_cvar()) {
                 return Some(*action_key);
