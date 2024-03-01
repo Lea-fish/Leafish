@@ -1615,8 +1615,7 @@ impl UIElement for TextBox {
             }
             self.submit_funcs.append(&mut temp);
         } else if key.eq_ignore_case('v') && down && ctrl_pressed {
-            let mut clipboard = game.clipboard_provider.write();
-            if let Ok(text) = clipboard.get_contents() {
+            if let Ok(text) = game.clipboard_provider.lock().get_contents() {
                 self.input.push_str(&text)
             }
         }

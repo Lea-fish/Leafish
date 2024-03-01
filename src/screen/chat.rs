@@ -276,7 +276,7 @@ impl super::Screen for Chat {
             return;
         }
         if key.0.eq_ignore_case('v') && game.is_ctrl_pressed {
-            if let Ok(clipboard) = game.clipboard_provider.clone().write().get_contents() {
+            if let Ok(clipboard) = game.clipboard_provider.lock().get_contents() {
                 for c in clipboard.chars() {
                     if self.written.len()
                         >= if game
@@ -312,23 +312,12 @@ impl super::Screen for Chat {
             if str.len() != 1 {
                 panic!("weird input!");
             }
-            const ILLEGAL_CHARS: &[&str] = &[
-                unsafe { std::str::from_utf8_unchecked(&[13 as u8]) },
-                unsafe { std::str::from_utf8_unchecked(&[127 as u8]) },
-                unsafe { std::str::from_utf8_unchecked(&[167 as u8]) },
-                unsafe { std::str::from_utf8_unchecked(&['§' as u8]) },
-                unsafe { std::str::from_utf8_unchecked(&[255 as u8]) },
-            ];
-            if !ILLEGAL_CHARS.iter().any(|illegal| illegal == &str) {
+            const ILLEGAL_CHARS: &[char] =
+                &[13 as char, 127 as char, 167 as char, '§', 255 as char];
+            let curr = str.chars().next().unwrap();
+            if !ILLEGAL_CHARS.iter().any(|illegal| curr == *illegal) {
                 if self.written.len()
-                    >= if game
-                        .server
-                        .as_ref()
-                        .unwrap()
-                        .clone()
-                        .mapped_protocol_version
-                        >= Version::V1_11
-                    {
+                    >= if game.server.as_ref().unwrap().mapped_protocol_version >= Version::V1_11 {
                         MAX_MESSAGE_LENGTH_SINCE_1_11
                     } else {
                         MAX_MESSAGE_LENGTH_PRE_1_11

@@ -80,6 +80,7 @@ impl Launcher {
 }
 
 impl super::Screen for Launcher {
+    #[allow(clippy::get_first)]
     fn on_active(
         &mut self,
         _screen_sys: &ScreenSystem,

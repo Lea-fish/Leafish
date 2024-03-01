@@ -103,7 +103,7 @@ pub struct Game {
     renderer: Arc<render::Renderer>,
     screen_sys: Arc<screen::ScreenSystem>,
     resource_manager: Arc<RwLock<resources::Manager>>,
-    clipboard_provider: Arc<RwLock<Box<dyn copypasta::ClipboardProvider>>>,
+    clipboard_provider: Mutex<Box<dyn copypasta::ClipboardProvider>>,
     console: Arc<Mutex<console::Console>>,
     vars: Rc<console::Vars>,
     should_close: bool,
@@ -232,6 +232,7 @@ struct Opt {
 // TODO: Fix pistons.
 fn main() {
     let opt = Opt::from_args();
+    #[allow(clippy::arc_with_non_send_sync)]
     let con = Arc::new(Mutex::new(console::Console::new()));
     let proxy = console::ConsoleProxy::new(con.clone());
 
@@ -284,7 +285,7 @@ fn main() {
             .with_context_api(ContextApi::Gles(None))
             .build(raw_window_handle);
 
-        let not_current_gl_context = Some(unsafe {
+        let not_current_gl_context = unsafe {
             gl_display
                 .create_context(&gl_config, &context_attributes)
                 .unwrap_or_else(|_| {
@@ -292,8 +293,7 @@ fn main() {
                         .create_context(&gl_config, &fallback_context_attributes)
                         .expect("failed to create context")
                 })
-        })
-        .unwrap();
+        };
 
         let shader_version = match not_current_gl_context.context_api() {
             ContextApi::OpenGl(_) => "#version 150",  // OpenGL 3.2
@@ -350,12 +350,11 @@ fn main() {
     if let Some((name, uuid, token)) = opt
         .name
         .clone()
-        .map(|name| {
+        .and_then(|name| {
             opt.uuid
                 .clone()
                 .map(|uuid| opt.token.clone().map(|token| (name, uuid, token)))
         })
-        .flatten()
         .flatten()
     {
         println!("Got microsoft credentials, adding account...");
@@ -423,7 +422,7 @@ fn main() {
         is_logo_pressed: false,
         is_fullscreen: false,
         default_protocol_version,
-        clipboard_provider: Arc::new(RwLock::new(clipboard)),
+        clipboard_provider: Mutex::new(clipboard),
         current_account: active_account,
     };
     game.renderer.camera.lock().pos = cgmath::Point3::new(0.5, 13.2, 0.5);

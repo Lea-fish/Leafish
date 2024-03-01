@@ -300,6 +300,7 @@ pub fn try_login(
 
 static DEFAULT_PW: String = String::new();
 
+#[allow(clippy::get_first)]
 fn try_login_account(
     refresh: bool,
     account: Account,

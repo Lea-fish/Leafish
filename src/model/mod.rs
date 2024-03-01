@@ -124,8 +124,8 @@ impl Factory {
                             for rule in &model.multipart {
                                 let ok = Self::eval_rules(block, &rule.rules);
                                 if ok {
-                                    if res.is_some() {
-                                        res.as_mut().unwrap().join(rule.apply.choose_model(rng));
+                                    if let Some(res) = &mut res {
+                                        res.join(rule.apply.choose_model(rng));
                                     } else {
                                         res = Some(rule.apply.choose_model(rng).clone());
                                     }

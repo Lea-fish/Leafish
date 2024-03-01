@@ -268,6 +268,7 @@ impl ScreenSystem {
                 .skip(lowest as usize)
             {
                 let idx = (self.screens.read().len() as isize - 1).max(0) as usize;
+                #[allow(clippy::arc_with_non_send_sync)]
                 self.screens.write().push(ScreenInfo {
                     screen: Arc::new(Mutex::new(screen.clone())),
                     active: false,

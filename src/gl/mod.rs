@@ -267,7 +267,8 @@ pub const CLAMP_TO_EDGE: TextureValue = gl::CLAMP_TO_EDGE as TextureValue;
 pub struct Texture(glow::Texture);
 
 impl Texture {
-    // Allocates a new texture.
+    /// Allocates a new texture.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Texture {
         Texture(unsafe {
             glow_context()
@@ -466,6 +467,7 @@ pub const INFO_LOG_LENGTH: ShaderParameter = gl::INFO_LOG_LENGTH;
 pub struct Program(glow::Program);
 
 impl Program {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Program {
         Program(unsafe {
             glow_context()
@@ -649,13 +651,14 @@ impl Attribute {
     }
 }
 
-// VertexArray is used to store state needed to render vertices.
-// This includes buffers, the format of the buffers and enabled
-// attributes.
+/// VertexArray is used to store state needed to render vertices.
+/// This includes buffers, the format of the buffers and enabled
+/// attributes.
 pub struct VertexArray(glow::VertexArray);
 
 impl VertexArray {
     /// Allocates a new `VertexArray`.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> VertexArray {
         VertexArray(unsafe {
             glow_context()
@@ -715,6 +718,7 @@ pub struct Buffer(glow::Buffer);
 
 impl Buffer {
     /// Allocates a new Buffer.
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Buffer {
         Buffer(unsafe {
             glow_context()
@@ -755,7 +759,7 @@ impl Buffer {
         unsafe {
             MappedBuffer {
                 inner: Vec::from_raw_parts(
-                    glow_context().map_buffer_range(target, 0, length as i32, access) as *mut u8,
+                    glow_context().map_buffer_range(target, 0, length as i32, access),
                     0,
                     length,
                 ),
@@ -854,6 +858,7 @@ pub fn check_gl_error() {
 }
 
 impl Framebuffer {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> Framebuffer {
         Framebuffer(unsafe {
             glow_context()
