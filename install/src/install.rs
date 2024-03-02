@@ -207,6 +207,7 @@ pub mod prism {
     const META_DIR_PATH: &str = "/meta/net.minecraft";
     const META_PATH: &str = "/meta/net.minecraft/Leafish.json";
     const LIB_DIR_PATH: &str = "/libraries/de/leafish/";
+    const LIB_PATH: &str = "/libraries/de/leafish/Leafish.jar"; // FIXME: this probably isn't entirely correct
 
     const DEFAULT_CFG: &str = "[General]
     ConfigVersion=1.2
@@ -256,6 +257,11 @@ pub mod prism {
                     important: Some(true),
                     uid: "de.leafish".to_string(),
                     version: "Leafish".to_string(),
+                    cached_name: Some("Leafish".to_string()),
+                    cached_requires: None,
+                    cached_version: Some("Leafish".to_string()),
+                    cached_volatile: None,
+                    dependency_only: None,
                 }],
                 format_version: 1,
             })?,
