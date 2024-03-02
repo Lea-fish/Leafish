@@ -194,20 +194,21 @@ pub mod mojang {
 pub mod prism {
     use std::{fs, path::Path};
 
+    use chrono::Utc;
     use serde_derive::Serialize;
     use serde_with::skip_serializing_none;
 
     use crate::install::mk_dir;
 
     const ICONS_DIR_PATH: &str = "/icons";
-    const ICON_PATH: &str = "/icons/leafish";
+    const ICON_PATH: &str = "/icons/leafish.png";
     const INSTANCE_DIR_PATH: &str = "/instances/Leafish";
     const CFG_PATH: &str = "/instances/Leafish/instance.cfg";
     const PACK_PATH: &str = "/instances/Leafish/mmc-pack.json";
-    const META_DIR_PATH: &str = "/meta/net.minecraft";
-    const META_PATH: &str = "/meta/net.minecraft/Leafish.json";
-    const LIB_DIR_PATH: &str = "/libraries/de/leafish/";
-    const LIB_PATH: &str = "/libraries/de/leafish/Leafish.jar"; // FIXME: this probably isn't entirely correct
+    const META_DIR_PATH: &str = "/meta/de.leafish";
+    const META_PATH: &str = "/meta/de.leafish/Leafish.json";
+    const LIB_DIR_PATH: &str = "/libraries/de/leafish";
+    const LIB_PATH: &str = "/libraries/de/leafish/Leafish.jar";
 
     const DEFAULT_CFG: &str = "[General]
     ConfigVersion=1.2
@@ -222,6 +223,8 @@ pub mod prism {
             return Ok(false);
         }
 
+        println!("[Info] [PrismLauncher] Found PrismLauncher directory");
+
         let dir_path = format!("{}{}", prefix, INSTANCE_DIR_PATH);
         if Path::new(&dir_path).exists() {
             println!("[Info] [PrismLauncher] Profile already exists");
@@ -231,8 +234,6 @@ pub mod prism {
             &dir_path,
             "[Info] [PrismLauncher] Creating instance directory...",
         )?;
-
-        println!("[Info] Found PrismLauncher directory");
 
         let dir_path = format!("{}{}", prefix, ICONS_DIR_PATH);
         mk_dir(
@@ -252,7 +253,7 @@ pub mod prism {
         let pack_path = format!("{}{}", prefix, PACK_PATH);
         fs::write(
             &pack_path,
-            serde_json::to_string(&PackDesc {
+            serde_json::to_string_pretty(&PackDesc {
                 components: vec![Component {
                     important: Some(true),
                     uid: "de.leafish".to_string(),
@@ -266,6 +267,45 @@ pub mod prism {
                 format_version: 1,
             })?,
         )?;
+        let dir_path = format!("{}{}", prefix, LIB_DIR_PATH);
+        mk_dir(&dir_path, "[Info] [PrismLauncher] Creating library directory...")?;
+        let lib_path = format!("{}{}", prefix, LIB_PATH);
+        fs::write(&lib_path, include_bytes!("../resources/wrapper.jar"))?;
+        let dir_path = format!("{}{}", prefix, META_DIR_PATH);
+        mk_dir(&dir_path, "[Info] [PrismLauncher] Creating meta directory...")?;
+        let meta_path = format!("{}{}", prefix, META_PATH);
+
+        let now = Utc::now();
+        let now = now.format("%Y-%m-%dT%H:%M:%S");
+
+        fs::write(&meta_path, serde_json::to_string_pretty(&VersionMeta {
+            traits: None,
+            asset_index: AssetIndex { // FIXME: don't choose one version statically!
+                id: "12".to_string(),
+                sha1: "518a69b460cb49a5547cea4290d343116a5d2eb8".to_string(),
+                size: 436400,
+                total_size: 627004279, // FIXME: does this not depend on the client jar?
+                url: "https://piston-meta.mojang.com/v1/packages/518a69b460cb49a5547cea4290d343116a5d2eb8/12.json".to_string(),
+            },
+            compatible_java_majors: vec![8,9,10,11,12,13,14,15,16,17],
+            format_version: 1,
+            libraries: vec![],
+            main_class: "de.leafish.Main".to_string(),
+            main_jar: MainJar {
+                downloads: Download {
+                    artifact: None,
+                },
+                name: "de.leafish:Leafish".to_string(),
+            },
+            minecraft_arguments: "--username ${auth_player_name} --version ${version_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userType ${user_type} --versionType ${version_type}".to_string(),
+            name: "Leafish".to_string(),
+            order: -2,
+            release_time: now.to_string(),
+            requires: vec![],
+            ty: "release".to_string(),
+            uid: "de.terrarier".to_string(),
+            version: "Leafish".to_string(),
+        })?)?;
 
         Ok(true)
     }
@@ -346,9 +386,10 @@ pub mod prism {
         name: String,
     }
 
+    #[skip_serializing_none]
     #[derive(Serialize)]
     struct Download {
-        artifact: Artifact,
+        artifact: Option<Artifact>,
     }
 
     #[derive(Serialize)]
