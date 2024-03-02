@@ -446,7 +446,10 @@ impl ServerList {
             options.add_click_func(|_, game| {
                 game.screen_sys
                     .clone()
-                    .add_screen(Box::new(super::SettingsMenu::new(game.vars.clone(), false)));
+                    .add_screen(Box::new(super::SettingsMenu::new(
+                        game.settings.clone(),
+                        false,
+                    )));
                 true
             });
         }

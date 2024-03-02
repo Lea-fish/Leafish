@@ -1,6 +1,7 @@
-use crate::console;
 use crate::render;
-use crate::settings;
+use crate::settings::SettingStore;
+use crate::settings::SettingType;
+use crate::settings::SettingValue;
 use crate::ui;
 
 use crate::screen::{Screen, ScreenSystem};
@@ -14,7 +15,7 @@ pub struct UIElements {
 }
 
 pub struct SettingsMenu {
-    _vars: Rc<console::Vars>,
+    settings: Rc<SettingStore>,
     elements: Option<UIElements>,
     show_disconnect_button: bool,
 }
@@ -22,7 +23,7 @@ pub struct SettingsMenu {
 impl Clone for SettingsMenu {
     fn clone(&self) -> Self {
         SettingsMenu {
-            _vars: self._vars.clone(),
+            settings: self.settings.clone(),
             elements: None,
             show_disconnect_button: self.show_disconnect_button,
         }
@@ -30,9 +31,9 @@ impl Clone for SettingsMenu {
 }
 
 impl SettingsMenu {
-    pub fn new(vars: Rc<console::Vars>, show_disconnect_button: bool) -> Self {
+    pub fn new(settings: Rc<SettingStore>, show_disconnect_button: bool) -> Self {
         SettingsMenu {
-            _vars: vars,
+            settings,
             elements: None,
             show_disconnect_button,
         }
@@ -71,7 +72,7 @@ impl super::Screen for SettingsMenu {
             audio_settings.add_click_func(|_, game| {
                 game.screen_sys
                     .clone()
-                    .add_screen(Box::new(AudioSettingsMenu::new(game.vars.clone())));
+                    .add_screen(Box::new(AudioSettingsMenu::new(game.settings.clone())));
                 true
             });
         }
@@ -92,7 +93,7 @@ impl super::Screen for SettingsMenu {
             video_settings.add_click_func(|_, game| {
                 game.screen_sys
                     .clone()
-                    .add_screen(Box::new(VideoSettingsMenu::new(game.vars.clone())));
+                    .add_screen(Box::new(VideoSettingsMenu::new(game.settings.clone())));
                 true
             });
         }
@@ -113,7 +114,7 @@ impl super::Screen for SettingsMenu {
             controls_settings.add_click_func(|_, game| {
                 game.screen_sys
                     .clone()
-                    .add_screen(Box::new(ControlsMenu::new(game.vars.clone())));
+                    .add_screen(Box::new(ControlsMenu::new(game.settings.clone())));
                 true
             });
         }
@@ -149,7 +150,7 @@ impl super::Screen for SettingsMenu {
             skin_settings.add_click_func(|_, game| {
                 game.screen_sys
                     .clone()
-                    .add_screen(Box::new(SkinSettingsMenu::new(game.vars.clone())));
+                    .add_screen(Box::new(SkinSettingsMenu::new(game.settings.clone())));
                 true
             });
         }
@@ -252,23 +253,23 @@ impl super::Screen for SettingsMenu {
 }
 
 pub struct VideoSettingsMenu {
-    vars: Rc<console::Vars>,
+    settings: Rc<SettingStore>,
     elements: Option<UIElements>,
 }
 
 impl Clone for VideoSettingsMenu {
     fn clone(&self) -> Self {
         VideoSettingsMenu {
-            vars: self.vars.clone(),
+            settings: self.settings.clone(),
             elements: None,
         }
     }
 }
 
 impl VideoSettingsMenu {
-    pub fn new(vars: Rc<console::Vars>) -> Self {
+    pub fn new(settings: Rc<SettingStore>) -> Self {
         VideoSettingsMenu {
-            vars,
+            settings,
             elements: None,
         }
     }
@@ -291,9 +292,9 @@ impl super::Screen for VideoSettingsMenu {
         let mut buttons = vec![];
 
         // Load defaults
-        let r_max_fps = *self.vars.get(settings::R_MAX_FPS);
-        let r_fov = *self.vars.get(settings::R_FOV);
-        let r_vsync = *self.vars.get(settings::R_VSYNC);
+        let r_max_fps = self.settings.get_i32(SettingType::MaxFps);
+        let r_fov = self.settings.get_i32(SettingType::FOV);
+        let r_vsync = self.settings.get_bool(SettingType::Vsync);
 
         // Setting buttons
         // TODO: Slider
@@ -336,10 +337,11 @@ impl super::Screen for VideoSettingsMenu {
             let txt_vsync = txt.clone();
             vsync_setting.add_text(txt);
             vsync_setting.add_click_func(move |_, game| {
-                let r_vsync = !*game.vars.get(settings::R_VSYNC);
+                let r_vsync = !game.settings.get_bool(SettingType::Vsync);
                 txt_vsync.borrow_mut().text =
                     format!("VSync: {}", if r_vsync { "Enabled" } else { "Disabled" });
-                game.vars.set(settings::R_VSYNC, r_vsync);
+                game.settings
+                    .set(SettingType::Vsync, SettingValue::Bool(r_vsync));
                 true
             });
         }
@@ -436,23 +438,23 @@ impl super::Screen for VideoSettingsMenu {
 }
 
 pub struct AudioSettingsMenu {
-    _vars: Rc<console::Vars>,
+    _settings: Rc<SettingStore>,
     elements: Option<UIElements>,
 }
 
 impl Clone for AudioSettingsMenu {
     fn clone(&self) -> Self {
         AudioSettingsMenu {
-            _vars: self._vars.clone(),
+            _settings: self._settings.clone(),
             elements: None,
         }
     }
 }
 
 impl AudioSettingsMenu {
-    pub fn new(vars: Rc<console::Vars>) -> AudioSettingsMenu {
+    pub fn new(_settings: Rc<SettingStore>) -> AudioSettingsMenu {
         AudioSettingsMenu {
-            _vars: vars,
+            _settings,
             elements: None,
         }
     }
@@ -546,23 +548,23 @@ impl super::Screen for AudioSettingsMenu {
 }
 
 pub struct SkinSettingsMenu {
-    vars: Rc<console::Vars>,
+    settings: Rc<SettingStore>,
     elements: Option<UIElements>,
 }
 
 impl Clone for SkinSettingsMenu {
     fn clone(&self) -> Self {
         SkinSettingsMenu {
-            vars: self.vars.clone(),
+            settings: self.settings.clone(),
             elements: None,
         }
     }
 }
 
 impl SkinSettingsMenu {
-    pub fn new(vars: Rc<console::Vars>) -> Self {
+    pub fn new(settings: Rc<SettingStore>) -> Self {
         SkinSettingsMenu {
-            vars,
+            settings,
             elements: None,
         }
     }
@@ -585,13 +587,13 @@ impl super::Screen for SkinSettingsMenu {
         let mut buttons = vec![];
 
         // Load defaults
-        let s_hat = *self.vars.get(settings::S_HAT);
-        let _s_jacket = *self.vars.get(settings::S_JACKET);
-        let _s_cape = *self.vars.get(settings::S_CAPE);
-        let _s_right_sleeve = *self.vars.get(settings::S_RIGHT_SLEEVE);
-        let _s_left_sleeve = *self.vars.get(settings::S_LEFT_SLEEVE);
-        let _s_right_pants = *self.vars.get(settings::S_RIGHT_PANTS);
-        let _s_left_pants = *self.vars.get(settings::S_LEFT_PANTS);
+        let s_hat = self.settings.get_bool(SettingType::HatVisible);
+        let _s_jacket = self.settings.get_bool(SettingType::JacketVisible);
+        let _s_cape = self.settings.get_bool(SettingType::CapeVisible);
+        let _s_right_sleeve = self.settings.get_bool(SettingType::RightSleeveVisible);
+        let _s_left_sleeve = self.settings.get_bool(SettingType::LeftSleeveVisible);
+        let _s_right_pants = self.settings.get_bool(SettingType::RightPantsVisible);
+        let _s_left_pants = self.settings.get_bool(SettingType::LeftPantsVisible);
 
         // Setting buttons
         let hat_setting = ui::ButtonBuilder::new()
@@ -614,7 +616,7 @@ impl super::Screen for SkinSettingsMenu {
             let txt_hat = txt.clone();
             hat_setting.add_text(txt);
             hat_setting.add_click_func(move |_, game| {
-                let s_hat = !*game.vars.get(settings::S_HAT);
+                let s_hat = !game.settings.get_bool(SettingType::HatVisible);
                 txt_hat.borrow_mut().text = format!(
                     "Hat: {}",
                     match s_hat {
@@ -622,7 +624,8 @@ impl super::Screen for SkinSettingsMenu {
                         false => "Off",
                     }
                 );
-                game.vars.set(settings::S_HAT, s_hat);
+                game.settings
+                    .set(SettingType::HatVisible, SettingValue::Bool(s_hat));
                 false
             });
         }
@@ -746,23 +749,23 @@ impl super::Screen for SkinSettingsMenu {
 }
 
 pub struct ControlsMenu {
-    vars: Rc<console::Vars>,
+    settings: Rc<SettingStore>,
     elements: Option<UIElements>,
 }
 
 impl Clone for ControlsMenu {
     fn clone(&self) -> Self {
         ControlsMenu {
-            vars: self.vars.clone(),
+            settings: self.settings.clone(),
             elements: None,
         }
     }
 }
 
 impl ControlsMenu {
-    pub fn new(vars: Rc<console::Vars>) -> Self {
+    pub fn new(settings: Rc<SettingStore>) -> Self {
         ControlsMenu {
-            vars,
+            settings,
             elements: None,
         }
     }
@@ -777,7 +780,7 @@ impl super::Screen for ControlsMenu {
     ) {
         let mut buttons = vec![];
         let mut sliders = vec![];
-        let r_mouse_sens = *self.vars.get(settings::R_MOUSE_SENS);
+        let r_mouse_sens = self.settings.get_float(SettingType::MouseSense);
 
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
@@ -824,9 +827,9 @@ impl super::Screen for ControlsMenu {
                 //update button position
                 slider_btn.borrow_mut().x = (game.last_mouse_x) - screen_width / 2.0 - this.x;
                 //update game setting based on button position
-                game.vars.set(
-                    settings::R_MOUSE_SENS,
-                    (slider_btn.borrow().x + 150.0) / 30.0,
+                game.settings.set(
+                    SettingType::MouseSense,
+                    SettingValue::Float((slider_btn.borrow().x + 150.0) / 30.0),
                 );
                 //update text in button
                 this.text
@@ -835,7 +838,7 @@ impl super::Screen for ControlsMenu {
                     .borrow_mut()
                     .text = format!(
                     "Mouse Sensetivity: {:.2}x",
-                    *game.vars.get(settings::R_MOUSE_SENS)
+                    game.settings.get_float(SettingType::MouseSense)
                 );
                 true
             });

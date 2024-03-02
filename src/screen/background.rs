@@ -1,14 +1,14 @@
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
-use crate::settings::BACKGROUND_IMAGE;
+use crate::settings::{SettingStore, SettingType};
+use crate::ui;
 use crate::ui::Container;
-use crate::{console, ui};
 use std::rc::Rc;
 use std::sync::Arc;
 
 pub struct Background {
     background: Option<ui::ImageRef>,
-    vars: Rc<console::Vars>,
+    settings: Rc<SettingStore>,
     screen_sys: Arc<ScreenSystem>,
     active: bool,
     delay: f64,
@@ -17,15 +17,15 @@ pub struct Background {
 
 impl Clone for Background {
     fn clone(&self) -> Self {
-        Self::new(self.vars.clone(), self.screen_sys.clone())
+        Self::new(self.settings.clone(), self.screen_sys.clone())
     }
 }
 
 impl Background {
-    pub fn new(vars: Rc<console::Vars>, screen_sys: Arc<ScreenSystem>) -> Self {
+    pub fn new(settings: Rc<SettingStore>, screen_sys: Arc<ScreenSystem>) -> Self {
         Self {
             background: None,
-            vars,
+            settings,
             screen_sys,
             active: false,
             delay: 0.0,
@@ -41,8 +41,8 @@ impl Screen for Background {
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        let path = self.vars.get(BACKGROUND_IMAGE);
-        self.last_path = (*path).clone();
+        let path = self.settings.get_string(SettingType::BackgroundImage);
+        self.last_path = path.clone();
         let background =
             if Renderer::get_texture_optional(renderer.get_textures_ref(), &format!("#{}", path))
                 .is_some()
@@ -50,7 +50,10 @@ impl Screen for Background {
                 Some(
                     ui::ImageBuilder::new()
                         .draw_index(i16::MIN as isize)
-                        .texture(&*format!("#{}", self.vars.get(BACKGROUND_IMAGE)))
+                        .texture(&*format!(
+                            "#{}",
+                            self.settings.get_string(SettingType::BackgroundImage)
+                        ))
                         .size(
                             renderer.screen_data.read().safe_width as f64,
                             renderer.screen_data.read().safe_height as f64,
@@ -111,7 +114,7 @@ impl Screen for Background {
                 self.init(screen_sys, renderer, ui_container);
                 return;
             }
-            let curr_path = (*self.vars.get(BACKGROUND_IMAGE)).clone();
+            let curr_path = self.settings.get_string(SettingType::BackgroundImage);
             if !self.last_path.eq(&curr_path) {
                 self.last_path = curr_path;
                 self.deinit(screen_sys, renderer.clone(), ui_container);
