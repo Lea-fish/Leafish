@@ -6,6 +6,7 @@ pub enum SettingValue {
     Bool(bool),
 }
 
+#[derive(Clone)]
 pub struct ConfigVar {
     pub name: &'static str,
     pub description: &'static str,
@@ -18,7 +19,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::MaxFps,
             ConfigVar {
-                name: "r_max_fps",
+                name: "max_fps",
                 description: "fps_max caps the maximum FPS for the rendering engine",
                 serializable: true,
                 value: SettingValue::Num(60),
@@ -27,7 +28,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::FOV,
             ConfigVar {
-                name: "r_fov",
+                name: "fov",
                 description: "Setting for controlling the client field of view",
                 serializable: true,
                 value: SettingValue::Num(90),
@@ -36,7 +37,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::Vsync,
             ConfigVar {
-                name: "r_vsync",
+                name: "vsync",
                 description: "Toggle to enable/disable vsync",
                 serializable: true,
                 value: SettingValue::Bool(false),
@@ -45,7 +46,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::MouseSense,
             ConfigVar {
-                name: "r_mouse_sens",
+                name: "mouse_sens",
                 description: "Mouse Sensitivity",
                 serializable: true,
                 value: SettingValue::Float(1.0),
@@ -54,7 +55,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::MasterVolume,
             ConfigVar {
-                name: "cl_master_volume",
+                name: "master_volume",
                 description: "Main volume control",
                 serializable: true,
                 value: SettingValue::Num(100),
@@ -63,7 +64,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::CapeVisible,
             ConfigVar {
-                name: "s_cape",
+                name: "cape",
                 description: "Toggle your cape",
                 serializable: true,
                 value: SettingValue::Bool(false),
@@ -72,7 +73,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::JacketVisible,
             ConfigVar {
-                name: "s_jacket",
+                name: "jacket",
                 description: "Toggle your jacket",
                 serializable: true,
                 value: SettingValue::Bool(false),
@@ -81,7 +82,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::LeftSleeveVisible,
             ConfigVar {
-                name: "s_left_sleeve",
+                name: "left_sleeve",
                 description: "Toggle your left sleeve",
                 serializable: true,
                 value: SettingValue::Bool(false),
@@ -90,7 +91,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::RightSleeveVisible,
             ConfigVar {
-                name: "s_right_sleeve",
+                name: "right_sleeve",
                 description: "Toggle your right sleeve",
                 serializable: true,
                 value: SettingValue::Bool(false),
@@ -99,7 +100,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::LeftPantsVisible,
             ConfigVar {
-                name: "s_left_pants",
+                name: "left_pants",
                 description: "Toggle your left pants",
                 serializable: true,
                 value: SettingValue::Bool(false),
@@ -108,7 +109,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::RightPantsVisible,
             ConfigVar {
-                name: "s_right_pants",
+                name: "right_pants",
                 description: "Toggle your right pants",
                 serializable: true,
                 value: SettingValue::Bool(false),
@@ -117,7 +118,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::HatVisible,
             ConfigVar {
-                name: "s_hat",
+                name: "hat",
                 description: "Toggle your hat",
                 serializable: true,
                 value: SettingValue::Bool(false),
@@ -126,7 +127,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::AutomaticOfflineAccounts,
             ConfigVar {
-                name: "l_automatic_offline_accounts",
+                name: "automatic_offline_accounts",
                 description:
                     "Enables using no password in the login screen for creating offline accounts",
                 serializable: true,
@@ -154,7 +155,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
         (
             SettingType::BackgroundImage,
             ConfigVar {
-                name: "background_image",
+                name: "background",
                 description: "Select the background image",
                 serializable: true,
                 value: SettingValue::String("leafish:gui/background".to_owned()),

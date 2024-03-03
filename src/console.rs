@@ -73,7 +73,7 @@ impl Console {
         }
     }
 
-    pub fn is_active(&self) -> bool {
+    pub fn _is_active(&self) -> bool {
         self.active
     }
 
@@ -81,7 +81,7 @@ impl Console {
         self.active = !self.active;
     }
 
-    pub fn activate(&mut self) {
+    pub fn _activate(&mut self) {
         self.active = true;
     }
 
@@ -215,7 +215,7 @@ impl Console {
     }
 }
 
-fn log_level_from_str(s: &str) -> Option<log::Level> {
+fn _log_level_from_str(s: &str) -> Option<log::Level> {
     // TODO: no opposite of FromStr in log crate?
     use log::Level::*;
     match s {

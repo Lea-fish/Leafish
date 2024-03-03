@@ -1,4 +1,5 @@
 use log::{info, warn};
+use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, BufWriter, Write};
@@ -15,35 +16,37 @@ pub struct Keybind {
     pub action: Actionkey,
 }
 
-pub struct KeybindStore(HashMap<i32, Keybind>);
+pub struct KeybindStore(Mutex<HashMap<i32, Keybind>>);
 
 impl KeybindStore {
     pub fn new() -> Self {
-        let mut store = KeybindStore(HashMap::new());
-        for bind in create_keybinds() {
-            store.0.insert(bind.0 as i32, bind.1);
-        }
+        let mut store = KeybindStore(Mutex::new(HashMap::new()));
+        store.load_defaults();
         store.load_config();
         store
     }
 
-    pub fn get(&self, key: KeyCode) -> Option<&Keybind> {
-        self.0.get(&(key as i32))
+    pub fn get(&self, key: KeyCode) -> Option<Keybind> {
+        self.0.lock().get(&(key as i32)).copied()
     }
 
-    pub fn set(&mut self, key: i32, action: Actionkey) {
-        let old_val = self
+    pub fn set(&self, key: i32, action: Actionkey) {
+        let old_key = self
             .0
-            .values()
-            .find(|v| v.action == action)
-            .expect("a action was not bound to a key?");
+            .lock()
+            .iter()
+            .find(|(_, v)| v.action == action)
+            .expect("a action was not bound to a key?")
+            .0
+            .clone();
 
-        self.0.insert(key, *old_val);
+        let old_val = self.0.lock().remove(&old_key).unwrap();
+        self.0.lock().insert(key, old_val);
         self.save_config();
     }
 
-    pub fn load_config(&mut self) {
-        if let Ok(file) = fs::File::open(paths::get_config_dir().join("conf.cfg")) {
+    fn load_config(&mut self) {
+        if let Ok(file) = fs::File::open(paths::get_config_dir().join("keybinds.cfg")) {
             let reader = BufReader::new(file);
             for line in reader.lines() {
                 let Ok(line) = line else {
@@ -61,33 +64,54 @@ impl KeybindStore {
                 if !name.starts_with("keybind_") {
                     continue;
                 }
-                if let Some(action) = self
-                    .0
+                let mut store = self.0.lock();
+                if let Some(action) = store
                     .values()
                     .find(|v| Actionkey::from_str(name).is_ok_and(|k| k == v.action))
                 {
-                    if let Some(val) = deserialize_key(arg) {
-                        self.set(val, action.action);
+                    if let Some(new_key) = deserialize_key(arg) {
+                        let key = store
+                            .iter()
+                            .find(|(_, v)| v.action == action.action)
+                            .expect("a action was not bound to a key?")
+                            .0
+                            .clone();
+
+                        let old_val = store.remove(&key).unwrap();
+                        store.insert(new_key, old_val);
                     }
                 } else {
-                    info!("a unknwon keybind was specified: {name}");
+                    info!("a unknown keybind was specified: {name}");
                 }
             }
         }
     }
 
-    pub fn save_config(&self) {
+    fn save_config(&self) {
         let mut file =
-            BufWriter::new(fs::File::create(paths::get_config_dir().join("conf.cfg")).unwrap());
-        for (key, keybind) in self.0.iter() {
+            BufWriter::new(fs::File::create(paths::get_config_dir().join("keybinds.cfg")).unwrap());
+        for (key, keybind) in self.0.lock().iter() {
             for line in keybind.description.lines() {
                 if let Err(err) = writeln!(file, "# {}", line) {
-                    warn!("couldnt write a keybind description to config file {err}, {}", keybind.name);
+                    warn!(
+                        "couldnt write a keybind description to config file {err}, {}",
+                        keybind.name
+                    );
                 }
             }
             if let Err(err) = write!(file, "{} {}\n\n", keybind.name, *key as i32) {
-                warn!("couldnt write a keybind to config file {err}, {}", keybind.name);
+                warn!(
+                    "couldnt write a keybind to config file {err}, {}",
+                    keybind.name
+                );
             };
+        }
+    }
+
+    fn load_defaults(&self) {
+        let mut s = self.0.lock();
+        for bind in create_keybinds() {
+            s.insert(bind.0 as i32, bind.1);
         }
     }
 }

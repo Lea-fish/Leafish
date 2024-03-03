@@ -236,6 +236,7 @@ fn main() {
 
     let settings = Rc::new(SettingStore::new());
     let keybinds = Rc::new(KeybindStore::new());
+    info!("settings all loaded!");
 
     con.lock().configure(&settings);
     let vsync = settings.get_bool(SettingType::Vsync);
