@@ -32,19 +32,21 @@ use glutin::surface::GlSurface;
 use glutin::surface::SwapInterval;
 use glutin_winit::DisplayBuilder;
 use glutin_winit::GlWindow;
-#[cfg(target_os = "linux")]
-use instant::{Duration, Instant};
+use instant::Duration;
 use leafish_protocol::protocol::login::AccountType;
 use log::{debug, error, info, warn};
 use raw_window_handle::HasRawWindowHandle;
 use shared::Version;
 use std::fs;
 use std::num::NonZeroU32;
+use std::time::Instant;
 use winit::keyboard::Key;
 use winit::keyboard::ModifiersKeyState;
 use winit::keyboard::NamedKey;
 use winit::keyboard::SmolStr;
+#[cfg(target_os = "linux")]
 use winit::raw_window_handle::HasDisplayHandle;
+#[cfg(target_os = "linux")]
 use winit::raw_window_handle::RawDisplayHandle;
 use winit::window::Icon;
 extern crate leafish_shared as shared;

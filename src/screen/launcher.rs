@@ -216,7 +216,6 @@ impl super::Screen for Launcher {
                 back.add_click_func(move |_, game| {
                     let accounts = accounts.clone();
                     let account_type = account_type.clone();
-                    let idx = idx;
                     let mut client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
                     if client_token.is_empty() {
                         client_token = std::iter::repeat(())
@@ -333,7 +332,6 @@ impl super::Screen for Launcher {
                 let accounts = self.accounts.clone();
                 btn.add_click_func(move |_, game| {
                     let accounts = accounts.clone();
-                    let idx = idx;
                     game.screen_sys.clone().add_screen(Box::new(
                         super::confirm_box::ConfirmBox::new(
                             String::from("Do you want to delete this account?"),
@@ -371,7 +369,6 @@ impl super::Screen for Launcher {
                 btn.add_click_func(move |_, game| {
                     let accounts = accounts.clone();
                     let account_type = account_type.clone();
-                    let idx = idx;
                     game.screen_sys.clone().add_screen(Box::new(
                         super::edit_account::EditAccountEntry::new(
                             Some((aname.clone(), apw.clone())),
