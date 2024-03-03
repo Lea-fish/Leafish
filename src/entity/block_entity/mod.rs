@@ -5,8 +5,8 @@ use crate::shared::Position;
 use crate::world::block::Block;
 use bevy_ecs::prelude::*;
 
-pub fn add_systems(m: &mut ecs::Manager, parallel: &mut SystemStage, sync: &mut SystemStage) {
-    sign::add_systems(m, parallel, sync);
+pub fn add_systems(m: &mut ecs::Manager) {
+    sign::add_systems(m);
 }
 
 pub enum BlockEntityType {
@@ -39,7 +39,7 @@ impl BlockEntityType {
     }
 
     pub fn create_entity(&self, m: &mut ecs::Manager, pos: Position) -> Entity {
-        let mut e = m.world.spawn();
+        let mut e = m.world.spawn_empty();
         e.insert(pos);
         let e = e.id();
         match *self {

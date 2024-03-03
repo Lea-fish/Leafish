@@ -55,57 +55,38 @@ srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
     [0.0, 0.0, 0.0, 1.0],
 */
 
-pub fn add_systems(
-    m: &mut Manager,
-    parallel: &mut SystemStage,
-    sync: &mut SystemStage,
-    entity_sched: &mut SystemStage,
-) {
-    entity_sched.add_system(
-        systems::update_last_position
-            .system()
-            .label(SystemExecStage::Normal),
-    );
+pub fn add_systems(m: &mut Manager) {
+    m.schedule
+        .write()
+        .add_systems(systems::update_last_position.in_set(SystemExecStage::Normal));
 
-    player::add_systems(m, parallel, sync, entity_sched);
+    player::add_systems(m);
+    let mut entity_sched = m.schedule.write();
     entity_sched
-        .add_system(
-            systems::apply_velocity
-                .system()
-                .label(SystemExecStage::Normal),
+        .add_systems(systems::apply_velocity.in_set(SystemExecStage::Normal))
+        .add_systems(systems::apply_gravity.in_set(SystemExecStage::Normal))
+        .add_systems(systems::apply_digging.in_set(SystemExecStage::Normal));
+
+    entity_sched /*sync*/
+        .add_systems(
+            systems::lerp_position
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
         )
-        .add_system(
-            systems::apply_gravity
-                .system()
-                .label(SystemExecStage::Normal),
+        .add_systems(
+            systems::lerp_rotation
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
         )
-        .add_system(
-            systems::apply_digging
-                .system()
-                .label(SystemExecStage::Normal),
+        .add_systems(
+            systems::light_entity
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
         );
 
-    sync.add_system(
-        systems::lerp_position
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        systems::lerp_rotation
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        systems::light_entity
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    );
-
-    block_entity::add_systems(m, parallel, sync);
-    crate::particle::block_break_effect::add_systems(m, parallel, sync, entity_sched);
+    drop(entity_sched);
+    block_entity::add_systems(m);
+    crate::particle::block_break_effect::add_systems(m);
 }
 
 /// Location of an entity in the world.
@@ -221,7 +202,7 @@ impl Bounds {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct GameInfo {
     pub delta: f64,
 }
@@ -404,7 +385,7 @@ impl EntityType {
         yaw: f64,
         pitch: f64,
     ) -> Entity {
-        let mut entity = m.world.spawn();
+        let mut entity = m.world.spawn_empty();
         entity
             .insert(Position::new(x, y, z))
             .insert(Rotation::new(yaw, pitch))

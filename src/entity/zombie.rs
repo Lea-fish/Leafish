@@ -2,10 +2,10 @@ use super::{Bounds, GameInfo, Light, Position, Rotation};
 use crate::entity::player_like::{compute_player_model_components, PlayerLikeModelPart};
 use crate::render::model;
 use crate::render::Renderer;
+use crate::server::RendererResource;
 use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::Aabb3;
-use std::sync::Arc;
 
 #[derive(Component)]
 pub struct ZombieModel {
@@ -32,10 +32,11 @@ impl ZombieModel {
 }
 
 pub fn added_zombie(
-    renderer: Res<Arc<Renderer>>,
+    renderer: Res<RendererResource>,
     mut commands: Commands,
     mut query: Query<(Entity, &mut ZombieModel), Added<ZombieModel>>,
 ) {
+    let renderer = &renderer.0;
     for (entity, mut zombie_model) in query.iter_mut() {
         commands.entity(entity).insert(Bounds::new(Aabb3::new(
             Point3::new(-0.3, 0.0, -0.3),
@@ -60,9 +61,10 @@ pub fn added_zombie(
 
 pub fn update_zombie(
     game_info: Res<GameInfo>,
-    renderer: Res<Arc<Renderer>>,
+    renderer: Res<RendererResource>,
     mut query: Query<(&mut ZombieModel, &Position, &Rotation, &Light)>,
 ) {
+    let renderer = &renderer.0;
     for (mut zombie_model, position, rotation, light) in query.iter_mut() {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;

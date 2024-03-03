@@ -3,10 +3,10 @@ use crate::ecs::Manager;
 use crate::entity::{resolve_textures, EntityType};
 use crate::render::model;
 use crate::render::Renderer;
+use crate::server::RendererResource;
 use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::Aabb3;
-use std::sync::Arc;
 
 #[derive(Component)]
 pub struct SlimeModel {
@@ -34,7 +34,7 @@ impl SlimeModel {
 }
 
 pub fn create_slime(m: &mut Manager) -> Entity {
-    let mut entity = m.world.spawn();
+    let mut entity = m.world.spawn_empty();
     entity
         .insert(Position::new(1478.5, 44.0, -474.5))
         .insert(Rotation::new(0.0, 0.0))
@@ -51,9 +51,10 @@ pub fn create_slime(m: &mut Manager) -> Entity {
 
 pub fn update_slime(
     game_info: Res<GameInfo>,
-    renderer: Res<Arc<Renderer>>,
+    renderer: Res<RendererResource>,
     mut query: Query<(&mut SlimeModel, &Position, &Rotation, &Light)>,
 ) {
+    let renderer = &renderer.0;
     for (mut slime_model, position, rotation, light) in query.iter_mut() {
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
@@ -120,7 +121,8 @@ pub fn update_slime(
 }
 
 #[allow(clippy::eq_op)] // we allow this because we want to allow 16.0 / 16.0
-pub fn added_slime(renderer: Res<Arc<Renderer>>, mut query: Query<&mut SlimeModel>) {
+pub fn added_slime(renderer: Res<RendererResource>, mut query: Query<&mut SlimeModel>) {
+    let renderer = &renderer.0;
     for mut slime_model in query.iter_mut() {
         let tex =
             Renderer::get_texture(renderer.get_textures_ref(), "minecraft:entity/slime/slime");
