@@ -44,13 +44,11 @@ impl Screen for Background {
         let path = self.vars.get(BACKGROUND_IMAGE);
         self.last_path = (*path).clone();
         let background =
-            if Renderer::get_texture_optional(renderer.get_textures_ref(), &format!("#{}", path))
-                .is_some()
-            {
+            if Renderer::get_texture_optional(renderer.get_textures_ref(), &path).is_some() {
                 Some(
                     ui::ImageBuilder::new()
                         .draw_index(i16::MIN as isize)
-                        .texture(&*format!("#{}", self.vars.get(BACKGROUND_IMAGE)))
+                        .texture(path.as_str())
                         .size(
                             renderer.screen_data.read().safe_width as f64,
                             renderer.screen_data.read().safe_height as f64,
