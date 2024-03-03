@@ -1336,9 +1336,12 @@ impl Server {
     pub fn on_left_click(&self, focused: bool) {
         if focused {
             let mut entities = self.entities.write();
-            let mut player = entities.world.entity_mut(self.player.read().unwrap().1);
-            let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
-            mouse_buttons.left = true;
+            // check if the player exists, as it might not be initialized very early on server join
+            if let Some(player) = self.player.read().as_ref() {
+                let mut player = entities.world.entity_mut(player.1);
+                let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
+                mouse_buttons.left = true;
+            }
         } else {
             self.inventory_context.write().on_click()
         }
@@ -1347,9 +1350,12 @@ impl Server {
     pub fn on_release_left_click(&self, focused: bool) {
         if focused {
             let mut entities = self.entities.write();
-            let mut player = entities.world.entity_mut(self.player.read().unwrap().1);
-            let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
-            mouse_buttons.left = false;
+            // check if the player exists, as it might not be initialized very early on server join
+            if let Some(player) = self.player.read().as_ref() {
+                let mut player = entities.world.entity_mut(player.1);
+                let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
+                mouse_buttons.left = false;
+            }
         }
         // TODO: Pass events into inventory context when not focused
     }
@@ -1405,9 +1411,12 @@ impl Server {
             }
 
             let mut entities = self.entities.write();
-            let mut player = entities.world.entity_mut(self.player.read().unwrap().1);
-            let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
-            mouse_buttons.right = true;
+            // check if the player exists, as it might not be initialized very early on server join
+            if let Some(player) = self.player.read().as_ref() {
+                let mut player = entities.world.entity_mut(player.1);
+                let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
+                mouse_buttons.right = true;
+            }
         }
         // TODO: Pass events into inventory context when not focused
     }
@@ -1415,9 +1424,12 @@ impl Server {
     pub fn on_release_right_click(&self, focused: bool) {
         if focused {
             let mut entities = self.entities.write();
-            let mut player = entities.world.entity_mut(self.player.read().unwrap().1);
-            let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
-            mouse_buttons.right = false;
+            // check if the player exists, as it might not be initialized very early on server join
+            if let Some(player) = self.player.read().as_ref() {
+                let mut player = entities.world.entity_mut(player.1);
+                let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
+                mouse_buttons.right = false;
+            }
         }
         // TODO: Pass events into inventory context when not focused
     }
