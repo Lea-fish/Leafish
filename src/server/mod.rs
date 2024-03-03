@@ -912,7 +912,7 @@ impl Server {
             conn.clone(),
         )));
         let mut entities = Manager::default();
-        // FIXME: fix stage ordering and threading mode!
+        // FIXME: fix threading modes (make some systems execute in parallel and others in sync)
         entities.world.insert_resource(entity::GameInfo::new());
         entities.world.insert_resource(WorldResource(world.clone()));
         entities
