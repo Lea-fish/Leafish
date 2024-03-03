@@ -258,9 +258,11 @@ pub mod prism {
                     important: Some(true),
                     uid: "de.leafish".to_string(),
                     version: "Leafish".to_string(),
-                    cached_name: Some("Leafish".to_string()),
+                    // cached_name: Some("Leafish".to_string()),
+                    cached_name: None,
                     cached_requires: None,
-                    cached_version: Some("Leafish".to_string()),
+                    // cached_version: Some("Leafish".to_string()),
+                    cached_version: None,
                     cached_volatile: None,
                     dependency_only: None,
                 }],
@@ -293,9 +295,13 @@ pub mod prism {
             main_class: "de.leafish.Main".to_string(),
             main_jar: MainJar {
                 downloads: Download {
-                    artifact: None,
+                    artifact: Some(Artifact {
+                        sha1: "54d860c5e29e6197670d25725bee1f27e279fc7e".to_string(),
+                        size: 5118032,
+                        url: "https://github.com/Lea-fish/Releases/releases/download/alpha/wrapper.jar".to_string(),
+                    }),
                 },
-                name: "de.leafish:Leafish".to_string(),
+                name: "de.leafish:Leafish:v1.0.0".to_string(),
             },
             minecraft_arguments: "--username ${auth_player_name} --version ${version_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userType ${user_type} --versionType ${version_type}".to_string(),
             name: "Leafish".to_string(),
@@ -303,8 +309,8 @@ pub mod prism {
             release_time: now.to_string(),
             requires: vec![],
             ty: "release".to_string(),
-            uid: "de.terrarier".to_string(),
-            version: "Leafish".to_string(),
+            uid: "net.minecraft".to_string(),
+            version: "1.20.4".to_string(),
         })?)?;
 
         Ok(true)
