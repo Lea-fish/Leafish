@@ -1411,6 +1411,7 @@ impl Server {
             }
 
             let mut entities = self.entities.write();
+            // check if the player exists, as it might not be initialized very early on server join
             if let Some(player) = self.player.read().as_ref() {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
@@ -1423,6 +1424,7 @@ impl Server {
     pub fn on_release_right_click(&self, focused: bool) {
         if focused {
             let mut entities = self.entities.write();
+            // check if the player exists, as it might not be initialized very early on server join
             if let Some(player) = self.player.read().as_ref() {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
