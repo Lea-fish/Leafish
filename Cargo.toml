@@ -56,7 +56,7 @@ crossbeam-channel = "0.5" # check if flume would be better in terms of performan
 # tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
 rayon = "1.5"
 rfd = "0.14"
-bevy_ecs = { git = "https://github.com/Lea-fish/bevy", rev = "a58b4936d0e1ccd241dca74bceae78a1b6d4f949" }
+bevy_ecs = "0.13"
 
 reqwest = { version = "0.11", features = [ "blocking" ]}
 # glutin = "0.29"

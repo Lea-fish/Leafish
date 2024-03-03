@@ -17,7 +17,7 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 
 // System labels to enforce a run order of our systems
-#[derive(SystemLabel, Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SystemExecStage {
     PreClearRemoveHandling, // TODO: This is a mess, clean it up as soon as bevy fixed the various remove detection issues!
     PreNormal,

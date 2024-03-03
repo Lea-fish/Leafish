@@ -2,27 +2,26 @@ use crate::ecs::{Manager, SystemExecStage};
 use crate::render;
 use crate::render::model::ModelHandle;
 use crate::render::{model, Renderer};
+use crate::server::RendererResource;
 use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Quaternion, Rad, Rotation3, Vector3};
 use std::sync::Arc;
 
-pub fn add_systems(
-    _m: &mut Manager,
-    _parallel: &mut SystemStage,
-    sync: &mut SystemStage,
-    _entity_sched: &mut SystemStage,
-) {
+pub fn add_systems(m: &mut Manager) {
     // TODO: Check sync/async usage!
-    sync.add_system(
-        effect_added
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        effect_updated
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    );
+    /*sync*/
+    m.entity_schedule
+        .write()
+        .add_systems(
+            effect_added
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        )
+        .add_systems(
+            effect_updated
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        );
 }
 
 #[derive(Component)]
@@ -56,13 +55,13 @@ impl BlockBreakEffect {
 }
 
 pub fn effect_added(
-    renderer: Res<Arc<Renderer>>,
+    renderer: Res<RendererResource>,
     mut commands: Commands,
     query: Query<(Entity, &BlockEffectData)>,
 ) {
     for (entity, data) in query.iter() {
         let mut effect = BlockBreakEffect::new(data);
-        readd_model(renderer.clone(), &mut effect);
+        readd_model(renderer.0.clone(), &mut effect);
         commands
             .entity(entity)
             .remove::<BlockEffectData>()
@@ -70,7 +69,8 @@ pub fn effect_added(
     }
 }
 
-pub fn effect_updated(renderer: Res<Arc<Renderer>>, mut query: Query<&mut BlockBreakEffect>) {
+pub fn effect_updated(renderer: Res<RendererResource>, mut query: Query<&mut BlockBreakEffect>) {
+    let renderer = &renderer.0;
     for mut effect in query.iter_mut() {
         if effect.dirty {
             readd_model(renderer.clone(), &mut effect);

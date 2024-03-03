@@ -712,11 +712,8 @@ fn handle_window_event<T>(
                         let server = game.server.as_ref().unwrap();
                         let entities = server.entities.clone();
                         let mut entities = entities.write();
-                        let mut rotation = entities
-                            .world
-                            .entity_mut(player.1)
-                            .get_mut::<Rotation>()
-                            .unwrap();
+                        let mut player = entities.world.entity_mut(player.1);
+                        let mut rotation = player.get_mut::<Rotation>().unwrap();
                         rotation.yaw -= rx;
                         rotation.pitch -= ry;
                         if rotation.pitch < (PI / 2.0) + 0.01 {

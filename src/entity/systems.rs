@@ -1,6 +1,7 @@
 use super::*;
 use crate::entity::player::PlayerMovement;
 use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
+use crate::server::{ConnResource, InventoryContextResource, RendererResource, WorldResource};
 use crate::shared::Position as BPos;
 use cgmath::InnerSpace;
 use leafish_blocks::Block;
@@ -72,10 +73,8 @@ pub fn lerp_rotation(
     }
 }
 
-pub fn light_entity(
-    world: Res<Arc<crate::world::World>>,
-    mut query: Query<(&Position, &Bounds, &mut Light)>,
-) {
+pub fn light_entity(world: Res<WorldResource>, mut query: Query<(&Position, &Bounds, &mut Light)>) {
+    let world = &world.0;
     for (pos, bounds, mut light) in query.iter_mut() {
         let mut count = 0.0;
         let mut block_light = 0.0;
@@ -117,16 +116,21 @@ pub fn light_entity(
 }
 
 pub fn apply_digging(
-    renderer: Res<Arc<crate::render::Renderer>>,
-    world: Res<Arc<crate::world::World>>,
-    conn: Res<Arc<RwLock<Option<protocol::Conn>>>>,
-    inventory: Res<Arc<RwLock<crate::inventory::InventoryContext>>>,
+    renderer: Res<RendererResource>,
+    world: Res<WorldResource>,
+    conn: Res<ConnResource>,
+    inventory: Res<InventoryContextResource>,
     commands: Commands,
     mut query: Query<(&MouseButtons, &mut Digging)>,
     mut effect_query: Query<&mut BlockBreakEffect>,
 ) {
     use crate::server::target::{test_block, trace_ray};
     use cgmath::EuclideanSpace;
+
+    let world = &world.0;
+    let renderer = &renderer.0;
+    let conn = &conn.0;
+    let inventory = &inventory.0;
 
     let target = trace_ray(
         world.as_ref(),
@@ -268,7 +272,7 @@ impl ApplyDigging<'_, '_> {
     fn start_digging(&mut self, state: &DiggingState, effect: &mut Option<Entity>) {
         self.send_digging(state, packet::DigType::StartDestroyBlock);
 
-        let mut entity = self.commands.spawn();
+        let mut entity = self.commands.spawn_empty();
         let pos = state.position;
         entity.insert(BlockEffectData {
             position: Vector3::new(pos.x as f64, pos.y as f64, pos.z as f64),
