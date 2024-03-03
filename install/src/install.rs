@@ -131,7 +131,7 @@ pub mod mojang {
             ty: "release".to_string(),
             libraries: vec![Library { name: "leafish:Leafish:Jar".to_string() }], // we need nobody, but ourselves ;)
             main_class: "de.leafish.Main".to_string(),
-            minecraft_arguments: "--username ${auth_player_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userProperties ${user_properties} --userType ${user_type}".to_string(),
+            minecraft_arguments: "--username ${auth_player_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userProperties ${user_properties} --userType ${user_type} --path ./versions/Leafish/".to_string(),
         })?.as_bytes())?;
 
         // FIXME: download the latest jar from github
@@ -296,16 +296,16 @@ pub mod prism {
             main_jar: MainJar {
                 downloads: Download {
                     artifact: Some(Artifact {
-                        sha1: "54d860c5e29e6197670d25725bee1f27e279fc7e".to_string(),
-                        size: 5118032,
-                        url: "https://github.com/Lea-fish/Releases/releases/download/alpha/wrapper.jar".to_string(),
+                        sha1: "fdfbab865254c28e67a6c4e7448583147db3a7f2".to_string(),
+                        size: 5118199,
+                        url: "https://github.com/Lea-fish/Releases/releases/download/alpha/bootstrap.jar".to_string(),
                     }),
                 },
                 name: "de.leafish:Leafish:v1.0.0".to_string(),
             },
-            minecraft_arguments: "--username ${auth_player_name} --version ${version_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userType ${user_type} --versionType ${version_type}".to_string(),
+            minecraft_arguments: "--username ${auth_player_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userProperties ${user_properties} --userType ${user_type} --path ../".to_string(),
             name: "Leafish".to_string(),
-            order: -2,
+            order: 0,
             release_time: now.to_string(),
             requires: vec![],
             ty: "release".to_string(),
