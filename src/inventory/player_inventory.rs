@@ -22,7 +22,7 @@ pub struct PlayerInventory {
 impl PlayerInventory {
     pub fn new(
         version: Version,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         base_slots: Arc<RwLock<SlotMapping>>,
     ) -> Self {
         let mut slots = SlotMapping::new((WINDOW_WIDTH, WINDOW_HEIGHT));
@@ -93,7 +93,7 @@ impl Inventory for PlayerInventory {
 
     fn init(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -106,7 +106,7 @@ impl Inventory for PlayerInventory {
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
 
         let center = renderer.screen_data.read().center();
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
 
         // Inventory window
         basic_elements.push(
@@ -163,7 +163,7 @@ impl Inventory for PlayerInventory {
 
     fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {

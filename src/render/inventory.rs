@@ -35,7 +35,7 @@ impl Screen for InventoryWindow {
         self.inventory
             .clone()
             .write()
-            .init(renderer, ui_container, self);
+            .init(&renderer, ui_container, self);
     }
 
     fn deinit(
@@ -74,7 +74,7 @@ impl Screen for InventoryWindow {
         self.inventory
             .clone()
             .write()
-            .tick(renderer.clone(), ui_container, self);
+            .tick(&renderer, ui_container, self);
         self.inventory_context
             .clone()
             .write()
@@ -91,7 +91,7 @@ impl Screen for InventoryWindow {
         self.inventory.clone().write().resize(
             renderer.screen_data.read().safe_width,
             renderer.screen_data.read().safe_height,
-            renderer.clone(),
+            &renderer,
             ui_container,
             self,
         );
@@ -101,7 +101,7 @@ impl Screen for InventoryWindow {
         if key.0 == Key::Named(NamedKey::Escape) && !down {
             self.inventory_context
                 .write()
-                .try_close_inventory(game.screen_sys.clone());
+                .try_close_inventory(&game.screen_sys);
         }
     }
 
@@ -138,10 +138,10 @@ impl InventoryWindow {
         elements: &mut Vec<ImageRef>,
         text_elements: &mut Vec<TextRef>,
         ui_container: &mut Container,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         v_attach: VAttach,
     ) {
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
         let textures = item.material.texture_locations();
         let texture =
             if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &textures.0) {
@@ -183,7 +183,7 @@ impl InventoryWindow {
         y: f64,
         elements_idx: usize,
         ui_container: &mut Container,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         v_attach: VAttach,
     ) {
         Self::draw_item(

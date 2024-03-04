@@ -63,6 +63,8 @@ reqwest = { version = "0.11", features = [ "blocking" ]}
 glutin = "0.31"
 glutin-winit = "0.4"
 
+arc-swap = "1.7.0"
+
 [dependencies.leafish_resources]
 path = "./resources"
 version = "0"

@@ -19,7 +19,7 @@ pub struct CraftingTableInventory {
 }
 
 impl CraftingTableInventory {
-    pub fn new(renderer: Arc<Renderer>, base_slots: Arc<RwLock<SlotMapping>>, id: i32) -> Self {
+    pub fn new(renderer: &Arc<Renderer>, base_slots: Arc<RwLock<SlotMapping>>, id: i32) -> Self {
         let mut slots = SlotMapping::new((WINDOW_WIDTH, WINDOW_HEIGHT));
         slots.set_child(base_slots, (8, 84), (10..46).collect());
 
@@ -77,7 +77,7 @@ impl Inventory for CraftingTableInventory {
 
     fn init(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -90,7 +90,7 @@ impl Inventory for CraftingTableInventory {
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
 
         let center = renderer.screen_data.read().center();
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
 
         // Crafting table texture
         basic_elements.push(
@@ -143,7 +143,7 @@ impl Inventory for CraftingTableInventory {
 
     fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {

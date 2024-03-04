@@ -42,7 +42,7 @@ impl SmeltingState {
 
 impl FurnaceInventory {
     pub fn new(
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         base_slots: Arc<RwLock<SlotMapping>>,
         ty: InventoryType,
         id: i32,
@@ -112,7 +112,7 @@ impl Inventory for FurnaceInventory {
 
     fn init(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -125,7 +125,7 @@ impl Inventory for FurnaceInventory {
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
 
         let center = renderer.screen_data.read().center();
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
 
         let top_left_x =
             renderer.screen_data.read().center().0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0;
@@ -202,11 +202,11 @@ impl Inventory for FurnaceInventory {
 
     fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
         let cp = self.smelting_state.current_progress as f64;
         let mp = self.smelting_state.max_progress as f64;

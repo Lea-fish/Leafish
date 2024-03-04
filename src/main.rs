@@ -708,7 +708,7 @@ fn handle_window_event<T>(
                 if game.server.is_some()
                     && !game.server.as_ref().unwrap().dead.load(Ordering::Acquire)
                 {
-                    if let Some(player) = *game.server.as_ref().unwrap().player.write() {
+                    if let Some(player) = game.server.as_ref().unwrap().player.load().as_ref() {
                         let server = game.server.as_ref().unwrap();
                         let entities = server.entities.clone();
                         let mut entities = entities.write();

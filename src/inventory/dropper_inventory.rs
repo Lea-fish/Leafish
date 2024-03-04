@@ -21,7 +21,7 @@ pub struct DropperInventory {
 
 impl DropperInventory {
     pub fn new(
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         base_slots: Arc<RwLock<SlotMapping>>,
         name: String,
         id: i32,
@@ -79,7 +79,7 @@ impl Inventory for DropperInventory {
 
     fn init(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -92,7 +92,7 @@ impl Inventory for DropperInventory {
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
 
         let center = renderer.screen_data.read().center();
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
 
         // Dropper texture
         basic_elements.push(
@@ -154,7 +154,7 @@ impl Inventory for DropperInventory {
 
     fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {

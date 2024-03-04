@@ -26,7 +26,7 @@ pub struct BrewingStandInventory {
 
 impl BrewingStandInventory {
     pub fn new(
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         base_slots: Arc<RwLock<SlotMapping>>,
         name: String,
         id: i32,
@@ -100,7 +100,7 @@ impl Inventory for BrewingStandInventory {
 
     fn init(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -112,7 +112,7 @@ impl Inventory for BrewingStandInventory {
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
 
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
         let top_left_x =
             renderer.screen_data.read().center().0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0;
         let top_left_y =
@@ -190,12 +190,11 @@ impl Inventory for BrewingStandInventory {
 
     fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
-        self.slots
-            .tick(renderer.clone(), ui_container, inventory_window, 1);
+        self.slots.tick(renderer, ui_container, inventory_window, 1);
         if self.dirty {
             self.dirty = false;
             let icon_scale = Hud::icon_scale(renderer);

@@ -17,7 +17,7 @@ fn main() {
     let id = str::parse::<usize>(&args[2]).unwrap();
 
     let id_map = VanillaIDMap::new(protocol_version);
-    let block = id_map.by_vanilla_id(id, Arc::new(RwLock::new(HashMap::new())));
+    let block = id_map.by_vanilla_id(id, &Arc::new(HashMap::new()));
 
     println!("{:?}", block);
 }
