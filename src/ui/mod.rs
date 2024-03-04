@@ -436,20 +436,25 @@ impl Container {
             }
             return;
         }
+        let chr = {
+            key.to_text().and_then(|text| {
+                if !down || text.len() != 1 {
+                    None
+                } else {
+                    let chr = text.chars().next().unwrap();
+                    if chr < ' ' && chr != '\x08' {
+                        return None;
+                    }
+                    Some(chr)
+                }
+            })
+        };
         for el in self.focusable_elements.iter().flat_map(|v| v.upgrade()) {
             if el.is_focused() {
                 el.key_press(game, key.clone(), down, ctrl_pressed);
-            }
-        }
-    }
-
-    pub fn key_type(&mut self, game: &mut crate::Game, c: char) {
-        if c < ' ' && c != '\x08' {
-            return;
-        }
-        for el in self.focusable_elements.iter().flat_map(|v| v.upgrade()) {
-            if el.is_focused() {
-                el.key_type(game, c);
+                if let Some(chr) = chr {
+                    el.key_type(game, chr);
+                }
             }
         }
     }

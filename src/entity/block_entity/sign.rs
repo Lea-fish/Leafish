@@ -1,27 +1,27 @@
-use crate::ecs;
-use crate::ecs::SystemExecStage;
+use crate::ecs::{self, SystemExecStage};
 use crate::format::{self, Component};
 use crate::render;
 use crate::render::model::{self, FormatState};
 use crate::render::Renderer;
+use crate::server::{RendererResource, WorldResource};
 use crate::shared::{Direction, Position};
 use crate::world::block::Block;
 use bevy_ecs::prelude::*;
 use std::sync::Arc;
 
-pub fn add_systems(_m: &mut ecs::Manager, _parallel: &mut SystemStage, sync: &mut SystemStage) {
-    sync.add_system(
-        render_sign
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        on_add_sign
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    );
+pub fn add_systems(m: &mut ecs::Manager) {
+    let mut sched = m.entity_schedule.write();
+    sched /*sync*/
+        .add_systems(
+            render_sign
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        )
+        .add_systems(
+            on_add_sign
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        );
 }
 
 pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
@@ -57,10 +57,12 @@ pub struct SignInfo {
 }
 
 pub fn render_sign(
-    renderer: Res<Arc<Renderer>>,
-    world: Res<Arc<crate::world::World>>,
+    renderer: Res<RendererResource>,
+    world: Res<WorldResource>,
     mut query: Query<(&mut SignInfo, &Position)>,
 ) {
+    let renderer = &renderer.0;
+    let world = &world.0;
     for (mut info, position) in query.iter_mut() {
         if info.dirty {
             remove_sign(&mut info);
@@ -77,10 +79,12 @@ pub fn render_sign(
 }
 
 pub fn on_add_sign(
-    renderer: Res<Arc<Renderer>>,
-    world: Res<Arc<crate::world::World>>,
+    renderer: Res<RendererResource>,
+    world: Res<WorldResource>,
     mut query: Query<(&mut SignInfo, &Position), Added<SignInfo>>,
 ) {
+    let renderer = &renderer.0;
+    let world = &world.0;
     for (mut info, position) in query.iter_mut() {
         add_sign(renderer.clone(), world.clone(), &mut info, position);
     }

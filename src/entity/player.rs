@@ -10,7 +10,7 @@ use crate::format;
 use crate::render;
 use crate::render::model::{self, FormatState};
 use crate::render::Renderer;
-use crate::screen::ScreenSystem;
+use crate::server::{RendererResource, ScreenSystemResource, WorldResource};
 use crate::settings::Actionkey;
 use crate::shared::Position as BPosition;
 use crate::types::hash::FNVHash;
@@ -25,61 +25,51 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::sync::Arc;
 
-pub fn add_systems(
-    _m: &mut Manager,
-    _parallel: &mut SystemStage,
-    sync: &mut SystemStage,
-    entity_sched: &mut SystemStage,
-) {
+pub fn add_systems(m: &mut Manager) {
     // TODO: Check sync/async usage!
-    entity_sched.add_system(
+    m.schedule.write().add_systems(
         handle_movement
-            .system()
-            .label(SystemExecStage::Normal)
-            .before(SystemExecStage::Render),
+            .in_set(SystemExecStage::Render)
+            .after(SystemExecStage::Normal),
     );
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
-    sync.add_system(
-        update_render_players
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        player_added
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        update_slime
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        added_slime
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        update_zombie
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    )
-    .add_system(
-        added_zombie
-            .system()
-            .label(SystemExecStage::Render)
-            .after(SystemExecStage::Normal),
-    );
+    let mut entity_sched = m.schedule.write();
+    entity_sched
+        .add_systems(
+            update_render_players
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        )
+        .add_systems(
+            player_added
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        )
+        .add_systems(
+            update_slime
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        )
+        .add_systems(
+            added_slime
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        )
+        .add_systems(
+            update_zombie
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        )
+        .add_systems(
+            added_zombie
+                .in_set(SystemExecStage::Render)
+                .after(SystemExecStage::Normal),
+        );
 }
 
 pub fn create_local(m: &mut Manager) -> Entity {
-    let mut entity = m.world.spawn();
+    let mut entity = m.world.spawn_empty();
     let mut tpos = TargetPosition::new(0.0, 0.0, 0.0);
     tpos.lerp_amount = 1.0 / 3.0;
     entity
@@ -103,7 +93,7 @@ pub fn create_local(m: &mut Manager) -> Entity {
 }
 
 pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
-    let mut entity = m.world.spawn();
+    let mut entity = m.world.spawn_empty();
     entity
         .insert(Position::new(0.0, 0.0, 0.0))
         .insert(TargetPosition::new(0.0, 0.0, 0.0))
@@ -171,10 +161,11 @@ impl PlayerModel {
 }
 
 fn update_render_players(
-    renderer: Res<Arc<Renderer>>,
+    renderer: Res<RendererResource>,
     game_info: Res<GameInfo>,
     mut query: Query<(&mut PlayerModel, &Position, &Rotation, &Light)>,
 ) {
+    let renderer = &renderer.0;
     let delta = game_info.delta;
     for (mut player_model, position, rotation, light) in query.iter_mut() {
         // println!("render player!");
@@ -329,9 +320,10 @@ fn update_render_players(
 }
 
 pub fn player_added(
-    renderer: Res<Arc<Renderer>>,
+    renderer: Res<RendererResource>,
     mut query: Query<&mut PlayerModel, Added<PlayerModel>>,
 ) {
+    let renderer = &renderer.0;
     for mut player_model in query.iter_mut() {
         add_player(renderer.clone(), &mut player_model);
     }
@@ -585,8 +577,8 @@ impl PlayerMovement {
 #[allow(clippy::type_complexity)]
 #[allow(unused_mut)] // we ignore this warning, as this case seems to be a clippy bug
 pub fn handle_movement(
-    world: Res<Arc<crate::world::World>>,
-    screen_sys: Res<Arc<ScreenSystem>>,
+    world: Res<WorldResource>,
+    screen_sys: Res<ScreenSystemResource>,
     mut commands: Commands,
     mut query: Query<(
         Entity,
@@ -599,6 +591,8 @@ pub fn handle_movement(
         Option<&mut Gravity>,
     )>,
 ) {
+    let world = &world.0;
+    let screen_sys = &screen_sys.0;
     for (
         entity,
         mut movement,
@@ -717,13 +711,13 @@ pub fn handle_movement(
                 // effect when pushing up against walls.
 
                 let (bounds, xhit) =
-                    check_collisions(&world, &mut position, &last_position, player_bounds);
+                    check_collisions(world, &mut position, &last_position, player_bounds);
                 position.position.x = bounds.min.x + 0.3;
                 last_position.x = position.position.x;
 
                 position.position.z = target.z;
                 let (bounds, zhit) =
-                    check_collisions(&world, &mut position, &last_position, player_bounds);
+                    check_collisions(world, &mut position, &last_position, player_bounds);
                 position.position.z = bounds.min.z + 0.3;
                 last_position.z = position.position.z;
 
@@ -744,8 +738,7 @@ pub fn handle_movement(
                             offset as f64 / 16.0,
                             0.0,
                         ));
-                        let (_, hit) =
-                            check_collisions(&world, &mut position, &last_position, mini);
+                        let (_, hit) = check_collisions(world, &mut position, &last_position, mini);
                         if !hit {
                             target.y += offset as f64 / 16.0;
                             ox = target.x;
@@ -759,7 +752,7 @@ pub fn handle_movement(
 
                 position.position.y = target.y;
                 let (bounds, yhit) =
-                    check_collisions(&world, &mut position, &last_position, player_bounds);
+                    check_collisions(world, &mut position, &last_position, player_bounds);
                 position.position.y = bounds.min.y;
                 last_position.y = position.position.y;
                 if yhit {
@@ -770,7 +763,7 @@ pub fn handle_movement(
                     let ground =
                         Aabb3::new(Point3::new(-0.3, -0.005, -0.3), Point3::new(0.3, 0.0, 0.3));
                     let prev = gravity.on_ground;
-                    let (_, hit) = check_collisions(&world, &mut position, &last_position, ground);
+                    let (_, hit) = check_collisions(world, &mut position, &last_position, ground);
                     gravity.on_ground = hit;
                     if !prev && gravity.on_ground {
                         movement.did_touch_ground = true;
