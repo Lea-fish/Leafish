@@ -16,13 +16,14 @@ use crate::shared::Position as BPosition;
 use crate::types::hash::FNVHash;
 use crate::types::GameMode;
 use crate::world;
+use arc_swap::ArcSwapOption;
 use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::{Aabb, Aabb3};
 use instant::Instant;
-use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 pub fn add_systems(m: &mut Manager) {
@@ -113,8 +114,8 @@ pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
 #[derive(Component)]
 pub struct PlayerModel {
     model: Option<model::ModelHandle>,
-    skin_url: Arc<Mutex<Option<String>>>,
-    dirty: bool,
+    skin_url: ArcSwapOption<String>,
+    dirty: AtomicBool,
     name: String,
 
     has_head: bool,
@@ -132,8 +133,8 @@ impl PlayerModel {
     pub fn new(name: &str, has_head: bool, has_name_tag: bool, first_person: bool) -> Self {
         Self {
             model: None,
-            skin_url: Arc::new(Mutex::new(None)),
-            dirty: false,
+            skin_url: ArcSwapOption::new(None),
+            dirty: AtomicBool::new(false),
             name: name.to_owned(),
 
             has_head,
@@ -149,13 +150,9 @@ impl PlayerModel {
     }
 
     pub fn set_skin(&mut self, skin: Option<String>) {
-        if *self.skin_url.lock() != skin {
-            if let Some(skin) = skin {
-                self.skin_url.lock().replace(skin);
-            } else {
-                self.skin_url.lock().take();
-            }
-            self.dirty = true;
+        if self.skin_url.load().as_ref().map(|skin| skin.as_ref()) != skin.as_ref() {
+            self.skin_url.store(skin.map(Arc::new));
+            self.dirty.store(true, Ordering::Release);
         }
     }
 }
@@ -172,7 +169,7 @@ fn update_render_players(
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
 
-        if player_model.dirty {
+        if player_model.dirty.load(Ordering::Acquire) {
             add_player(renderer.clone(), &mut player_model);
         }
 
@@ -331,9 +328,9 @@ pub fn player_added(
 
 // TODO: Setup culling
 fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
-    player_model.dirty = false;
+    player_model.dirty.store(false, Ordering::Release);
 
-    let skin = if let Some(url) = player_model.skin_url.lock().as_ref() {
+    let skin = if let Some(url) = player_model.skin_url.load().as_ref() {
         renderer.get_skin(renderer.get_textures_ref(), url)
     } else {
         render::Renderer::get_texture(renderer.get_textures_ref(), "entity/steve")
@@ -495,11 +492,11 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
         ],
         renderer,
     );
-    let skin_url = player_model.skin_url.clone();
+    let skin_url = player_model.skin_url.load();
     model.2 = player_model.model.as_ref().map_or(
         Some(Arc::new(move |renderer: Arc<Renderer>| {
             let skin_url = skin_url.clone();
-            if let Some(url) = skin_url.lock().as_ref() {
+            if let Some(url) = skin_url.as_ref() {
                 renderer.get_textures_ref().read().release_skin(url); // TODO: Move this into the custom drop handling fn!
             };
         })),

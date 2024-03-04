@@ -258,19 +258,19 @@ impl Screen for Hud {
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        if self.hud_context.clone().read().enabled {
-            self.render_slots(renderer.clone(), ui_container);
-            self.render_slots_items(renderer.clone(), ui_container);
-            self.render_slot_index(renderer.clone(), ui_container);
-            self.render_crosshair(renderer.clone(), ui_container);
-            self.render_chat(renderer.clone(), ui_container);
-            let game_mode = self.hud_context.clone().read().game_mode;
+        if self.hud_context.read().enabled {
+            self.render_slots(&renderer, ui_container);
+            self.render_slots_items(&renderer, ui_container);
+            self.render_slot_index(&renderer, ui_container);
+            self.render_crosshair(&renderer, ui_container);
+            self.render_chat(&renderer, ui_container);
+            let game_mode = self.hud_context.read().game_mode;
             if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
-                self.render_health(renderer.clone(), ui_container);
-                self.render_armor(renderer.clone(), ui_container);
-                self.render_exp(renderer.clone(), ui_container);
-                self.render_food(renderer.clone(), ui_container);
-                self.render_breath(renderer, ui_container);
+                self.render_health(&renderer, ui_container);
+                self.render_armor(&renderer, ui_container);
+                self.render_exp(&renderer, ui_container);
+                self.render_food(&renderer, ui_container);
+                self.render_breath(&renderer, ui_container);
             }
         }
     }
@@ -319,35 +319,35 @@ impl Screen for Hud {
         ui_container: &mut ui::Container,
         _delta: f64,
     ) {
-        if !self.hud_context.clone().read().enabled {
+        if !self.hud_context.read().enabled {
             if self.last_enabled {
                 self.on_deactive(screen_sys, renderer, ui_container);
                 self.last_enabled = false;
             }
             return;
         }
-        if self.hud_context.clone().read().enabled && !self.last_enabled {
+        if self.hud_context.read().enabled && !self.last_enabled {
             self.on_active(screen_sys, renderer, ui_container);
             self.last_enabled = true;
             return;
         }
-        if self.hud_context.clone().read().debug {
-            self.render_debug(renderer.clone(), ui_container);
+        if self.hud_context.read().debug {
+            self.render_debug(&renderer, ui_container);
             self.last_debug_enabled = true;
         } else if self.last_debug_enabled {
             self.debug_elements.clear();
             self.last_debug_enabled = false;
         }
-        let game_mode = self.hud_context.clone().read().game_mode;
+        let game_mode = self.hud_context.read().game_mode;
         if self.hud_context.clone().read().dirty_game_mode {
             self.hud_context.clone().write().dirty_game_mode = false;
             if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
                 if self.health_elements.is_empty() {
-                    self.render_health(renderer.clone(), ui_container);
-                    self.render_armor(renderer.clone(), ui_container);
-                    self.render_exp(renderer.clone(), ui_container);
-                    self.render_food(renderer.clone(), ui_container);
-                    self.render_breath(renderer.clone(), ui_container);
+                    self.render_health(&renderer, ui_container);
+                    self.render_armor(&renderer, ui_container);
+                    self.render_exp(&renderer, ui_container);
+                    self.render_food(&renderer, ui_container);
+                    self.render_breath(&renderer, ui_container);
                 }
             } else {
                 self.health_elements.clear();
@@ -359,46 +359,45 @@ impl Screen for Hud {
             }
         }
         if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
-            if self.hud_context.clone().read().dirty_health {
+            if self.hud_context.read().dirty_health {
                 self.health_elements.clear();
-                self.render_health(renderer.clone(), ui_container);
+                self.render_health(&renderer, ui_container);
             }
-            if self.hud_context.clone().read().dirty_armor {
+            if self.hud_context.read().dirty_armor {
                 self.armor_elements.clear();
-                self.render_armor(renderer.clone(), ui_container);
+                self.render_armor(&renderer, ui_container);
             }
-            if self.hud_context.clone().read().dirty_food {
+            if self.hud_context.read().dirty_food {
                 self.food_elements.clear();
-                self.render_food(renderer.clone(), ui_container);
+                self.render_food(&renderer, ui_container);
             }
-            if self.hud_context.clone().read().dirty_exp {
+            if self.hud_context.read().dirty_exp {
                 self.exp_elements.clear();
                 self.exp_text_elements.clear();
-                self.render_exp(renderer.clone(), ui_container);
+                self.render_exp(&renderer, ui_container);
             }
-            if self.hud_context.clone().read().dirty_breath {
+            if self.hud_context.read().dirty_breath {
                 self.breath_elements.clear();
-                self.render_breath(renderer.clone(), ui_container);
+                self.render_breath(&renderer, ui_container);
             }
         }
         if self
             .hud_context
-            .clone()
             .read()
             .dirty_slots
             .load(AtomicOrdering::Relaxed)
         {
             self.slot_elements.clear();
             self.slot_text_elements.clear();
-            self.render_slots_items(renderer.clone(), ui_container);
+            self.render_slots_items(&renderer, ui_container);
         }
-        if self.hud_context.clone().read().dirty_slot_index {
+        if self.hud_context.read().dirty_slot_index {
             self.slot_index_elements.clear();
-            self.render_slot_index(renderer.clone(), ui_container);
+            self.render_slot_index(&renderer, ui_container);
         }
-        if self.hud_context.clone().read().dirty_debug {
+        if self.hud_context.read().dirty_debug {
             self.debug_elements.clear();
-            self.render_debug(renderer.clone(), ui_container);
+            self.render_debug(&renderer, ui_container);
         }
         if !self.chat_background_elements.is_empty()
             && screen_sys.current_screen_ty() == ScreenType::Chat
@@ -409,7 +408,6 @@ impl Screen for Hud {
         }
         if (self
             .hud_context
-            .clone()
             .read()
             .server
             .as_ref()
@@ -421,7 +419,7 @@ impl Screen for Hud {
             || self.render_chat)
             && screen_sys.current_screen_ty() != ScreenType::Chat
         {
-            self.render_chat(renderer, ui_container);
+            self.render_chat(&renderer, ui_container);
             self.render_chat = false;
         }
     }
@@ -430,7 +428,6 @@ impl Screen for Hud {
         // TODO: Is there a threshold we have to implement?
         let curr_slot = self
             .hud_context
-            .clone()
             .read()
             .server
             .as_ref()
@@ -456,7 +453,6 @@ impl Screen for Hud {
             curr_slot
         };
         self.hud_context
-            .clone()
             .read()
             .server
             .as_ref()
@@ -466,7 +462,6 @@ impl Screen for Hud {
                 slot: new_slot as i16,
             });
         self.hud_context
-            .clone()
             .read()
             .server
             .as_ref()
@@ -486,7 +481,7 @@ impl Screen for Hud {
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        if self.hud_context.clone().read().enabled {
+        if self.hud_context.read().enabled {
             self.deinit(screen_sys, renderer.clone(), ui_container);
             self.init(screen_sys, renderer, ui_container);
         }
@@ -530,7 +525,7 @@ impl Screen for Hud {
 }
 
 impl Hud {
-    pub fn icon_scale(renderer: Arc<Renderer>) -> f64 {
+    pub fn icon_scale(renderer: &Arc<Renderer>) -> f64 {
         let screen = renderer.screen_data.read();
         Hud::icon_scale_by_dims(screen.safe_width, screen.safe_height)
     }
@@ -540,9 +535,8 @@ impl Hud {
         (width / 320).min(height / 240).max(1) as f64
     }
 
-    fn render_health(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
-        let hud_context = self.hud_context.clone();
-        let hud_context = hud_context.read();
+    fn render_health(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
+        let hud_context = self.hud_context.read();
         let icon_scale = Hud::icon_scale(renderer);
         let x_offset = icon_scale * 182.0 / 2.0 * -1.0 + icon_scale * 9.0 / 2.0;
         let y_offset = icon_scale * 30.0;
@@ -671,7 +665,7 @@ impl Hud {
         }
     }
 
-    fn render_armor(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+    fn render_armor(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let armor = self.hud_context.clone().read().armor;
         let icon_scale = Hud::icon_scale(renderer);
         let x_offset = icon_scale * 182.0 / 2.0 * -1.0 + icon_scale * 9.0 / 2.0;
@@ -703,7 +697,7 @@ impl Hud {
         self.hud_context.write().dirty_armor = false;
     }
 
-    fn render_food(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+    fn render_food(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         let hud_context = self.hud_context.clone();
         let hud_context = hud_context.read();
@@ -763,7 +757,7 @@ impl Hud {
         self.hud_context.write().dirty_food = false;
     }
 
-    fn render_exp(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+    fn render_exp(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         let y_offset = icon_scale * 24.0;
         let hud_context = self.hud_context.clone();
@@ -869,7 +863,7 @@ impl Hud {
         self.hud_context.write().dirty_exp = false;
     }
 
-    fn render_slots(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+    fn render_slots(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
@@ -884,17 +878,17 @@ impl Hud {
 
     // TODO: make use of "render_scoreboard"
     #[allow(dead_code)]
-    fn render_scoreboard(&mut self, _renderer: Arc<Renderer>, _ui_container: &mut Container) {}
+    fn render_scoreboard(&mut self, _renderer: &Arc<Renderer>, _ui_container: &mut Container) {}
 
     // TODO: make use of "render_title"
     #[allow(dead_code)]
-    fn render_title(&mut self, _renderer: Arc<Renderer>, _ui_container: &mut Container) {}
+    fn render_title(&mut self, _renderer: &Arc<Renderer>, _ui_container: &mut Container) {}
 
-    fn render_slots_items(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
-        let icon_scale = Hud::icon_scale(renderer.clone());
+    fn render_slots_items(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
+        let icon_scale = Hud::icon_scale(renderer);
         for i in 0..9 {
-            if let Some(inventory) = &self.hud_context.clone().read().slots {
-                if let Some(item) = inventory.clone().read().get_item(27 + i as u16) {
+            if let Some(inventory) = &self.hud_context.read().slots {
+                if let Some(item) = inventory.read().get_item(27 + i as u16) {
                     let (slot_item, stack_count) = self.draw_item(
                         &item,
                         (icon_scale) * -1.0
@@ -903,7 +897,7 @@ impl Hud {
                             + icon_scale * 11.0,
                         icon_scale * 3.0,
                         ui_container,
-                        renderer.clone(),
+                        renderer,
                     );
                     self.slot_elements.push(slot_item);
                     if let Some(stack_count) = stack_count {
@@ -919,7 +913,7 @@ impl Hud {
             .store(false, AtomicOrdering::Relaxed);
     }
 
-    fn render_slot_index(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+    fn render_slot_index(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         let slot = self.hud_context.clone().read().slot_index as f64;
         let image = ui::ImageBuilder::new()
@@ -942,9 +936,9 @@ impl Hud {
 
     // TODO: make use of "render_item" (in right hand)
     #[allow(dead_code)]
-    fn render_item(&mut self, _renderer: Arc<Renderer>, _ui_container: &mut Container) {}
+    fn render_item(&mut self, _renderer: &Arc<Renderer>, _ui_container: &mut Container) {}
 
-    fn render_crosshair(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+    fn render_crosshair(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
         let image = ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
@@ -957,7 +951,7 @@ impl Hud {
         self.elements.push(image);
     }
 
-    fn render_breath(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+    fn render_breath(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let hud_context = self.hud_context.clone();
         let hud_context = hud_context.read();
 
@@ -1002,9 +996,8 @@ impl Hud {
         self.hud_context.write().dirty_breath = false;
     }
 
-    pub fn render_debug(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
-        let hud_context = self.hud_context.clone();
-        let hud_context = hud_context.read();
+    pub fn render_debug(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
+        let hud_context = self.hud_context.read();
         let icon_scale = Hud::icon_scale(renderer);
         let scale = icon_scale / 2.0;
         self.debug_elements.push(
@@ -1021,13 +1014,13 @@ impl Hud {
         );
     }
 
-    pub fn render_chat(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
+    pub fn render_chat(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let now = Instant::now();
         if now.duration_since(self.last_tick).as_millis() >= 50 {
             self.last_tick = now;
             self.chat_elements.clear();
             self.chat_background_elements.clear();
-            let scale = Hud::icon_scale(renderer.clone());
+            let scale = Hud::icon_scale(renderer);
             let messages = self
                 .hud_context
                 .clone()
@@ -1100,9 +1093,9 @@ impl Hud {
         x: f64,
         y: f64,
         ui_container: &mut Container,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
     ) -> (ImageRef, Option<TextRef>) {
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
         let textures = item.material.texture_locations();
         let texture =
             if let Some(tex) = Renderer::get_texture_optional(&renderer.textures, &textures.0) {

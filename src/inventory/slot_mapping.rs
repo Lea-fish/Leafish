@@ -134,11 +134,11 @@ impl SlotMapping {
     /// location.
     pub fn update_icons(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         offset: (i32, i32),
         outer_size: Option<(i32, i32)>,
     ) {
-        let scale = Hud::icon_scale(renderer.clone()) as i32;
+        let scale = Hud::icon_scale(renderer) as i32;
         let slot_size = scale as f64 * 16.0;
         let center = renderer.screen_data.read().center();
         let size = match outer_size {
@@ -168,7 +168,7 @@ impl SlotMapping {
     /// Render slots if required.
     pub fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
         element_idx: usize,
@@ -196,7 +196,7 @@ impl SlotMapping {
                         slot.y,
                         element_idx,
                         ui_container,
-                        renderer.clone(),
+                        renderer,
                         VAttach::Top,
                     );
                 }

@@ -26,7 +26,7 @@ pub struct AnvilInventory {
 }
 
 impl AnvilInventory {
-    pub fn new(renderer: Arc<Renderer>, base_slots: Arc<RwLock<SlotMapping>>, id: i32) -> Self {
+    pub fn new(renderer: &Arc<Renderer>, base_slots: Arc<RwLock<SlotMapping>>, id: i32) -> Self {
         let mut slots = SlotMapping::new((WINDOW_WIDTH, WINDOW_HEIGHT));
         slots.set_child(base_slots, (8, 84), (3..39).collect());
 
@@ -96,7 +96,7 @@ impl Inventory for AnvilInventory {
 
     fn init(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -107,7 +107,7 @@ impl Inventory for AnvilInventory {
 
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(renderer);
 
         let top_left_x =
             renderer.screen_data.read().center().0 as f64 - icon_scale * WINDOW_WIDTH as f64 / 2.0;
@@ -200,7 +200,7 @@ impl Inventory for AnvilInventory {
 
     fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {

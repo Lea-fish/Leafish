@@ -16,8 +16,6 @@ pub use self::material::Material;
 
 pub use self::blocks::Block::*;
 pub use self::blocks::*;
-use parking_lot::RwLock;
-use std::sync::Arc;
 
 pub trait WorldAccess {
     fn get_block(&self, pos: Position) -> Block;
@@ -51,7 +49,7 @@ impl VanillaIDMap {
     pub fn by_vanilla_id(
         &self,
         id: usize,
-        modded_block_ids: Arc<RwLock<HashMap<usize, String>>>, // TODO: remove and add to constructor, but have to mutate in Server
+        modded_block_ids: &HashMap<usize, String>, // TODO: remove and add to constructor, but have to mutate in Server
     ) -> Block {
         match &self.mapping {
             IDMapKind::Flat(blocks) => {
@@ -63,7 +61,7 @@ impl VanillaIDMap {
                     block
                 } else {
                     let data = id & 0xf;
-                    if let Some(name) = modded_block_ids.read().get(&(id >> 4)) {
+                    if let Some(name) = modded_block_ids.get(&(id >> 4)) {
                         if let Some(blocks_by_data) = self.modded.get(name) {
                             blocks_by_data[data].unwrap_or(Block::Missing {})
                         } else {
@@ -99,13 +97,13 @@ mod tests {
     fn hier_1_12_2() {
         let id_map = VanillaIDMap::new(340);
         assert_eq!(
-            id_map.by_vanilla_id(255 << 4, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(255 << 4, &Arc::new(HashMap::new())),
             StructureBlock {
                 mode: StructureBlockMode::Save
             }
         );
         assert_eq!(
-            id_map.by_vanilla_id((255 << 4) | 3, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id((255 << 4) | 3, &Arc::new(HashMap::new())),
             StructureBlock {
                 mode: StructureBlockMode::Data
             }
@@ -116,13 +114,13 @@ mod tests {
     fn flat_1_13_2() {
         let id_map = VanillaIDMap::new(404);
         assert_eq!(
-            id_map.by_vanilla_id(8595, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(8595, &Arc::new(HashMap::new())),
             StructureBlock {
                 mode: StructureBlockMode::Save
             }
         );
         assert_eq!(
-            id_map.by_vanilla_id(8598, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(8598, &Arc::new(HashMap::new())),
             StructureBlock {
                 mode: StructureBlockMode::Data
             }
@@ -133,11 +131,11 @@ mod tests {
     fn flat_1_14_4() {
         let id_map = VanillaIDMap::new(477);
         assert_eq!(
-            id_map.by_vanilla_id(9113, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(9113, &Arc::new(HashMap::new())),
             Conduit { waterlogged: true }
         );
         assert_eq!(
-            id_map.by_vanilla_id(9114, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(9114, &Arc::new(HashMap::new())),
             Conduit { waterlogged: false }
         );
     }
@@ -146,11 +144,11 @@ mod tests {
     fn flat_1_15_1() {
         let id_map = VanillaIDMap::new(575);
         assert_eq!(
-            id_map.by_vanilla_id(9113, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(9113, &Arc::new(HashMap::new())),
             Conduit { waterlogged: true }
         );
         assert_eq!(
-            id_map.by_vanilla_id(9114, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(9114, &Arc::new(HashMap::new())),
             Conduit { waterlogged: false }
         );
     }
@@ -159,7 +157,7 @@ mod tests {
     fn flat_1_16() {
         let id_map = VanillaIDMap::new(735);
         assert_eq!(
-            id_map.by_vanilla_id(1048, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(1048, &Arc::new(HashMap::new())),
             NoteBlock {
                 instrument: NoteBlockInstrument::Pling,
                 note: 24,
@@ -172,7 +170,7 @@ mod tests {
     fn flat_1_16_2() {
         let id_map = VanillaIDMap::new(751);
         assert_eq!(
-            id_map.by_vanilla_id(1048, Arc::new(RwLock::new(HashMap::new()))),
+            id_map.by_vanilla_id(1048, &Arc::new(HashMap::new())),
             NoteBlock {
                 instrument: NoteBlockInstrument::Pling,
                 note: 24,
