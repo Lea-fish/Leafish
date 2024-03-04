@@ -1,3 +1,12 @@
+use crate::paths;
+use log::{info, warn};
+use parking_lot::Mutex;
+use std::collections::HashMap;
+use std::fs;
+use std::io::{BufRead, BufReader, BufWriter, Write};
+
+use super::default_config::default_vars;
+
 #[derive(Clone)]
 pub enum SettingValue {
     String(String),
@@ -12,166 +21,6 @@ pub struct ConfigVar {
     pub description: &'static str,
     pub serializable: bool,
     pub value: SettingValue,
-}
-
-pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
-    vec![
-        (
-            SettingType::MaxFps,
-            ConfigVar {
-                name: "max_fps",
-                description: "fps_max caps the maximum FPS for the rendering engine",
-                serializable: true,
-                value: SettingValue::Num(60),
-            },
-        ),
-        (
-            SettingType::FOV,
-            ConfigVar {
-                name: "fov",
-                description: "Setting for controlling the client field of view",
-                serializable: true,
-                value: SettingValue::Num(90),
-            },
-        ),
-        (
-            SettingType::Vsync,
-            ConfigVar {
-                name: "vsync",
-                description: "Toggle to enable/disable vsync",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::MouseSense,
-            ConfigVar {
-                name: "mouse_sens",
-                description: "Mouse Sensitivity",
-                serializable: true,
-                value: SettingValue::Float(1.0),
-            },
-        ),
-        (
-            SettingType::MasterVolume,
-            ConfigVar {
-                name: "master_volume",
-                description: "Main volume control",
-                serializable: true,
-                value: SettingValue::Num(100),
-            },
-        ),
-        (
-            SettingType::CapeVisible,
-            ConfigVar {
-                name: "cape",
-                description: "Toggle your cape",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::JacketVisible,
-            ConfigVar {
-                name: "jacket",
-                description: "Toggle your jacket",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::LeftSleeveVisible,
-            ConfigVar {
-                name: "left_sleeve",
-                description: "Toggle your left sleeve",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::RightSleeveVisible,
-            ConfigVar {
-                name: "right_sleeve",
-                description: "Toggle your right sleeve",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::LeftPantsVisible,
-            ConfigVar {
-                name: "left_pants",
-                description: "Toggle your left pants",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::RightPantsVisible,
-            ConfigVar {
-                name: "right_pants",
-                description: "Toggle your right pants",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::HatVisible,
-            ConfigVar {
-                name: "hat",
-                description: "Toggle your hat",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::AutomaticOfflineAccounts,
-            ConfigVar {
-                name: "automatic_offline_accounts",
-                description:
-                    "Enables using no password in the login screen for creating offline accounts",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::LogLevelTerm,
-            ConfigVar {
-                name: "log_level_term",
-                description: "log level of messages to log to the terminal",
-                serializable: true,
-                value: SettingValue::String("info".to_owned()),
-            },
-        ),
-        (
-            SettingType::LogLevelFile,
-            ConfigVar {
-                name: "log_level_file",
-                description: "log level of messages to log to the file",
-                serializable: true,
-                value: SettingValue::String("trace".to_owned()),
-            },
-        ),
-        (
-            SettingType::BackgroundImage,
-            ConfigVar {
-                name: "background",
-                description: "Select the background image",
-                serializable: true,
-                value: SettingValue::String("leafish:gui/background".to_owned()),
-            },
-        ),
-        (
-            SettingType::AuthClientToken,
-            ConfigVar {
-                name: "auth_client_token",
-                description: r#"auth_client_token is a token that stays static between sessions.
-Used to identify this client vs others."#,
-                serializable: true,
-                value: SettingValue::String("".to_owned()),
-            },
-        ),
-    ]
 }
 
 #[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
@@ -224,5 +73,137 @@ impl ConfigVar {
     }
     pub fn as_bool(&self) -> Option<bool> {
         if let SettingValue::Bool(b) = self.value { Some(b) } else { None }
+    }
+}
+
+// stores all game settings, except keybinds
+pub struct SettingStore(Mutex<HashMap<SettingType, ConfigVar>>);
+
+impl SettingStore {
+    pub fn new() -> Self {
+        let mut store = SettingStore(Mutex::new(HashMap::new()));
+        store.load_defaults();
+        store.load_config();
+        store.save_config();
+        store
+    }
+
+    pub fn set(&self, s_type: SettingType, val: SettingValue) {
+        self.0.lock().get_mut(&s_type).unwrap().value = val;
+        self.save_config();
+    }
+
+    pub fn get_value(&self, input: SettingType) -> SettingValue {
+        self.0.lock().get(&input).unwrap().value.clone()
+    }
+
+    pub fn get_bool(&self, input: SettingType) -> bool {
+        self.0
+            .lock()
+            .get(&input)
+            .map(|v| v.as_bool())
+            .flatten()
+            .unwrap()
+    }
+
+    pub fn get_i32(&self, input: SettingType) -> i32 {
+        self.0
+            .lock()
+            .get(&input)
+            .map(|v| v.as_i32())
+            .flatten()
+            .unwrap()
+    }
+
+    pub fn get_float(&self, input: SettingType) -> f64 {
+        self.0
+            .lock()
+            .get(&input)
+            .map(|v| v.as_float())
+            .flatten()
+            .unwrap()
+    }
+
+    pub fn get_string(&self, input: SettingType) -> String {
+        self.0
+            .lock()
+            .get(&input)
+            .map(|v| v.as_string())
+            .flatten()
+            .unwrap()
+    }
+
+    fn load_config(&mut self) {
+        if let Ok(file) = fs::File::open(paths::get_config_dir().join("conf.cfg")) {
+            let reader = BufReader::new(file);
+            for line in reader.lines() {
+                let line = line.unwrap();
+                if line.starts_with('#') || line.is_empty() {
+                    continue;
+                }
+                let parts = line
+                    .splitn(2, ' ')
+                    .map(|v| v.to_owned())
+                    .collect::<Vec<String>>();
+                let (name, arg) = (&parts[0], &parts[1]);
+                if name.starts_with("keybind_") {
+                    continue;
+                }
+                let mut store = self.0.lock();
+                if let Some((s_type, setting)) = store.clone().iter().find(|(_, e)| e.name == name)
+                {
+                    let Some(val) = deserialize_value(arg, setting.value.clone()) else {
+                        warn!("a config value couldnt be loaded from file: {name}");
+                        continue;
+                    };
+                    if setting.serializable {
+                        store.get_mut(s_type).unwrap().value = val;
+                    }
+                } else {
+                    info!("a unknwon config option was specified: {name}");
+                }
+            }
+        }
+    }
+
+    fn save_config(&self) {
+        let mut file =
+            BufWriter::new(fs::File::create(paths::get_config_dir().join("conf.cfg")).unwrap());
+        for var in self.0.lock().values() {
+            if !var.serializable {
+                continue;
+            }
+            for line in var.description.lines() {
+                if let Err(err) = writeln!(file, "# {}", line) {
+                    warn!("couldnt write a setting description to config file: {err}, {line}");
+                }
+            }
+            let name = var.name;
+
+            if let Err(err) = match &var.value {
+                SettingValue::Float(f) => write!(file, "{name} {f}\n\n"),
+                SettingValue::Num(n) => write!(file, "{name} {n}\n\n"),
+                SettingValue::Bool(b) => write!(file, "{name} {b}\n\n"),
+                SettingValue::String(s) => write!(file, "{name} {s}\n\n"),
+            } {
+                warn!("couldnt write a setting to config file: {err}, {name}");
+            }
+        }
+    }
+
+    fn load_defaults(&self) {
+        let mut s = self.0.lock();
+        for (var_type, var) in default_vars() {
+            s.insert(var_type, var);
+        }
+    }
+}
+
+fn deserialize_value(input: &str, old: SettingValue) -> Option<SettingValue> {
+    match old {
+        SettingValue::Num(_) => input.parse::<i32>().ok().map(|num| SettingValue::Num(num)),
+        SettingValue::Float(_) => input.parse::<f64>().ok().map(|f| SettingValue::Float(f)),
+        SettingValue::Bool(_) => input.parse::<bool>().ok().map(|b| SettingValue::Bool(b)),
+        SettingValue::String(_) => Some(SettingValue::String(input.to_owned())),
     }
 }
