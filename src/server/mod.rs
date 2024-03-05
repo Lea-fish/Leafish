@@ -35,6 +35,7 @@ use crate::types::GameMode;
 use crate::world::{self, World};
 use crate::world::{CPos, LightData, LightUpdate};
 use crate::{ecs, Game};
+use arc_swap::ArcSwapOption;
 use atomic_float::AtomicF64;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
@@ -63,7 +64,7 @@ use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::io::Cursor;
 use std::str::FromStr;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -113,13 +114,13 @@ pub struct Server {
     version: AtomicUsize,
 
     // Entity accessors
-    pub player: Arc<RwLock<Option<(i32, Entity)>>>,
+    pub player: ArcSwapOption<(i32, Entity)>,
     entity_map: Arc<RwLock<HashMap<i32, Entity, BuildHasherDefault<FNVHash>>>>,
     players: Arc<RwLock<HashMap<protocol::UUID, PlayerInfo, BuildHasherDefault<FNVHash>>>>,
 
     tick_timer: AtomicF64,
     entity_tick_timer: AtomicF64,
-    pub received_chat_at: Arc<RwLock<Option<Instant>>>,
+    pub received_chat_at: ArcSwapOption<Instant>,
 
     sun_model: RwLock<Option<sun::SunModel>>,
     target_info: Arc<RwLock<target::Info>>,
@@ -128,7 +129,7 @@ pub struct Server {
     pub hud_context: Arc<RwLock<HudContext>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
     fps: AtomicU32,
-    fps_start: RwLock<u128>,
+    fps_start: AtomicU64,
     pub dead: AtomicBool,
     just_died: AtomicBool,
     last_chat_open: AtomicBool,
@@ -405,10 +406,9 @@ impl Server {
             screen_sys,
             renderer,
         ));
-        server.hud_context.clone().write().server = Some(server.clone());
+        server.hud_context.write().server = Some(server.clone());
 
-        let actual_server = server.clone();
-        inner_server.replace(actual_server);
+        inner_server.replace(server.clone());
         render_list_computer.0.send(true).unwrap();
         server
     }
@@ -418,19 +418,19 @@ impl Server {
         thread::spawn(move || {
             let threads = ThreadPoolBuilder::new().num_threads(8).build().unwrap();
             loop {
-                let server = server.clone().lock().as_ref().unwrap().clone();
+                let server = server.lock().as_ref().unwrap().clone();
                 let pck = read.read_packet();
                 match pck {
                     Ok(pck) => match pck.map() {
                         MappedPacket::KeepAliveClientbound(keep_alive) => {
                             packet::send_keep_alive(
-                                server.conn.clone().write().as_mut().unwrap(),
+                                server.conn.write().as_mut().unwrap(),
                                 keep_alive.id,
                             )
                             .map_err(|_| server.disconnect_closed(None));
                         }
                         MappedPacket::ChunkData_NoEntities(chunk_data) => {
-                            let sky_light = server.world.dimension.read().has_sky_light();
+                            let sky_light = server.world.dimension.load().has_sky_light();
                             server.on_chunk_data_no_entities(chunk_data, sky_light);
                         }
                         MappedPacket::ChunkData_NoEntities_u16(chunk_data) => {
@@ -455,31 +455,31 @@ impl Server {
                             server.on_block_entity_update(block_update);
                         }
                         MappedPacket::ChunkData_Biomes3D(chunk_data) => {
-                            let sky_light = server.world.dimension.read().has_sky_light();
+                            let sky_light = server.world.dimension.load().has_sky_light();
                             threads.spawn(move || {
                                 server.on_chunk_data_biomes3d(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::ChunkData_Biomes3D_i32(chunk_data) => {
-                            let sky_light = server.world.dimension.read().has_sky_light();
+                            let sky_light = server.world.dimension.load().has_sky_light();
                             threads.spawn(move || {
                                 server.on_chunk_data_biomes3d_varint(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::ChunkData_Biomes3D_bool(chunk_data) => {
-                            let sky_light = server.world.dimension.read().has_sky_light();
+                            let sky_light = server.world.dimension.load().has_sky_light();
                             threads.spawn(move || {
                                 server.on_chunk_data_biomes3d_bool(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::ChunkData(chunk_data) => {
-                            let sky_light = server.world.dimension.read().has_sky_light();
+                            let sky_light = server.world.dimension.load().has_sky_light();
                             threads.spawn(move || {
                                 server.on_chunk_data(chunk_data, sky_light);
                             });
                         }
                         MappedPacket::ChunkData_HeightMap(chunk_data) => {
-                            let sky_light = server.world.dimension.read().has_sky_light();
+                            let sky_light = server.world.dimension.load().has_sky_light();
                             threads.spawn(move || {
                                 server.on_chunk_data_heightmap(chunk_data, sky_light);
                             });
@@ -509,11 +509,8 @@ impl Server {
                         }
                         MappedPacket::EntityHeadLook(look) => {
                             use std::f64::consts::PI;
-                            if let Some(entity) =
-                                server.entity_map.clone().read().get(&look.entity_id)
-                            {
-                                let entities = server.entities.clone();
-                                let mut entities = entities.write();
+                            if let Some(entity) = server.entity_map.read().get(&look.entity_id) {
+                                let mut entities = server.entities.write();
                                 let mut entity = entities.world.get_entity_mut(*entity).unwrap();
                                 let mut rotation = entity.get_mut::<TargetRotation>().unwrap();
                                 rotation.yaw = -(look.head_yaw as f64 / 256.0) * PI * 2.0;
@@ -601,7 +598,6 @@ impl Server {
                                         .unwrap();
                                 server
                                     .players
-                                    .clone()
                                     .write()
                                     .entry(uuid.clone())
                                     .or_insert(PlayerInfo {
@@ -648,7 +644,7 @@ impl Server {
                             .unwrap();
                         }
                         MappedPacket::UpdateLight(update_light) => {
-                            server.world.clone().lighting_cache.clone().write().insert(
+                            server.world.lighting_cache.write().insert(
                                 CPos(update_light.chunk_x, update_light.chunk_z),
                                 LightData {
                                     arrays: Cursor::new(update_light.light_arrays),
@@ -685,19 +681,13 @@ impl Server {
                         MappedPacket::SetExperience(set_exp) => {
                             server
                                 .hud_context
-                                .clone()
                                 .write()
                                 .update_exp(set_exp.experience_bar, set_exp.level);
                         }
                         MappedPacket::SetCurrentHotbarSlot(set_slot) => {
                             if set_slot.slot <= 8 {
-                                server.inventory_context.clone().write().hotbar_index =
-                                    set_slot.slot;
-                                server
-                                    .hud_context
-                                    .clone()
-                                    .write()
-                                    .update_slot_index(set_slot.slot);
+                                server.inventory_context.write().hotbar_index = set_slot.slot;
+                                server.hud_context.write().update_slot_index(set_slot.slot);
                             } else {
                                 warn!("The server tried to set the hotbar slot to {}, although it has to be in a range of 0-8! Did it try to crash you?", set_slot.slot);
                             }
@@ -726,9 +716,8 @@ impl Server {
                         MappedPacket::WindowClose(_close) => {
                             server
                                 .inventory_context
-                                .clone()
                                 .write()
-                                .try_close_inventory(server.screen_sys.clone());
+                                .try_close_inventory(&server.screen_sys);
                         }
                         MappedPacket::WindowOpen(open) => {
                             let inv_type = if let Some(name) = &open.ty_name {
@@ -742,14 +731,14 @@ impl Server {
                                 let inventory = inventory_from_type(
                                     inv_type,
                                     open.title,
-                                    server.renderer.clone(),
+                                    &server.renderer,
                                     server.inventory_context.read().base_slots.clone(),
                                     open.id,
                                 );
                                 if let Some(inventory) = inventory {
-                                    server.inventory_context.clone().write().open_inventory(
+                                    server.inventory_context.write().open_inventory(
                                         inventory.clone(),
-                                        server.screen_sys.clone(),
+                                        &server.screen_sys,
                                         server.inventory_context.clone(),
                                     );
                                 }
@@ -779,15 +768,14 @@ impl Server {
                                     .active_block_break_anims
                                     .remove(&block_break.entity_id)
                                 {
-                                    server.entities.clone().write().world.despawn(break_impl.1);
+                                    server.entities.write().world.despawn(break_impl.1);
                                 }
                             } else if let Some(anim_ent) = server
                                 .active_block_break_anims
                                 .clone()
                                 .get(&block_break.entity_id)
                             {
-                                let entities = server.entities.clone();
-                                let mut entities = entities.write();
+                                let mut entities = server.entities.write();
                                 let mut anim =
                                     entities.world.get_entity_mut(*anim_ent.value()).unwrap();
                                 let effect = anim.get_mut::<BlockBreakEffect>();
@@ -795,8 +783,7 @@ impl Server {
                                     effect.update(block_break.stage);
                                 }
                             } else {
-                                let entities = server.entities.clone();
-                                let mut entities = entities.write();
+                                let mut entities = server.entities.write();
                                 let mut entity = entities.world.spawn_empty();
                                 entity.insert(BlockEffectData {
                                     position: Vector3::new(
@@ -810,7 +797,6 @@ impl Server {
                                 let entity = entity.id();
                                 server
                                     .active_block_break_anims
-                                    .clone()
                                     .insert(block_break.entity_id, entity);
                             }
                         }
@@ -819,22 +805,13 @@ impl Server {
                         }
                     },
                     Err(err) => {
-                        if server
-                            .disconnect_data
-                            .clone()
-                            .read()
-                            .disconnect_reason
-                            .is_none()
-                        {
-                            server
-                                .disconnect_data
-                                .clone()
-                                .write()
-                                .disconnect_reason
-                                .replace(Component::new(format::ComponentType::new(
+                        if server.disconnect_data.read().disconnect_reason.is_none() {
+                            server.disconnect_data.write().disconnect_reason.replace(
+                                Component::new(format::ComponentType::new(
                                     &format!("An error occurred while reading a packet: {}", err),
                                     None,
-                                )));
+                                )),
+                            );
                         }
                     }
                 }
@@ -881,9 +858,12 @@ impl Server {
         let (etx, erx) = unbounded();
         thread::spawn(move || loop {
             let _ = rx.recv().unwrap();
-            let server = server.clone().lock().as_ref().unwrap().clone();
-            let world = server.world.clone();
-            world.compute_render_list(renderer.clone());
+            let server = server.lock();
+            server
+                .as_ref()
+                .unwrap()
+                .world
+                .compute_render_list(renderer.clone());
             while rx.try_recv().is_ok() {}
             etx.send(true).unwrap();
         });
@@ -902,12 +882,12 @@ impl Server {
         hud_context: Arc<RwLock<HudContext>>,
         screen_sys: Arc<ScreenSystem>,
         renderer: Arc<Renderer>,
-    ) -> Server {
+    ) -> Self {
         let world = Arc::new(world::World::new(protocol_version, light_updater));
         let mapped_protocol_version = Version::from_id(protocol_version as u32);
         let inventory_context = Arc::new(RwLock::new(InventoryContext::new(
             mapped_protocol_version,
-            renderer.clone(),
+            &renderer,
             hud_context.clone(),
             conn.clone(),
         )));
@@ -930,7 +910,7 @@ impl Server {
         hud_context.write().slots = Some(inventory_context.read().base_slots.clone());
 
         let version = resources.read().version();
-        Server {
+        Self {
             uuid,
             conn,
             disconnect_gracefully: Default::default(),
@@ -944,9 +924,8 @@ impl Server {
             version: AtomicUsize::new(version),
             resources,
 
-            //
             entities: Arc::new(RwLock::new(entities)),
-            player: Arc::new(RwLock::new(None)),
+            player: ArcSwapOption::new(None),
             entity_map: Arc::new(RwLock::new(HashMap::with_hasher(
                 BuildHasherDefault::default(),
             ))),
@@ -956,7 +935,7 @@ impl Server {
 
             tick_timer: AtomicF64::new(0.0),
             entity_tick_timer: AtomicF64::new(0.0),
-            received_chat_at: Arc::new(RwLock::new(None)),
+            received_chat_at: ArcSwapOption::new(None),
             sun_model: RwLock::new(None),
 
             target_info: Arc::new(RwLock::new(target::Info::new())),
@@ -965,7 +944,7 @@ impl Server {
             hud_context,
             inventory_context,
             fps: AtomicU32::new(0),
-            fps_start: RwLock::new(0),
+            fps_start: AtomicU64::new(0),
             dead: AtomicBool::new(false),
             just_died: AtomicBool::new(false),
             last_chat_open: AtomicBool::new(false),
@@ -978,54 +957,53 @@ impl Server {
     }
 
     pub fn disconnect(&self, reason: Option<format::Component>) {
-        self.conn.clone().write().take().unwrap().close();
-        self.disconnect_data.clone().write().disconnect_reason = reason;
-        if let Some(player) = self.player.clone().write().take() {
+        self.conn.write().take().unwrap().close();
+        self.disconnect_data.write().disconnect_reason = reason;
+        if let Some(player) = self.player.swap(None) {
             // TODO: Is this even required if we have the despawn code below?
-            self.entities.clone().write().world.despawn(player.1);
+            self.entities.write().world.despawn(player.1);
         }
-        for entity in &*self.entity_map.clone().write() {
+        for entity in &*self.entity_map.write() {
             if self.entities.read().world.get_entity(*entity.1).is_some() {
-                self.entities.clone().write().world.despawn(*entity.1);
+                self.entities.write().world.despawn(*entity.1);
             }
         }
-        self.disconnect_data.clone().write().just_disconnected = true;
+        self.disconnect_data.write().just_disconnected = true;
     }
 
     pub fn disconnect_closed(&self, reason: Option<format::Component>) {
-        self.disconnect_data.clone().write().disconnect_reason = reason;
-        self.disconnect_data.clone().write().just_disconnected = true;
+        self.disconnect_data.write().disconnect_reason = reason;
+        self.disconnect_data.write().just_disconnected = true;
         self.disconnect_gracefully.store(true, Ordering::Relaxed);
     }
 
     pub fn finish_disconnect(&self) {
-        self.conn.clone().write().take().unwrap().close();
-        if let Some(player) = self.player.clone().write().take() {
+        self.conn.write().take().unwrap().close();
+        if let Some(player) = self.player.swap(None) {
             // TODO: Is this even required if we have the despawn code below?
-            self.entities.clone().write().world.despawn(player.1);
+            self.entities.write().world.despawn(player.1);
         }
-        for entity in &*self.entity_map.clone().write() {
+        for entity in &*self.entity_map.write() {
             if self.entities.read().world.get_entity(*entity.1).is_some() {
-                self.entities.clone().write().world.despawn(*entity.1);
+                self.entities.write().world.despawn(*entity.1);
             }
         }
         self.sun_model.write().take();
     }
 
     pub fn is_connected(&self) -> bool {
-        return self.conn.clone().read().is_some();
+        return self.conn.read().is_some();
     }
 
     pub fn tick(&self, delta: f64, game: &mut Game) {
         let renderer = self.renderer.clone();
         let start = SystemTime::now();
-        let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis();
-        if *self.fps_start.read() + 1000 < time {
+        let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64; // FIXME: use safer conversion
+        if self.fps_start.load(Ordering::Acquire) + 1000 < time {
             self.hud_context
-                .clone()
                 .write()
                 .update_fps(self.fps.load(Ordering::Acquire));
-            *self.fps_start.write() = time;
+            self.fps_start.store(time, Ordering::Release);
             self.fps.store(0, Ordering::Release);
         } else {
             self.fps
@@ -1036,16 +1014,15 @@ impl Server {
             self.last_chat_open.store(chat_open, Ordering::Release);
             if chat_open {
                 game.screen_sys
-                    .clone()
                     .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
             } else {
-                game.screen_sys.clone().pop_screen();
+                game.screen_sys.pop_screen();
             }
         }
         let version = self.resources.read().version();
         if version != self.version.load(Ordering::Acquire) {
             self.version.store(version, Ordering::Release);
-            self.world.clone().flag_dirty_all();
+            self.world.flag_dirty_all();
         }
         {
             // TODO: Check if the world type actually needs a sun
@@ -1056,7 +1033,7 @@ impl Server {
             }
 
             // Copy to camera
-            if let Some(player) = *self.player.clone().read() {
+            if let Some(player) = self.player.load().as_ref() {
                 let entities = self.entities.read();
                 let position = entities
                     .world
@@ -1095,53 +1072,45 @@ impl Server {
         if let Some(sun_model) = self.sun_model.write().as_mut() {
             sun_model.tick(
                 renderer.clone(),
-                self.world_data.clone().read().world_time,
-                self.world_data.clone().read().world_age,
+                self.world_data.read().world_time,
+                self.world_data.read().world_age,
             );
         }
-        let world = self.world.clone();
-        world.tick(&mut self.entities.clone().write());
+        self.world.tick(&mut self.entities.write());
 
-        if self.player.clone().read().is_some() {
+        if self.player.load().as_ref().is_some() {
             if self.just_died.load(Ordering::Acquire) {
                 self.just_died.store(false, Ordering::Release);
                 game.screen_sys.close_closable_screens();
-                game.screen_sys
-                    .clone()
-                    .add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
+                game.screen_sys.add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
             }
-            let world = self.world.clone();
             if let Some((pos, bl, _, _)) = target::trace_ray(
-                &world,
+                &self.world,
                 4.0,
                 renderer.camera.lock().pos.to_vec(),
                 renderer.view_vector.lock().cast().unwrap(),
                 target::test_block,
             ) {
-                self.target_info
-                    .clone()
-                    .write()
-                    .update(renderer.clone(), pos, bl);
+                self.target_info.write().update(renderer.clone(), pos, bl);
             } else {
-                self.target_info.clone().write().clear();
+                self.target_info.write().clear();
             }
         } else {
-            self.target_info.clone().write().clear();
+            self.target_info.write().clear();
         }
     }
 
     fn entity_tick(&self, delta: f64, _focused: bool, _dead: bool) {
-        let entities = self.entities.clone();
-        let mut entities = entities.write();
+        let mut entities = self.entities.write();
         {
             let mut game_info = entities.world.get_resource_mut::<GameInfo>().unwrap();
             // Update the game's state for entities to read
             game_info.delta = delta;
         }
 
-        if self.is_connected() || self.disconnect_data.clone().read().just_disconnected {
+        if self.is_connected() || self.disconnect_data.read().just_disconnected {
             // Allow an extra tick when disconnected to clean up
-            self.disconnect_data.clone().write().just_disconnected = false;
+            self.disconnect_data.write().just_disconnected = false;
             self.entity_tick_timer.store(
                 self.entity_tick_timer.load(Ordering::Acquire) + delta,
                 Ordering::Release,
@@ -1149,7 +1118,7 @@ impl Server {
             entities.world.clear_trackers();
             let entity_schedule = entities.entity_schedule.clone();
             while self.entity_tick_timer.load(Ordering::Acquire) >= 3.0 {
-                entity_schedule.clone().write().run(&mut entities.world);
+                entity_schedule.write().run(&mut entities.world);
                 self.entity_tick_timer.store(
                     self.entity_tick_timer.load(Ordering::Acquire) - 3.0,
                     Ordering::Release,
@@ -1173,31 +1142,31 @@ impl Server {
     }*/
 
     fn update_time(&self, renderer: Arc<render::Renderer>, delta: f64) {
-        if self.world_data.clone().read().tick_time {
-            self.world_data.clone().write().world_time_target += delta / 3.0;
-            let time = self.world_data.clone().read().world_time_target;
-            self.world_data.clone().write().world_time_target = (24000.0 + time) % 24000.0;
-            let mut diff = self.world_data.clone().read().world_time_target
-                - self.world_data.clone().read().world_time;
+        let mut world_data = self.world_data.write();
+        if world_data.tick_time {
+            world_data.world_time_target += delta / 3.0;
+            let time = world_data.world_time_target;
+            world_data.world_time_target = (24000.0 + time) % 24000.0;
+            let mut diff = world_data.world_time_target - world_data.world_time;
             if diff < -12000.0 {
                 diff += 24000.0
             } else if diff > 12000.0 {
                 diff -= 24000.0
             }
-            self.world_data.clone().write().world_time += diff * (1.5 / 60.0) * delta;
-            let time = self.world_data.clone().read().world_time;
-            self.world_data.clone().write().world_time = (24000.0 + time) % 24000.0;
+            world_data.world_time += diff * (1.5 / 60.0) * delta;
+            let time = world_data.world_time;
+            world_data.world_time = (24000.0 + time) % 24000.0;
         } else {
-            let time = self.world_data.clone().read().world_time_target;
-            self.world_data.clone().write().world_time = time;
+            let time = world_data.world_time_target;
+            world_data.world_time = time;
         }
+        drop(world_data);
         renderer.light_data.lock().sky_offset = self.calculate_sky_offset();
     }
 
     fn calculate_sky_offset(&self) -> f32 {
         use std::f32::consts::PI;
-        let mut offset =
-            ((1.0 + self.world_data.clone().read().world_time as f32) / 24000.0) - 0.25;
+        let mut offset = ((1.0 + self.world_data.read().world_time as f32) / 24000.0) - 0.25;
         if offset < 0.0 {
             offset += 1.0;
         } else if offset > 1.0 {
@@ -1220,9 +1189,8 @@ impl Server {
 
     #[allow(unused_must_use)]
     pub fn minecraft_tick(&self, game: &mut Game) {
-        if let Some(player) = *self.player.read() {
-            let entities = self.entities.clone();
-            let mut entities = entities.write();
+        if let Some(player) = self.player.load().as_ref() {
+            let mut entities = self.entities.write();
             let on_ground = {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut movement = player.get_mut::<PlayerMovement>().unwrap();
@@ -1258,7 +1226,7 @@ impl Server {
             // Sync our position to the server
             // Use the smaller packets when possible
             packet::send_position_look(
-                self.conn.clone().write().as_mut().unwrap(),
+                self.conn.write().as_mut().unwrap(),
                 &position.position,
                 rotation.yaw as f32,
                 rotation.pitch as f32,
@@ -1278,10 +1246,9 @@ impl Server {
     pub fn key_press(&self, down: bool, key: Actionkey, focused: &mut bool) -> bool {
         if *focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
             let mut state_changed = false;
-            if let Some(player) = *self.player.clone().write() {
+            if let Some(player) = self.player.load().as_ref() {
                 if let Some(mut movement) = self
                     .entities
-                    .clone()
                     .write()
                     .world
                     .entity_mut(player.1)
@@ -1294,15 +1261,10 @@ impl Server {
             match key {
                 Actionkey::OpenInv => {
                     if down {
-                        let player_inv = self
-                            .inventory_context
-                            .clone()
-                            .read()
-                            .player_inventory
-                            .clone();
-                        self.inventory_context.clone().write().open_inventory(
+                        let player_inv = self.inventory_context.read().player_inventory.clone();
+                        self.inventory_context.write().open_inventory(
                             player_inv,
-                            self.screen_sys.clone(),
+                            &self.screen_sys,
                             self.inventory_context.clone(),
                         );
                         return true;
@@ -1337,7 +1299,7 @@ impl Server {
         if focused {
             let mut entities = self.entities.write();
             // check if the player exists, as it might not be initialized very early on server join
-            if let Some(player) = self.player.read().as_ref() {
+            if let Some(player) = self.player.load().as_ref() {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
                 mouse_buttons.left = true;
@@ -1351,7 +1313,7 @@ impl Server {
         if focused {
             let mut entities = self.entities.write();
             // check if the player exists, as it might not be initialized very early on server join
-            if let Some(player) = self.player.read().as_ref() {
+            if let Some(player) = self.player.load().as_ref() {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
                 mouse_buttons.left = false;
@@ -1362,19 +1324,18 @@ impl Server {
 
     #[allow(unused_must_use)]
     pub fn on_right_click(&self, focused: bool) {
-        if self.player.clone().read().is_some() && focused {
-            let world = self.world.clone();
+        if self.player.load().as_ref().is_some() && focused {
             let gamemode = *self
                 .entities
                 .read()
                 .world
-                .entity(self.player.clone().read().as_ref().unwrap().1)
+                .entity(self.player.load().as_ref().unwrap().1)
                 .get::<GameMode>()
                 .unwrap();
             if gamemode.can_interact_with_world() {
                 // TODO: Check this
                 if let Some((pos, _, face, at)) = target::trace_ray(
-                    &world,
+                    &self.world,
                     4.0,
                     self.renderer.camera.lock().pos.to_vec(),
                     self.renderer.view_vector.lock().cast().unwrap(),
@@ -1382,21 +1343,20 @@ impl Server {
                 ) {
                     let hud_context = self.hud_context.clone();
                     packet::send_block_place(
-                        self.conn.clone().write().as_mut().unwrap(),
+                        self.conn.write().as_mut().unwrap(),
                         pos,
                         face.index() as u8,
                         at,
                         Hand::MainHand,
                         Box::new(move || {
                             hud_context
-                                .clone()
                                 .read()
                                 .slots
                                 .as_ref()
                                 .unwrap()
                                 .clone()
                                 .read()
-                                .get_item((27 + hud_context.clone().read().get_slot_index()) as u16)
+                                .get_item((27 + hud_context.read().get_slot_index()) as u16)
                                 .as_ref()
                                 .map(|item| item.stack.clone())
                         }),
@@ -1412,7 +1372,7 @@ impl Server {
 
             let mut entities = self.entities.write();
             // check if the player exists, as it might not be initialized very early on server join
-            if let Some(player) = self.player.read().as_ref() {
+            if let Some(player) = self.player.load().as_ref() {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
                 mouse_buttons.right = true;
@@ -1425,7 +1385,7 @@ impl Server {
         if focused {
             let mut entities = self.entities.write();
             // check if the player exists, as it might not be initialized very early on server join
-            if let Some(player) = self.player.read().as_ref() {
+            if let Some(player) = self.player.load().as_ref() {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
                 mouse_buttons.right = false;
@@ -1440,8 +1400,7 @@ impl Server {
     }
 
     pub fn write_packet<T: protocol::PacketType>(&self, p: T) {
-        let conn = self.conn.clone();
-        let mut conn = conn.write();
+        let mut conn = self.conn.write();
         if conn.is_some() {
             let result = conn.as_mut().unwrap().write_packet(p);
             if result.is_ok() {
@@ -1510,17 +1469,14 @@ impl Server {
                         item_substitutions: _,
                     } => {
                         debug!("Received FML|HS ModIdData");
+                        let mut mod_ids = self.world.modded_block_ids.load().as_ref().clone();
                         for m in mappings.data {
                             let (namespace, name) = m.name.split_at(1);
                             if namespace == protocol::forge::BLOCK_NAMESPACE {
-                                self.world
-                                    .clone()
-                                    .modded_block_ids
-                                    .clone()
-                                    .write()
-                                    .insert(m.id.0 as usize, name.to_string());
+                                mod_ids.insert(m.id.0 as usize, name.to_string());
                             }
                         }
+                        self.world.modded_block_ids.store(Arc::new(mod_ids));
                         self.write_fmlhs_plugin_message(&HandshakeAck {
                             phase: WaitingServerComplete,
                         });
@@ -1534,14 +1490,11 @@ impl Server {
                     } => {
                         debug!("Received FML|HS RegistryData for {}", name);
                         if name == "minecraft:blocks" {
+                            let mut mod_ids = self.world.modded_block_ids.load().as_ref().clone();
                             for m in ids.data {
-                                self.world
-                                    .clone()
-                                    .modded_block_ids
-                                    .clone()
-                                    .write()
-                                    .insert(m.id.0 as usize, m.name);
+                                mod_ids.insert(m.id.0 as usize, m.name);
                             }
+                            self.world.modded_block_ids.store(Arc::new(mod_ids));
                         }
                         if !has_more {
                             self.write_fmlhs_plugin_message(&HandshakeAck {
@@ -1570,7 +1523,6 @@ impl Server {
     fn write_fmlhs_plugin_message(&self, msg: &forge::FmlHs) {
         let _ = self
             .conn
-            .clone()
             .write()
             .as_mut()
             .unwrap()
@@ -1580,7 +1532,6 @@ impl Server {
     fn write_plugin_message(&self, channel: &str, data: &[u8]) {
         let _ = self
             .conn
-            .clone()
             .write()
             .as_mut()
             .unwrap()
@@ -1594,7 +1545,7 @@ impl Server {
             slot,
             inventory_id
         );*/
-        let top_inventory = self.inventory_context.clone();
+        let top_inventory = &self.inventory_context;
         let inventory = if inventory_id == -1 || inventory_id == 0 {
             top_inventory.read().player_inventory.clone() // TODO: This caused a race condition, check why!
         } else if let Some(inventory) = top_inventory.read().safe_inventory.as_ref() {
@@ -1603,7 +1554,7 @@ impl Server {
             println!("Couldn't set item to slot {}", slot);
             return;
         };
-        let curr_slots = inventory.clone().read().size();
+        let curr_slots = inventory.read().size();
         if slot < 0 || slot as u16 >= curr_slots {
             if slot == -1 {
                 let item = item.map(|stack| {
@@ -1625,7 +1576,7 @@ impl Server {
                     material: to_material(id as u16, self.mapped_protocol_version),
                 }
             });
-            inventory.clone().write().set_item(slot as u16, item);
+            inventory.write().set_item(slot as u16, item);
             self.hud_context
                 .write()
                 .dirty_slots
@@ -1643,9 +1594,8 @@ impl Server {
     fn on_game_join(&self, gamemode: u8, entity_id: i32) {
         let gamemode = GameMode::from_int((gamemode & 0x7) as i32);
         let player = entity::player::create_local(&mut self.entities.clone().write());
-        if let Some(info) = self.players.clone().read().get(&self.uuid) {
-            let entities = self.entities.clone();
-            let mut entities = entities.write();
+        if let Some(info) = self.players.read().get(&self.uuid) {
+            let mut entities = self.entities.write();
             let mut player = entities.world.entity_mut(player);
             let mut model = player.get_mut::<PlayerModel>().unwrap();
             model.set_skin(info.skin_url.clone());
@@ -1653,14 +1603,12 @@ impl Server {
         self.hud_context.clone().write().update_game_mode(gamemode);
         *self
             .entities
-            .clone()
             .write()
             .world
             .entity_mut(player)
             .get_mut::<GameMode>()
             .unwrap() = gamemode;
         self.entities
-            .clone()
             .write()
             .world
             .entity_mut(player)
@@ -1668,17 +1616,17 @@ impl Server {
             .unwrap()
             .flying = gamemode.can_fly();
 
-        self.entity_map.clone().write().insert(entity_id, player);
-        self.player.clone().write().replace((entity_id, player));
+        self.entity_map.write().insert(entity_id, player);
+        self.player.store(Some(Arc::new((entity_id, player))));
 
         // Let the server know who we are
         let brand = plugin_messages::Brand {
             brand: "leafish".into(),
         };
-        brand.write_to(self.conn.clone().write().as_mut().unwrap());
+        brand.write_to(self.conn.write().as_mut().unwrap());
 
         packet::send_client_settings(
-            self.conn.clone().write().as_mut().unwrap(),
+            self.conn.write().as_mut().unwrap(),
             "en_us".to_string(),
             8,
             0,
@@ -1699,30 +1647,28 @@ impl Server {
             ..
         } = respawn;
 
-        for entity in &*self.entity_map.clone().write() {
+        for entity in &*self.entity_map.write() {
             if self.entities.read().world.get_entity(*entity.1).is_some() {
-                self.entities.clone().write().world.despawn(*entity.1);
+                self.entities.write().world.despawn(*entity.1);
             }
         }
 
-        let entity_id = self.player.read().unwrap().0;
-        let local_player = create_local(&mut self.entities.clone().write());
-        *self.player.clone().write() = Some((entity_id, local_player));
+        let entity_id = self.player.load().as_ref().unwrap().0;
+        let local_player = create_local(&mut self.entities.write());
+        self.player.store(Some(Arc::new((entity_id, local_player))));
         let gamemode = GameMode::from_int((gamemode & 0x7) as i32);
 
-        if let Some(player) = *self.player.clone().write() {
-            self.hud_context.clone().write().update_game_mode(gamemode);
+        if let Some(player) = self.player.load().as_ref() {
+            self.hud_context.write().update_game_mode(gamemode);
 
             *self
                 .entities
-                .clone()
                 .write()
                 .world
                 .entity_mut(player.1)
                 .get_mut::<GameMode>()
                 .unwrap() = gamemode;
             self.entities
-                .clone()
                 .write()
                 .world
                 .entity_mut(player.1)
@@ -1733,21 +1679,17 @@ impl Server {
         if self.dead.load(Ordering::Acquire) {
             self.dead.store(false, Ordering::Release);
             self.just_died.store(false, Ordering::Release);
-            self.hud_context
-                .clone()
-                .write()
-                .update_health_and_food(20.0, 20, 0); // TODO: Verify this!
-            self.hud_context.clone().write().update_slot_index(0);
-            self.hud_context.clone().write().update_exp(0.0, 0);
-            self.hud_context.clone().write().update_absorbtion(0.0);
-            self.hud_context.clone().write().update_armor(0);
-            // self.hud_context.clone().write().update_breath(-1); // TODO: Fix this!
+            let mut hud_context = self.hud_context.write();
+            hud_context.update_health_and_food(20.0, 20, 0); // TODO: Verify this!
+            hud_context.update_slot_index(0);
+            hud_context.update_exp(0.0, 0);
+            hud_context.update_absorbtion(0.0);
+            hud_context.update_armor(0);
+            // hud_context.update_breath(-1); // TODO: Fix this!
+            drop(hud_context);
             self.screen_sys.pop_screen();
         }
-        self.entity_map
-            .clone()
-            .write()
-            .insert(entity_id, local_player);
+        self.entity_map.write().insert(entity_id, local_player);
 
         let dimension = dimension
             .map(world::Dimension::from_index)
@@ -1767,32 +1709,30 @@ impl Server {
     }
 
     fn on_time_update(&self, time_update: mapped_packet::play::clientbound::TimeUpdate) {
-        self.world_data.clone().write().world_age = time_update.time_of_day;
-        self.world_data.clone().write().world_time_target =
-            (time_update.time_of_day % 24000) as f64;
-        if self.world_data.clone().read().world_time_target < 0.0 {
-            self.world_data.clone().write().world_time_target *= -1.0;
-            self.world_data.clone().write().tick_time = false;
+        let mut world_data = self.world_data.write();
+        world_data.world_age = time_update.time_of_day;
+        world_data.world_time_target = (time_update.time_of_day % 24000) as f64;
+        if world_data.world_time_target < 0.0 {
+            world_data.world_time_target *= -1.0;
+            world_data.tick_time = false;
         } else {
-            self.world_data.clone().write().tick_time = true;
+            world_data.tick_time = true;
         }
     }
 
     fn on_game_state_change(&self, game_state: mapped_packet::play::clientbound::ChangeGameState) {
         if game_state.reason == 3 {
-            if let Some(player) = *self.player.write() {
+            if let Some(player) = self.player.load().as_ref() {
                 let gamemode = GameMode::from_int(game_state.value as i32);
                 self.hud_context.clone().write().update_game_mode(gamemode);
                 *self
                     .entities
-                    .clone()
                     .write()
                     .world
                     .entity_mut(player.1)
                     .get_mut::<GameMode>()
                     .unwrap() = gamemode;
                 self.entities
-                    .clone()
                     .write()
                     .world
                     .entity_mut(player.1)
@@ -1815,10 +1755,9 @@ impl Server {
     ) {
         let entity_type = entity::versions::to_entity_type(ty, self.mapped_protocol_version);
         if entity_type != EntityType::Unknown {
-            let entity =
-                entity_type.create_entity(&mut self.entities.clone().write(), x, y, z, yaw, pitch);
+            let entity = entity_type.create_entity(&mut self.entities.write(), x, y, z, yaw, pitch);
             if let Some(entity) = entity {
-                self.entity_map.clone().write().insert(entity_id, entity);
+                self.entity_map.write().insert(entity_id, entity);
                 println!("spawned {} {:?}", ty, entity_type);
             }
         }
@@ -1826,8 +1765,8 @@ impl Server {
 
     fn on_entity_destroy(&self, entity_destroy: mapped_packet::play::clientbound::EntityDestroy) {
         for id in entity_destroy.entity_ids {
-            if let Some(entity) = self.entity_map.clone().write().remove(&id) {
-                self.entities.clone().write().world.despawn(entity);
+            if let Some(entity) = self.entity_map.write().remove(&id) {
+                self.entities.write().world.despawn(entity);
             }
         }
     }
@@ -1843,9 +1782,8 @@ impl Server {
         _on_ground: bool,
     ) {
         use std::f64::consts::PI;
-        if let Some(entity) = self.entity_map.clone().read().get(&entity_id) {
-            let entities = self.entities.clone();
-            let mut entities = entities.write();
+        if let Some(entity) = self.entity_map.read().get(&entity_id) {
+            let mut entities = self.entities.write();
             let mut entity = entities.world.entity_mut(*entity);
             let mut target_position = entity.get_mut::<TargetPosition>().unwrap();
             target_position.position.x = x;
@@ -1858,9 +1796,8 @@ impl Server {
     }
 
     fn on_entity_move(&self, entity_move: mapped_packet::play::clientbound::EntityMove) {
-        if let Some(entity) = self.entity_map.clone().read().get(&entity_move.entity_id) {
-            let entities = self.entities.clone();
-            let mut entities = entities.write();
+        if let Some(entity) = self.entity_map.read().get(&entity_move.entity_id) {
+            let mut entities = self.entities.write();
             let mut entity = entities.world.entity_mut(*entity);
             let mut position = entity.get_mut::<TargetPosition>().unwrap();
             position.position.x += entity_move.delta_x;
@@ -1871,9 +1808,8 @@ impl Server {
 
     fn on_entity_look(&self, entity_id: i32, yaw: f64, pitch: f64) {
         use std::f64::consts::PI;
-        if let Some(entity) = self.entity_map.clone().read().get(&entity_id) {
-            let entities = self.entities.clone();
-            let mut entities = entities.write();
+        if let Some(entity) = self.entity_map.read().get(&entity_id) {
+            let mut entities = self.entities.write();
             let mut entity = entities.world.entity_mut(*entity);
             let mut rotation = entity.get_mut::<TargetRotation>().unwrap();
             rotation.yaw = -(yaw / 256.0) * PI * 2.0;
@@ -1891,9 +1827,8 @@ impl Server {
         pitch: f64,
     ) {
         use std::f64::consts::PI;
-        if let Some(entity) = self.entity_map.clone().read().get(&entity_id) {
-            let entities = self.entities.clone();
-            let mut entities = entities.write();
+        if let Some(entity) = self.entity_map.read().get(&entity_id) {
+            let mut entities = self.entities.write();
             let mut entity = entities.world.entity_mut(*entity);
             let mut position = entity.get_mut::<TargetPosition>().unwrap();
             position.position.x += delta_x;
@@ -1916,19 +1851,17 @@ impl Server {
         yaw: f64,
     ) {
         use std::f64::consts::PI;
-        if let Some(entity) = self.entity_map.clone().write().remove(&entity_id) {
-            self.entities.clone().write().world.despawn(entity);
+        if let Some(entity) = self.entity_map.write().remove(&entity_id) {
+            self.entities.write().world.despawn(entity);
         }
         let world_entity = entity::player::create_remote(
-            &mut self.entities.clone().write(),
+            &mut self.entities.write(),
             self.players
-                .clone()
                 .read()
                 .get(&uuid)
                 .map_or("MISSING", |v| &v.name),
         );
-        let entities = self.entities.clone();
-        let mut entities = entities.write();
+        let mut entities = self.entities.write();
         let mut entity = entities.world.entity_mut(world_entity);
         {
             let mut position = entity.get_mut::<crate::entity::Position>().unwrap();
@@ -1953,7 +1886,7 @@ impl Server {
             target_rotation.yaw = yaw;
             target_rotation.pitch = pitch;
         }
-        if let Some(info) = self.players.clone().read().get(&uuid) {
+        if let Some(info) = self.players.read().get(&uuid) {
             let mut model = entity.get_mut::<PlayerModel>().unwrap();
             model.set_skin(info.skin_url.clone());
         }
@@ -1965,10 +1898,9 @@ impl Server {
 
     fn on_teleport_player(&self, teleport: mapped_packet::play::clientbound::TeleportPlayer) {
         use std::f64::consts::PI;
-        if let Some(player) = *self.player.clone().write() {
+        if let Some(player) = self.player.load().as_ref() {
             let flags = teleport.flags.unwrap_or(0);
-            let entities = self.entities.clone();
-            let mut entities = entities.write();
+            let mut entities = self.entities.write();
             let mut player_entity = entities.world.entity_mut(player.1);
 
             let mut position = player_entity.get_mut::<TargetPosition>().unwrap();
@@ -2034,7 +1966,6 @@ impl Server {
             None => {
                 // NBT is null, so we need to remove the block entity
                 self.world
-                    .clone()
                     .add_block_entity_action(world::BlockEntityAction::Remove(
                         block_update.location,
                     ));
@@ -2099,7 +2030,6 @@ impl Server {
         update_sign.line3 = update_sign.line3.try_update_with_legacy();
         update_sign.line4 = update_sign.line4.try_update_with_legacy();
         self.world
-            .clone()
             .add_block_entity_action(world::BlockEntityAction::UpdateSignText(Box::new((
                 update_sign.location,
                 update_sign.line1,
@@ -2144,8 +2074,7 @@ impl Server {
                     gamemode,
                     ping,
                 } => {
-                    let players = self.players.clone();
-                    let mut players = players.write();
+                    let mut players = self.players.write();
                     let info = players.entry(uuid.clone()).or_insert(PlayerInfo {
                         name: name.clone(),
                         uuid,
@@ -2199,32 +2128,31 @@ impl Server {
                     // This isn't an issue for other players because this packet
                     // must come before the spawn player packet.
                     if info.uuid == self.uuid {
-                        let entities = self.entities.clone();
-                        let mut entities = entities.write();
+                        let mut entities = self.entities.write();
                         let mut player = entities
                             .world
-                            .entity_mut(self.player.clone().write().unwrap().1);
+                            .entity_mut(self.player.load().as_ref().unwrap().1);
                         let mut model = player.get_mut::<entity::player::PlayerModel>().unwrap();
                         model.set_skin(info.skin_url.clone());
                     }
                 }
                 UpdateGamemode { uuid, gamemode } => {
-                    if let Some(info) = self.players.clone().write().get_mut(&uuid) {
+                    if let Some(info) = self.players.write().get_mut(&uuid) {
                         info.gamemode = GameMode::from_int(gamemode.0);
                     }
                 }
                 UpdateLatency { uuid, ping } => {
-                    if let Some(info) = self.players.clone().write().get_mut(&uuid) {
+                    if let Some(info) = self.players.write().get_mut(&uuid) {
                         info.ping = ping.0;
                     }
                 }
                 UpdateDisplayName { uuid, display } => {
-                    if let Some(info) = self.players.clone().write().get_mut(&uuid) {
+                    if let Some(info) = self.players.write().get_mut(&uuid) {
                         info.display_name = display;
                     }
                 }
                 Remove { uuid } => {
-                    self.players.clone().write().remove(&uuid);
+                    self.players.write().remove(&uuid);
                 }
             }
         }
@@ -2233,13 +2161,9 @@ impl Server {
     fn on_servermessage(&self, message: mapped_packet::play::clientbound::ServerMessage) {
         debug!("Received chat message: {}", message.message);
         self.hud_context
-            .clone()
             .write()
             .display_message_in_chat(message.message);
-        self.received_chat_at
-            .clone()
-            .write()
-            .replace(Instant::now());
+        self.received_chat_at.store(Some(Arc::new(Instant::now())));
     }
 
     fn load_block_entities(&self, block_entities: Vec<Option<crate::nbt::NamedTag>>) {
@@ -2278,7 +2202,6 @@ impl Server {
         sky_light: bool,
     ) {
         self.world
-            .clone()
             .load_chunk115(
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
@@ -2297,7 +2220,6 @@ impl Server {
         sky_light: bool,
     ) {
         self.world
-            .clone()
             .load_chunk115(
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
@@ -2316,7 +2238,6 @@ impl Server {
         sky_light: bool,
     ) {
         self.world
-            .clone()
             .load_chunk115(
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
@@ -2335,7 +2256,6 @@ impl Server {
         sky_light: bool,
     ) {
         self.world
-            .clone()
             .load_chunk19(
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
@@ -2354,7 +2274,6 @@ impl Server {
         sky_light: bool,
     ) {
         self.world
-            .clone()
             .load_chunk19(
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
@@ -2373,7 +2292,6 @@ impl Server {
         sky_light: bool,
     ) {
         self.world
-            .clone()
             .load_chunk19(
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
@@ -2396,14 +2314,12 @@ impl Server {
         }];
         let skylight = false;
         self.world
-            .clone()
             .load_chunks18(chunk_data.new, skylight, &chunk_meta, chunk_data.data)
             .unwrap();
     }
 
     fn on_chunk_data_17(&self, chunk_data: mapped_packet::play::clientbound::ChunkData_17) {
         self.world
-            .clone()
             .load_chunk17(
                 chunk_data.chunk_x,
                 chunk_data.chunk_z,
@@ -2418,7 +2334,6 @@ impl Server {
     fn on_chunk_data_bulk(&self, bulk: mapped_packet::play::clientbound::ChunkDataBulk) {
         let new = true;
         self.world
-            .clone()
             .load_chunks18(
                 new,
                 bulk.skylight,
@@ -2430,7 +2345,6 @@ impl Server {
 
     fn on_chunk_data_bulk_17(&self, bulk: mapped_packet::play::clientbound::ChunkDataBulk_17) {
         self.world
-            .clone()
             .load_chunks17(
                 bulk.chunk_column_count,
                 bulk.data_length,
@@ -2441,18 +2355,16 @@ impl Server {
     }
 
     fn on_chunk_unload(&self, chunk_unload: mapped_packet::play::clientbound::ChunkUnload) {
-        self.world.clone().unload_chunk(
-            chunk_unload.x,
-            chunk_unload.z,
-            &mut self.entities.clone().write(),
-        );
+        self.world
+            .unload_chunk(chunk_unload.x, chunk_unload.z, &mut self.entities.write());
     }
 
     fn on_block_change_in_world(&self, location: Position, id: i32) {
-        let world = self.world.clone();
-        let modded_block_ids = world.modded_block_ids.clone();
-        let block = world.id_map.by_vanilla_id(id as usize, modded_block_ids);
-        world.set_block(location, block)
+        let block = self
+            .world
+            .id_map
+            .by_vanilla_id(id as usize, &self.world.modded_block_ids.load());
+        self.world.set_block(location, block)
     }
 
     fn on_block_change(&self, block_change: mapped_packet::play::clientbound::BlockChange) {
@@ -2491,15 +2403,12 @@ impl Server {
 
     pub fn on_update_health(&self, health: f32, food: u8, saturation: u8) {
         self.hud_context
-            .clone()
             .write()
             .update_health_and_food(health, food, saturation);
         if health <= 0.0 && !self.dead.load(Ordering::Acquire) {
             self.dead.store(true, Ordering::Release);
             self.screen_sys.close_closable_screens();
-            self.screen_sys
-                .clone()
-                .add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
+            self.screen_sys.add_screen(Box::new(Respawn::new(0))); // TODO: Use the correct score!
         }
     }
 }

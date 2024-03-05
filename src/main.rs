@@ -49,6 +49,7 @@ use winit::keyboard::SmolStr;
 use winit::raw_window_handle::HasDisplayHandle;
 #[cfg(target_os = "linux")]
 use winit::raw_window_handle::RawDisplayHandle;
+use winit::window::CursorGrabMode;
 use winit::window::Icon;
 extern crate leafish_shared as shared;
 
@@ -570,8 +571,8 @@ fn tick_all(
     }
     let fps_cap = game.settings.get_int(IntSetting::MaxFps);
 
-    if game.server.is_some() {
-        game.server.as_ref().unwrap().clone().tick(delta, game); // TODO: Improve perf in load screen!
+    if let Some(server) = game.server.as_ref() {
+        server.clone().tick(delta, game); // TODO: Improve perf in load screen!
     }
 
     // Check if window is valid, it might be minimized
@@ -579,13 +580,10 @@ fn tick_all(
         return;
     }
 
-    if game.server.is_some() {
+    if let Some(server) = game.server.as_ref() {
         game.renderer.update_camera(physical_width, physical_height);
-        game.chunk_builder.tick(
-            game.server.as_ref().unwrap().world.clone(),
-            game.renderer.clone(),
-            version,
-        );
+        game.chunk_builder
+            .tick(server.world.clone(), game.renderer.clone(), version);
     } else if game.renderer.screen_data.read().safe_width != physical_width
         || game.renderer.screen_data.read().safe_height != physical_height
     {
@@ -598,20 +596,20 @@ fn tick_all(
         .screen_sys
         .tick(delta, game.renderer.clone(), ui_container, window)
     {
-        window
-            .set_cursor_grab(winit::window::CursorGrabMode::None)
-            .unwrap();
-        window.set_cursor_visible(true);
-        game.focused = false;
-    } else {
+        if game.focused {
+            window
+                .set_cursor_grab(winit::window::CursorGrabMode::None)
+                .unwrap();
+            window.set_cursor_visible(true);
+            game.focused = false;
+        }
+    } else if !game.focused {
         // see https://docs.rs/winit/latest/winit/window/enum.CursorGrabMode.html
         // fix for https://github.com/Lea-fish/Leafish/issues/265
-        let cursor_grab_mode = if cfg!(target_os = "macos") {
-            winit::window::CursorGrabMode::Locked
-        } else {
-            winit::window::CursorGrabMode::Confined
-        };
-        window.set_cursor_grab(cursor_grab_mode).unwrap();
+        // prefer Locked cursor mode, and fallback to Confined if that doesn't work
+        if window.set_cursor_grab(CursorGrabMode::Locked).is_err() {
+            window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
+        }
         window.set_cursor_visible(false);
         game.focused = true;
     }
@@ -619,9 +617,11 @@ fn tick_all(
         .lock()
         .tick(ui_container, game.renderer.clone(), delta, width as f64);
     ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
-    let world = game.server.as_ref().map(|server| server.world.clone());
+    let world = game
+        .server
+        .as_ref()
+        .map(|server: &Arc<server::Server>| server.world.clone());
     game.renderer
-        .clone()
         .tick(world, delta, width, height, physical_width, physical_height);
     if game.server.is_some() {
         game.server
@@ -679,40 +679,24 @@ fn handle_window_event<T>(
 
             use std::f64::consts::PI;
 
-            if game.focused {
-                // see https://docs.rs/winit/latest/winit/window/enum.CursorGrabMode.html
-                // fix for https://github.com/Lea-fish/Leafish/issues/265
-                let cursor_grab_mode = if cfg!(target_os = "macos") {
-                    winit::window::CursorGrabMode::Locked
-                } else {
-                    winit::window::CursorGrabMode::Confined
-                };
-                window.set_cursor_grab(cursor_grab_mode).unwrap();
-                window.set_cursor_visible(false);
-                if game.server.is_some()
-                    && !game.server.as_ref().unwrap().dead.load(Ordering::Acquire)
-                {
-                    if let Some(player) = *game.server.as_ref().unwrap().player.write() {
-                        let server = game.server.as_ref().unwrap();
-                        let entities = server.entities.clone();
-                        let mut entities = entities.write();
-                        let mut player = entities.world.entity_mut(player.1);
-                        let mut rotation = player.get_mut::<Rotation>().unwrap();
-                        rotation.yaw -= rx;
-                        rotation.pitch -= ry;
-                        if rotation.pitch < (PI / 2.0) + 0.01 {
-                            rotation.pitch = (PI / 2.0) + 0.01;
-                        }
-                        if rotation.pitch > (PI / 2.0) * 3.0 - 0.01 {
-                            rotation.pitch = (PI / 2.0) * 3.0 - 0.01;
-                        }
+            if game.focused
+                && game.server.is_some()
+                && !game.server.as_ref().unwrap().dead.load(Ordering::Acquire)
+            {
+                if let Some(player) = game.server.as_ref().unwrap().player.load().as_ref() {
+                    let server = game.server.as_ref().unwrap();
+                    let mut entities = server.entities.write();
+                    let mut player = entities.world.entity_mut(player.1);
+                    let mut rotation = player.get_mut::<Rotation>().unwrap();
+                    rotation.yaw -= rx;
+                    rotation.pitch -= ry;
+                    if rotation.pitch < (PI / 2.0) + 0.01 {
+                        rotation.pitch = (PI / 2.0) + 0.01;
+                    }
+                    if rotation.pitch > (PI / 2.0) * 3.0 - 0.01 {
+                        rotation.pitch = (PI / 2.0) * 3.0 - 0.01;
                     }
                 }
-            } else {
-                window
-                    .set_cursor_grab(winit::window::CursorGrabMode::None)
-                    .unwrap();
-                window.set_cursor_visible(true);
             }
         }
 

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use arc_swap::ArcSwap;
 pub use leafish_blocks as block;
 use leafish_protocol::nbt::NamedTag;
 
@@ -71,25 +72,25 @@ pub struct World {
     block_entity_actions: (Sender<BlockEntityAction>, Receiver<BlockEntityAction>),
 
     protocol_version: i32,
-    pub modded_block_ids: Arc<RwLock<HashMap<usize, String>>>,
+    pub modded_block_ids: ArcSwap<HashMap<usize, String>>,
     pub id_map: Arc<block::VanillaIDMap>,
 
-    pub dimension: Arc<RwLock<Dimension>>,
+    pub dimension: ArcSwap<Dimension>,
 }
 
 impl World {
-    pub fn new(protocol_version: i32, sender: Sender<LightUpdate>) -> World {
+    pub fn new(protocol_version: i32, sender: Sender<LightUpdate>) -> Self {
         let id_map = Arc::new(block::VanillaIDMap::new(protocol_version));
-        World {
+        Self {
             chunks: Arc::new(Default::default()),
             lighting_cache: Arc::new(Default::default()),
             protocol_version,
-            modded_block_ids: Arc::new(Default::default()),
+            modded_block_ids: ArcSwap::new(Arc::new(Default::default())),
             id_map,
             light_updates: sender,
             render_list: Arc::new(Default::default()),
             block_entity_actions: unbounded(),
-            dimension: Arc::new(Default::default()),
+            dimension: ArcSwap::new(Arc::new(Default::default())),
         }
     }
 
@@ -855,7 +856,7 @@ impl World {
                 if chunk.sections[i].is_none() {
                     let mut fill_sky = chunk.sections.iter().skip(i).all(|v| v.is_none());
                     fill_sky &= (mask & !((1 << i) | ((1 << i) - 1))) == 0;
-                    fill_sky &= self.dimension.read().has_sky_light();
+                    fill_sky &= self.dimension.load().has_sky_light();
                     if !fill_sky || mask & (1 << i) != 0 {
                         chunk.sections[i] = Some(ChunkSection::new(i as u8, fill_sky));
                     }
@@ -933,7 +934,7 @@ impl World {
                 let id = VarInt::read_from(data).unwrap().0;
                 let bl = self
                     .id_map
-                    .by_vanilla_id(id as usize, self.modded_block_ids.clone());
+                    .by_vanilla_id(id as usize, self.modded_block_ids.load().as_ref());
                 mappings.insert(i as usize, bl);
             }
         }
@@ -951,7 +952,8 @@ impl World {
                     .cloned()
                     // TODO: fix or_fun_call, but do not re-borrow self
                     .unwrap_or_else(|| {
-                        self.id_map.by_vanilla_id(id, self.modded_block_ids.clone())
+                        self.id_map
+                            .by_vanilla_id(id, self.modded_block_ids.load().as_ref())
                     }),
             );
             // Spawn block entities
@@ -995,7 +997,7 @@ impl World {
             section.blocks.set(
                 bi,
                 self.id_map
-                    .by_vanilla_id(id as usize, self.modded_block_ids.clone()),
+                    .by_vanilla_id(id as usize, &self.modded_block_ids.load()),
             );
 
             // Spawn block entities
@@ -1131,7 +1133,7 @@ impl World {
                 section.blocks.set(
                     bi,
                     self.id_map
-                        .by_vanilla_id(id as usize, self.modded_block_ids.clone()),
+                        .by_vanilla_id(id as usize, &self.modded_block_ids.load()),
                 );
 
                 // Spawn block entities
@@ -1421,8 +1423,7 @@ impl World {
     }
 
     pub fn set_dimension(&self, new_dimension: Dimension) {
-        let mut dimension = self.dimension.write();
-        *dimension = new_dimension;
+        self.dimension.store(Arc::new(new_dimension));
     }
 }
 

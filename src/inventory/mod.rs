@@ -63,14 +63,14 @@ pub trait Inventory {
 
     fn init(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     );
 
     fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     );
@@ -79,7 +79,7 @@ pub trait Inventory {
         &mut self,
         _width: u32,
         _height: u32,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -95,7 +95,7 @@ pub trait Inventory {
 pub fn inventory_from_type(
     ty: InventoryType,
     title: Component,
-    renderer: Arc<Renderer>,
+    renderer: &Arc<Renderer>,
     base_slots: Arc<RwLock<SlotMapping>>,
     id: i32,
 ) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
@@ -203,12 +203,12 @@ pub struct InventoryContext {
 
 impl InventoryContext {
     pub fn get_conn(&self) -> Conn {
-        self.conn.clone().write().clone().unwrap()
+        self.conn.write().clone().unwrap()
     }
 
     pub fn new(
         version: Version,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         hud_context: Arc<RwLock<HudContext>>,
         conn: Arc<RwLock<Option<Conn>>>,
     ) -> Self {
@@ -251,16 +251,16 @@ impl InventoryContext {
     pub fn open_inventory(
         &mut self,
         inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
-        screen_sys: Arc<ScreenSystem>,
+        screen_sys: &Arc<ScreenSystem>,
         self_ref: Arc<RwLock<InventoryContext>>,
     ) {
-        self.try_close_inventory(screen_sys.clone());
+        self.try_close_inventory(screen_sys);
         screen_sys.add_screen(Box::new(InventoryWindow::new(inventory.clone(), self_ref)));
         self.safe_inventory.replace(inventory.clone());
         self.has_inv_open = true;
     }
 
-    pub fn try_close_inventory(&mut self, screen_sys: Arc<ScreenSystem>) -> bool {
+    pub fn try_close_inventory(&mut self, screen_sys: &Arc<ScreenSystem>) -> bool {
         if self.has_inv_open {
             self.has_inv_open = false;
             if let Some(inventory) = self.safe_inventory.take() {
@@ -291,7 +291,7 @@ impl InventoryContext {
             inventory_window.text_elements.get_mut(3).unwrap().clear();
             if let Some(item) = &self.cursor {
                 if let Some(mouse_position) = &self.mouse_position {
-                    let scale = Hud::icon_scale(renderer.clone());
+                    let scale = Hud::icon_scale(&renderer);
                     let (x, y) = *mouse_position;
                     // Center the icon on the mouse position
                     let x = x - scale * 8.0;
@@ -304,7 +304,7 @@ impl InventoryContext {
                         &mut inventory_window.cursor_element,
                         inventory_window.text_elements.get_mut(3).unwrap(),
                         ui_container,
-                        renderer,
+                        &renderer,
                         VAttach::Top,
                     );
                 }

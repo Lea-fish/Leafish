@@ -46,10 +46,10 @@ impl ChatContext {
     }
 
     pub fn push_msg(&self, message: Component) {
-        if self.messages.clone().read().len() >= MAX_MESSAGES {
-            self.messages.clone().write().remove(0);
+        if self.messages.read().len() >= MAX_MESSAGES {
+            self.messages.write().remove(0);
         }
-        self.messages.clone().write().push((START_TICKS, message));
+        self.messages.write().push((START_TICKS, message));
         self.dirty.store(true, Ordering::Release);
     }
 
@@ -60,7 +60,7 @@ impl ChatContext {
     pub fn tick_visible_messages(&self) -> Vec<(usize, Component)> {
         // TODO: Provide all non-faded out messages and decrement their life counter
         let mut ret = vec![];
-        for message in self.messages.clone().write().iter_mut().rev() {
+        for message in self.messages.write().iter_mut().rev() {
             if message.0 == 0 {
                 break;
             }
@@ -200,7 +200,7 @@ impl super::Screen for Chat {
         ui_container: &mut ui::Container,
         _delta: f64,
     ) {
-        let scale = Hud::icon_scale(renderer.clone());
+        let scale = Hud::icon_scale(&renderer);
         if self.animation == 0 {
             self.animation = 20;
             self.animated_tex = Some(
@@ -261,30 +261,25 @@ impl super::Screen for Chat {
 
     fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
         if key.0 == Key::Named(NamedKey::Escape) && !down {
-            game.screen_sys.clone().pop_screen();
+            game.screen_sys.pop_screen();
             return;
         }
         if key.0 == Key::Named(NamedKey::Enter) && !down {
             if !self.written.is_empty() {
-                game.server.as_ref().unwrap().clone().write_packet(
+                game.server.as_ref().unwrap().write_packet(
                     packet::play::serverbound::ChatMessage {
                         message: self.written.clone(),
                     },
                 );
             }
-            game.screen_sys.clone().pop_screen();
+            game.screen_sys.pop_screen();
             return;
         }
         if key.0.eq_ignore_case('v') && game.is_ctrl_pressed {
             if let Ok(clipboard) = game.clipboard_provider.lock().get_contents() {
                 for c in clipboard.chars() {
                     if self.written.len()
-                        >= if game
-                            .server
-                            .as_ref()
-                            .unwrap()
-                            .clone()
-                            .mapped_protocol_version
+                        >= if game.server.as_ref().unwrap().mapped_protocol_version
                             >= Version::V1_11
                         {
                             MAX_MESSAGE_LENGTH_SINCE_1_11
@@ -346,12 +341,12 @@ impl super::Screen for Chat {
 
 impl Chat {
     fn render_chat(&mut self, renderer: Arc<Renderer>, ui_container: &mut Container) {
-        let scale = Hud::icon_scale(renderer.clone());
-        let history_size = self.context.messages.clone().read().len();
+        let scale = Hud::icon_scale(&renderer);
+        let history_size = self.context.messages.read().len();
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
+            let message = self.context.messages.read()[history_size - 1 - i].clone();
             let lines = (renderer.ui.lock().size_of_string(&message.1.to_string())
                 / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;
@@ -390,7 +385,7 @@ impl Chat {
 
         let mut component_lines = 0;
         for i in 0..cmp::min(10, history_size) {
-            let message = self.context.messages.clone().read()[history_size - 1 - i].clone();
+            let message = self.context.messages.read()[history_size - 1 - i].clone();
             let lines = (renderer.ui.lock().size_of_string(&message.1.to_string())
                 / (hud::CHAT_WIDTH * scale))
                 .ceil() as u8;

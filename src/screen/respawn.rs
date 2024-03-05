@@ -47,7 +47,7 @@ impl super::Screen for Respawn {
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        let icon_scale = Hud::icon_scale(renderer.clone());
+        let icon_scale = Hud::icon_scale(&renderer);
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
             .position(0.0, 0.0)

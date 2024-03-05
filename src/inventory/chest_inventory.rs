@@ -27,7 +27,7 @@ pub struct ChestInventory {
 
 impl ChestInventory {
     pub fn new(
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         base_slots: Arc<RwLock<SlotMapping>>,
         rows: u8,
         name: String,
@@ -86,7 +86,7 @@ impl Inventory for ChestInventory {
 
     fn init(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
@@ -98,7 +98,7 @@ impl Inventory for ChestInventory {
         let basic_elements = inventory_window.elements.get_mut(0).unwrap();
         let basic_text_elements = inventory_window.text_elements.get_mut(0).unwrap();
 
-        let icon_scale = Hud::icon_scale(renderer.clone()) as i32;
+        let icon_scale = Hud::icon_scale(renderer) as i32;
         let chest_height_scaled = icon_scale * chest_height(self.rows);
         let inventory_height_scaled = icon_scale * INVENTORY_HEIGHT;
         let total_height_scaled = chest_height_scaled + inventory_height_scaled;
@@ -189,7 +189,7 @@ impl Inventory for ChestInventory {
 
     fn tick(
         &mut self,
-        renderer: Arc<Renderer>,
+        renderer: &Arc<Renderer>,
         ui_container: &mut Container,
         inventory_window: &mut InventoryWindow,
     ) {
