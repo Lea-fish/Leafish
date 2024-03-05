@@ -34,14 +34,13 @@ impl KeybindStore {
     }
 
     pub fn set(&self, key: i32, action: Actionkey) {
-        let old_key = self
+        let old_key = *self
             .0
             .lock()
             .iter()
             .find(|(_, v)| v.action == action)
             .expect("a action was not bound to a key?")
-            .0
-            .clone();
+            .0;
 
         let old_val = self.0.lock().remove(&old_key).unwrap();
         self.0.lock().insert(key, old_val);
@@ -73,12 +72,11 @@ impl KeybindStore {
                     .find(|v| Actionkey::from_str(name).is_ok_and(|k| k == v.action))
                 {
                     if let Some(new_key) = deserialize_key(arg) {
-                        let key = store
+                        let key = *store
                             .iter()
                             .find(|(_, v)| v.action == action.action)
                             .expect("a action was not bound to a key?")
-                            .0
-                            .clone();
+                            .0;
 
                         let old_val = store.remove(&key).unwrap();
                         store.insert(new_key, old_val);
@@ -102,7 +100,7 @@ impl KeybindStore {
                     );
                 }
             }
-            if let Err(err) = write!(file, "{} {}\n\n", keybind.name, *key as i32) {
+            if let Err(err) = write!(file, "{} {}\n\n", keybind.name, *key) {
                 warn!(
                     "couldnt write a keybind to config file {err}, {}",
                     keybind.name
@@ -181,5 +179,11 @@ impl Actionkey {
 
     pub fn values() -> &'static [Actionkey] {
         &Self::VALUES
+    }
+}
+
+impl Default for KeybindStore {
+    fn default() -> Self {
+        Self::new()
     }
 }

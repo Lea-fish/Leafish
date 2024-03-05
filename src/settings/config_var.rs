@@ -1,3 +1,4 @@
+#![allow(clippy::redundant_closure)]
 use crate::paths;
 use log::{info, warn};
 use parking_lot::Mutex;
@@ -217,5 +218,11 @@ fn deserialize_value(input: &str, old: SettingValue) -> Option<SettingValue> {
         SettingValue::Float(_) => input.parse::<f64>().ok().map(|f| SettingValue::Float(f)),
         SettingValue::Bool(_) => input.parse::<bool>().ok().map(|b| SettingValue::Bool(b)),
         SettingValue::String(_) => Some(SettingValue::String(input.to_owned())),
+    }
+}
+
+impl Default for SettingStore {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -219,7 +219,6 @@ impl super::Screen for Launcher {
                 back.add_click_func(move |_, game| {
                     let accounts = accounts.clone();
                     let account_type = account_type.clone();
-                    let idx = idx;
                     let mut client_token = game.settings.get_string(StringSetting::AuthClientToken);
                     if client_token.is_empty() {
                         client_token = std::iter::repeat(())
