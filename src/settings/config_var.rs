@@ -25,11 +25,22 @@ pub struct ConfigVar {
 
 #[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
 pub enum SettingType {
+    Int(IntSetting),
+    Bool(BoolSetting),
+    Float(FloatSetting),
+    String(StringSetting),
+}
+
+#[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
+pub enum IntSetting {
     MaxFps,
     FOV,
-    Vsync,
-    MouseSense,
     MasterVolume,
+}
+
+#[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
+pub enum BoolSetting {
+    Vsync,
     CapeVisible,
     JacketVisible,
     RightSleeveVisible,
@@ -38,6 +49,15 @@ pub enum SettingType {
     LeftPantsVisible,
     HatVisible,
     AutomaticOfflineAccounts,
+}
+
+#[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
+pub enum FloatSetting {
+    MouseSense,
+}
+
+#[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
+pub enum StringSetting {
     AuthClientToken,
     BackgroundImage,
     LogLevelFile,
@@ -46,33 +66,17 @@ pub enum SettingType {
 
 #[rustfmt::skip]
 impl SettingValue {
-    pub fn as_string(&self) -> Option<String> {
+    fn as_string(&self) -> Option<String> {
         if let Self::String(s) = self { Some(s.clone()) } else { None }
     }
-    pub fn as_i32(&self) -> Option<i32> {
+    fn as_int(&self) -> Option<i32> {
         if let Self::Num(n) = self { Some(*n) } else { None }
     }
-    pub fn as_float(&self) -> Option<f64> {
+    fn as_float(&self) -> Option<f64> {
         if let Self::Float(f) = self { Some(*f) } else { None }
     }
-    pub fn as_bool(&self) -> Option<bool> {
+    fn as_bool(&self) -> Option<bool> {
         if let Self::Bool(b) = self { Some(*b) } else { None }
-    }
-}
-
-#[rustfmt::skip]
-impl ConfigVar {
-    pub fn as_string(&self) -> Option<String> {
-        if let SettingValue::String(s) = &self.value { Some(s.to_owned()) } else { None }
-    }
-    pub fn as_i32(&self) -> Option<i32> {
-        if let SettingValue::Num(n) = self.value { Some(n) } else { None }
-    }
-    pub fn as_float(&self) -> Option<f64> {
-        if let SettingValue::Float(f) = self.value { Some(f) } else { None }
-    }
-    pub fn as_bool(&self) -> Option<bool> {
-        if let SettingValue::Bool(b) = self.value { Some(b) } else { None }
     }
 }
 
@@ -88,48 +92,56 @@ impl SettingStore {
         store
     }
 
-    pub fn set(&self, s_type: SettingType, val: SettingValue) {
+    fn set(&self, s_type: SettingType, val: SettingValue) {
         self.0.lock().get_mut(&s_type).unwrap().value = val;
         self.save_config();
     }
 
-    pub fn get_value(&self, input: SettingType) -> SettingValue {
+    pub fn set_bool(&self, setting: BoolSetting, val: bool) {
+        Self::set(self, SettingType::Bool(setting), SettingValue::Bool(val));
+    }
+
+    pub fn set_int(&self, setting: IntSetting, val: i32) {
+        Self::set(self, SettingType::Int(setting), SettingValue::Num(val));
+    }
+
+    pub fn set_float(&self, setting: FloatSetting, val: f64) {
+        Self::set(self, SettingType::Float(setting), SettingValue::Float(val));
+    }
+
+    pub fn set_string(&self, setting: StringSetting, val: &str) {
+        Self::set(
+            self,
+            SettingType::String(setting),
+            SettingValue::String(val.to_owned()),
+        );
+    }
+
+    fn get_value(&self, input: SettingType) -> SettingValue {
         self.0.lock().get(&input).unwrap().value.clone()
     }
 
-    pub fn get_bool(&self, input: SettingType) -> bool {
-        self.0
-            .lock()
-            .get(&input)
-            .map(|v| v.as_bool())
-            .flatten()
+    pub fn get_bool(&self, input: BoolSetting) -> bool {
+        Self::get_value(self, SettingType::Bool(input))
+            .as_bool()
             .unwrap()
     }
 
-    pub fn get_i32(&self, input: SettingType) -> i32 {
-        self.0
-            .lock()
-            .get(&input)
-            .map(|v| v.as_i32())
-            .flatten()
+    pub fn get_int(&self, input: IntSetting) -> i32 {
+        Self::get_value(self, SettingType::Int(input))
+            .as_int()
             .unwrap()
     }
 
-    pub fn get_float(&self, input: SettingType) -> f64 {
-        self.0
-            .lock()
-            .get(&input)
-            .map(|v| v.as_float())
-            .flatten()
+    pub fn get_float(&self, input: FloatSetting) -> f64 {
+        Self::get_value(self, SettingType::Float(input))
+            .as_float()
             .unwrap()
     }
 
-    pub fn get_string(&self, input: SettingType) -> String {
-        self.0
-            .lock()
-            .get(&input)
-            .map(|v| v.as_string())
-            .flatten()
+    pub fn get_string(&self, input: StringSetting) -> String {
+        Self::get_value(self, SettingType::String(input))
+            .as_string()
             .unwrap()
     }
 

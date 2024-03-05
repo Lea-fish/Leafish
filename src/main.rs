@@ -78,9 +78,7 @@ pub mod world;
 
 use crate::entity::Rotation;
 use crate::render::hud::HudContext;
-use crate::settings::KeybindStore;
-use crate::settings::SettingStore;
-use crate::settings::SettingType;
+use crate::settings::*;
 use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::Error;
 use parking_lot::Mutex;
@@ -241,7 +239,7 @@ fn main() {
     info!("settings all loaded!");
 
     con.lock().configure(&settings);
-    let vsync = settings.get_bool(SettingType::Vsync);
+    let vsync = settings.get_bool(BoolSetting::Vsync);
 
     let (res, mut resui) = resources::Manager::new();
     let resource_manager = Arc::new(RwLock::new(res));
@@ -563,14 +561,14 @@ fn tick_all(
     };
     *last_resource_version = version;
 
-    let vsync_changed = game.settings.get_bool(SettingType::Vsync);
+    let vsync_changed = game.settings.get_bool(BoolSetting::Vsync);
     if vsync != vsync_changed {
         error!("Changing vsync currently requires restarting");
         game.should_close = true;
         // TODO: after changing to wgpu and the new renderer, allow changing vsync on a Window
         //vsync = vsync_changed;
     }
-    let fps_cap = game.settings.get_i32(SettingType::MaxFps);
+    let fps_cap = game.settings.get_int(IntSetting::MaxFps);
 
     if game.server.is_some() {
         game.server.as_ref().unwrap().clone().tick(delta, game); // TODO: Improve perf in load screen!
@@ -660,7 +658,7 @@ fn handle_window_event<T>(
             },
             ..
         } => {
-            let mouse_sens: f64 = game.settings.get_float(SettingType::MouseSense);
+            let mouse_sens: f64 = game.settings.get_float(FloatSetting::MouseSense);
             let (rx, ry) = if xrel > 1000.0 || yrel > 1000.0 {
                 // Heuristic for if we were passed an absolute value instead of relative
                 // Workaround https://github.com/tomaka/glutin/issues/1084 MouseMotion event returns absolute instead of relative values, when running Linux in a VM

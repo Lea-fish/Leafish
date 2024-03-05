@@ -1,6 +1,6 @@
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
-use crate::settings::{SettingStore, SettingType};
+use crate::settings::*;
 use crate::ui;
 use crate::ui::Container;
 use std::rc::Rc;
@@ -41,7 +41,7 @@ impl Screen for Background {
         renderer: Arc<Renderer>,
         ui_container: &mut Container,
     ) {
-        let path = self.settings.get_string(SettingType::BackgroundImage);
+        let path = self.settings.get_string(StringSetting::BackgroundImage);
         self.last_path = path.clone();
         let background =
             if Renderer::get_texture_optional(renderer.get_textures_ref(), &path).is_some() {
@@ -50,7 +50,7 @@ impl Screen for Background {
                         .draw_index(i16::MIN as isize)
                         .texture(&*format!(
                             "#{}",
-                            self.settings.get_string(SettingType::BackgroundImage)
+                            self.settings.get_string(StringSetting::BackgroundImage)
                         ))
                         .size(
                             renderer.screen_data.read().safe_width as f64,
@@ -112,7 +112,7 @@ impl Screen for Background {
                 self.init(screen_sys, renderer, ui_container);
                 return;
             }
-            let curr_path = self.settings.get_string(SettingType::BackgroundImage);
+            let curr_path = self.settings.get_string(StringSetting::BackgroundImage);
             if !self.last_path.eq(&curr_path) {
                 self.last_path = curr_path;
                 self.deinit(screen_sys, renderer.clone(), ui_container);

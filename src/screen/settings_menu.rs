@@ -1,10 +1,11 @@
 use crate::render;
 use crate::settings::SettingStore;
-use crate::settings::SettingType;
-use crate::settings::SettingValue;
 use crate::ui;
 
 use crate::screen::{Screen, ScreenSystem};
+use crate::BoolSetting;
+use crate::FloatSetting;
+use crate::IntSetting;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -292,9 +293,9 @@ impl super::Screen for VideoSettingsMenu {
         let mut buttons = vec![];
 
         // Load defaults
-        let r_max_fps = self.settings.get_i32(SettingType::MaxFps);
-        let r_fov = self.settings.get_i32(SettingType::FOV);
-        let r_vsync = self.settings.get_bool(SettingType::Vsync);
+        let r_max_fps = self.settings.get_int(IntSetting::MaxFps);
+        let r_fov = self.settings.get_int(IntSetting::FOV);
+        let r_vsync = self.settings.get_bool(BoolSetting::Vsync);
 
         // Setting buttons
         // TODO: Slider
@@ -337,11 +338,10 @@ impl super::Screen for VideoSettingsMenu {
             let txt_vsync = txt.clone();
             vsync_setting.add_text(txt);
             vsync_setting.add_click_func(move |_, game| {
-                let r_vsync = !game.settings.get_bool(SettingType::Vsync);
+                let r_vsync = !game.settings.get_bool(BoolSetting::Vsync);
                 txt_vsync.borrow_mut().text =
                     format!("VSync: {}", if r_vsync { "Enabled" } else { "Disabled" });
-                game.settings
-                    .set(SettingType::Vsync, SettingValue::Bool(r_vsync));
+                game.settings.set_bool(BoolSetting::Vsync, r_vsync);
                 true
             });
         }
@@ -587,13 +587,13 @@ impl super::Screen for SkinSettingsMenu {
         let mut buttons = vec![];
 
         // Load defaults
-        let s_hat = self.settings.get_bool(SettingType::HatVisible);
-        let _s_jacket = self.settings.get_bool(SettingType::JacketVisible);
-        let _s_cape = self.settings.get_bool(SettingType::CapeVisible);
-        let _s_right_sleeve = self.settings.get_bool(SettingType::RightSleeveVisible);
-        let _s_left_sleeve = self.settings.get_bool(SettingType::LeftSleeveVisible);
-        let _s_right_pants = self.settings.get_bool(SettingType::RightPantsVisible);
-        let _s_left_pants = self.settings.get_bool(SettingType::LeftPantsVisible);
+        let s_hat = self.settings.get_bool(BoolSetting::HatVisible);
+        let _s_jacket = self.settings.get_bool(BoolSetting::JacketVisible);
+        let _s_cape = self.settings.get_bool(BoolSetting::CapeVisible);
+        let _s_right_sleeve = self.settings.get_bool(BoolSetting::RightSleeveVisible);
+        let _s_left_sleeve = self.settings.get_bool(BoolSetting::LeftSleeveVisible);
+        let _s_right_pants = self.settings.get_bool(BoolSetting::RightPantsVisible);
+        let _s_left_pants = self.settings.get_bool(BoolSetting::LeftPantsVisible);
 
         // Setting buttons
         let hat_setting = ui::ButtonBuilder::new()
@@ -616,7 +616,7 @@ impl super::Screen for SkinSettingsMenu {
             let txt_hat = txt.clone();
             hat_setting.add_text(txt);
             hat_setting.add_click_func(move |_, game| {
-                let s_hat = !game.settings.get_bool(SettingType::HatVisible);
+                let s_hat = !game.settings.get_bool(BoolSetting::HatVisible);
                 txt_hat.borrow_mut().text = format!(
                     "Hat: {}",
                     match s_hat {
@@ -624,8 +624,7 @@ impl super::Screen for SkinSettingsMenu {
                         false => "Off",
                     }
                 );
-                game.settings
-                    .set(SettingType::HatVisible, SettingValue::Bool(s_hat));
+                game.settings.set_bool(BoolSetting::HatVisible, s_hat);
                 false
             });
         }
@@ -780,7 +779,7 @@ impl super::Screen for ControlsMenu {
     ) {
         let mut buttons = vec![];
         let mut sliders = vec![];
-        let r_mouse_sens = self.settings.get_float(SettingType::MouseSense);
+        let r_mouse_sens = self.settings.get_float(FloatSetting::MouseSense);
 
         let background = ui::ImageBuilder::new()
             .texture("leafish:solid")
@@ -827,9 +826,9 @@ impl super::Screen for ControlsMenu {
                 //update button position
                 slider_btn.borrow_mut().x = (game.last_mouse_x) - screen_width / 2.0 - this.x;
                 //update game setting based on button position
-                game.settings.set(
-                    SettingType::MouseSense,
-                    SettingValue::Float((slider_btn.borrow().x + 150.0) / 30.0),
+                game.settings.set_float(
+                    FloatSetting::MouseSense,
+                    (slider_btn.borrow().x + 150.0) / 30.0,
                 );
                 //update text in button
                 this.text
@@ -838,7 +837,7 @@ impl super::Screen for ControlsMenu {
                     .borrow_mut()
                     .text = format!(
                     "Mouse Sensetivity: {:.2}x",
-                    game.settings.get_float(SettingType::MouseSense)
+                    game.settings.get_float(FloatSetting::MouseSense)
                 );
                 true
             });

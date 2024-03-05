@@ -3,7 +3,7 @@ use super::*;
 pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
     vec![
         (
-            SettingType::MaxFps,
+            SettingType::Int(IntSetting::MaxFps),
             ConfigVar {
                 name: "max_fps",
                 description: "fps_max caps the maximum FPS for the rendering engine",
@@ -12,7 +12,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::FOV,
+            SettingType::Int(IntSetting::FOV),
             ConfigVar {
                 name: "fov",
                 description: "Setting for controlling the client field of view",
@@ -21,7 +21,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::Vsync,
+            SettingType::Bool(BoolSetting::Vsync),
             ConfigVar {
                 name: "vsync",
                 description: "Toggle to enable/disable vsync",
@@ -30,7 +30,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::MouseSense,
+            SettingType::Float(FloatSetting::MouseSense),
             ConfigVar {
                 name: "mouse_sens",
                 description: "Mouse Sensitivity",
@@ -39,7 +39,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::MasterVolume,
+            SettingType::Int(IntSetting::MasterVolume),
             ConfigVar {
                 name: "master_volume",
                 description: "Main volume control",
@@ -48,7 +48,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::CapeVisible,
+            SettingType::Bool(BoolSetting::CapeVisible),
             ConfigVar {
                 name: "cape",
                 description: "Toggle your cape",
@@ -57,7 +57,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::JacketVisible,
+            SettingType::Bool(BoolSetting::JacketVisible),
             ConfigVar {
                 name: "jacket",
                 description: "Toggle your jacket",
@@ -66,7 +66,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::LeftSleeveVisible,
+            SettingType::Bool(BoolSetting::LeftSleeveVisible),
             ConfigVar {
                 name: "left_sleeve",
                 description: "Toggle your left sleeve",
@@ -75,7 +75,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::RightSleeveVisible,
+            SettingType::Bool(BoolSetting::RightSleeveVisible),
             ConfigVar {
                 name: "right_sleeve",
                 description: "Toggle your right sleeve",
@@ -84,7 +84,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::LeftPantsVisible,
+            SettingType::Bool(BoolSetting::LeftPantsVisible),
             ConfigVar {
                 name: "left_pants",
                 description: "Toggle your left pants",
@@ -93,7 +93,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::RightPantsVisible,
+            SettingType::Bool(BoolSetting::RightPantsVisible),
             ConfigVar {
                 name: "right_pants",
                 description: "Toggle your right pants",
@@ -102,7 +102,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::HatVisible,
+            SettingType::Bool(BoolSetting::HatVisible),
             ConfigVar {
                 name: "hat",
                 description: "Toggle your hat",
@@ -111,7 +111,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::AutomaticOfflineAccounts,
+            SettingType::Bool(BoolSetting::AutomaticOfflineAccounts),
             ConfigVar {
                 name: "automatic_offline_accounts",
                 description:
@@ -121,7 +121,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::LogLevelTerm,
+            SettingType::String(StringSetting::LogLevelTerm),
             ConfigVar {
                 name: "log_level_term",
                 description: "log level of messages to log to the terminal",
@@ -130,7 +130,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::LogLevelFile,
+            SettingType::String(StringSetting::LogLevelFile),
             ConfigVar {
                 name: "log_level_file",
                 description: "log level of messages to log to the file",
@@ -139,7 +139,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::BackgroundImage,
+            SettingType::String(StringSetting::BackgroundImage),
             ConfigVar {
                 name: "background",
                 description: "Select the background image",
@@ -148,7 +148,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             },
         ),
         (
-            SettingType::AuthClientToken,
+            SettingType::String(StringSetting::AuthClientToken),
             ConfigVar {
                 name: "auth_client_token",
                 description: r#"auth_client_token is a token that stays static between sessions.

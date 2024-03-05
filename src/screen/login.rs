@@ -19,11 +19,11 @@ use std::thread;
 
 use rand::Rng;
 
-use crate::protocol;
 use crate::render;
 use crate::screen::{Screen, ScreenSystem};
-use crate::settings::{SettingStore, SettingType, SettingValue};
+use crate::settings::SettingStore;
 use crate::ui;
+use crate::{protocol, StringSetting};
 use leafish_protocol::protocol::login::{Account, AccountType};
 use leafish_protocol::protocol::Error;
 use std::ops::Deref;
@@ -212,17 +212,15 @@ impl super::Screen for Login {
             elements.login_res = Some(rx);
             elements.login_btn.borrow_mut().disabled = true;
             elements.login_btn_text.borrow_mut().text = "Logging in...".into();
-            let mut client_token = self.settings.get_string(SettingType::AuthClientToken);
+            let mut client_token = self.settings.get_string(StringSetting::AuthClientToken);
             // Generate random token if it wasn't supplied
             if client_token.is_empty() {
                 client_token = std::iter::repeat(())
                     .map(|()| rand::thread_rng().sample(rand::distributions::Alphanumeric) as char)
                     .take(20)
                     .collect();
-                self.settings.set(
-                    SettingType::AuthClientToken,
-                    SettingValue::String(client_token.clone()),
-                );
+                self.settings
+                    .set_string(StringSetting::AuthClientToken, &client_token);
             }
             let username = elements.username_txt.borrow().input.clone();
             let password = elements.password_txt.borrow().input.clone();

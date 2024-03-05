@@ -2,9 +2,9 @@ use log::Level;
 use parking_lot::Mutex;
 
 use crate::format::{Color, Component, ComponentType};
-use crate::render;
-use crate::settings::{SettingStore, SettingType};
+use crate::settings::SettingStore;
 use crate::{paths, ui};
+use crate::{render, StringSetting};
 
 use std::fs;
 use std::io::Write;
@@ -229,11 +229,11 @@ fn _log_level_from_str(s: &str) -> Option<log::Level> {
 }
 
 fn term_log_level(store: &SettingStore) -> Option<Level> {
-    let val = store.get_string(SettingType::LogLevelTerm);
+    let val = store.get_string(StringSetting::LogLevelTerm);
     Level::from_str(&val).ok()
 }
 fn file_log_level(store: &SettingStore) -> Option<Level> {
-    let val = store.get_string(SettingType::LogLevelFile);
+    let val = store.get_string(StringSetting::LogLevelFile);
     Level::from_str(&val).ok()
 }
 
