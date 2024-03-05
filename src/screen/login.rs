@@ -19,19 +19,17 @@ use std::thread;
 
 use rand::Rng;
 
-use crate::auth;
-use crate::console;
-use crate::console::Vars;
-use crate::protocol;
 use crate::render;
 use crate::screen::{Screen, ScreenSystem};
+use crate::settings::SettingStore;
 use crate::ui;
+use crate::{protocol, StringSetting};
 use leafish_protocol::protocol::login::{Account, AccountType};
 use leafish_protocol::protocol::Error;
 use std::ops::Deref;
 
 pub struct Login {
-    vars: Rc<console::Vars>,
+    settings: Rc<SettingStore>,
     elements: Option<UIElements>,
     callback: Arc<dyn Fn(Option<Account>)>,
 }
@@ -39,7 +37,7 @@ pub struct Login {
 impl Clone for Login {
     fn clone(&self) -> Self {
         Login {
-            vars: self.vars.clone(),
+            settings: self.settings.clone(),
             elements: None,
             callback: self.callback.clone(),
         }
@@ -63,9 +61,9 @@ struct UIElements {
 }
 
 impl Login {
-    pub fn new(callback: Arc<dyn Fn(Option<Account>)>, vars: Rc<Vars>) -> Self {
+    pub fn new(callback: Arc<dyn Fn(Option<Account>)>, vars: Rc<SettingStore>) -> Self {
         Login {
-            vars,
+            settings: vars,
             elements: None,
             callback,
         }
@@ -214,16 +212,16 @@ impl super::Screen for Login {
             elements.login_res = Some(rx);
             elements.login_btn.borrow_mut().disabled = true;
             elements.login_btn_text.borrow_mut().text = "Logging in...".into();
-            let mut client_token = self.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+            let mut client_token = self.settings.get_string(StringSetting::AuthClientToken);
             // Generate random token if it wasn't supplied
             if client_token.is_empty() {
                 client_token = std::iter::repeat(())
                     .map(|()| rand::thread_rng().sample(rand::distributions::Alphanumeric) as char)
                     .take(20)
                     .collect();
-                self.vars.set(auth::AUTH_CLIENT_TOKEN, client_token);
+                self.settings
+                    .set_string(StringSetting::AuthClientToken, &client_token);
             }
-            let client_token = self.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
             let username = elements.username_txt.borrow().input.clone();
             let password = elements.password_txt.borrow().input.clone();
             let refresh = elements.refresh;

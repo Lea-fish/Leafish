@@ -15,15 +15,14 @@
 use std::fs;
 use std::sync::Arc;
 
-use crate::auth;
 use crate::paths;
 use crate::protocol;
 use crate::ui;
 
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem, ServerList};
-use crate::settings::BACKGROUND_IMAGE;
 use crate::ui::Container;
+use crate::StringSetting;
 use leafish_protocol::protocol::login::{Account, AccountType};
 use parking_lot::Mutex;
 use rand::Rng;
@@ -105,7 +104,10 @@ impl super::Screen for Launcher {
             options.add_click_func(|_, game| {
                 game.screen_sys
                     .clone()
-                    .add_screen(Box::new(super::SettingsMenu::new(game.vars.clone(), false)));
+                    .add_screen(Box::new(super::SettingsMenu::new(
+                        game.settings.clone(),
+                        false,
+                    )));
                 true
             });
         }
@@ -152,7 +154,7 @@ impl super::Screen for Launcher {
                             screen_sys.pop_screen();
                             save_accounts(&accounts.lock());
                         }),
-                        game.vars.clone(),
+                        game.settings.clone(),
                     )));
                 true
             })
@@ -181,7 +183,8 @@ impl super::Screen for Launcher {
                     .pick_file();
                 if let Some(files) = files {
                     let file_name = files.as_path().to_str().unwrap();
-                    game.vars.set(BACKGROUND_IMAGE, format!("#{}", file_name));
+                    game.settings
+                        .set_string(StringSetting::BackgroundImage, file_name);
                 }
                 true
             })
@@ -216,7 +219,7 @@ impl super::Screen for Launcher {
                 back.add_click_func(move |_, game| {
                     let accounts = accounts.clone();
                     let account_type = account_type.clone();
-                    let mut client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+                    let mut client_token = game.settings.get_string(StringSetting::AuthClientToken);
                     if client_token.is_empty() {
                         client_token = std::iter::repeat(())
                             .map(|()| {
@@ -224,9 +227,10 @@ impl super::Screen for Launcher {
                             })
                             .take(20)
                             .collect();
-                        game.vars.set(auth::AUTH_CLIENT_TOKEN, client_token);
+                        game.settings
+                            .set_string(StringSetting::AuthClientToken, &client_token);
                     }
-                    let client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+                    let client_token = game.settings.get_string(StringSetting::AuthClientToken);
                     let result = protocol::login::ACCOUNT_IMPLS
                         .get(&account.account_type)
                         .unwrap()
@@ -250,7 +254,7 @@ impl super::Screen for Launcher {
                                 )),
                                 Rc::new(move |game, name, password| {
                                     let client_token =
-                                        game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+                                        game.settings.get_string(StringSetting::AuthClientToken);
                                     let account = crate::screen::login::try_login(
                                         false,
                                         name,
@@ -373,7 +377,8 @@ impl super::Screen for Launcher {
                         super::edit_account::EditAccountEntry::new(
                             Some((aname.clone(), apw.clone())),
                             Rc::new(move |game, name, password| {
-                                let client_token = game.vars.get(auth::AUTH_CLIENT_TOKEN).clone();
+                                let client_token =
+                                    game.settings.get_string(StringSetting::AuthClientToken);
                                 let account = crate::screen::login::try_login(
                                     false,
                                     name,

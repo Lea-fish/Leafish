@@ -17,6 +17,7 @@
 #![allow(clippy::many_single_char_names)] // short variable names provide concise clarity
 #![allow(clippy::float_cmp)] // float comparison used to check if changed
 
+mod console;
 use copypasta::nop_clipboard;
 use copypasta::ClipboardContext;
 use copypasta::ClipboardProvider;
@@ -62,9 +63,7 @@ use leafish_protocol::nbt;
 use leafish_protocol::protocol;
 pub mod gl;
 use leafish_protocol::types;
-pub mod auth;
 pub mod chunk_builder;
-pub mod console;
 pub mod entity;
 mod inventory;
 pub mod model;
@@ -80,12 +79,12 @@ pub mod world;
 
 use crate::entity::Rotation;
 use crate::render::hud::HudContext;
+use crate::settings::*;
 use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::Error;
 use parking_lot::Mutex;
 use parking_lot::RwLock;
 use std::cell::RefCell;
-use std::marker::PhantomData;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
@@ -93,23 +92,14 @@ use std::thread;
 
 // TODO: Improve calculate light performance and fix capturesnapshot
 
-const CL_BRAND: console::CVar<String> = console::CVar {
-    ty: PhantomData,
-    name: "cl_brand",
-    description: "cl_brand has the value of the clients current 'brand'. e.g. \"Leafish\" or \
-                  \"Vanilla\"",
-    mutable: false,
-    serializable: false,
-    default: &|| "Leafish".to_owned(),
-};
-
 pub struct Game {
     renderer: Arc<render::Renderer>,
     screen_sys: Arc<screen::ScreenSystem>,
     resource_manager: Arc<RwLock<resources::Manager>>,
     clipboard_provider: Mutex<Box<dyn copypasta::ClipboardProvider>>,
     console: Arc<Mutex<console::Console>>,
-    vars: Rc<console::Vars>,
+    settings: Rc<settings::SettingStore>,
+    keybinds: Rc<settings::KeybindStore>,
     should_close: bool,
 
     server: Option<Arc<server::Server>>,
@@ -245,18 +235,12 @@ fn main() {
 
     info!("Starting Leafish...");
 
-    let (vars, mut vsync) = {
-        let mut vars = console::Vars::new();
-        vars.register(CL_BRAND);
-        console::register_vars(&mut vars);
-        auth::register_vars(&mut vars);
-        settings::register_vars(&mut vars);
-        vars.load_config();
-        vars.save_config();
-        con.lock().configure(&vars);
-        let vsync = *vars.get(settings::R_VSYNC);
-        (Rc::new(vars), vsync)
-    };
+    let settings = Rc::new(SettingStore::new());
+    let keybinds = Rc::new(KeybindStore::new());
+    info!("settings all loaded!");
+
+    con.lock().configure(&settings);
+    let vsync = settings.get_bool(BoolSetting::Vsync);
 
     let (res, mut resui) = resources::Manager::new();
     let resource_manager = Arc::new(RwLock::new(res));
@@ -358,7 +342,7 @@ fn main() {
     let screen_sys = Arc::new(screen::ScreenSystem::new());
     let active_account = Arc::new(Mutex::new(None));
     screen_sys.add_screen(Box::new(screen::background::Background::new(
-        vars.clone(),
+        settings.clone(),
         screen_sys.clone(),
     )));
     let mut accounts = screen::launcher::load_accounts().unwrap_or_default();
@@ -424,7 +408,6 @@ fn main() {
         screen_sys,
         resource_manager: resource_manager.clone(),
         console: con,
-        vars,
         should_close: false,
         chunk_builder: chunk_builder::ChunkBuilder::new(resource_manager, textures),
         connect_error: None,
@@ -439,6 +422,8 @@ fn main() {
         default_protocol_version,
         clipboard_provider: Mutex::new(clipboard),
         current_account: active_account,
+        settings,
+        keybinds,
     };
     if opt.network_debug {
         protocol::enable_network_debug();
@@ -487,7 +472,7 @@ fn main() {
                 &mut last_frame,
                 &mut resui,
                 &mut last_resource_version,
-                &mut vsync,
+                vsync,
             );
             if DEBUG {
                 let dist = Instant::now().checked_duration_since(start);
@@ -513,7 +498,7 @@ fn tick_all(
     last_frame: &mut Instant,
     resui: &mut resources::ManagerUI,
     last_resource_version: &mut usize,
-    vsync: &mut bool,
+    vsync: bool,
 ) {
     if game.server.is_some() {
         if !game.server.as_ref().unwrap().is_connected() {
@@ -577,14 +562,14 @@ fn tick_all(
     };
     *last_resource_version = version;
 
-    let vsync_changed = *game.vars.get(settings::R_VSYNC);
-    if *vsync != vsync_changed {
+    let vsync_changed = game.settings.get_bool(BoolSetting::Vsync);
+    if vsync != vsync_changed {
         error!("Changing vsync currently requires restarting");
         game.should_close = true;
         // TODO: after changing to wgpu and the new renderer, allow changing vsync on a Window
         //vsync = vsync_changed;
     }
-    let fps_cap = *game.vars.get(settings::R_MAX_FPS);
+    let fps_cap = game.settings.get_int(IntSetting::MaxFps);
 
     if let Some(server) = game.server.as_ref() {
         server.clone().tick(delta, game); // TODO: Improve perf in load screen!
@@ -647,7 +632,7 @@ fn tick_all(
             .unwrap();
     }
 
-    if fps_cap > 0 && !*vsync {
+    if fps_cap > 0 && !vsync {
         let frame_time = now.elapsed();
         let sleep_interval = Duration::from_millis(1000 / fps_cap as u64);
         if frame_time < sleep_interval {
@@ -673,20 +658,19 @@ fn handle_window_event<T>(
             },
             ..
         } => {
+            let mouse_sens: f64 = game.settings.get_float(FloatSetting::MouseSense);
             let (rx, ry) = if xrel > 1000.0 || yrel > 1000.0 {
                 // Heuristic for if we were passed an absolute value instead of relative
                 // Workaround https://github.com/tomaka/glutin/issues/1084 MouseMotion event returns absolute instead of relative values, when running Linux in a VM
                 // Note SDL2 had a hint to handle this scenario:
                 // sdl2::hint::set_with_priority("SDL_MOUSE_RELATIVE_MODE_WARP", "1", &sdl2::hint::Hint::Override);
                 let s = 8000.0 + 0.01;
-                let mouse_sens: f64 = *game.vars.get(settings::R_MOUSE_SENS);
                 (
                     ((xrel - game.last_mouse_xrel) / s) * mouse_sens,
                     ((yrel - game.last_mouse_yrel) / s) * mouse_sens,
                 )
             } else {
                 let s = 2000.0 + 0.01;
-                let mouse_sens: f64 = *game.vars.get(settings::R_MOUSE_SENS);
                 ((xrel / s) * mouse_sens, (yrel / s) * mouse_sens)
             };
 

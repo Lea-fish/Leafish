@@ -31,7 +31,7 @@ use crate::screen::{Screen, ScreenSystem, ScreenType};
 use crate::server::Server;
 use crate::ui;
 use crate::ui::{Container, FormattedRef, HAttach, ImageRef, TextRef, VAttach};
-use crate::{format, screen, settings, Game};
+use crate::{format, screen, Game};
 use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::types::GameMode;
 use std::sync::atomic::AtomicBool;
@@ -490,15 +490,19 @@ impl Screen for Hud {
     fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
         if key.0 == Key::Named(NamedKey::Escape) && !down && game.focused {
             game.screen_sys
-                .add_screen(Box::new(screen::SettingsMenu::new(game.vars.clone(), true)));
+                .add_screen(Box::new(screen::SettingsMenu::new(
+                    game.settings.clone(),
+                    true,
+                )));
             return;
         }
         match key.1 {
             PhysicalKey::Code(code) => {
-                if let Some(action_key) = settings::Actionkey::get_by_keycode(code, &game.vars) {
+                if let Some(action_key) = game.keybinds.get(code) {
+                    // if let Some(action_key) = settings::Actionkey::get_by_keycode(code, &game.vars) {
                     game.server.as_ref().unwrap().key_press(
                         down,
-                        action_key,
+                        action_key.action,
                         &mut game.focused.clone(),
                     );
                 }
