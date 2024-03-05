@@ -48,6 +48,7 @@ use winit::keyboard::SmolStr;
 use winit::raw_window_handle::HasDisplayHandle;
 #[cfg(target_os = "linux")]
 use winit::raw_window_handle::RawDisplayHandle;
+use winit::window::CursorGrabMode;
 use winit::window::Icon;
 extern crate leafish_shared as shared;
 
@@ -611,7 +612,6 @@ fn tick_all(
         .tick(delta, game.renderer.clone(), ui_container, window)
     {
         if game.focused {
-            println!("unconfine 2");
             window
                 .set_cursor_grab(winit::window::CursorGrabMode::None)
                 .unwrap();
@@ -621,12 +621,10 @@ fn tick_all(
     } else if !game.focused {
         // see https://docs.rs/winit/latest/winit/window/enum.CursorGrabMode.html
         // fix for https://github.com/Lea-fish/Leafish/issues/265
-        let cursor_grab_mode = if cfg!(target_os = "macos") {
-            winit::window::CursorGrabMode::Locked
-        } else {
-            winit::window::CursorGrabMode::Confined
-        };
-        window.set_cursor_grab(cursor_grab_mode).unwrap();
+        // prefer Locked cursor mode, and fallback to Confined if that doesn't work
+        if window.set_cursor_grab(CursorGrabMode::Locked).is_err() {
+            window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
+        }
         window.set_cursor_visible(false);
         game.focused = true;
     }
