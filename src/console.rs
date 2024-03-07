@@ -4,7 +4,7 @@ use parking_lot::Mutex;
 use crate::format::{Color, Component, ComponentType};
 use crate::settings::SettingStore;
 use crate::{paths, ui};
-use crate::{render, StringSetting};
+use crate::{StringSetting};
 
 use std::fs;
 use std::io::Write;
@@ -18,15 +18,15 @@ pub struct Console {
     log_level_term: log::Level,
     log_level_file: log::Level,
 
-    elements: Option<ConsoleElements>,
+    // elements: Option<ConsoleElements>,
     active: bool,
     position: f64,
 }
 
-struct ConsoleElements {
+/*struct ConsoleElements {
     background: ui::ImageRef,
     lines: Vec<ui::FormattedRef>,
-}
+}*/
 
 impl Default for Console {
     fn default() -> Self {
@@ -44,7 +44,7 @@ impl Console {
             log_level_term: log::Level::Info,
             log_level_file: log::Level::Trace,
 
-            elements: None,
+            // elements: None,
             active: false,
             position: -220.0,
         }
@@ -85,7 +85,7 @@ impl Console {
         self.active = true;
     }
 
-    pub fn tick(
+    /*pub fn tick(
         &mut self,
         ui_container: &mut ui::Container,
         renderer: Arc<render::Renderer>,
@@ -153,7 +153,7 @@ impl Console {
                 offset += height;
             }
         }
-    }
+    }*/
 
     fn log(&mut self, record: &log::Record) {
         for filtered in FILTERED_CRATES {

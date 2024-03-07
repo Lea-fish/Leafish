@@ -1,6 +1,5 @@
 use crate::world::biome::Biome;
 use crate::world::{biome, storage, CPos, World};
-use crate::{chunk_builder, render};
 use lazy_static::lazy_static;
 pub use leafish_blocks as block;
 use leafish_protocol::types::nibble;

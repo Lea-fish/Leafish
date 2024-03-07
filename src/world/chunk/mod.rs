@@ -20,7 +20,7 @@ pub struct Chunk {
     pub(crate) position: CPos,
 
     pub(crate) sections: [Option<ChunkSection>; 16],
-    pub(crate) sections_rendered_on: [u32; 16],
+    pub(crate) sections_rendered_on: [u64; 16],
     pub(crate) biomes: [u8; 16 * 16],
 
     pub(crate) heightmap: [u8; 16 * 16],

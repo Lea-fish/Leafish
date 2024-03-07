@@ -97,13 +97,13 @@ mod tests {
     fn hier_1_12_2() {
         let id_map = VanillaIDMap::new(340);
         assert_eq!(
-            id_map.by_vanilla_id(255 << 4, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(255 << 4, &HashMap::new()),
             StructureBlock {
                 mode: StructureBlockMode::Save
             }
         );
         assert_eq!(
-            id_map.by_vanilla_id((255 << 4) | 3, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id((255 << 4) | 3, &HashMap::new()),
             StructureBlock {
                 mode: StructureBlockMode::Data
             }
@@ -114,13 +114,13 @@ mod tests {
     fn flat_1_13_2() {
         let id_map = VanillaIDMap::new(404);
         assert_eq!(
-            id_map.by_vanilla_id(8595, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(8595, &HashMap::new()),
             StructureBlock {
                 mode: StructureBlockMode::Save
             }
         );
         assert_eq!(
-            id_map.by_vanilla_id(8598, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(8598, &HashMap::new()),
             StructureBlock {
                 mode: StructureBlockMode::Data
             }
@@ -131,11 +131,11 @@ mod tests {
     fn flat_1_14_4() {
         let id_map = VanillaIDMap::new(477);
         assert_eq!(
-            id_map.by_vanilla_id(9113, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(9113, &HashMap::new()),
             Conduit { waterlogged: true }
         );
         assert_eq!(
-            id_map.by_vanilla_id(9114, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(9114, &HashMap::new()),
             Conduit { waterlogged: false }
         );
     }
@@ -144,11 +144,11 @@ mod tests {
     fn flat_1_15_1() {
         let id_map = VanillaIDMap::new(575);
         assert_eq!(
-            id_map.by_vanilla_id(9113, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(9113, &HashMap::new()),
             Conduit { waterlogged: true }
         );
         assert_eq!(
-            id_map.by_vanilla_id(9114, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(9114, &HashMap::new()),
             Conduit { waterlogged: false }
         );
     }
@@ -157,7 +157,7 @@ mod tests {
     fn flat_1_16() {
         let id_map = VanillaIDMap::new(735);
         assert_eq!(
-            id_map.by_vanilla_id(1048, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(1048, &HashMap::new()),
             NoteBlock {
                 instrument: NoteBlockInstrument::Pling,
                 note: 24,
@@ -170,7 +170,7 @@ mod tests {
     fn flat_1_16_2() {
         let id_map = VanillaIDMap::new(751);
         assert_eq!(
-            id_map.by_vanilla_id(1048, &Arc::new(HashMap::new())),
+            id_map.by_vanilla_id(1048, &HashMap::new()),
             NoteBlock {
                 instrument: NoteBlockInstrument::Pling,
                 note: 24,

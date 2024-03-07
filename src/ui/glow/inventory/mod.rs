@@ -20,9 +20,22 @@ use shared::Version;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 
+use self::anvil_inventory::AnvilInventory;
+use self::beacon_inventory::BeaconInventory;
+use self::brewing_stand_inventory::BrewingStandInventory;
+use self::chest_inventory::ChestInventory;
+use self::crafting_table_inventory::CraftingTableInventory;
+use self::dropper_inventory::DropperInventory;
+use self::enchanting_table_inventory::EnchantmentTableInventory;
+use self::furnace_inventory::FurnaceInventory;
+use self::player_inventory::PlayerInventory;
 use self::slot_mapping::SlotMapping;
 
 use super::render::hud::{Hud, HudContext};
+use super::render::inventory::InventoryWindow;
+use super::render::Renderer;
+use super::screen::ScreenSystem;
+use super::ui::{Container, VAttach};
 
 pub trait Inventory {
     /// The number of item slots in this inventory.
@@ -50,6 +63,14 @@ pub trait Inventory {
     /// Find the slot containing this position on the screen.
     fn get_slot(&self, x: f64, y: f64) -> Option<u16>;
 
+    fn ty(&self) -> InventoryType;
+
+    // for handeling the WindowProperty packet in inventorys that need it
+    fn handle_property_packet(&mut self, _property: i16, _value: i16) {}
+}
+
+pub(crate) trait InventoryRenderExt {
+    
     fn init(
         &mut self,
         renderer: &Arc<Renderer>,
@@ -75,10 +96,71 @@ pub trait Inventory {
         self.init(renderer, ui_container, inventory_window);
     }
 
-    fn ty(&self) -> InventoryType;
+}
 
-    // for handeling the WindowProperty packet in inventorys that need it
-    fn handle_property_packet(&mut self, _property: i16, _value: i16) {}
+pub fn inventory_from_type(
+    ty: InventoryType,
+    title: Component,
+    renderer: &Arc<Renderer>,
+    base_slots: Arc<RwLock<SlotMapping>>,
+    id: i32,
+) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
+    match ty {
+        /*InventoryType::Internal => {}
+        InventoryType::Main => {}*/
+        InventoryType::Chest(rows) => Some(Arc::new(RwLock::new(ChestInventory::new(
+            renderer,
+            base_slots,
+            rows,
+            title.to_string(),
+            id,
+        )))),
+        InventoryType::CraftingTable => Some(Arc::new(RwLock::new(CraftingTableInventory::new(
+            renderer, base_slots, id,
+        )))),
+        InventoryType::Dropper => Some(Arc::new(RwLock::new(DropperInventory::new(
+            renderer,
+            base_slots,
+            title.to_string(),
+            id,
+        )))),
+        InventoryType::Furnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
+        InventoryType::Smoker => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
+        InventoryType::BlastFurnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        )))),
+        InventoryType::EnchantingTable => Some(Arc::new(RwLock::new(
+            EnchantmentTableInventory::new(renderer, base_slots, title.to_string(), id),
+        ))),
+        InventoryType::Anvil => Some(Arc::new(RwLock::new(AnvilInventory::new(
+            renderer, base_slots, id,
+        )))),
+        InventoryType::Beacon => Some(Arc::new(RwLock::new(BeaconInventory::new(
+            renderer, base_slots, id,
+        )))),
+        InventoryType::BrewingStand => Some(Arc::new(RwLock::new(BrewingStandInventory::new(
+            renderer,
+            base_slots,
+            title.to_string(),
+            id,
+        )))),
+        /*
+        InventoryType::Grindstone => {}
+        InventoryType::Hopper => {}
+        InventoryType::Lectern => {}
+        InventoryType::Loom => {}
+        InventoryType::Merchant => {}
+        InventoryType::ShulkerBox => {}
+        InventoryType::SmithingTable => {}
+        InventoryType::CartographyTable => {}
+        InventoryType::Stonecutter => {}
+        InventoryType::Horse => {}*/
+        _ => None,
+    }
 }
 
 #[derive(Debug)]

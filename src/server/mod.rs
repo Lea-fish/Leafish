@@ -13,21 +13,9 @@
 // limitations under the License.
 
 use crate::ecs::Manager;
-use crate::entity;
-use crate::entity::player::{create_local, PlayerModel, PlayerMovement};
-use crate::entity::{EntityType, GameInfo, Gravity, MouseButtons, TargetPosition, TargetRotation};
 use crate::format;
-use crate::inventory::material::versions::to_material;
-use crate::inventory::{inventory_from_type, InventoryContext, InventoryType, Item};
-use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::protocol::{self, forge, mapped_packet, packet};
-use crate::render;
-use crate::render::hud::HudContext;
-use crate::render::Renderer;
 use crate::resources;
-use crate::screen::chat::{Chat, ChatContext};
-use crate::screen::respawn::Respawn;
-use crate::screen::ScreenSystem;
 use crate::settings::Actionkey;
 use crate::shared::Position;
 use crate::types::hash::FNVHash;
@@ -70,8 +58,6 @@ use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 pub mod plugin_messages;
-mod sun;
-pub mod target;
 
 #[derive(Default)]
 pub struct DisconnectData {
@@ -122,10 +108,6 @@ pub struct Server {
     entity_tick_timer: AtomicF64,
     pub received_chat_at: ArcSwapOption<Instant>,
 
-    sun_model: RwLock<Option<sun::SunModel>>,
-    target_info: Arc<RwLock<target::Info>>,
-    pub render_list_computer: Sender<bool>,
-    pub render_list_computer_notify: Receiver<bool>,
     pub hud_context: Arc<RwLock<HudContext>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
     fps: AtomicU32,
@@ -135,8 +117,6 @@ pub struct Server {
     last_chat_open: AtomicBool,
     pub chat_open: AtomicBool,
     pub chat_ctx: Arc<ChatContext>,
-    screen_sys: Arc<ScreenSystem>,
-    renderer: Arc<Renderer>,
     active_block_break_anims: Arc<DashMap<i32, Entity>>,
 }
 
@@ -159,9 +139,6 @@ impl Server {
         protocol_version: i32,
         forge_mods: Vec<forge::ForgeMod>,
         fml_network_version: Option<i64>,
-        renderer: Arc<Renderer>,
-        hud_context: Arc<RwLock<HudContext>>,
-        screen_sys: Arc<ScreenSystem>,
     ) -> Result<Arc<Server>, protocol::Error> {
         let mut conn = protocol::Conn::new(address, protocol_version)?;
 
@@ -215,9 +192,6 @@ impl Server {
                         forge_mods,
                         uuid,
                         resources,
-                        renderer,
-                        hud_context,
-                        screen_sys,
                     );
                     return Ok(server);
                 }
@@ -231,9 +205,6 @@ impl Server {
                         forge_mods,
                         val.uuid,
                         resources,
-                        renderer,
-                        hud_context,
-                        screen_sys,
                     );
 
                     return Ok(server);
@@ -367,9 +338,6 @@ impl Server {
             forge_mods,
             uuid,
             resources,
-            renderer,
-            hud_context,
-            screen_sys,
         );
 
         Ok(server)
@@ -381,17 +349,12 @@ impl Server {
         forge_mods: Vec<forge::ForgeMod>,
         uuid: protocol::UUID,
         resources: Arc<RwLock<resources::Manager>>,
-        renderer: Arc<Renderer>,
-        hud_context: Arc<RwLock<HudContext>>,
-        screen_sys: Arc<ScreenSystem>,
     ) -> Arc<Server> {
         let server_callback = Arc::new(Mutex::new(None));
         let inner_server = server_callback.clone();
         let mut inner_server = inner_server.lock();
         Self::spawn_reader(conn.clone(), server_callback.clone());
         let light_updater = Self::spawn_light_updater(server_callback.clone());
-        let render_list_computer =
-            Self::spawn_render_list_computer(server_callback, renderer.clone());
         let conn = Arc::new(RwLock::new(Some(conn)));
         let server = Arc::new(Server::new(
             protocol_version,
@@ -400,16 +363,10 @@ impl Server {
             resources,
             conn,
             light_updater,
-            render_list_computer.0.clone(),
-            render_list_computer.1,
-            hud_context,
-            screen_sys,
-            renderer,
         ));
         server.hud_context.write().server = Some(server.clone());
 
         inner_server.replace(server.clone());
-        render_list_computer.0.send(true).unwrap();
         server
     }
 
@@ -850,26 +807,6 @@ impl Server {
         tx
     }
 
-    fn spawn_render_list_computer(
-        server: Arc<Mutex<Option<Arc<Server>>>>,
-        renderer: Arc<Renderer>,
-    ) -> (Sender<bool>, Receiver<bool>) {
-        let (tx, rx) = unbounded();
-        let (etx, erx) = unbounded();
-        thread::spawn(move || loop {
-            let _ = rx.recv().unwrap();
-            let server = server.lock();
-            server
-                .as_ref()
-                .unwrap()
-                .world
-                .compute_render_list(renderer.clone());
-            while rx.try_recv().is_ok() {}
-            etx.send(true).unwrap();
-        });
-        (tx, erx)
-    }
-
     fn new(
         protocol_version: i32,
         forge_mods: Vec<forge::ForgeMod>,
@@ -877,11 +814,6 @@ impl Server {
         resources: Arc<RwLock<resources::Manager>>,
         conn: Arc<RwLock<Option<protocol::Conn>>>,
         light_updater: Sender<LightUpdate>,
-        render_list_computer: Sender<bool>,
-        render_list_computer_notify: Receiver<bool>,
-        hud_context: Arc<RwLock<HudContext>>,
-        screen_sys: Arc<ScreenSystem>,
-        renderer: Arc<Renderer>,
     ) -> Self {
         let world = Arc::new(world::World::new(protocol_version, light_updater));
         let mapped_protocol_version = Version::from_id(protocol_version as u32);
@@ -893,19 +825,8 @@ impl Server {
         )));
         let mut entities = Manager::default();
         // FIXME: fix threading modes (make some systems execute in parallel and others in sync)
-        entities.world.insert_resource(entity::GameInfo::new());
         entities.world.insert_resource(WorldResource(world.clone()));
-        entities
-            .world
-            .insert_resource(RendererResource(renderer.clone()));
-        entities
-            .world
-            .insert_resource(ScreenSystemResource(screen_sys.clone()));
         entities.world.insert_resource(ConnResource(conn.clone()));
-        entities
-            .world
-            .insert_resource(InventoryContextResource(inventory_context.clone()));
-        entity::add_systems(&mut entities);
 
         hud_context.write().slots = Some(inventory_context.read().base_slots.clone());
 
@@ -936,11 +857,7 @@ impl Server {
             tick_timer: AtomicF64::new(0.0),
             entity_tick_timer: AtomicF64::new(0.0),
             received_chat_at: ArcSwapOption::new(None),
-            sun_model: RwLock::new(None),
 
-            target_info: Arc::new(RwLock::new(target::Info::new())),
-            render_list_computer,
-            render_list_computer_notify,
             hud_context,
             inventory_context,
             fps: AtomicU32::new(0),
@@ -950,8 +867,6 @@ impl Server {
             last_chat_open: AtomicBool::new(false),
             chat_open: AtomicBool::new(false),
             chat_ctx: Arc::new(ChatContext::new()),
-            screen_sys,
-            renderer,
             active_block_break_anims: Arc::new(Default::default()),
         }
     }
@@ -995,7 +910,7 @@ impl Server {
         return self.conn.read().is_some();
     }
 
-    pub fn tick(&self, delta: f64, game: &mut Game) {
+    pub fn tick(&self, delta: f64) {
         let renderer = self.renderer.clone();
         let start = SystemTime::now();
         let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64; // FIXME: use safer conversion
@@ -1188,7 +1103,7 @@ impl Server {
     }
 
     #[allow(unused_must_use)]
-    pub fn minecraft_tick(&self, game: &mut Game) {
+    pub fn minecraft_tick(&self, game: &Arc<Game>) {
         if let Some(player) = self.player.load().as_ref() {
             let mut entities = self.entities.write();
             let on_ground = {
@@ -1243,8 +1158,8 @@ impl Server {
         }
     }
 
-    pub fn key_press(&self, down: bool, key: Actionkey, focused: &mut bool) -> bool {
-        if *focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
+    pub fn key_press(&self, down: bool, key: Actionkey, focused: bool) -> bool {
+        if focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
             let mut state_changed = false;
             if let Some(player) = self.player.load().as_ref() {
                 if let Some(mut movement) = self
@@ -2435,13 +2350,4 @@ fn calculate_relative_teleport(flag: TeleportFlag, flags: u8, base: f64, val: f6
 pub struct WorldResource(pub Arc<World>);
 
 #[derive(Resource)]
-pub struct RendererResource(pub Arc<Renderer>);
-
-#[derive(Resource)]
-pub struct ScreenSystemResource(pub Arc<ScreenSystem>);
-
-#[derive(Resource)]
 pub struct ConnResource(pub Arc<RwLock<Option<Conn>>>);
-
-#[derive(Resource)]
-pub struct InventoryContextResource(pub Arc<RwLock<InventoryContext>>);
