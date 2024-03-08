@@ -498,7 +498,7 @@ impl Screen for Hud {
         }
         match key.1 {
             PhysicalKey::Code(code) => {
-                if let Some(action_key) = game.keybinds.get(code) {
+                if let Some(action_key) = game.keybinds.get(code, &key.0) {
                     // if let Some(action_key) = settings::Actionkey::get_by_keycode(code, &game.vars) {
                     game.server.as_ref().unwrap().key_press(
                         down,

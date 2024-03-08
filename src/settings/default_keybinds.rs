@@ -1,11 +1,11 @@
-use winit::keyboard::KeyCode;
+use winit::keyboard::{Key, NamedKey, SmolStr};
 
 use super::*;
 
-pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
+pub fn create_keybinds() -> Vec<(Key, Keybind)> {
     vec![
         (
-            KeyCode::KeyW,
+            Key::Character(SmolStr::new_inline("w")),
             Keybind {
                 name: "keybind_forward",
                 description: "Keybinding for moving forward",
@@ -13,7 +13,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::KeyS,
+            Key::Character(SmolStr::new_inline("s")),
             Keybind {
                 name: "keybind_backward",
                 description: "Keybinding for moving backward",
@@ -21,7 +21,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::KeyA,
+            Key::Character(SmolStr::new_inline("a")),
             Keybind {
                 name: "keybind_left",
                 description: "Keybinding for moving to the left",
@@ -29,7 +29,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::KeyD,
+            Key::Character(SmolStr::new_inline("d")),
             Keybind {
                 name: "keybind_right",
                 description: "Keybinding for moving to the right",
@@ -37,7 +37,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::KeyE,
+            Key::Character(SmolStr::new_inline("e")),
             Keybind {
                 name: "keybind_open_inv",
                 description: "Keybinding for opening the inventory",
@@ -45,7 +45,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::ShiftLeft,
+            Key::Named(NamedKey::Shift),
             Keybind {
                 name: "keybind_sneak",
                 description: "Keybinding for sneaking",
@@ -53,7 +53,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::ControlLeft,
+            Key::Named(NamedKey::Control),
             Keybind {
                 name: "keybind_sprint",
                 description: "Keybinding for sprinting",
@@ -61,7 +61,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::Space,
+            Key::Named(NamedKey::Space),
             Keybind {
                 name: "keybind_jump",
                 description: "Keybinding for jumping",
@@ -69,7 +69,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::F1,
+            Key::Named(NamedKey::F1),
             Keybind {
                 name: "keybind_toggle_hud",
                 description: "Keybinding for toggeling the hud",
@@ -77,7 +77,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::F3,
+            Key::Named(NamedKey::F3),
             Keybind {
                 name: "keybind_toggle_debug_info",
                 description: "Keybinding for toggeling the debug info",
@@ -85,7 +85,7 @@ pub fn create_keybinds() -> Vec<(KeyCode, Keybind)> {
             },
         ),
         (
-            KeyCode::KeyT,
+            Key::Character(SmolStr::new_inline("t")),
             Keybind {
                 name: "keybind_toggle_chat",
                 description: "Keybinding for toggeling the chat",
