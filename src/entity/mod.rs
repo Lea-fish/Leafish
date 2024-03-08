@@ -55,19 +55,16 @@ srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
     [0.0, 0.0, 0.0, 1.0],
 */
 
-pub fn add_systems(m: &mut Manager) {
-    m.schedule
-        .write()
-        .add_systems(systems::update_last_position.in_set(SystemExecStage::Normal));
+pub fn add_systems(sched: &mut Schedule) {
+    sched.add_systems(systems::update_last_position.in_set(SystemExecStage::Normal));
 
-    player::add_systems(m);
-    let mut entity_sched = m.schedule.write();
-    entity_sched
+    player::add_systems(sched);
+    sched
         .add_systems(systems::apply_velocity.in_set(SystemExecStage::Normal))
         .add_systems(systems::apply_gravity.in_set(SystemExecStage::Normal))
         .add_systems(systems::apply_digging.in_set(SystemExecStage::Normal));
 
-    entity_sched /*sync*/
+    sched /*sync*/
         .add_systems(
             systems::lerp_position
                 .in_set(SystemExecStage::Render)
@@ -84,9 +81,8 @@ pub fn add_systems(m: &mut Manager) {
                 .after(SystemExecStage::Normal),
         );
 
-    drop(entity_sched);
-    block_entity::add_systems(m);
-    crate::particle::block_break_effect::add_systems(m);
+    block_entity::add_systems(sched);
+    crate::particle::block_break_effect::add_systems(sched);
 }
 
 /// Location of an entity in the world.

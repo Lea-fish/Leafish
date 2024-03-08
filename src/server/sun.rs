@@ -14,7 +14,7 @@ const SIZE: f32 = 50.0;
 impl SunModel {
     pub fn new(renderer: Arc<render::Renderer>) -> SunModel {
         SunModel {
-            sun: SunModel::generate_sun(renderer.clone()),
+            sun: SunModel::generate_sun(&renderer),
             moon: SunModel::generate_moon(renderer, 0),
             last_phase: 0,
         }
@@ -62,7 +62,7 @@ impl SunModel {
         }
     }
 
-    pub fn generate_sun(renderer: Arc<render::Renderer>) -> model::ModelHandle {
+    pub fn generate_sun(renderer: &Arc<render::Renderer>) -> model::ModelHandle {
         let tex = render::Renderer::get_texture(renderer.get_textures_ref(), "environment/sun");
         renderer.models.lock().create_model(
             model::SUN,

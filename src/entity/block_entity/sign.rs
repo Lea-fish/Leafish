@@ -1,4 +1,4 @@
-use crate::ecs::{self, SystemExecStage};
+use crate::ecs::SystemExecStage;
 use crate::format::{self, Component};
 use crate::render;
 use crate::render::model::{self, FormatState};
@@ -9,8 +9,7 @@ use crate::world::block::Block;
 use bevy_ecs::prelude::*;
 use std::sync::Arc;
 
-pub fn add_systems(m: &mut ecs::Manager) {
-    let mut sched = m.entity_schedule.write();
+pub fn add_systems(sched: &mut Schedule) {
     sched /*sync*/
         .add_systems(
             render_sign
@@ -24,8 +23,8 @@ pub fn add_systems(m: &mut ecs::Manager) {
         );
 }
 
-pub fn init_entity(m: &mut ecs::Manager, e: Entity) {
-    m.world.get_entity_mut(e).unwrap().insert(SignInfo {
+pub fn init_entity(cmds: &mut Commands, e: Entity) {
+    cmds.get_entity(e).unwrap().insert(SignInfo {
         model: None,
         lines: [
             Component::new(format::ComponentType::new("", None)),
