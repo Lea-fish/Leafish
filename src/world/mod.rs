@@ -13,7 +13,10 @@
 // limitations under the License.
 
 use arc_swap::ArcSwap;
+use bevy_ecs::entity::Entity;
+use bevy_ecs::system::{Command, Commands};
 pub use leafish_blocks as block;
+use leafish_protocol::format::Component;
 use leafish_protocol::nbt::NamedTag;
 
 use crate::shared::Position;
@@ -237,14 +240,14 @@ impl World {
     }
 
     #[allow(clippy::verbose_bit_mask)] // "llvm generates better code" for updates_performed & 0xFFF "on x86"
-    pub fn tick(&self, m: &mut ecs::Manager) {
+    pub fn tick(&self, cmds: &mut Commands) {
         while let Ok(action) = self.block_entity_actions.1.try_recv() {
             match action {
                 BlockEntityAction::Remove(pos) => {
                     if let Some(chunk) = self.chunks.write().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
                     {
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            m.world.despawn(entity);
+                            cmds.entity(entity).despawn();
                         }
                     }
                 }
@@ -253,13 +256,13 @@ impl World {
                     {
                         // Remove existing entity
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            m.world.despawn(entity);
+                            cmds.entity(entity).despawn();
                         }
                         let block = chunk.get_block(pos.x & 0xF, pos.y, pos.z & 0xF);
                         if let Some(entity_type) =
                             block_entity::BlockEntityType::get_block_entity(block)
                         {
-                            let entity = entity_type.create_entity(m, pos);
+                            let entity = entity_type.create_entity(cmds, pos);
                             chunk.block_entities.insert(pos, entity);
                         }
                     }
@@ -268,15 +271,7 @@ impl World {
                     let (pos, line1, line2, line3, line4) = *bx;
                     if let Some(chunk) = self.chunks.write().get(&CPos(pos.x >> 4, pos.z >> 4)) {
                         if let Some(entity) = chunk.block_entities.get(&pos) {
-                            if let Some(mut sign) = m
-                                .world
-                                .get_entity_mut(*entity)
-                                .unwrap()
-                                .get_mut::<SignInfo>()
-                            {
-                                sign.lines = [line1, line2, line3, line4];
-                                sign.dirty = true;
-                            }
+                            cmds.add(UpdateSignInfoCmd([line1, line2, line3, line4], *entity));
                         }
                     }
                 }
@@ -1474,6 +1469,21 @@ impl Dimension {
 
     pub fn has_sky_light(&self) -> bool {
         matches!(*self, Dimension::Overworld)
+    }
+}
+
+struct UpdateSignInfoCmd([Component; 4], Entity);
+
+impl Command for UpdateSignInfoCmd {
+    fn apply(self, world: &mut bevy_ecs::world::World) {
+        let mut entity = world.get_entity_mut(self.1);
+        if let Some(mut info) = entity
+            .as_mut()
+            .and_then(|entity| entity.get_mut::<SignInfo>())
+        {
+            info.lines = self.0.clone();
+            info.dirty = true;
+        }
     }
 }
 

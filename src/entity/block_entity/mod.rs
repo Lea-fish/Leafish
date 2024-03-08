@@ -1,12 +1,11 @@
 pub mod sign;
 
-use crate::ecs;
 use crate::shared::Position;
 use crate::world::block::Block;
 use bevy_ecs::prelude::*;
 
-pub fn add_systems(m: &mut ecs::Manager) {
-    sign::add_systems(m);
+pub fn add_systems(sched: &mut Schedule) {
+    sign::add_systems(sched);
 }
 
 pub enum BlockEntityType {
@@ -38,12 +37,12 @@ impl BlockEntityType {
         }
     }
 
-    pub fn create_entity(&self, m: &mut ecs::Manager, pos: Position) -> Entity {
-        let mut e = m.world.spawn_empty();
+    pub fn create_entity(&self, cmds: &mut Commands, pos: Position) -> Entity {
+        let mut e = cmds.spawn_empty();
         e.insert(pos);
         let e = e.id();
         match *self {
-            BlockEntityType::Sign => sign::init_entity(m, e),
+            BlockEntityType::Sign => sign::init_entity(cmds, e),
         }
         e
     }

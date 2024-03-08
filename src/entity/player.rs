@@ -26,17 +26,16 @@ use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-pub fn add_systems(m: &mut Manager) {
+pub fn add_systems(sched: &mut Schedule) {
     // TODO: Check sync/async usage!
-    m.schedule.write().add_systems(
+    sched.add_systems(
         handle_movement
             .in_set(SystemExecStage::Render)
             .after(SystemExecStage::Normal),
     );
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
-    let mut entity_sched = m.schedule.write();
-    entity_sched
+    sched
         .add_systems(
             update_render_players
                 .in_set(SystemExecStage::Render)

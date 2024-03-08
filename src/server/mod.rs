@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::ecs::Manager;
+use crate::ecs::{Manager, SystemExecStage};
 use crate::entity;
 use crate::entity::player::{create_local, PlayerModel, PlayerMovement};
 use crate::entity::{EntityType, GameInfo, Gravity, MouseButtons, TargetPosition, TargetRotation};
@@ -40,7 +40,8 @@ use atomic_float::AtomicF64;
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use bevy_ecs::prelude::Entity;
-use bevy_ecs::system::Resource;
+use bevy_ecs::schedule::{IntoSystemConfigs, Schedule};
+use bevy_ecs::system::{Commands, Res, ResMut, Resource};
 use cgmath::prelude::*;
 use cgmath::Vector3;
 use crossbeam_channel::unbounded;
@@ -69,6 +70,8 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use self::sun::SunModel;
+
 pub mod plugin_messages;
 mod sun;
 pub mod target;
@@ -79,7 +82,9 @@ pub struct DisconnectData {
     just_disconnected: bool,
 }
 
+#[derive(Resource)]
 struct WorldData {
+    // FIXME: move to world?
     world_age: i64,         // move to world?
     world_time: f64,        // move to world?
     world_time_target: f64, // move to world?
@@ -108,7 +113,6 @@ pub struct Server {
 
     pub world: Arc<world::World>,
     pub entities: Arc<RwLock<ecs::Manager>>,
-    world_data: Arc<RwLock<WorldData>>,
 
     resources: Arc<RwLock<resources::Manager>>,
     version: AtomicUsize,
@@ -122,14 +126,11 @@ pub struct Server {
     entity_tick_timer: AtomicF64,
     pub received_chat_at: ArcSwapOption<Instant>,
 
-    sun_model: RwLock<Option<sun::SunModel>>,
     target_info: Arc<RwLock<target::Info>>,
     pub render_list_computer: Sender<bool>,
     pub render_list_computer_notify: Receiver<bool>,
     pub hud_context: Arc<RwLock<HudContext>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
-    fps: AtomicU32,
-    fps_start: AtomicU64,
     pub dead: AtomicBool,
     just_died: AtomicBool,
     last_chat_open: AtomicBool,
@@ -893,8 +894,6 @@ impl Server {
         )));
         let mut entities = Manager::default();
         // FIXME: fix threading modes (make some systems execute in parallel and others in sync)
-        entities.world.insert_resource(entity::GameInfo::new());
-        entities.world.insert_resource(WorldResource(world.clone()));
         entities
             .world
             .insert_resource(RendererResource(renderer.clone()));
@@ -902,10 +901,15 @@ impl Server {
             .world
             .insert_resource(ScreenSystemResource(screen_sys.clone()));
         entities.world.insert_resource(ConnResource(conn.clone()));
+        entities.world.insert_resource(entity::GameInfo::new());
+        entities.world.insert_resource(WorldResource(world.clone()));
         entities
             .world
             .insert_resource(InventoryContextResource(inventory_context.clone()));
-        entity::add_systems(&mut entities);
+        entities.world.insert_resource(DeltaResource(0.0));
+        entities.world.insert_resource(WorldData::default());
+        entity::add_systems(&mut entities.schedule.write());
+        add_systems(&mut entities.schedule.write());
 
         hud_context.write().slots = Some(inventory_context.read().base_slots.clone());
 
@@ -920,7 +924,6 @@ impl Server {
             disconnect_data: Arc::new(RwLock::new(DisconnectData::default())),
 
             world,
-            world_data: Arc::new(RwLock::new(WorldData::default())),
             version: AtomicUsize::new(version),
             resources,
 
@@ -936,15 +939,12 @@ impl Server {
             tick_timer: AtomicF64::new(0.0),
             entity_tick_timer: AtomicF64::new(0.0),
             received_chat_at: ArcSwapOption::new(None),
-            sun_model: RwLock::new(None),
 
             target_info: Arc::new(RwLock::new(target::Info::new())),
             render_list_computer,
             render_list_computer_notify,
             hud_context,
             inventory_context,
-            fps: AtomicU32::new(0),
-            fps_start: AtomicU64::new(0),
             dead: AtomicBool::new(false),
             just_died: AtomicBool::new(false),
             last_chat_open: AtomicBool::new(false),
@@ -988,27 +988,39 @@ impl Server {
                 self.entities.write().world.despawn(*entity.1);
             }
         }
-        self.sun_model.write().take();
+        self.entities
+            .write()
+            .world
+            .remove_resource::<SunModelResource>();
+        // FIXME: remove other resources!
     }
 
     pub fn is_connected(&self) -> bool {
-        return self.conn.read().is_some();
+        self.conn.read().is_some()
     }
 
     pub fn tick(&self, delta: f64, game: &mut Game) {
-        let renderer = self.renderer.clone();
-        let start = SystemTime::now();
-        let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64; // FIXME: use safer conversion
-        if self.fps_start.load(Ordering::Acquire) + 1000 < time {
-            self.hud_context
-                .write()
-                .update_fps(self.fps.load(Ordering::Acquire));
-            self.fps_start.store(time, Ordering::Release);
-            self.fps.store(0, Ordering::Release);
-        } else {
-            self.fps
-                .store(self.fps.load(Ordering::Acquire) + 1, Ordering::Release);
+        {
+            let mut entities = self.entities.write();
+            // FIXME: is there another way to do this?
+            entities.world.resource_mut::<DeltaResource>().0 = delta;
+            let start = SystemTime::now();
+            let time = start.duration_since(UNIX_EPOCH).unwrap().as_millis() as u64; // FIXME: use safer conversion
+            let fps_res = entities.world.get_resource::<RenderCtxResource>().unwrap();
+            if fps_res.0.frame_start.load(Ordering::Acquire) + 1000 < time {
+                self.hud_context
+                    .write()
+                    .update_fps(fps_res.0.fps.load(Ordering::Acquire));
+                fps_res.0.frame_start.store(time, Ordering::Release);
+                fps_res.0.fps.store(0, Ordering::Release);
+            } else {
+                fps_res
+                    .0
+                    .fps
+                    .store(fps_res.0.fps.load(Ordering::Acquire) + 1, Ordering::Release);
+            }
         }
+        let renderer = self.renderer.clone();
         let chat_open = self.chat_open.load(Ordering::Acquire);
         if chat_open != self.last_chat_open.load(Ordering::Acquire) {
             self.last_chat_open.store(chat_open, Ordering::Release);
@@ -1025,13 +1037,15 @@ impl Server {
             self.world.flag_dirty_all();
         }
         {
-            // TODO: Check if the world type actually needs a sun
-            if self.sun_model.read().is_none() {
-                self.sun_model
-                    .write()
-                    .replace(sun::SunModel::new(renderer.clone()));
+            {
+                let mut entities = self.entities.write();
+                if !entities.world.contains_resource::<SunModelResource>() {
+                    // TODO: Check if the world type actually needs a sun
+                    entities
+                        .world
+                        .insert_resource(SunModelResource(SunModel::new(renderer.clone())));
+                }
             }
-
             // Copy to camera
             if let Some(player) = self.player.load().as_ref() {
                 let entities = self.entities.read();
@@ -1068,15 +1082,9 @@ impl Server {
             );
         }
 
-        self.update_time(renderer.clone(), delta);
-        if let Some(sun_model) = self.sun_model.write().as_mut() {
-            sun_model.tick(
-                renderer.clone(),
-                self.world_data.read().world_time,
-                self.world_data.read().world_age,
-            );
-        }
-        self.world.tick(&mut self.entities.write());
+        self.update_time(&renderer);
+        // FIXME: tick sun in between!
+        // self.world.tick(&mut self.entities.write());
 
         if self.player.load().as_ref().is_some() {
             if self.just_died.load(Ordering::Acquire) {
@@ -1141,32 +1149,21 @@ impl Server {
         self.target_info.clone().write().clear(renderer);
     }*/
 
-    fn update_time(&self, renderer: Arc<render::Renderer>, delta: f64) {
-        let mut world_data = self.world_data.write();
-        if world_data.tick_time {
-            world_data.world_time_target += delta / 3.0;
-            let time = world_data.world_time_target;
-            world_data.world_time_target = (24000.0 + time) % 24000.0;
-            let mut diff = world_data.world_time_target - world_data.world_time;
-            if diff < -12000.0 {
-                diff += 24000.0
-            } else if diff > 12000.0 {
-                diff -= 24000.0
-            }
-            world_data.world_time += diff * (1.5 / 60.0) * delta;
-            let time = world_data.world_time;
-            world_data.world_time = (24000.0 + time) % 24000.0;
-        } else {
-            let time = world_data.world_time_target;
-            world_data.world_time = time;
-        }
-        drop(world_data);
+    fn update_time(&self, renderer: &Arc<render::Renderer>) {
         renderer.light_data.lock().sky_offset = self.calculate_sky_offset();
     }
 
     fn calculate_sky_offset(&self) -> f32 {
         use std::f32::consts::PI;
-        let mut offset = ((1.0 + self.world_data.read().world_time as f32) / 24000.0) - 0.25;
+        let mut offset = ((1.0
+            + self
+                .entities
+                .read()
+                .world
+                .resource::<WorldData>()
+                .world_time as f32)
+            / 24000.0)
+            - 0.25;
         if offset < 0.0 {
             offset += 1.0;
         } else if offset > 1.0 {
@@ -1709,7 +1706,9 @@ impl Server {
     }
 
     fn on_time_update(&self, time_update: mapped_packet::play::clientbound::TimeUpdate) {
-        let mut world_data = self.world_data.write();
+        // FIXME: use events that are passed to the world instead of locking up!
+        let mut entities = self.entities.write();
+        let mut world_data = entities.world.resource_mut::<WorldData>();
         world_data.world_age = time_update.time_of_day;
         world_data.world_time_target = (time_update.time_of_day % 24000) as f64;
         if world_data.world_time_target < 0.0 {
@@ -2445,3 +2444,64 @@ pub struct ConnResource(pub Arc<RwLock<Option<Conn>>>);
 
 #[derive(Resource)]
 pub struct InventoryContextResource(pub Arc<RwLock<InventoryContext>>);
+
+#[derive(Resource)]
+pub struct RenderCtxResource(pub Arc<RenderCtx>);
+
+pub struct RenderCtx {
+    pub fps: AtomicU32,
+    pub frame_start: AtomicU64,
+}
+
+#[derive(Resource)]
+pub struct SunModelResource(pub SunModel);
+
+#[derive(Resource)]
+pub struct TargetResource(pub Arc<RwLock<target::Info>>);
+
+#[derive(Resource)]
+pub struct DeltaResource(pub f64);
+
+fn tick_sun(
+    mut sun: ResMut<SunModelResource>,
+    renderer: Res<RendererResource>,
+    world_data: ResMut<WorldData>,
+) {
+    sun.0.tick(
+        renderer.0.clone(),
+        world_data.world_time,
+        world_data.world_age,
+    );
+}
+
+fn tick_world(mut commands: Commands, world: Res<WorldResource>) {
+    world.0.tick(&mut commands);
+}
+
+fn tick_time(mut world_data: ResMut<WorldData>, delta: Res<DeltaResource>) {
+    let delta = delta.0;
+    if world_data.tick_time {
+        world_data.world_time_target += delta / 3.0;
+        let time = world_data.world_time_target;
+        world_data.world_time_target = (24000.0 + time) % 24000.0;
+        let mut diff = world_data.world_time_target - world_data.world_time;
+        if diff < -12000.0 {
+            diff += 24000.0
+        } else if diff > 12000.0 {
+            diff -= 24000.0
+        }
+        world_data.world_time += diff * (1.5 / 60.0) * delta;
+        let time = world_data.world_time;
+        world_data.world_time = (24000.0 + time) % 24000.0;
+    } else {
+        let time = world_data.world_time_target;
+        world_data.world_time = time;
+    }
+}
+
+fn add_systems(sched: &mut Schedule) {
+    sched
+        .add_systems(tick_sun.in_set(SystemExecStage::Render))
+        .add_systems(tick_world.in_set(SystemExecStage::Normal))
+        .add_systems(tick_time.in_set(SystemExecStage::Normal));
+}
