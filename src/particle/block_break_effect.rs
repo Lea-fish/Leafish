@@ -1,4 +1,4 @@
-use crate::ecs::{Manager, SystemExecStage};
+use crate::ecs::SystemExecStage;
 use crate::render;
 use crate::render::model::ModelHandle;
 use crate::render::{model, Renderer};
@@ -7,11 +7,10 @@ use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Quaternion, Rad, Rotation3, Vector3};
 use std::sync::Arc;
 
-pub fn add_systems(m: &mut Manager) {
+pub fn add_systems(sched: &mut Schedule) {
     // TODO: Check sync/async usage!
     /*sync*/
-    m.entity_schedule
-        .write()
+    sched
         .add_systems(
             effect_added
                 .in_set(SystemExecStage::Render)
