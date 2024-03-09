@@ -908,6 +908,7 @@ impl Server {
             .insert_resource(InventoryContextResource(inventory_context.clone()));
         entities.world.insert_resource(DeltaResource(0.0));
         entities.world.insert_resource(WorldData::default());
+        entities.world.insert_resource(RenderCtxResource::default());
         entity::add_systems(&mut entities.schedule.write());
         add_systems(&mut entities.schedule.write());
 
@@ -2447,6 +2448,15 @@ pub struct InventoryContextResource(pub Arc<RwLock<InventoryContext>>);
 
 #[derive(Resource)]
 pub struct RenderCtxResource(pub Arc<RenderCtx>);
+
+impl Default for RenderCtxResource {
+    fn default() -> Self {
+        Self(Arc::new(RenderCtx {
+            fps: AtomicU32::new(0),
+            frame_start: AtomicU64::new(0),
+        }))
+    }
+}
 
 pub struct RenderCtx {
     pub fps: AtomicU32,

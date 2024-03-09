@@ -1,11 +1,14 @@
+use arc_swap::ArcSwap;
 use log::{info, warn};
-use parking_lot::Mutex;
 use std::collections::HashMap;
 use std::fs;
 use std::io::{BufRead, BufReader, BufWriter, Write};
+use std::ops::Deref;
 use std::str::FromStr;
+use std::sync::Arc;
+use winit::platform::scancode::PhysicalKeyExtScancode;
 
-use winit::keyboard::KeyCode;
+use winit::keyboard::{Key, KeyCode};
 
 use crate::paths;
 
@@ -18,32 +21,63 @@ pub struct Keybind {
     pub action: Actionkey,
 }
 
-pub struct KeybindStore(Mutex<HashMap<i32, Keybind>>);
+pub struct KeybindStore {
+    key_cache: ArcSwap<HashMap<Key, Keybind>>,
+    mapping_cache: ArcSwap<HashMap<u32, Keybind>>,
+}
 
 impl KeybindStore {
     pub fn new() -> Self {
-        let mut store = KeybindStore(Mutex::new(HashMap::new()));
+        let mut store = KeybindStore {
+            key_cache: ArcSwap::new(Arc::new(HashMap::new())),
+            mapping_cache: ArcSwap::new(Arc::new(HashMap::new())),
+        };
         store.load_defaults();
         store.load_config();
         store.save_config();
         store
     }
 
-    pub fn get(&self, key: KeyCode) -> Option<Keybind> {
-        self.0.lock().get(&(key as i32)).copied()
+    pub fn get(&self, code: KeyCode, key: &Key) -> Option<Keybind> {
+        if let Some(cache) = self
+            .mapping_cache
+            .load()
+            .get(&code.to_scancode().unwrap())
+            .copied()
+        {
+            return Some(cache);
+        }
+        if let Some(cached) = self.key_cache.load().get(key) {
+            let mut cache = self.mapping_cache.load().deref().deref().clone();
+            cache.insert(code.to_scancode().unwrap(), *cached);
+            return Some(*cached);
+        }
+        None
     }
 
-    pub fn set(&self, key: i32, action: Actionkey) {
-        let old_key = *self
-            .0
-            .lock()
+    pub fn set(&self, key: Key, action: Actionkey) {
+        let old_key = self
+            .key_cache
+            .load()
             .iter()
             .find(|(_, v)| v.action == action)
             .expect("a action was not bound to a key?")
-            .0;
+            .0
+            .clone();
+        let old_mapping = self.mapping_cache.load();
+        let old_raw_keys = old_mapping
+            .iter()
+            .filter(|(_, v)| v.action == action)
+            .collect::<Vec<_>>();
+        let mut mapping = self.mapping_cache.load().deref().deref().clone();
+        for key in old_raw_keys {
+            mapping.remove(key.0);
+        }
 
-        let old_val = self.0.lock().remove(&old_key).unwrap();
-        self.0.lock().insert(key, old_val);
+        let mut cache = self.key_cache.load().deref().deref().clone();
+        let old_val = cache.remove(&old_key).unwrap();
+        cache.insert(key, old_val);
+        self.key_cache.store(Arc::new(cache));
         self.save_config();
     }
 
@@ -66,23 +100,24 @@ impl KeybindStore {
                 if !name.starts_with("keybind_") {
                     continue;
                 }
-                let mut store = self.0.lock();
+                let mut store = self.key_cache.load().deref().deref().clone();
                 if let Some(action) = store
                     .values()
                     .find(|v| Actionkey::from_str(name).is_ok_and(|k| k == v.action))
                 {
                     if let Some(new_key) = deserialize_key(arg) {
-                        let key = *store
+                        let key = store
                             .iter()
                             .find(|(_, v)| v.action == action.action)
                             .expect("a action was not bound to a key?")
-                            .0;
+                            .0
+                            .clone();
 
                         let old_val = store.remove(&key).unwrap();
                         store.insert(new_key, old_val);
                     }
                 } else {
-                    info!("a unknown keybind was specified: {name}");
+                    info!("an unknown keybind was specified: {name}");
                 }
             }
         }
@@ -91,7 +126,7 @@ impl KeybindStore {
     fn save_config(&self) {
         let mut file =
             BufWriter::new(fs::File::create(paths::get_config_dir().join("keybinds.cfg")).unwrap());
-        for (key, keybind) in self.0.lock().iter() {
+        for (key, keybind) in self.key_cache.load().iter() {
             for line in keybind.description.lines() {
                 if let Err(err) = writeln!(file, "# {}", line) {
                     warn!(
@@ -100,7 +135,7 @@ impl KeybindStore {
                     );
                 }
             }
-            if let Err(err) = write!(file, "{} {}\n\n", keybind.name, *key) {
+            if let Err(err) = write!(file, "{} {:?}\n\n", keybind.name, key.clone()) {
                 warn!(
                     "couldnt write a keybind to config file {err}, {}",
                     keybind.name
@@ -110,15 +145,16 @@ impl KeybindStore {
     }
 
     fn load_defaults(&self) {
-        let mut s = self.0.lock();
+        let mut s = self.key_cache.load().deref().deref().clone();
         for bind in create_keybinds() {
-            s.insert(bind.0 as i32, bind.1);
+            s.insert(bind.0, bind.1);
         }
+        self.key_cache.store(Arc::new(s));
     }
 }
 
-fn deserialize_key(input: &str) -> Option<i32> {
-    match input.parse::<i32>() {
+fn deserialize_key(input: &str) -> Option<Key> {
+    match serde_json::from_str(input) {
         Ok(num) => Some(num),
         Err(err) => {
             warn!("couldnt deserialize keybind: {err}, {input}");
