@@ -19,7 +19,6 @@ pub struct BrewingStandInventory {
     id: i32,
     client_state_id: i16,
     brew_time: u16,
-    last_brew_time: u16,
     fuel_time: u8,
     dirty: bool,
 }
@@ -47,8 +46,8 @@ impl BrewingStandInventory {
             client_state_id: 0,
             name,
             id,
-            brew_time: 400,
-            last_brew_time: 0,
+            // brew progress in %
+            brew_time: 0,
             fuel_time: 0,
             dirty: true,
         }
@@ -62,10 +61,7 @@ impl Inventory for BrewingStandInventory {
 
     fn handle_property_packet(&mut self, property: i16, value: i16) {
         match property {
-            0 => {
-                self.last_brew_time = self.brew_time;
-                self.brew_time = value as u16;
-            }
+            0 => self.brew_time = ((400 - value as u16) / 4) % 100,
             1 => self.fuel_time = value as u8,
             _ => warn!("server sent invalid data for brewing stand"),
         }
@@ -179,7 +175,10 @@ impl Inventory for BrewingStandInventory {
                     top_left_x + 60.0 * icon_scale,
                     top_left_y + 6.0 * icon_scale,
                 )
-                .text(self.name.to_string())
+                .text(match self.name.as_str() {
+                    "container.brewing" => "Brewing Stand".to_owned(),
+                    name => name.to_owned(),
+                })
                 .colour((64, 64, 64, 255))
                 .shadow(false)
                 .create(ui_container),
@@ -209,9 +208,10 @@ impl Inventory for BrewingStandInventory {
                     .unwrap()
                     .borrow_mut();
                 fuel_bar.width = self.fuel_time as f64 * 0.9 * icon_scale;
-                fuel_bar.texture_coords.3 = fuel_bar.width / icon_scale;
+                // fuel_bar.texture_coords.2 = fuel_bar.width / icon_scale;
             }
 
+            dbg!(self.brew_time);
             {
                 let mut arrow = inventory_window
                     .elements
@@ -220,26 +220,20 @@ impl Inventory for BrewingStandInventory {
                     .get_mut(3)
                     .unwrap()
                     .borrow_mut();
-                arrow.height = (400 - self.brew_time) as f64 * icon_scale * (28.0 / 400.0);
+                arrow.height = (self.brew_time) as f64 * icon_scale * (28.0 / 100.0);
                 arrow.texture_coords.3 = arrow.height / icon_scale;
             }
 
             // bubble animation
-            if self.last_brew_time != self.brew_time {
-                let mut bubbles = inventory_window
-                    .elements
-                    .first_mut()
-                    .unwrap()
-                    .get_mut(2)
-                    .unwrap()
-                    .borrow_mut();
-                bubbles.height += 1.0 * icon_scale;
-                bubbles.texture_coords.3 += 1.0;
-                if bubbles.texture_coords.3 >= 29.0 {
-                    bubbles.height = 0.0;
-                    bubbles.texture_coords.3 = 0.0;
-                }
-            }
+            let mut bubbles = inventory_window
+                .elements
+                .first_mut()
+                .unwrap()
+                .get_mut(2)
+                .unwrap()
+                .borrow_mut();
+            bubbles.height = (self.brew_time % 10) as f64 * icon_scale * (29.0 / 10.0);
+            bubbles.texture_coords.3 = bubbles.height / icon_scale;
         }
     }
 

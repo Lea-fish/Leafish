@@ -148,8 +148,8 @@ impl Inventory for EnchantmentTableInventory {
 
         if slot_id == 1 && is_lapis_or_none(&item) {
             self.slots.set_item(slot_id, item);
-            self.dirty = true;
         }
+        self.dirty = true;
     }
 
     fn get_slot(&self, x: f64, y: f64) -> Option<u16> {
@@ -317,6 +317,7 @@ impl Inventory for EnchantmentTableInventory {
     ) {
         self.slots.tick(renderer, ui_container, inventory_window, 1);
         if self.dirty {
+            self.dirty = false;
             for i in 0..3 {
                 if self.button_data[i].level_required.is_some()
                     || self.button_data[i].enchantment_level.is_some()
@@ -437,7 +438,6 @@ impl Inventory for EnchantmentTableInventory {
                         .text = "".to_string();
                 }
             }
-            self.dirty = false;
         }
     }
 
