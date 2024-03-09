@@ -135,7 +135,12 @@ impl KeybindStore {
                     );
                 }
             }
-            if let Err(err) = write!(file, "{} {:?}\n\n", keybind.name, key.clone()) {
+            if let Err(err) = write!(
+                file,
+                "{} {}\n\n",
+                keybind.name,
+                serde_json::to_string(&key).unwrap()
+            ) {
                 warn!(
                     "couldnt write a keybind to config file {err}, {}",
                     keybind.name
