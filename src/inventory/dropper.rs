@@ -115,6 +115,7 @@ impl Inventory for DropperInventory {
         let title = match self.name.as_str() {
             "container.dispenser" => "Dispenser",
             "container.dropper" => "Dropper",
+            "container.hopper" => "Hopper",
             name => name,
         };
         let title_offset = renderer.ui.lock().size_of_string(title) / 4.0;

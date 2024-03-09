@@ -1,23 +1,25 @@
-pub mod anvil_inventory;
-pub mod beacon_inventory;
-pub mod brewing_stand_inventory;
-pub mod chest_inventory;
-pub mod crafting_table_inventory;
-pub mod dropper_inventory;
-pub mod enchanting_table_inventory;
-pub mod furnace_inventory;
+pub mod anvil;
+pub mod beacon;
+pub mod brewing_stand;
+pub mod chest;
+pub mod crafting_table;
+pub mod dropper;
+pub mod enchanting_table;
+pub mod furnace;
+pub mod grindstone;
 pub(crate) mod material;
 pub mod player_inventory;
 pub mod slot_mapping;
 
-use crate::inventory::anvil_inventory::AnvilInventory;
-use crate::inventory::beacon_inventory::BeaconInventory;
-use crate::inventory::brewing_stand_inventory::BrewingStandInventory;
-use crate::inventory::chest_inventory::ChestInventory;
-use crate::inventory::crafting_table_inventory::CraftingTableInventory;
-use crate::inventory::dropper_inventory::DropperInventory;
-use crate::inventory::enchanting_table_inventory::EnchantmentTableInventory;
-use crate::inventory::furnace_inventory::FurnaceInventory;
+use crate::inventory::anvil::AnvilInventory;
+use crate::inventory::beacon::BeaconInventory;
+use crate::inventory::brewing_stand::BrewingStandInventory;
+use crate::inventory::chest::ChestInventory;
+use crate::inventory::crafting_table::CraftingTableInventory;
+use crate::inventory::dropper::DropperInventory;
+use crate::inventory::enchanting_table::EnchantmentTableInventory;
+use crate::inventory::furnace::FurnaceInventory;
+use crate::inventory::grindstone::GrindStoneInventory;
 use crate::inventory::player_inventory::PlayerInventory;
 use crate::inventory::slot_mapping::SlotMapping;
 use crate::render::hud::{Hud, HudContext};
@@ -99,52 +101,63 @@ pub fn inventory_from_type(
     base_slots: Arc<RwLock<SlotMapping>>,
     id: i32,
 ) -> Option<Arc<RwLock<dyn Inventory + Sync + Send>>> {
-    match ty {
+    Some(match ty {
         /*InventoryType::Internal => {}
         InventoryType::Main => {}*/
-        InventoryType::Chest(rows) => Some(Arc::new(RwLock::new(ChestInventory::new(
+        InventoryType::Chest(rows) => Arc::new(RwLock::new(ChestInventory::new(
             renderer,
             base_slots,
             rows,
             title.to_string(),
             id,
-        )))),
-        InventoryType::CraftingTable => Some(Arc::new(RwLock::new(CraftingTableInventory::new(
-            renderer, base_slots, id,
-        )))),
-        InventoryType::Dropper => Some(Arc::new(RwLock::new(DropperInventory::new(
-            renderer,
-            base_slots,
-            title.to_string(),
-            id,
-        )))),
-        InventoryType::Furnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
-            renderer, base_slots, ty, id,
-        )))),
-        InventoryType::Smoker => Some(Arc::new(RwLock::new(FurnaceInventory::new(
-            renderer, base_slots, ty, id,
-        )))),
-        InventoryType::BlastFurnace => Some(Arc::new(RwLock::new(FurnaceInventory::new(
-            renderer, base_slots, ty, id,
-        )))),
-        InventoryType::EnchantingTable => Some(Arc::new(RwLock::new(
-            EnchantmentTableInventory::new(renderer, base_slots, title.to_string(), id),
         ))),
-        InventoryType::Anvil => Some(Arc::new(RwLock::new(AnvilInventory::new(
+        InventoryType::CraftingTable => Arc::new(RwLock::new(CraftingTableInventory::new(
             renderer, base_slots, id,
-        )))),
-        InventoryType::Beacon => Some(Arc::new(RwLock::new(BeaconInventory::new(
-            renderer, base_slots, id,
-        )))),
-        InventoryType::BrewingStand => Some(Arc::new(RwLock::new(BrewingStandInventory::new(
+        ))),
+
+        InventoryType::Dropper => Arc::new(RwLock::new(DropperInventory::new(
             renderer,
             base_slots,
             title.to_string(),
             id,
-        )))),
+        ))),
+        InventoryType::Hopper => Arc::new(RwLock::new(DropperInventory::new(
+            renderer,
+            base_slots,
+            title.to_string(),
+            id,
+        ))),
+        InventoryType::Furnace => Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        ))),
+        InventoryType::Smoker => Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        ))),
+        InventoryType::BlastFurnace => Arc::new(RwLock::new(FurnaceInventory::new(
+            renderer, base_slots, ty, id,
+        ))),
+        InventoryType::EnchantingTable => Arc::new(RwLock::new(EnchantmentTableInventory::new(
+            renderer,
+            base_slots,
+            title.to_string(),
+            id,
+        ))),
+        InventoryType::Anvil => {
+            Arc::new(RwLock::new(AnvilInventory::new(renderer, base_slots, id)))
+        }
+        InventoryType::Beacon => {
+            Arc::new(RwLock::new(BeaconInventory::new(renderer, base_slots, id)))
+        }
+        InventoryType::BrewingStand => Arc::new(RwLock::new(BrewingStandInventory::new(
+            renderer,
+            base_slots,
+            title.to_string(),
+            id,
+        ))),
+        InventoryType::Grindstone => Arc::new(RwLock::new(GrindStoneInventory::new(
+            renderer, base_slots, id,
+        ))),
         /*
-        InventoryType::Grindstone => {}
-        InventoryType::Hopper => {}
         InventoryType::Lectern => {}
         InventoryType::Loom => {}
         InventoryType::Merchant => {}
@@ -153,8 +166,8 @@ pub fn inventory_from_type(
         InventoryType::CartographyTable => {}
         InventoryType::Stonecutter => {}
         InventoryType::Horse => {}*/
-        _ => None,
-    }
+        _ => return None,
+    })
 }
 
 #[derive(Debug)]
