@@ -14,6 +14,8 @@
 
 extern crate leafish_resources as internal;
 
+use log::warn;
+
 use crate::paths;
 
 use std::collections::HashMap;
@@ -385,6 +387,8 @@ impl Manager {
                             io::copy(&mut progress, &mut file).unwrap();
                         }
                         fs::rename(&tmp_file, &location).unwrap();
+                    } else {
+                        warn!("The asset \"{k}\" (hash: {hash}) could not be downloaded");
                     }
                     Self::add_task_progress(
                         &progress_info,
