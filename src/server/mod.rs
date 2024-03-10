@@ -53,6 +53,7 @@ use leafish_protocol::item::Stack;
 use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
+use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
 use leafish_protocol::protocol::packet::Hand;
 use leafish_protocol::protocol::Conn;
 use log::{debug, error, info, warn};
@@ -1285,6 +1286,69 @@ impl Server {
                         self.screen_sys
                             .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
                         return true;
+                    }
+                }
+                Actionkey::Hotbar1 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 0;
+                        self.hud_context.write().update_slot_index(0);
+                        self.write_packet(HeldItemChange { slot: 0 });
+                    }
+                }
+                Actionkey::Hotbar2 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 1;
+                        self.hud_context.write().update_slot_index(1);
+                        self.write_packet(HeldItemChange { slot: 1 });
+                    }
+                }
+                Actionkey::Hotbar3 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 2;
+                        self.hud_context.write().update_slot_index(2);
+                        self.write_packet(HeldItemChange { slot: 2 });
+                    }
+                }
+                Actionkey::Hotbar4 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 3;
+                        self.hud_context.write().update_slot_index(3);
+                        self.write_packet(HeldItemChange { slot: 3 });
+                    }
+                }
+                Actionkey::Hotbar5 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 4;
+                        self.hud_context.write().update_slot_index(4);
+                        self.write_packet(HeldItemChange { slot: 4 });
+                    }
+                }
+                Actionkey::Hotbar6 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 5;
+                        self.hud_context.write().update_slot_index(5);
+                        self.write_packet(HeldItemChange { slot: 5 })
+                    }
+                }
+                Actionkey::Hotbar7 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 6;
+                        self.hud_context.write().update_slot_index(6);
+                        self.write_packet(HeldItemChange { slot: 6 });
+                    }
+                }
+                Actionkey::Hotbar8 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 7;
+                        self.hud_context.write().update_slot_index(7);
+                        self.write_packet(HeldItemChange { slot: 7 });
+                    }
+                }
+                Actionkey::Hotbar9 => {
+                    if down {
+                        self.inventory_context.write().hotbar_index = 8;
+                        self.hud_context.write().update_slot_index(8);
+                        self.write_packet(HeldItemChange { slot: 8 });
                     }
                 }
                 _ => {}

@@ -3,7 +3,7 @@ use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
 use crate::ui::{Container, ImageRef, TextBoxRef, TextRef, VAttach};
-use crate::{ui, Game, KeyCmp};
+use crate::{ui, Actionkey, Game};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use winit::keyboard::{Key, NamedKey, PhysicalKey};
@@ -99,12 +99,16 @@ impl Screen for InventoryWindow {
     }
 
     fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
-        let is_e = key.0.eq_ignore_case('e');
-        if is_e && !down && !self.initial_release {
+        let is_inv = if let PhysicalKey::Code(code) = key.1 {
+            game.keybinds.get(code, &key.0).map(|kb| kb.action) == Some(Actionkey::OpenInv)
+        } else {
+            false
+        };
+        if is_inv && !down && !self.initial_release {
             self.initial_release = true;
             return;
         }
-        if (key.0 == Key::Named(NamedKey::Escape) || is_e) && !down {
+        if (key.0 == Key::Named(NamedKey::Escape) || is_inv) && !down {
             self.inventory_context
                 .write()
                 .try_close_inventory(&game.screen_sys);

@@ -458,21 +458,19 @@ impl Screen for Hud {
             .as_ref()
             .unwrap()
             .clone()
-            .write_packet(HeldItemChange {
-                slot: new_slot as i16,
-            });
+            .inventory_context
+            .write()
+            .hotbar_index = new_slot;
+        self.hud_context.write().slot_index = new_slot;
+        self.hud_context.write().dirty_slot_index = true;
         self.hud_context
             .read()
             .server
             .as_ref()
             .unwrap()
-            .clone()
-            .inventory_context
-            .clone()
-            .write()
-            .hotbar_index = new_slot;
-        self.hud_context.clone().write().slot_index = new_slot;
-        self.hud_context.clone().write().dirty_slot_index = true;
+            .write_packet(HeldItemChange {
+                slot: new_slot as i16,
+            });
     }
 
     fn on_resize(
