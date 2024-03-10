@@ -388,7 +388,7 @@ impl Manager {
                         }
                         fs::rename(&tmp_file, &location).unwrap();
                     } else {
-                        warn!("The asset {k} (hash: {hash}) could not be downloaded");
+                        warn!("The asset \"{k}\" (hash: {hash}) could not be downloaded");
                     }
                     Self::add_task_progress(
                         &progress_info,
