@@ -360,36 +360,39 @@ impl Manager {
                 let hash_path = format!("{}/{}", &hash[..2], hash);
                 let location = root_location.join(&hash_path);
                 if fs::metadata(&location).is_err() {
-                    fs::create_dir_all(location.parent().unwrap()).unwrap();
-                    let res = client
+                    // ignore errors, as either the asset in question may not be available or
+                    // an error might have occoured connecting to the asset server
+                    if let Ok(res) = client
                         .get(&format!(
                             "http://resources.download.minecraft.net/{}",
                             hash_path
                         ))
                         .send()
-                        .unwrap();
-                    let length = v.get("size").and_then(|v| v.as_u64()).unwrap();
-                    Self::add_task(&progress_info, "Downloading Asset", k, length);
-                    let mut tmp_file = location.to_owned();
-                    tmp_file.set_file_name(format!("{}.tmp", hash));
                     {
-                        let mut file = fs::File::create(&tmp_file).unwrap();
-                        let mut progress = ProgressRead {
-                            read: res,
-                            progress: &progress_info,
-                            task_name: "Downloading Asset".into(),
-                            task_file: k.to_owned(),
-                        };
-                        io::copy(&mut progress, &mut file).unwrap();
+                        fs::create_dir_all(location.parent().unwrap()).unwrap();
+                        let length = v.get("size").and_then(|v| v.as_u64()).unwrap();
+                        Self::add_task(&progress_info, "Downloading Asset", k, length);
+                        let mut tmp_file = location.to_owned();
+                        tmp_file.set_file_name(format!("{}.tmp", hash));
+                        {
+                            let mut file = fs::File::create(&tmp_file).unwrap();
+                            let mut progress = ProgressRead {
+                                read: res,
+                                progress: &progress_info,
+                                task_name: "Downloading Asset".into(),
+                                task_file: k.to_owned(),
+                            };
+                            io::copy(&mut progress, &mut file).unwrap();
+                        }
+                        fs::rename(&tmp_file, &location).unwrap();
                     }
-                    fs::rename(&tmp_file, &location).unwrap();
+                    Self::add_task_progress(
+                        &progress_info,
+                        "Downloading Assets",
+                        &root_location.to_string_lossy(),
+                        1,
+                    );
                 }
-                Self::add_task_progress(
-                    &progress_info,
-                    "Downloading Assets",
-                    &root_location.to_string_lossy(),
-                    1,
-                );
             }
         });
     }
