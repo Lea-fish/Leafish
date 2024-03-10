@@ -181,6 +181,15 @@ pub enum Actionkey {
     ToggleHud,
     ToggleDebug,
     ToggleChat,
+    Hotbar1,
+    Hotbar2,
+    Hotbar3,
+    Hotbar4,
+    Hotbar5,
+    Hotbar6,
+    Hotbar7,
+    Hotbar8,
+    Hotbar9,
 }
 
 impl FromStr for Actionkey {
@@ -198,13 +207,22 @@ impl FromStr for Actionkey {
             "keybind_toggle_hud" => Ok(Actionkey::ToggleHud),
             "keybind_toggle_debug_info" => Ok(Actionkey::ToggleDebug),
             "keybind_toggle_chat" => Ok(Actionkey::ToggleChat),
+            "keybind_hotbar_1" => Ok(Actionkey::Hotbar1),
+            "keybind_hotbar_2" => Ok(Actionkey::Hotbar2),
+            "keybind_hotbar_3" => Ok(Actionkey::Hotbar3),
+            "keybind_hotbar_4" => Ok(Actionkey::Hotbar4),
+            "keybind_hotbar_5" => Ok(Actionkey::Hotbar5),
+            "keybind_hotbar_6" => Ok(Actionkey::Hotbar6),
+            "keybind_hotbar_7" => Ok(Actionkey::Hotbar7),
+            "keybind_hotbar_8" => Ok(Actionkey::Hotbar8),
+            "keybind_hotbar_9" => Ok(Actionkey::Hotbar9),
             _ => Err(()),
         }
     }
 }
 
 impl Actionkey {
-    const VALUES: [Actionkey; 11] = [
+    const VALUES: [Actionkey; 20] = [
         Actionkey::Forward,
         Actionkey::Backward,
         Actionkey::Left,
@@ -216,6 +234,15 @@ impl Actionkey {
         Actionkey::ToggleHud,
         Actionkey::ToggleDebug,
         Actionkey::ToggleChat,
+        Actionkey::Hotbar1,
+        Actionkey::Hotbar2,
+        Actionkey::Hotbar3,
+        Actionkey::Hotbar4,
+        Actionkey::Hotbar5,
+        Actionkey::Hotbar6,
+        Actionkey::Hotbar7,
+        Actionkey::Hotbar8,
+        Actionkey::Hotbar9,
     ];
 
     pub fn values() -> &'static [Actionkey] {

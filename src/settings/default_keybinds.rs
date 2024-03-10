@@ -92,5 +92,77 @@ pub fn create_keybinds() -> Vec<(Key, Keybind)> {
                 action: Actionkey::ToggleChat,
             },
         ),
+        (
+            Key::Character(SmolStr::new_inline("1")),
+            Keybind {
+                name: "keybind_hotbar_1",
+                description: "Keybind for selecting slot 1 of the hotbar",
+                action: Actionkey::Hotbar1,
+            },
+        ),
+        (
+            Key::Character(SmolStr::new_inline("2")),
+            Keybind {
+                name: "keybind_hotbar_2",
+                description: "Keybind for selecting slot 2 of the hotbar",
+                action: Actionkey::Hotbar2,
+            },
+        ),
+        (
+            Key::Character(SmolStr::new_inline("3")),
+            Keybind {
+                name: "keybind_hotbar_3",
+                description: "Keybind for selecting slot 3 of the hotbar",
+                action: Actionkey::Hotbar3,
+            },
+        ),
+        (
+            Key::Character(SmolStr::new_inline("4")),
+            Keybind {
+                name: "keybind_hotbar_4",
+                description: "Keybind for selecting slot 4 of the hotbar",
+                action: Actionkey::Hotbar4,
+            },
+        ),
+        (
+            Key::Character(SmolStr::new_inline("5")),
+            Keybind {
+                name: "keybind_hotbar_5",
+                description: "Keybind for selecting slot 5 of the hotbar",
+                action: Actionkey::Hotbar5,
+            },
+        ),
+        (
+            Key::Character(SmolStr::new_inline("6")),
+            Keybind {
+                name: "keybind_hotbar_6",
+                description: "Keybind for selecting slot 6 of the hotbar",
+                action: Actionkey::Hotbar6,
+            },
+        ),
+        (
+            Key::Character(SmolStr::new_inline("7")),
+            Keybind {
+                name: "keybind_hotbar_7",
+                description: "Keybind for selecting slot 7 of the hotbar",
+                action: Actionkey::Hotbar7,
+            },
+        ),
+        (
+            Key::Character(SmolStr::new_inline("8")),
+            Keybind {
+                name: "keybind_hotbar_8",
+                description: "Keybind for selecting slot 8 of the hotbar",
+                action: Actionkey::Hotbar8,
+            },
+        ),
+        (
+            Key::Character(SmolStr::new_inline("9")),
+            Keybind {
+                name: "keybind_hotbar_9",
+                description: "Keybind for selecting slot 9 of the hotbar",
+                action: Actionkey::Hotbar9,
+            },
+        ),
     ]
 }
