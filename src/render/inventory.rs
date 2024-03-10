@@ -3,7 +3,7 @@ use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
 use crate::ui::{Container, ImageRef, TextBoxRef, TextRef, VAttach};
-use crate::{ui, Game};
+use crate::{ui, Game, KeyCmp};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use winit::keyboard::{Key, NamedKey, PhysicalKey};
@@ -16,6 +16,7 @@ pub struct InventoryWindow {
     pub text_box: Vec<TextBoxRef>,
     pub inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
+    initial_release: bool,
 }
 
 impl Screen for InventoryWindow {
@@ -98,7 +99,12 @@ impl Screen for InventoryWindow {
     }
 
     fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
-        if key.0 == Key::Named(NamedKey::Escape) && !down {
+        let is_e = key.0.eq_ignore_case('e');
+        if is_e && !down && !self.initial_release {
+            self.initial_release = true;
+            return;
+        }
+        if (key.0 == Key::Named(NamedKey::Escape) || is_e) && !down {
             self.inventory_context
                 .write()
                 .try_close_inventory(&game.screen_sys);
@@ -126,6 +132,7 @@ impl InventoryWindow {
             inventory_context,
             cursor_element: vec![],
             text_box: vec![],
+            initial_release: false,
         }
     }
 }
