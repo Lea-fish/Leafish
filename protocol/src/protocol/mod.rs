@@ -25,7 +25,7 @@ use std::io;
 use std::io::{Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, Mutex};
 
 use aes::Aes128;
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
@@ -1122,8 +1122,8 @@ pub struct Conn {
     pub protocol_version: i32,
     pub state: State,
 
-    read_cipher: Arc<RwLock<Option<Aes128Cfb>>>,
-    write_cipher: Arc<RwLock<Option<Aes128Cfb>>>,
+    read_cipher: Arc<Mutex<Option<Aes128Cfb>>>,
+    write_cipher: Arc<Mutex<Option<Aes128Cfb>>>,
 
     pub compression_threshold: i32,
     pub send: Arc<Mutex<Option<bool>>>,
@@ -1187,8 +1187,8 @@ impl Conn {
             direction: Direction::Serverbound,
             state: State::Handshaking,
             protocol_version,
-            read_cipher: Arc::new(RwLock::new(None)),
-            write_cipher: Arc::new(RwLock::new(None)),
+            read_cipher: Arc::new(Mutex::new(None)),
+            write_cipher: Arc::new(Mutex::new(None)),
             compression_threshold: -1,
             send: Arc::new(Mutex::new(None)),
         })
@@ -1229,7 +1229,6 @@ impl Conn {
             VarInt(0).write_to(self)?;
         }
         self.write_all(&buf)?;
-
         Ok(())
     }
 
@@ -1389,13 +1388,11 @@ impl Conn {
         let read_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
         let write_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
         self.read_cipher
-            .clone()
-            .write()
+            .lock()
             .unwrap()
             .replace(read_cipher);
         self.write_cipher
-            .clone()
-            .write()
+            .lock()
             .unwrap()
             .replace(write_cipher);
     }
@@ -1619,7 +1616,7 @@ pub struct StatusPlayer {
 
 impl Read for Conn {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        match self.read_cipher.clone().write().unwrap().as_mut() {
+        match self.read_cipher.lock().unwrap().as_mut() {
             Option::None => self.stream.read(buf),
             Option::Some(cipher) => {
                 let ret = self.stream.read(buf)?;
@@ -1633,7 +1630,7 @@ impl Read for Conn {
 
 impl Write for Conn {
     fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self.write_cipher.clone().write().unwrap().as_mut() {
+        match self.write_cipher.lock().unwrap().as_mut() {
             Option::None => self.stream.write(buf),
             Option::Some(cipher) => {
                 let mut data = vec![0; buf.len()];
