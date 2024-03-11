@@ -567,12 +567,12 @@ fn tick_all(
         error!("Changing vsync currently requires restarting");
         game.should_close = true;
         // TODO: after changing to wgpu and the new renderer, allow changing vsync on a Window
-        //vsync = vsync_changed;
+        // vsync = vsync_changed;
     }
     let fps_cap = game.settings.get_int(IntSetting::MaxFps);
 
     if let Some(server) = game.server.as_ref() {
-        server.clone().tick(delta, game); // TODO: Improve perf in load screen!
+        server.clone().tick(delta, game);
     }
 
     // Check if window is valid, it might be minimized
@@ -718,7 +718,7 @@ fn handle_window_event<T>(
                         let physical_size = window.inner_size();
                         let (width, height) =
                             physical_size.to_logical::<f64>(game.dpi_factor).into();
-                        if !game.screen_sys.clone().is_current_ingame() && !game.focused {
+                        if !game.screen_sys.is_current_ingame() && !game.focused {
                             // TODO: after Pointer Lock https://github.com/rust-windowing/winit/issues/1674
                             ui_container.click_at(
                                 game,

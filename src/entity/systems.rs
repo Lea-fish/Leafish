@@ -216,7 +216,7 @@ impl ApplyDigging<'_, '_> {
                 self.start_digging(current, &mut digging.effect);
             }
             // Finish the new digging operation.
-            (Some(_), Some(current)) if !current.is_finished(&self.tool) => {
+            (Some(_), Some(current)) if current.is_finished(&self.tool) => {
                 current.finished = true;
                 self.finish_digging(current, &mut digging.effect, world);
             }
