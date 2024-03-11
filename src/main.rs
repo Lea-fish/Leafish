@@ -872,3 +872,10 @@ impl KeyCmp for Key {
         }
     }
 }
+
+pub fn remove_key_modifiers(key: &Key) -> Key {
+    match key {
+        Key::Character(str) => Key::Character(SmolStr::new_inline(&str.to_lowercase())),
+        _ => key.clone(),
+    }
+}
