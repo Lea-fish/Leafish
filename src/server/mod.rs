@@ -802,6 +802,14 @@ impl Server {
                                     .insert(block_break.entity_id, entity);
                             }
                         }
+                        MappedPacket::Title(title) => {
+                            if let Some(bar) = title.action_bar_text {
+                                server
+                                    .hud_context
+                                    .write()
+                                    .set_action_bar(format::Component::from_str(&bar));
+                            }
+                        }
                         _ => {
                             // debug!("other packet!");
                         }
@@ -2208,10 +2216,23 @@ impl Server {
 
     fn on_servermessage(&self, message: mapped_packet::play::clientbound::ServerMessage) {
         debug!("Received chat message: {}", message.message);
-        self.hud_context
-            .write()
-            .display_message_in_chat(message.message);
-        self.received_chat_at.store(Some(Arc::new(Instant::now())));
+        match message.position {
+            None | Some(0) | Some(1) => {
+                self.hud_context
+                    .write()
+                    .display_message_in_chat(message.message);
+                self.received_chat_at.store(Some(Arc::new(Instant::now())));
+            }
+            Some(2) => {
+                self.hud_context.write().set_action_bar(message.message);
+            }
+            Some(val) => {
+                warn!(
+                    "Received unknown chat message type {val} message \"{}\"",
+                    &message.message
+                );
+            }
+        }
     }
 
     fn load_block_entities(&self, block_entities: Vec<Option<crate::nbt::NamedTag>>) {
