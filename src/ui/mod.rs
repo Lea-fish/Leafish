@@ -186,12 +186,12 @@ macro_rules! define_elements {
                 }
             }
 
-            fn key_press(&self, game: &mut crate::Game, key: Key, down: bool, ctrl_pressed: bool) {
+            fn key_press(&self, game: &mut crate::Game, key: Key, down: bool, ctrl_pressed: bool) -> bool {
                 match *self {
                     $(
                         Element::$name(ref inner) => {
                             let mut el = inner.borrow_mut();
-                            el.key_press(game, key, down, ctrl_pressed);
+                            el.key_press(game, key, down, ctrl_pressed)
                         },
                     )*
                 }
@@ -450,8 +450,7 @@ impl Container {
             })
         };
         for el in self.focusable_elements.iter().flat_map(|v| v.upgrade()) {
-            if el.is_focused() {
-                el.key_press(game, key.clone(), down, ctrl_pressed);
+            if el.is_focused() && el.key_press(game, key.clone(), down, ctrl_pressed) {
                 if let Some(chr) = chr {
                     el.key_type(game, chr);
                 }
@@ -511,7 +510,15 @@ trait UIElement {
     fn get_size(&self) -> (f64, f64);
     fn is_dirty(&self) -> bool;
     fn post_init(_: Rc<RefCell<Self>>) {}
-    fn key_press(&mut self, _game: &mut crate::Game, _key: Key, _down: bool, _ctrl_pressed: bool) {}
+    fn key_press(
+        &mut self,
+        _game: &mut crate::Game,
+        _key: Key,
+        _down: bool,
+        _ctrl_pressed: bool,
+    ) -> bool {
+        true
+    }
     fn key_type(&mut self, _game: &mut crate::Game, _c: char) {}
     fn tick(&mut self, renderer: Arc<render::Renderer>);
 }
@@ -1610,7 +1617,13 @@ impl UIElement for TextBox {
         );
     }
 
-    fn key_press(&mut self, game: &mut crate::Game, key: Key, down: bool, ctrl_pressed: bool) {
+    fn key_press(
+        &mut self,
+        game: &mut crate::Game,
+        key: Key,
+        down: bool,
+        ctrl_pressed: bool,
+    ) -> bool {
         if key == Key::Named(NamedKey::Enter) && !down {
             use std::mem;
             let len = self.submit_funcs.len();
@@ -1619,11 +1632,14 @@ impl UIElement for TextBox {
                 (func)(self, game);
             }
             self.submit_funcs.append(&mut temp);
+            return false;
         } else if key.eq_ignore_case('v') && down && ctrl_pressed {
             if let Ok(text) = game.clipboard_provider.lock().get_contents() {
                 self.input.push_str(&text)
             }
+            return false;
         }
+        true
     }
 
     fn key_type(&mut self, _game: &mut crate::Game, c: char) {
