@@ -1242,8 +1242,8 @@ impl Server {
         }
     }
 
-    pub fn key_press(&self, down: bool, key: Actionkey, focused: &mut bool) -> bool {
-        if *focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
+    pub fn key_press(&self, down: bool, key: Actionkey, focused: bool) -> bool {
+        if focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
             let mut state_changed = false;
             if let Some(player) = self.player.load().as_ref() {
                 if let Some(mut movement) = self
@@ -1257,99 +1257,80 @@ impl Server {
                     movement.pressed_keys.insert(key, down);
                 }
             }
+            if !down {
+                return false;
+            }
             match key {
                 Actionkey::OpenInv => {
-                    if down {
-                        let player_inv = self.inventory_context.read().player_inventory.clone();
-                        self.inventory_context.write().open_inventory(
-                            player_inv,
-                            &self.screen_sys,
-                            self.inventory_context.clone(),
-                        );
-                        return true;
-                    }
+                    let player_inv = self.inventory_context.read().player_inventory.clone();
+                    self.inventory_context.write().open_inventory(
+                        player_inv,
+                        &self.screen_sys,
+                        self.inventory_context.clone(),
+                    );
+                    return true;
                 }
                 Actionkey::ToggleHud => {
-                    if down && state_changed {
+                    if state_changed {
                         let curr = self.hud_context.read().enabled;
                         self.hud_context.write().enabled = !curr;
                     }
                 }
                 Actionkey::ToggleDebug => {
-                    if down && state_changed {
+                    if state_changed {
                         let curr = self.hud_context.read().debug;
                         self.hud_context.write().debug = !curr;
                     }
                 }
                 Actionkey::ToggleChat => {
-                    if down {
-                        self.screen_sys
-                            .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
-                        return true;
-                    }
+                    self.screen_sys
+                        .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
+                    return true;
                 }
                 Actionkey::Hotbar1 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 0;
-                        self.hud_context.write().update_slot_index(0);
-                        self.write_packet(HeldItemChange { slot: 0 });
-                    }
+                    self.inventory_context.write().hotbar_index = 0;
+                    self.hud_context.write().update_slot_index(0);
+                    self.write_packet(HeldItemChange { slot: 0 });
                 }
                 Actionkey::Hotbar2 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 1;
-                        self.hud_context.write().update_slot_index(1);
-                        self.write_packet(HeldItemChange { slot: 1 });
-                    }
+                    self.inventory_context.write().hotbar_index = 1;
+                    self.hud_context.write().update_slot_index(1);
+                    self.write_packet(HeldItemChange { slot: 1 });
                 }
                 Actionkey::Hotbar3 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 2;
-                        self.hud_context.write().update_slot_index(2);
-                        self.write_packet(HeldItemChange { slot: 2 });
-                    }
+                    self.inventory_context.write().hotbar_index = 2;
+                    self.hud_context.write().update_slot_index(2);
+                    self.write_packet(HeldItemChange { slot: 2 });
                 }
                 Actionkey::Hotbar4 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 3;
-                        self.hud_context.write().update_slot_index(3);
-                        self.write_packet(HeldItemChange { slot: 3 });
-                    }
+                    self.inventory_context.write().hotbar_index = 3;
+                    self.hud_context.write().update_slot_index(3);
+                    self.write_packet(HeldItemChange { slot: 3 });
                 }
                 Actionkey::Hotbar5 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 4;
-                        self.hud_context.write().update_slot_index(4);
-                        self.write_packet(HeldItemChange { slot: 4 });
-                    }
+                    self.inventory_context.write().hotbar_index = 4;
+                    self.hud_context.write().update_slot_index(4);
+                    self.write_packet(HeldItemChange { slot: 4 });
                 }
                 Actionkey::Hotbar6 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 5;
-                        self.hud_context.write().update_slot_index(5);
-                        self.write_packet(HeldItemChange { slot: 5 })
-                    }
+                    self.inventory_context.write().hotbar_index = 5;
+                    self.hud_context.write().update_slot_index(5);
+                    self.write_packet(HeldItemChange { slot: 5 });
                 }
                 Actionkey::Hotbar7 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 6;
-                        self.hud_context.write().update_slot_index(6);
-                        self.write_packet(HeldItemChange { slot: 6 });
-                    }
+                    self.inventory_context.write().hotbar_index = 6;
+                    self.hud_context.write().update_slot_index(6);
+                    self.write_packet(HeldItemChange { slot: 6 });
                 }
                 Actionkey::Hotbar8 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 7;
-                        self.hud_context.write().update_slot_index(7);
-                        self.write_packet(HeldItemChange { slot: 7 });
-                    }
+                    self.inventory_context.write().hotbar_index = 7;
+                    self.hud_context.write().update_slot_index(7);
+                    self.write_packet(HeldItemChange { slot: 7 });
                 }
                 Actionkey::Hotbar9 => {
-                    if down {
-                        self.inventory_context.write().hotbar_index = 8;
-                        self.hud_context.write().update_slot_index(8);
-                        self.write_packet(HeldItemChange { slot: 8 });
-                    }
+                    self.inventory_context.write().hotbar_index = 8;
+                    self.hud_context.write().update_slot_index(8);
+                    self.write_packet(HeldItemChange { slot: 8 });
                 }
                 _ => {}
             };

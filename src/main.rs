@@ -783,43 +783,42 @@ fn handle_window_event<T>(
                     } else {
                         match (event.state, event.logical_key) {
                             (ElementState::Pressed, Key::Named(NamedKey::F11)) => {
-                                if !game.is_fullscreen {
-                                    // TODO: support options for exclusive and simple fullscreen
-                                    // see https://docs.rs/glutin/0.22.0-alpha5/glutin/window/struct.Window.html#method.set_fullscreen
-                                    window.set_fullscreen(Some(
-                                        winit::window::Fullscreen::Borderless(
-                                            window.current_monitor(),
-                                        ),
-                                    ));
-                                } else {
-                                    window.set_fullscreen(None);
-                                }
+                                if !event.repeat {
+                                    if !game.is_fullscreen {
+                                        // TODO: support options for exclusive and simple fullscreen
+                                        // see https://docs.rs/glutin/0.22.0-alpha5/glutin/window/struct.Window.html#method.set_fullscreen
+                                        window.set_fullscreen(Some(
+                                            winit::window::Fullscreen::Borderless(
+                                                window.current_monitor(),
+                                            ),
+                                        ));
+                                    } else {
+                                        window.set_fullscreen(None);
+                                    }
 
-                                game.is_fullscreen = !game.is_fullscreen;
+                                    game.is_fullscreen = !game.is_fullscreen;
+                                }
                             }
-                            (ElementState::Pressed, key) => {
+                            (state, key) => {
+                                let pressed = state == ElementState::Pressed;
                                 #[cfg(target_os = "macos")]
-                                if game.is_logo_pressed && key.eq_ignore_case('q') {
+                                if pressed && game.is_logo_pressed && key.eq_ignore_case('q') {
                                     game.should_close = true;
                                 }
                                 if !game.focused {
-                                    let ctrl_pressed = game.is_ctrl_pressed || game.is_logo_pressed;
-                                    ui_container.key_press(game, key.clone(), true, ctrl_pressed);
+                                    let ctrl_pressed =
+                                        game.is_ctrl_pressed || (pressed && game.is_logo_pressed);
+                                    ui_container.key_press(
+                                        game,
+                                        key.clone(),
+                                        pressed,
+                                        ctrl_pressed,
+                                    );
                                 }
                                 game.screen_sys.clone().press_key(
                                     (key, event.physical_key),
-                                    true,
-                                    game,
-                                );
-                            }
-                            (ElementState::Released, key) => {
-                                if !game.focused {
-                                    let ctrl_pressed = game.is_ctrl_pressed;
-                                    ui_container.key_press(game, key.clone(), false, ctrl_pressed);
-                                }
-                                game.screen_sys.clone().press_key(
-                                    (key, event.physical_key),
-                                    false,
+                                    pressed,
+                                    event.repeat,
                                     game,
                                 );
                             }
