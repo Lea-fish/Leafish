@@ -275,6 +275,9 @@ impl super::Screen for Chat {
             game.screen_sys.pop_screen();
             return;
         }
+        if !down {
+            return;
+        }
         if key.0.eq_ignore_case('v') && game.is_ctrl_pressed {
             if let Ok(clipboard) = game.clipboard_provider.lock().get_contents() {
                 for c in clipboard.chars() {
