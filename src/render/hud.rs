@@ -904,7 +904,6 @@ impl Hud {
             }
         }
         self.hud_context
-            .clone()
             .write()
             .dirty_slots
             .store(false, AtomicOrdering::Relaxed);
@@ -912,7 +911,7 @@ impl Hud {
 
     fn render_slot_index(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let icon_scale = Hud::icon_scale(renderer);
-        let slot = self.hud_context.clone().read().slot_index as f64;
+        let slot = self.hud_context.read().slot_index as f64;
         let image = ui::ImageBuilder::new()
             .draw_index(HUD_PRIORITY)
             .texture_coords((0.0, 22.0, 24.0, 22.0))
@@ -928,7 +927,7 @@ impl Hud {
             .texture("minecraft:gui/widgets")
             .create(ui_container);
         self.slot_index_elements.push(image);
-        self.hud_context.clone().write().dirty_slot_index = false;
+        self.hud_context.write().dirty_slot_index = false;
     }
 
     // TODO: make use of "render_item" (in right hand)
@@ -1116,10 +1115,10 @@ impl Hud {
         let text = if item.stack.count != 1 {
             Some(
                 ui::TextBuilder::new()
-                    .scale_x(icon_scale / 2.0)
-                    .scale_y(icon_scale / 2.0)
+                    .scale_x(icon_scale / 2.25)
+                    .scale_y(icon_scale / 2.25)
                     .text(item.stack.count.to_string())
-                    .position(x - icon_scale * 2.0, y + icon_scale * 5.0)
+                    .position(x + icon_scale * 3.0, y - icon_scale * 3.0)
                     .alignment(ui::VAttach::Bottom, ui::HAttach::Center)
                     .colour((255, 255, 255, 255))
                     .shadow(true)
