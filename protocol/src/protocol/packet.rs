@@ -3456,6 +3456,20 @@ pub fn send_digging(
     }
 }
 
+pub fn send_use_item(
+    conn: &mut Conn,
+    hand: Hand,
+) -> Result<(), Error> {
+    let version = conn.get_version();
+    if version < Version::V1_8 {
+        todo!()
+    } else {
+        conn.write_packet(packet::play::serverbound::UseItem {
+            hand: VarInt(hand.ordinal()),
+        })
+    }
+}
+
 pub fn send_block_place(
     conn: &mut Conn,
     pos: Position,
