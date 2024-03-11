@@ -1370,6 +1370,16 @@ impl Server {
     #[allow(unused_must_use)]
     pub fn on_right_click(&self, focused: bool) {
         if self.player.load().as_ref().is_some() && focused {
+            {
+                let mut entities = self.entities.write();
+                // check if the player exists, as it might not be initialized very early on server join
+                if let Some(player) = self.player.load().as_ref() {
+                    let mut player = entities.world.entity_mut(player.1);
+                    let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
+                    mouse_buttons.right = true;
+                }
+            }
+
             let gamemode = *self
                 .entities
                 .read()
@@ -1377,51 +1387,45 @@ impl Server {
                 .entity(self.player.load().as_ref().unwrap().1)
                 .get::<GameMode>()
                 .unwrap();
-            if gamemode.can_interact_with_world() {
-                // TODO: Check this
-                if let Some((pos, _, face, at)) = target::trace_ray(
-                    &self.world,
-                    4.0,
-                    self.renderer.camera.lock().pos.to_vec(),
-                    self.renderer.view_vector.lock().cast().unwrap(),
-                    target::test_block,
-                ) {
-                    let hud_context = self.hud_context.clone();
-                    packet::send_block_place(
-                        self.conn.write().as_mut().unwrap(),
-                        pos,
-                        face.index() as u8,
-                        at,
-                        Hand::MainHand,
-                        Box::new(move || {
-                            hud_context
-                                .read()
-                                .slots
-                                .as_ref()
-                                .unwrap()
-                                .clone()
-                                .read()
-                                .get_item((27 + hud_context.read().get_slot_index()) as u16)
-                                .as_ref()
-                                .map(|item| item.stack.clone())
-                        }),
-                    )
-                    .map_err(|_| self.disconnect_closed(None));
-                    packet::send_arm_swing(
-                        self.conn.clone().write().as_mut().unwrap(),
-                        Hand::MainHand,
-                    )
-                    .map_err(|_| self.disconnect_closed(None));
-                }
+            // FIXME: should we always send UseItem when in adventure?
+            if gamemode == GameMode::Adventure {
+                packet::send_use_item(self.conn.clone().write().as_mut().unwrap(), Hand::MainHand);
+                return;
             }
-
-            let mut entities = self.entities.write();
-            // check if the player exists, as it might not be initialized very early on server join
-            if let Some(player) = self.player.load().as_ref() {
-                let mut player = entities.world.entity_mut(player.1);
-                let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
-                mouse_buttons.right = true;
+            if let Some((pos, _, face, at)) = target::trace_ray(
+                &self.world,
+                4.0,
+                self.renderer.camera.lock().pos.to_vec(),
+                self.renderer.view_vector.lock().cast().unwrap(),
+                target::test_block,
+            ) {
+                let hud_context = self.hud_context.clone();
+                packet::send_block_place(
+                    self.conn.write().as_mut().unwrap(),
+                    pos,
+                    face.index() as u8,
+                    at,
+                    Hand::MainHand,
+                    Box::new(move || {
+                        hud_context
+                            .read()
+                            .slots
+                            .as_ref()
+                            .unwrap()
+                            .clone()
+                            .read()
+                            .get_item((27 + hud_context.read().get_slot_index()) as u16)
+                            .as_ref()
+                            .map(|item| item.stack.clone())
+                    }),
+                )
+                .map_err(|_| self.disconnect_closed(None));
+                packet::send_arm_swing(self.conn.clone().write().as_mut().unwrap(), Hand::MainHand)
+                    .map_err(|_| self.disconnect_closed(None)); // FIXME: should we actually swing after placing a block?
+                return;
             }
+            // we don't look it a block while rightclicking
+            packet::send_use_item(self.conn.clone().write().as_mut().unwrap(), Hand::MainHand);
         }
         // TODO: Pass events into inventory context when not focused
     }
