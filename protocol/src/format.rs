@@ -174,7 +174,7 @@ impl Component {
     }
 
     fn from_chat_sections(sections: ChatSections, modifier: &Modifier) -> Self {
-        Component {
+        Self {
             list: sections
                 .sections
                 .into_iter()
@@ -187,11 +187,11 @@ impl Component {
         let modifier = modifier.over_write(&chat.get_modifier());
         let text_components: Vec<ComponentType> = match (&chat.translate, &chat.text, &chat.extra) {
             (None, None, None) => chat
-                .with
-                .iter()
-                .map(|with| Component::get_text(with, &modifier).list)
-                .flatten()
-                .collect(),
+            .with
+            .iter()
+            .map(|with| Component::get_text(with, &modifier).list)
+            .flatten()
+            .collect(),
 
             (Some(translate), None, None) => {
                 let mut list = chat
@@ -202,8 +202,13 @@ impl Component {
 
                 let mut iter_component = list.iter_mut();
 
+                // FIXME: this is just a band-aid solution, parse the translate string properly as defined in https://wiki.vg/Text_formatting#Text_components
+                if translate == "%s" {
+                    return list.into_iter().next().unwrap();
+                }
+
                 let mut components = Vec::new();
-                let translated = translate::translate(translate);
+                let translated = translate::translate(translate).replace("%%", "%");
                 let mut index = 0;
                 for (i, char) in translated.char_indices() {
                     match char {

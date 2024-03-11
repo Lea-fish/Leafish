@@ -255,7 +255,7 @@ impl UIState {
             let sw = self.page_width / 16.0;
             return (((info.1 - info.0) as f64) / sw) * 16.0;
         }
-        let info = self.font_character_info[c as usize];
+        let info = self.font_character_info[c as usize]; // FIXME: handle unsupported chars gracefully and don't panic on OOB here!
         (info.1 - info.0) as f64
     }
 
