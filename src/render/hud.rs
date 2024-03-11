@@ -17,6 +17,7 @@ use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use leafish_protocol::format::Component;
 use log::debug;
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
@@ -77,6 +78,8 @@ pub struct HudContext {
     dirty_slot_index: bool,
     pub game_mode: GameMode,
     dirty_game_mode: bool,
+    pub action_bar: Option<Component>,
+    dirty_action_bar: bool,
 }
 
 impl Default for render::hud::HudContext {
@@ -122,6 +125,8 @@ impl HudContext {
             dirty_slot_index: false,
             game_mode: GameMode::Survival,
             dirty_game_mode: false,
+            action_bar: None,
+            dirty_action_bar: false,
         }
     }
 
@@ -199,6 +204,11 @@ impl HudContext {
             .clone()
             .push_msg(message);
     }
+
+    pub fn set_action_bar(&mut self, message: format::Component) {
+        self.action_bar = Some(message);
+        self.dirty_action_bar = true;
+    }
 }
 
 #[derive(Clone)]
@@ -218,6 +228,7 @@ pub struct Hud {
     debug_elements: Vec<TextRef>,
     chat_elements: Vec<FormattedRef>,
     chat_background_elements: Vec<ImageRef>,
+    action_bar_text_elements: Option<FormattedRef>,
     hud_context: Arc<RwLock<HudContext>>,
     last_tick: Instant,
     render_chat: bool,
@@ -225,7 +236,7 @@ pub struct Hud {
 
 impl Hud {
     pub fn new(hud_context: Arc<RwLock<HudContext>>) -> Self {
-        Hud {
+        Self {
             last_enabled: true,
             last_debug_enabled: false,
             elements: vec![],
@@ -241,6 +252,7 @@ impl Hud {
             debug_elements: vec![],
             chat_elements: vec![],
             chat_background_elements: vec![],
+            action_bar_text_elements: None,
             hud_context,
             last_tick: Instant::now(),
             render_chat: false,
@@ -261,6 +273,7 @@ impl Screen for Hud {
             self.render_slot_index(&renderer, ui_container);
             self.render_crosshair(&renderer, ui_container);
             self.render_chat(&renderer, ui_container);
+            self.render_action_bar(&renderer, ui_container);
             let game_mode = self.hud_context.read().game_mode;
             if matches!(game_mode, GameMode::Adventure | GameMode::Survival) {
                 self.render_health(&renderer, ui_container);
@@ -403,6 +416,9 @@ impl Screen for Hud {
             self.chat_elements.clear();
             self.render_chat = true;
         }
+        if self.hud_context.read().dirty_action_bar {
+            self.render_action_bar(&renderer, ui_container);
+        }
         if (self
             .hud_context
             .read()
@@ -411,7 +427,6 @@ impl Screen for Hud {
             .unwrap()
             .clone()
             .chat_ctx
-            .clone()
             .is_dirty()
             || self.render_chat)
             && screen_sys.current_screen_ty() != ScreenType::Chat
@@ -1010,7 +1025,7 @@ impl Hud {
         );
     }
 
-    pub fn render_chat(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
+    fn render_chat(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
         let now = Instant::now();
         if now.duration_since(self.last_tick).as_millis() >= 50 {
             self.last_tick = now;
@@ -1019,13 +1034,11 @@ impl Hud {
             let scale = Hud::icon_scale(renderer);
             let messages = self
                 .hud_context
-                .clone()
                 .read()
                 .server
                 .as_ref()
                 .unwrap()
                 .chat_ctx
-                .clone()
                 .tick_visible_messages();
             let history_size = messages.len();
 
@@ -1080,6 +1093,28 @@ impl Hud {
                 self.chat_elements.push(text);
                 component_lines += lines;
             }
+        }
+    }
+
+    fn render_action_bar(&mut self, renderer: &Arc<Renderer>, ui_container: &mut Container) {
+        self.hud_context.write().dirty_action_bar = false;
+        let hud_ctx = self.hud_context.read();
+        if let Some(action_bar) = hud_ctx.action_bar.as_ref() {
+            // FIXME: center action bar
+            // FIXME: implement fade out
+            let scale = Hud::icon_scale(renderer);
+            let y = scale * (26.0 * 2.0 + 5.0);
+            let text = ui::FormattedBuilder::new()
+                .draw_index(HUD_PRIORITY + 1)
+                .scale_x(scale / 2.0)
+                .scale_y(scale / 2.0)
+                .alignment(VAttach::Bottom, HAttach::Center)
+                .position(0.0, y)
+                .text(action_bar.clone())
+                .create(ui_container);
+            self.action_bar_text_elements = Some(text);
+        } else {
+            self.action_bar_text_elements = None;
         }
     }
 
