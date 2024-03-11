@@ -1941,10 +1941,7 @@ impl Server {
             let mut model = entity.get_mut::<PlayerModel>().unwrap();
             model.set_skin(info.skin_url.clone());
         }
-        self.entity_map
-            .clone()
-            .write()
-            .insert(entity_id, world_entity);
+        self.entity_map.write().insert(entity_id, world_entity);
     }
 
     fn on_teleport_player(&self, teleport: mapped_packet::play::clientbound::TeleportPlayer) {
@@ -2046,7 +2043,7 @@ impl Server {
                         let line4 = format::Component::from_str(
                             nbt.1.get("Text4").unwrap().as_str().unwrap(),
                         );
-                        self.world.clone().add_block_entity_action(
+                        self.world.add_block_entity_action(
                             world::BlockEntityAction::UpdateSignText(Box::new((
                                 block_update.location,
                                 line1,
