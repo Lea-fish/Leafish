@@ -95,8 +95,8 @@ pub trait Screen {
     ) {
     } // TODO: make non-optional!
 
-    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
-        if key.0 == Key::Named(NamedKey::Escape) && !down && self.is_closable() {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
+        if key.0 == Key::Named(NamedKey::Escape) && down && !repeat && self.is_closable() {
             game.screen_sys.pop_screen();
         }
     }
@@ -154,8 +154,8 @@ impl ScreenSystem {
     }
 
     pub fn add_screen(&self, screen: Box<dyn Screen>) {
-        let new_offset = self.pre_computed_screens.clone().read().len() as isize;
-        self.pre_computed_screens.clone().write().push(screen);
+        let new_offset = self.pre_computed_screens.read().len() as isize;
+        self.pre_computed_screens.write().push(screen);
         let curr_offset = self.lowest_offset.load(Ordering::Acquire);
         if curr_offset == -1 {
             self.lowest_offset.store(new_offset, Ordering::Release);
@@ -169,11 +169,11 @@ impl ScreenSystem {
     }
 
     pub fn pop_screen(&self) {
-        if self.pre_computed_screens.clone().read().last().is_some() {
+        if self.pre_computed_screens.read().last().is_some() {
             // TODO: Improve thread safety (becuz of possible race conditions (which are VERY UNLIKELY to happen - and only if screens get added and removed very fast (in one tick)))
-            self.pre_computed_screens.clone().write().pop();
+            self.pre_computed_screens.write().pop();
             let curr_offset = self.lowest_offset.load(Ordering::Acquire);
-            let new_offset = self.pre_computed_screens.clone().read().len() as isize;
+            let new_offset = self.pre_computed_screens.read().len() as isize;
             if curr_offset == -1 || new_offset < curr_offset {
                 self.lowest_offset.store(new_offset, Ordering::Release);
             }
@@ -186,21 +186,21 @@ impl ScreenSystem {
     }
 
     pub fn is_current_closable(&self) -> bool {
-        if let Some(last) = self.pre_computed_screens.clone().read().last() {
+        if let Some(last) = self.pre_computed_screens.read().last() {
             return last.is_closable();
         }
         false
     }
 
     pub fn is_current_ingame(&self) -> bool {
-        if let Some(last) = self.pre_computed_screens.clone().read().last() {
+        if let Some(last) = self.pre_computed_screens.read().last() {
             return last.ty() == ScreenType::InGame;
         }
         false
     }
 
     pub fn is_any_ingame(&self) -> bool {
-        for screen in self.pre_computed_screens.clone().read().iter().rev() {
+        for screen in self.pre_computed_screens.read().iter().rev() {
             if screen.ty() == ScreenType::InGame {
                 return true;
             }
@@ -209,15 +209,15 @@ impl ScreenSystem {
     }
 
     pub fn current_screen_ty(&self) -> ScreenType {
-        if let Some(last) = self.pre_computed_screens.clone().read().last() {
+        if let Some(last) = self.pre_computed_screens.read().last() {
             return last.ty();
         }
         ScreenType::Other(String::new())
     }
 
-    pub fn press_key(&self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
-        if let Some(screen) = self.screens.clone().read().last() {
-            screen.screen.clone().lock().on_key_press(key, down, game);
+    pub fn press_key(&self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
+        if let Some(screen) = self.screens.read().last() {
+            screen.screen.lock().on_key_press(key, down, repeat, game);
         }
     }
 
@@ -246,7 +246,7 @@ impl ScreenSystem {
             };
             if lowest <= screens_len as isize {
                 for _ in 0..(screens_len as isize - lowest) {
-                    let screen = self.screens.clone().write().pop().unwrap();
+                    let screen = self.screens.write().pop().unwrap();
                     if screen.active {
                         screen.screen.clone().lock().on_deactive(
                             self,
@@ -309,7 +309,7 @@ impl ScreenSystem {
             }
         }
 
-        let len = self.screens.clone().read().len();
+        let len = self.screens.read().len();
         if len == 0 {
             return true;
         }
@@ -331,7 +331,7 @@ impl ScreenSystem {
             {
                 if current.last_width != -1 && current.last_height != -1 {
                     for screen in tmp.iter_mut().enumerate() {
-                        if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
+                        if screen.1.screen.lock().is_tick_always() || screen.0 == len - 1 {
                             screen.1.screen.clone().lock().on_resize(
                                 self,
                                 renderer.clone(),
@@ -347,7 +347,7 @@ impl ScreenSystem {
                 }
             }
             for screen in tmp.iter_mut().enumerate() {
-                if screen.1.screen.clone().lock().is_tick_always() || screen.0 == len - 1 {
+                if screen.1.screen.lock().is_tick_always() || screen.0 == len - 1 {
                     screen.1.screen.clone().lock().tick(
                         self,
                         renderer.clone(),
@@ -358,17 +358,12 @@ impl ScreenSystem {
             }
         }
         // Handle current
-        return self.screens.clone().read()[len - 1]
-            .screen
-            .clone()
-            .lock()
-            .ty()
-            != ScreenType::InGame;
+        return self.screens.read()[len - 1].screen.lock().ty() != ScreenType::InGame;
     }
 
     pub fn on_scroll(&self, x: f64, y: f64) {
-        if let Some(screen) = self.screens.clone().read().last() {
-            screen.screen.clone().lock().on_scroll(x, y);
+        if let Some(screen) = self.screens.read().last() {
+            screen.screen.lock().on_scroll(x, y);
         }
     }
 }

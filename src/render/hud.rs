@@ -19,8 +19,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use log::debug;
 use parking_lot::RwLock;
-use rand::rngs::ThreadRng;
-use rand::Rng;
+use rand::{thread_rng, Rng};
 use winit::keyboard::{Key, NamedKey, PhysicalKey};
 
 use crate::inventory::slot_mapping::SlotMapping;
@@ -87,7 +86,7 @@ impl Default for render::hud::HudContext {
 }
 impl HudContext {
     pub fn new() -> Self {
-        HudContext {
+        Self {
             enabled: true,
             debug: false,
             fps: 0,
@@ -220,7 +219,6 @@ pub struct Hud {
     chat_elements: Vec<FormattedRef>,
     chat_background_elements: Vec<ImageRef>,
     hud_context: Arc<RwLock<HudContext>>,
-    random: ThreadRng,
     last_tick: Instant,
     render_chat: bool,
 }
@@ -244,7 +242,6 @@ impl Hud {
             chat_elements: vec![],
             chat_background_elements: vec![],
             hud_context,
-            random: rand::thread_rng(),
             last_tick: Instant::now(),
             render_chat: false,
         }
@@ -485,8 +482,8 @@ impl Screen for Hud {
         }
     }
 
-    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
-        if key.0 == Key::Named(NamedKey::Escape) && !down && game.focused {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
+        if key.0 == Key::Named(NamedKey::Escape) && down && !repeat && game.focused {
             game.screen_sys
                 .add_screen(Box::new(screen::SettingsMenu::new(
                     game.settings.clone(),
@@ -497,12 +494,10 @@ impl Screen for Hud {
         match key.1 {
             PhysicalKey::Code(code) => {
                 if let Some(action_key) = game.keybinds.get(code, &key.0) {
-                    // if let Some(action_key) = settings::Actionkey::get_by_keycode(code, &game.vars) {
-                    game.server.as_ref().unwrap().key_press(
-                        down,
-                        action_key.action,
-                        &mut game.focused.clone(),
-                    );
+                    game.server
+                        .as_ref()
+                        .unwrap()
+                        .key_press(down, action_key.action, game.focused);
                 }
             }
             PhysicalKey::Unidentified(_) => {}
@@ -574,7 +569,7 @@ impl Hud {
 
             if hp <= 4.0 {
                 // Creates the jittery effect when player has less than 2.5 hearts
-                y += icon_scale * (self.random.gen_range(0..2) as f64);
+                y += icon_scale * (thread_rng().gen_range(0..2) as f64);
                 redirty_health = true;
             }
 

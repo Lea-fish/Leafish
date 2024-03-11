@@ -16,7 +16,6 @@ pub struct InventoryWindow {
     pub text_box: Vec<TextBoxRef>,
     pub inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
     pub inventory_context: Arc<RwLock<InventoryContext>>,
-    initial_release: bool,
 }
 
 impl Screen for InventoryWindow {
@@ -98,17 +97,13 @@ impl Screen for InventoryWindow {
         );
     }
 
-    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
         let is_inv = if let PhysicalKey::Code(code) = key.1 {
             game.keybinds.get(code, &key.0).map(|kb| kb.action) == Some(Actionkey::OpenInv)
         } else {
             false
         };
-        if is_inv && !down && !self.initial_release {
-            self.initial_release = true;
-            return;
-        }
-        if (key.0 == Key::Named(NamedKey::Escape) || is_inv) && !down {
+        if (key.0 == Key::Named(NamedKey::Escape) || is_inv) && down && !repeat {
             self.inventory_context
                 .write()
                 .try_close_inventory(&game.screen_sys);
@@ -136,7 +131,6 @@ impl InventoryWindow {
             inventory_context,
             cursor_element: vec![],
             text_box: vec![],
-            initial_release: false,
         }
     }
 }

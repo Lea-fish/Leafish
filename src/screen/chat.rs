@@ -259,12 +259,15 @@ impl super::Screen for Chat {
         self.on_active(screen_sys, renderer, ui_container);
     }
 
-    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, game: &mut Game) {
-        if key.0 == Key::Named(NamedKey::Escape) && !down {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
+        if !down {
+            return;
+        }
+        if key.0 == Key::Named(NamedKey::Escape) && !repeat {
             game.screen_sys.pop_screen();
             return;
         }
-        if key.0 == Key::Named(NamedKey::Enter) && !down {
+        if key.0 == Key::Named(NamedKey::Enter) && !repeat {
             if !self.written.is_empty() {
                 game.server.as_ref().unwrap().write_packet(
                     packet::play::serverbound::ChatMessage {
@@ -273,9 +276,6 @@ impl super::Screen for Chat {
                 );
             }
             game.screen_sys.pop_screen();
-            return;
-        }
-        if !down {
             return;
         }
         if key.0.eq_ignore_case('v') && game.is_ctrl_pressed {
