@@ -42,7 +42,7 @@ use std::fs;
 use std::num::NonZeroU32;
 use std::time::Instant;
 use winit::keyboard::Key;
-use winit::keyboard::ModifiersKeyState;
+use winit::keyboard::ModifiersState;
 use winit::keyboard::NamedKey;
 use winit::keyboard::SmolStr;
 #[cfg(target_os = "linux")]
@@ -703,12 +703,10 @@ fn handle_window_event<T>(
         Event::WindowEvent { event, .. } => {
             match event {
                 WindowEvent::ModifiersChanged(modifiers_state) => {
-                    game.is_ctrl_pressed = modifiers_state.lcontrol_state()
-                        == ModifiersKeyState::Pressed
-                        || modifiers_state.rcontrol_state() == ModifiersKeyState::Pressed;
-                    game.is_logo_pressed = modifiers_state.lsuper_state()
-                        == ModifiersKeyState::Pressed
-                        || modifiers_state.rsuper_state() == ModifiersKeyState::Pressed;
+                    game.is_ctrl_pressed = modifiers_state.state() & ModifiersState::CONTROL
+                        != ModifiersState::empty();
+                    game.is_logo_pressed =
+                        modifiers_state.state() & ModifiersState::SUPER != ModifiersState::empty();
                 }
                 WindowEvent::CloseRequested => game.should_close = true,
                 WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
