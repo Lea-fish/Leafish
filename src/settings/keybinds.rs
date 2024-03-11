@@ -10,7 +10,7 @@ use winit::platform::scancode::PhysicalKeyExtScancode;
 
 use winit::keyboard::{Key, KeyCode};
 
-use crate::paths;
+use crate::{paths, remove_key_modifiers};
 
 use super::default_keybinds::create_keybinds;
 
@@ -47,7 +47,7 @@ impl KeybindStore {
         {
             return Some(cache);
         }
-        if let Some(cached) = self.key_cache.load().get(key) {
+        if let Some(cached) = self.key_cache.load().get(&remove_key_modifiers(key)) {
             let mut cache = self.mapping_cache.load().deref().deref().clone();
             cache.insert(code.to_scancode().unwrap(), *cached);
             return Some(*cached);
@@ -56,6 +56,9 @@ impl KeybindStore {
     }
 
     pub fn set(&self, key: Key, action: Actionkey) {
+        // ensure that we ignore all modifiers when saving the key
+        // as the key should always trigger the action no matter the modifiers
+        let key = remove_key_modifiers(&key);
         let old_key = self
             .key_cache
             .load()
