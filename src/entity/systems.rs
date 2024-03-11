@@ -3,6 +3,7 @@ use crate::entity::player::PlayerMovement;
 use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::server::{ConnResource, InventoryContextResource, RendererResource, WorldResource};
 use crate::shared::Position as BPos;
+use crate::world::World;
 use cgmath::InnerSpace;
 use leafish_blocks::Block;
 use leafish_protocol::protocol;
@@ -153,10 +154,15 @@ pub fn apply_digging(
     for (mouse_buttons, mut digging) in query.iter_mut() {
         if let Some(effect) = digging.effect {
             if let Ok(mut effect) = effect_query.get_mut(effect) {
-                system.update(mouse_buttons, digging.as_mut(), Some(effect.as_mut()));
+                system.update(
+                    mouse_buttons,
+                    digging.as_mut(),
+                    Some(effect.as_mut()),
+                    world,
+                );
             }
         }
-        system.update(mouse_buttons, digging.as_mut(), None);
+        system.update(mouse_buttons, digging.as_mut(), None, world);
     }
 }
 
@@ -187,6 +193,7 @@ impl ApplyDigging<'_, '_> {
         mouse_buttons: &MouseButtons,
         digging: &mut Digging,
         effect: Option<&mut BlockBreakEffect>,
+        world: &Arc<World>,
     ) {
         // Move the previous current value into last, and then calculate the
         // new current value.
@@ -211,7 +218,7 @@ impl ApplyDigging<'_, '_> {
             // Finish the new digging operation.
             (Some(_), Some(current)) if !current.is_finished(&self.tool) => {
                 current.finished = true;
-                self.finish_digging(current, &mut digging.effect);
+                self.finish_digging(current, &mut digging.effect, world);
             }
             _ => {}
         }
@@ -270,8 +277,6 @@ impl ApplyDigging<'_, '_> {
     }
 
     fn start_digging(&mut self, state: &DiggingState, effect: &mut Option<Entity>) {
-        self.send_digging(state, packet::DigType::StartDestroyBlock);
-
         let mut entity = self.commands.spawn_empty();
         let pos = state.position;
         entity.insert(BlockEffectData {
@@ -280,22 +285,29 @@ impl ApplyDigging<'_, '_> {
         });
         entity.insert(crate::particle::ParticleType::BlockBreak);
         effect.replace(entity.id());
+
+        self.send_digging(state, packet::DigType::StartDestroyBlock);
     }
 
     fn abort_digging(&mut self, state: &DiggingState, effect: &mut Option<Entity>) {
-        self.send_digging(state, packet::DigType::AbortDestroyBlock);
-
         if let Some(effect) = effect.take() {
             self.commands.entity(effect).despawn();
         }
+        self.send_digging(state, packet::DigType::AbortDestroyBlock);
     }
 
-    fn finish_digging(&mut self, state: &DiggingState, effect: &mut Option<Entity>) {
-        self.send_digging(state, packet::DigType::FinishDestroyBlock);
-
+    fn finish_digging(
+        &mut self,
+        state: &DiggingState,
+        effect: &mut Option<Entity>,
+        world: &Arc<World>,
+    ) {
         if let Some(effect) = effect.take() {
             self.commands.entity(effect).despawn();
         }
+        world.set_block(state.position, block::Block::Air {});
+
+        self.send_digging(state, packet::DigType::FinishDestroyBlock);
     }
 
     fn send_digging(&self, state: &DiggingState, status: packet::DigType) {
