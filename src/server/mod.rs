@@ -1346,6 +1346,8 @@ impl Server {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
                 mouse_buttons.left = true;
+                packet::send_arm_swing(self.conn.write().as_mut().unwrap(), Hand::MainHand)
+                    .unwrap();
             }
         } else {
             self.inventory_context.write().on_click()
