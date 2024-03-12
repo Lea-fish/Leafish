@@ -113,6 +113,7 @@ pub struct Game {
     last_mouse_y: f64,
     last_mouse_xrel: f64,
     last_mouse_yrel: f64,
+    is_shift_pressed: bool,
     is_ctrl_pressed: bool,
     is_logo_pressed: bool,
     is_fullscreen: bool,
@@ -416,6 +417,7 @@ fn main() {
         last_mouse_y: 0.0,
         last_mouse_xrel: 0.0,
         last_mouse_yrel: 0.0,
+        is_shift_pressed: false,
         is_ctrl_pressed: false,
         is_logo_pressed: false,
         is_fullscreen: false,
@@ -707,6 +709,8 @@ fn handle_window_event<T>(
                         != ModifiersState::empty();
                     game.is_logo_pressed =
                         modifiers_state.state() & ModifiersState::SUPER != ModifiersState::empty();
+                    game.is_shift_pressed =
+                        modifiers_state.state() & ModifiersState::SHIFT != ModifiersState::empty();
                 }
                 WindowEvent::CloseRequested => game.should_close = true,
                 WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
@@ -734,7 +738,7 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Left) => {
                         if let Some(server) = &game.server {
-                            server.on_left_click(game.focused, false); // FIXME: impl shift
+                            server.on_left_click(game.focused, game.is_shift_pressed);
                         }
                     }
                     (ElementState::Released, MouseButton::Right) => {
@@ -744,7 +748,7 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
                         if let Some(server) = &game.server {
-                            server.on_right_click(game.focused, false); // FIXME: impl shift
+                            server.on_right_click(game.focused, game.is_shift_pressed);
                         }
                     }
                     (_, _) => (),

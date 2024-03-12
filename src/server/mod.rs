@@ -1439,7 +1439,6 @@ impl Server {
         } else {
             self.inventory_context.write().on_click(false, shift);
         }
-        // TODO: Pass events into inventory context when not focused
     }
 
     pub fn on_release_right_click(&self, focused: bool) {

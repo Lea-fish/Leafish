@@ -84,7 +84,7 @@ macro_rules! state_packets {
             )*
         })+
     })+) => {
-        use crate::protocol::*;
+        use $crate::protocol::*;
         use std::io;
 
         #[derive(Debug)]
@@ -104,13 +104,13 @@ macro_rules! state_packets {
             $(
             pub mod $dir {
                 #![allow(unused_imports)]
-                use crate::protocol::*;
+                use $crate::protocol::*;
                 use std::io;
-                use crate::format;
-                use crate::nbt;
-                use crate::types;
-                use crate::item;
-                use crate::shared::Position;
+                use $crate::format;
+                use $crate::nbt;
+                use $crate::types;
+                use $crate::item;
+                use $crate::shared::Position;
 
 
                 #[allow(non_upper_case_globals)]
@@ -193,7 +193,7 @@ macro_rules! state_mapped_packets {
             )*
         })+
     })+) => {
-        use crate::protocol::*;
+        use $crate::protocol::*;
 
         #[derive(Debug)]
         pub enum MappedPacket {
@@ -212,14 +212,14 @@ macro_rules! state_mapped_packets {
             $(
             pub mod $dir {
                 #![allow(unused_imports)]
-                use crate::protocol::*;
+                use $crate::protocol::*;
                 use std::io;
-                use crate::format;
-                use crate::nbt;
-                use crate::types;
-                use crate::item;
-                use crate::shared::Position;
-                use crate::protocol::packet::Hand;
+                use $crate::format;
+                use $crate::nbt;
+                use $crate::types;
+                use $crate::item;
+                use $crate::shared::Position;
+                use $crate::protocol::packet::Hand;
 
 
                 $(
@@ -245,7 +245,7 @@ macro_rules! protocol_packet_ids {
            )*
        })+
     })+) => {
-        use crate::protocol::*;
+        use $crate::protocol::*;
 
         pub fn translate_internal_packet_id(state: State, dir: Direction, id: i32, to_internal: bool) -> i32 {
             match state {
@@ -257,14 +257,14 @@ macro_rules! protocol_packet_ids {
                                     if to_internal {
                                         match id {
                                         $(
-                                            $id => crate::protocol::packet::$state::$dir::internal_ids::$name,
+                                            $id => $crate::protocol::packet::$state::$dir::internal_ids::$name,
                                         )*
                                             _ => panic!("bad packet id 0x{:x} in {:?} {:?}", id, dir, state),
                                         }
                                     } else {
                                         match id {
                                         $(
-                                            crate::protocol::packet::$state::$dir::internal_ids::$name => $id,
+                                            $crate::protocol::packet::$state::$dir::internal_ids::$name => $id,
                                         )*
                                             _ => panic!("bad packet internal id 0x{:x} in {:?} {:?}", id, dir, state),
                                         }
@@ -482,7 +482,7 @@ impl Serializable for f64 {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize, Deserialize, Default)]
 pub struct UUID(u64, u64);
 
 #[derive(Debug)]
@@ -521,12 +521,6 @@ impl std::str::FromStr for UUID {
             low |= (parts[i + 8] as u64) << (56 - i * 8);
         }
         Ok(UUID(high, low))
-    }
-}
-
-impl Default for UUID {
-    fn default() -> Self {
-        UUID(0, 0)
     }
 }
 
@@ -829,7 +823,7 @@ where
 
 /// `VarInt` have a variable size (between 1 and 5 bytes) when encoded based
 /// on the size of the number
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct VarInt(pub i32);
 
 impl Lengthable for VarInt {
@@ -878,12 +872,6 @@ impl Serializable for VarInt {
     }
 }
 
-impl default::Default for VarInt {
-    fn default() -> VarInt {
-        VarInt(0)
-    }
-}
-
 impl fmt::Debug for VarInt {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -892,7 +880,7 @@ impl fmt::Debug for VarInt {
 
 /// `VarShort` have a variable size (2 or 3 bytes) and are backwards-compatible
 /// with vanilla shorts, used for Forge custom payloads
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct VarShort(pub i32);
 
 impl Lengthable for VarShort {
@@ -941,12 +929,6 @@ impl Serializable for VarShort {
     }
 }
 
-impl default::Default for VarShort {
-    fn default() -> VarShort {
-        VarShort(0)
-    }
-}
-
 impl fmt::Debug for VarShort {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -955,7 +937,7 @@ impl fmt::Debug for VarShort {
 
 /// `VarLong` have a variable size (between 1 and 10 bytes) when encoded based
 /// on the size of the number
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub struct VarLong(pub i64);
 
 impl Lengthable for VarLong {
@@ -1004,12 +986,6 @@ impl Serializable for VarLong {
     }
 }
 
-impl default::Default for VarLong {
-    fn default() -> VarLong {
-        VarLong(0)
-    }
-}
-
 impl fmt::Debug for VarLong {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{}", self.0)
@@ -1035,17 +1011,16 @@ impl Serializable for Position {
         }
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), Error> {
-        let pos;
         let protocol_version = current_protocol_version();
-        if Version::from_id(protocol_version as u32) < Version::V1_14 {
-            pos = (((self.x as u64) & 0x3FFFFFF) << 38)
+        let pos = if Version::from_id(protocol_version as u32) < Version::V1_14 {
+            (((self.x as u64) & 0x3FFFFFF) << 38)
                 | (((self.y as u64) & 0xFFF) << 26)
-                | ((self.z as u64) & 0x3FFFFFF);
+                | ((self.z as u64) & 0x3FFFFFF)
         } else {
-            pos = (((self.x as u64) & 0x3FFFFFF) << 38)
+            (((self.x as u64) & 0x3FFFFFF) << 38)
                 | ((self.y as u64) & 0xFFF)
-                | (((self.z as u64) & 0x3FFFFFF) << 12);
-        }
+                | (((self.z as u64) & 0x3FFFFFF) << 12)
+        };
 
         buf.write_u64::<BigEndian>(pos)?;
         Ok(())
@@ -1164,7 +1139,7 @@ impl Conn {
         }
 
         use std::str::FromStr;
-        if let Err(_) = std::net::IpAddr::from_str(&address) {
+        if std::net::IpAddr::from_str(&address).is_err() {
             debug!("address: {} is not an IP", address);
             for (adresse, port) in Conn::get_server_addresses(&address) {
                 debug!("{}'s ip may be {}:{}.", target, adresse, port);
@@ -1387,14 +1362,8 @@ impl Conn {
     pub fn enable_encyption(&mut self, key: &[u8]) {
         let read_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
         let write_cipher = Aes128Cfb::new_from_slices(key, key).unwrap();
-        self.read_cipher
-            .lock()
-            .unwrap()
-            .replace(read_cipher);
-        self.write_cipher
-            .lock()
-            .unwrap()
-            .replace(write_cipher);
+        self.read_cipher.lock().unwrap().replace(read_cipher);
+        self.write_cipher.lock().unwrap().replace(write_cipher);
     }
 
     pub fn set_compression(&mut self, threshold: i32) {
@@ -1454,21 +1423,18 @@ impl Conn {
         if let Some(modinfo) = val.get("modinfo") {
             if let Some(modinfo_type) = modinfo.get("type") {
                 if modinfo_type == "FML" {
-                    if let Some(modlist) = modinfo.get("modList") {
-                        if let Value::Array(items) = modlist {
-                            for item in items {
-                                if let Value::Object(obj) = item {
-                                    let modid =
-                                        obj.get("modid").unwrap().as_str().unwrap().to_string();
-                                    let version =
-                                        obj.get("version").unwrap().as_str().unwrap().to_string();
+                    if let Some(Value::Array(items)) = modinfo.get("modList") {
+                        for item in items {
+                            if let Value::Object(obj) = item {
+                                let modid = obj.get("modid").unwrap().as_str().unwrap().to_string();
+                                let version =
+                                    obj.get("version").unwrap().as_str().unwrap().to_string();
 
-                                    forge_mods
-                                        .push(crate::protocol::forge::ForgeMod { modid, version });
-                                }
+                                forge_mods
+                                    .push(crate::protocol::forge::ForgeMod { modid, version });
                             }
-                            fml_network_version = Some(1);
                         }
+                        fml_network_version = Some(1);
                     }
                 } else {
                     warn!(
@@ -1480,18 +1446,15 @@ impl Conn {
         }
         // Forge 1.13+ TODO: update for 1.14+ and test
         if let Some(forge_data) = val.get("forgeData") {
-            if let Some(mods) = forge_data.get("mods") {
-                if let Value::Array(items) = mods {
-                    for item in items {
-                        if let Value::Object(obj) = item {
-                            let modid = obj.get("modId").unwrap().as_str().unwrap().to_string();
-                            let modmarker =
-                                obj.get("modmarker").unwrap().as_str().unwrap().to_string();
+            if let Some(Value::Array(items)) = forge_data.get("mods") {
+                for item in items {
+                    if let Value::Object(obj) = item {
+                        let modid = obj.get("modId").unwrap().as_str().unwrap().to_string();
+                        let modmarker = obj.get("modmarker").unwrap().as_str().unwrap().to_string();
 
-                            let version = modmarker;
+                        let version = modmarker;
 
-                            forge_mods.push(crate::protocol::forge::ForgeMod { modid, version });
-                        }
+                        forge_mods.push(crate::protocol::forge::ForgeMod { modid, version });
                     }
                 }
             }
@@ -1634,7 +1597,7 @@ impl Write for Conn {
             Option::None => self.stream.write(buf),
             Option::Some(cipher) => {
                 let mut data = vec![0; buf.len()];
-                data[..buf.len()].clone_from_slice(&buf[..]);
+                data[..buf.len()].clone_from_slice(buf);
 
                 cipher.encrypt(&mut data);
 

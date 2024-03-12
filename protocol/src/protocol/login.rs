@@ -59,7 +59,7 @@ impl Account {
             .get(&self.account_type)
             .unwrap()
             .clone()
-            .join_server(&self, server_id, shared_key, public_key)
+            .join_server(self, server_id, shared_key, public_key)
     }
 
     pub fn refresh(self, token: &str) -> Result<Account, super::Error> {

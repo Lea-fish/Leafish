@@ -42,8 +42,9 @@ impl Component {
             list: self
                 .list
                 .iter()
-                .map(|comp| Component::from_legacy_str(&comp.get_text(), comp.get_modifier()).list)
-                .flatten()
+                .flat_map(|comp| {
+                    Component::from_legacy_str(comp.get_text(), comp.get_modifier()).list
+                })
                 .collect(),
         }
     }
@@ -121,6 +122,7 @@ impl Component {
         Self { list: components }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(str: &str) -> Self {
         log::trace!("Raw: {}", str);
         match serde_json::from_str::<ChatSections>(str) {
@@ -136,7 +138,7 @@ impl Component {
     fn get_text(with: &ComponentData, modifier: &Modifier) -> Self {
         match with {
             ComponentData::Chat(chat) => {
-                Component::from_chat(&chat, &modifier.over_write(&chat.get_modifier()))
+                Component::from_chat(chat, &modifier.over_write(&chat.get_modifier()))
             }
 
             ComponentData::Str(str) => Self {
@@ -152,7 +154,7 @@ impl Component {
         Self {
             list: extra
                 .iter()
-                .map(|chat_or_string| match chat_or_string {
+                .flat_map(|chat_or_string| match chat_or_string {
                     ComponentData::Chat(chat) => {
                         Component::from_chat(
                             chat,
@@ -168,7 +170,6 @@ impl Component {
                         .list
                     }
                 })
-                .flatten()
                 .collect::<_>(),
         }
     }
@@ -187,11 +188,10 @@ impl Component {
         let modifier = modifier.over_write(&chat.get_modifier());
         let text_components: Vec<ComponentType> = match (&chat.translate, &chat.text, &chat.extra) {
             (None, None, None) => chat
-            .with
-            .iter()
-            .map(|with| Component::get_text(with, &modifier).list)
-            .flatten()
-            .collect(),
+                .with
+                .iter()
+                .flat_map(|with| Component::get_text(with, &modifier).list)
+                .collect(),
 
             (Some(translate), None, None) => {
                 let mut list = chat
@@ -217,10 +217,9 @@ impl Component {
                                 text: translated[index..i].to_string(),
                                 modifier: modifier.clone(),
                             });
-                            match iter_component.next() {
-                                Some(component) => components.append(&mut component.list),
-                                None => {}
-                            };
+                            if let Some(component) = iter_component.next() {
+                                components.append(&mut component.list);
+                            }
                         }
                         '}' => index = i + 1,
                         _ => {}
@@ -266,12 +265,10 @@ impl Component {
 
     pub fn from_json(v: &serde_json::Value) -> Result<Self, Error> {
         match serde_json::from_value::<ChatSections>(v.clone()) {
-            Ok(sections) => {
-                return Ok(Component::from_chat_sections(
-                    sections,
-                    &Modifier::default(),
-                ))
-            }
+            Ok(sections) => Ok(Component::from_chat_sections(
+                sections,
+                &Modifier::default(),
+            )),
             // Sometimes mojang sends a literal string, so we should interpret it literally
             Err(error) => {
                 log::trace!("Failed error: {}", error);
@@ -440,10 +437,10 @@ impl ComponentType {
 
     pub fn get_modifier(&self) -> &Modifier {
         match self {
-            ComponentType::Text { modifier, .. } => &modifier,
-            ComponentType::Hover { modifier, .. } => &modifier,
-            ComponentType::Click { modifier, .. } => &modifier,
-            ComponentType::ClickAndHover { modifier, .. } => &modifier,
+            ComponentType::Text { modifier, .. } => modifier,
+            ComponentType::Hover { modifier, .. } => modifier,
+            ComponentType::Click { modifier, .. } => modifier,
+            ComponentType::ClickAndHover { modifier, .. } => modifier,
         }
     }
 
@@ -510,7 +507,7 @@ pub mod color {
         }
     }
 
-    #[derive(Debug, Clone, Copy, PartialEq)]
+    #[derive(Debug, Clone, Copy, PartialEq, Default)]
     pub enum Color {
         Black,
         DarkBlue,
@@ -530,13 +527,8 @@ pub mod color {
         White,
         Reset,
         RGB(RGB),
+        #[default]
         None,
-    }
-
-    impl Default for Color {
-        fn default() -> Self {
-            Color::None
-        }
     }
 
     impl<'de> Deserialize<'de> for Color {
@@ -662,7 +654,7 @@ pub mod color {
         type Err = ParseColorError;
 
         fn from_str(s: &str) -> Result<Self, Self::Err> {
-            let without_prefix = s.trim_start_matches("#");
+            let without_prefix = s.trim_start_matches('#');
             if without_prefix.len() != 6 {
                 return Err(ParseColorError::InvalidLenError(without_prefix.len()));
             }

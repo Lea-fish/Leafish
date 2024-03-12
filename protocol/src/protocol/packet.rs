@@ -2364,7 +2364,7 @@ impl Serializable for ExplosionRecord {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct MapIcon {
     pub direction_type: i8,
     pub x: i8,
@@ -2384,16 +2384,6 @@ impl Serializable for MapIcon {
         self.direction_type.write_to(buf)?;
         self.x.write_to(buf)?;
         self.z.write_to(buf)
-    }
-}
-
-impl Default for MapIcon {
-    fn default() -> Self {
-        MapIcon {
-            direction_type: 0,
-            x: 0,
-            z: 0,
-        }
     }
 }
 
@@ -2797,7 +2787,7 @@ use std::f32::consts::PI;
 
 type RecipeIngredient = LenPrefixed<VarInt, Option<item::Stack>>;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum RecipeData {
     Shapeless {
         group: String,
@@ -2811,6 +2801,7 @@ pub enum RecipeData {
         ingredients: Vec<RecipeIngredient>,
         result: Option<item::Stack>,
     },
+    #[default]
     ArmorDye,
     BookCloning,
     MapCloning,
@@ -2863,12 +2854,6 @@ pub enum RecipeData {
         addition: RecipeIngredient,
         result: Option<item::Stack>,
     },
-}
-
-impl Default for RecipeData {
-    fn default() -> Self {
-        RecipeData::ArmorDye
-    }
 }
 
 #[derive(Debug, Default)]
@@ -3343,17 +3328,12 @@ impl From<i32> for DigType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub enum Hand {
+    #[default]
     MainHand,
     OffHand,
     Invalid(i32),
-}
-
-impl Default for Hand {
-    fn default() -> Self {
-        Hand::MainHand
-    }
 }
 
 impl Hand {
@@ -3390,8 +3370,8 @@ pub fn send_position_look(
                 x: position.x,
                 y: position.y,
                 z: position.z,
-                yaw: -(yaw as f32) * (180.0 / PI),
-                pitch: ((-pitch as f32) * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
+                yaw: -yaw * (180.0 / PI),
+                pitch: (-pitch * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
                 on_ground,
             },
         )
@@ -3402,8 +3382,8 @@ pub fn send_position_look(
                 feet_y: position.y,
                 head_y: position.y + 1.62,
                 z: position.z,
-                yaw: -(yaw as f32) * (180.0 / PI),
-                pitch: ((-pitch as f32) * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
+                yaw: -yaw * (180.0 / PI),
+                pitch: (-pitch * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
                 on_ground,
             },
         )
@@ -3421,7 +3401,7 @@ pub fn send_arm_swing(conn: &mut Conn, hand: Hand) -> Result<(), Error> {
         conn.write_packet(packet::play::serverbound::ArmSwing_Handsfree { empty: () })
     } else {
         conn.write_packet(packet::play::serverbound::ArmSwing {
-            hand: VarInt(hand.ordinal() as i32),
+            hand: VarInt(hand.ordinal()),
         })
     }
 }
@@ -3456,10 +3436,7 @@ pub fn send_digging(
     }
 }
 
-pub fn send_use_item(
-    conn: &mut Conn,
-    hand: Hand,
-) -> Result<(), Error> {
+pub fn send_use_item(conn: &mut Conn, hand: Hand) -> Result<(), Error> {
     let version = conn.get_version();
     if version < Version::V1_8 {
         todo!()
@@ -3484,7 +3461,7 @@ pub fn send_block_place(
             packet::play::serverbound::PlayerBlockPlacement_insideblock {
                 location: pos,
                 face: VarInt(face as i32),
-                hand: VarInt(hand.ordinal() as i32),
+                hand: VarInt(hand.ordinal()),
                 cursor_x: cursor_position.x as f32,
                 cursor_y: cursor_position.y as f32,
                 cursor_z: cursor_position.z as f32,
@@ -3495,7 +3472,7 @@ pub fn send_block_place(
         conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_f32 {
             location: pos,
             face: VarInt(face as i32),
-            hand: VarInt(hand.ordinal() as i32),
+            hand: VarInt(hand.ordinal()),
             cursor_x: cursor_position.x as f32,
             cursor_y: cursor_position.y as f32,
             cursor_z: cursor_position.z as f32,
@@ -3505,7 +3482,7 @@ pub fn send_block_place(
         conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8 {
             location: pos,
             face: VarInt(face as i32),
-            hand: VarInt(hand.ordinal() as i32),
+            hand: VarInt(hand.ordinal()),
             cursor_x: (cursor_position.x * 16.0) as u8,
             cursor_y: (cursor_position.y * 16.0) as u8,
             cursor_z: (cursor_position.z * 16.0) as u8,
@@ -3513,7 +3490,7 @@ pub fn send_block_place(
     } else if version >= Version::V1_8 {
         conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8_Item {
             location: pos,
-            face: face as u8,
+            face,
             hand: item(),
             cursor_x: (cursor_position.x * 16.0) as u8,
             cursor_y: (cursor_position.y * 16.0) as u8,
@@ -3525,7 +3502,7 @@ pub fn send_block_place(
                 x: pos.x,
                 y: pos.y as u8,
                 z: pos.x,
-                face: face as u8,
+                face,
                 hand: item(),
                 cursor_x: (cursor_position.x * 16.0) as u8,
                 cursor_y: (cursor_position.y * 16.0) as u8,
@@ -3562,7 +3539,7 @@ pub fn send_client_settings(
             chat_mode: VarInt(chat_mode as i32),
             chat_colors,
             displayed_skin_parts,
-            main_hand: VarInt(main_hand.ordinal() as i32),
+            main_hand: VarInt(main_hand.ordinal()),
         })
     }
 }

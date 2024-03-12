@@ -194,7 +194,7 @@ impl std::fmt::Debug for Chat {
         if self.extra.is_some() {
             dbg.field("extra", &self.extra);
         }
-        if self.with.len() > 0 {
+        if !self.with.is_empty() {
             dbg.field("with", &self.with);
         }
         dbg.finish_non_exhaustive()
