@@ -8,6 +8,7 @@ use crate::render::Texture;
 use crate::world::block;
 use bevy_ecs::component::Component;
 use bevy_ecs::prelude::*;
+use block::MiningTime;
 use cgmath::Vector3;
 use collision::Aabb3;
 use std::sync::Arc;
@@ -493,21 +494,32 @@ pub struct DiggingState {
     pub finished: bool,
 }
 
+pub enum DiggingFinishState {
+    Finished,
+    FinishedInstant,
+    NotFinished,
+}
+
 impl DiggingState {
-    pub fn is_finished(&self, tool: &Option<block::Tool>) -> bool {
+    pub fn is_finished(&self, tool: &Option<block::Tool>) -> DiggingFinishState {
         // If marked as finished, we don't need to calculate the mining time
         // again.
         if self.finished {
-            return true;
+            return DiggingFinishState::Finished;
         }
 
         let mining_time = self.block.get_mining_time(tool);
         match mining_time {
-            Some(mining_time) => {
+            block::MiningTime::Instant => DiggingFinishState::FinishedInstant,
+            block::MiningTime::Time(mining_time) => {
                 let finish_time = self.start + mining_time;
-                finish_time < std::time::Instant::now()
+                if finish_time < std::time::Instant::now() {
+                    DiggingFinishState::Finished
+                } else {
+                    DiggingFinishState::NotFinished
+                }
             }
-            None => false,
+            block::MiningTime::Never => DiggingFinishState::NotFinished,
         }
     }
 
@@ -520,8 +532,9 @@ impl DiggingState {
 
         let mining_time = self.block.get_mining_time(tool);
         let mining_time = match mining_time {
-            Some(mining_time) => mining_time,
-            None => return 0.0,
+            MiningTime::Instant => return 1.0,
+            MiningTime::Never => return 0.0,
+            MiningTime::Time(time) => time,
         };
         let now = std::time::Instant::now();
         let expected = now - self.start;

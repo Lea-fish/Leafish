@@ -395,7 +395,13 @@ mod tests {
     }
 }
 
-pub fn get_mining_time(block: &Block, tool: &Option<Tool>) -> Option<std::time::Duration> {
+pub enum MiningTime {
+    Instant,
+    Time(std::time::Duration),
+    Never,
+}
+
+pub fn get_mining_time(block: &Block, tool: &Option<Tool>) -> MiningTime {
     let mut speed_multiplier = 1.0;
 
     let tool_multiplier = tool.map(|t| t.get_multiplier()).unwrap_or(1.0);
@@ -415,9 +421,9 @@ pub fn get_mining_time(block: &Block, tool: &Option<Tool>) -> Option<std::time::
 
     let mut damage = match block.get_hardness() {
         // Instant mine
-        Some(n) if n == 0.0 => return Some(std::time::Duration::from_secs_f64(0.05)),
+        Some(n) if n == 0.0 => return MiningTime::Instant,
         // Impossible to mine
-        None => return None,
+        None => return MiningTime::Never,
         Some(n) => speed_multiplier / n,
     };
 
@@ -429,12 +435,12 @@ pub fn get_mining_time(block: &Block, tool: &Option<Tool>) -> Option<std::time::
 
     // Instant breaking
     if damage > 1.0 {
-        return Some(std::time::Duration::from_secs_f64(0.05));
+        return MiningTime::Instant;
     }
 
     let ticks = (1.0 / damage).ceil();
     let seconds = ticks / 20.0;
-    Some(std::time::Duration::from_secs_f64(seconds))
+    MiningTime::Time(std::time::Duration::from_secs_f64(seconds))
 }
 
 fn can_burn<W: WorldAccess>(world: &W, pos: Position) -> bool {
