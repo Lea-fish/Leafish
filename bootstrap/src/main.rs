@@ -13,6 +13,15 @@ const MAIN_BINARY_PATH: &str = "./leafish";
 const UPDATED_BOOTSTRAP_BINARY_PATH: &str = "./bootstrap_new";
 const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap";
 
+#[cfg(target_os = "windows")]
+const USER_AGENT: &str =
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0";
+#[cfg(target_os = "macos")]
+const USER_AGENT: &str =
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.3; rv:123.0) Gecko/20100101 Firefox/123.0";
+#[cfg(target_os = "linux")]
+const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux i686; rv:123.0) Gecko/20100101 Firefox/123.0";
+
 #[tokio::main]
 async fn main() {
     let args: Vec<String> = env::args().collect();
@@ -68,7 +77,14 @@ async fn main() {
 
 async fn try_update() -> anyhow::Result<()> {
     println!("[INFO] Checking for updates....");
-    let latest = Client::builder().user_agent("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Safari/605.1.1").build()?.get(URL).send().await?.text().await?;
+    let latest = Client::builder()
+        .user_agent(USER_AGENT)
+        .build()?
+        .get(URL)
+        .send()
+        .await?
+        .text()
+        .await?;
     let latest: LatestResponse = serde_json::from_str(&latest).unwrap();
     println!("[INFO] Looking for update files...");
     let bootstrap_binary_name = format!(
