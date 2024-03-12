@@ -147,5 +147,14 @@ Used to identify this client vs others."#,
                 value: SettingValue::String("".to_owned()),
             },
         ),
+        (
+            SettingType::Int(IntSetting::DefaultProtocolVersion),
+            ConfigVar {
+                name: "default_protocol_version",
+                description: "Protocol version to use in the autodetection ping",
+                serializable: true,
+                value: SettingValue::String("".to_owned()),
+            },
+        ),
     ]
 }

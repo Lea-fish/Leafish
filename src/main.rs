@@ -117,7 +117,6 @@ pub struct Game {
     is_ctrl_pressed: bool,
     is_logo_pressed: bool,
     is_fullscreen: bool,
-    default_protocol_version: i32,
     current_account: Arc<Mutex<Option<Account>>>,
 }
 
@@ -127,8 +126,9 @@ impl Game {
         address: &str,
         hud_context: Arc<RwLock<HudContext>>,
     ) -> Result<(), Error> {
+        let default_protocol_version = self.settings.get_int(IntSetting::DefaultProtocolVersion);
         let (protocol_version, forge_mods, fml_network_version) =
-            match protocol::Conn::new(address, self.default_protocol_version)
+            match protocol::Conn::new(address, default_protocol_version)
                 .and_then(|conn| conn.do_status())
             {
                 Ok(res) => {
@@ -145,9 +145,9 @@ impl Game {
                 Err(err) => {
                     warn!(
                         "Error pinging server {} to get protocol version: {:?}, defaulting to {}",
-                        address, err, self.default_protocol_version
+                        address, err, default_protocol_version
                     );
-                    (self.default_protocol_version, vec![], None)
+                    (default_protocol_version, vec![], None)
                 }
             };
         if !Version::from_id(protocol_version as u32).is_supported() {
@@ -206,9 +206,6 @@ struct Opt {
     #[structopt(short = "N", long = "network-parse-packet")]
     network_parse_packet: Option<String>,
 
-    /// Protocol version to use in the autodetection ping
-    #[structopt(short = "p", long = "default-protocol-version")]
-    default_protocol_version: Option<String>,
     #[structopt(long)]
     uuid: Option<String>,
     #[structopt(long)]
@@ -382,9 +379,6 @@ fn main() {
     )));
 
     let textures = renderer.get_textures();
-    let default_protocol_version = protocol::versions::protocol_name_to_protocol_version(
-        opt.default_protocol_version.unwrap_or_default(),
-    );
 
     #[cfg(target_os = "linux")]
     let clipboard: Box<dyn ClipboardProvider> = match events_loop.display_handle() {
@@ -430,7 +424,6 @@ fn main() {
         is_ctrl_pressed: false,
         is_logo_pressed: false,
         is_fullscreen: false,
-        default_protocol_version,
         clipboard_provider: Mutex::new(clipboard),
         current_account: active_account,
         settings,
@@ -442,7 +435,10 @@ fn main() {
 
     if let Some(filename) = opt.network_parse_packet {
         let data = fs::read(filename).unwrap();
-        protocol::try_parse_packet(data, default_protocol_version);
+        protocol::try_parse_packet(
+            data,
+            game.settings.get_int(IntSetting::DefaultProtocolVersion),
+        );
         return;
     }
 

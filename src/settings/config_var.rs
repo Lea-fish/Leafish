@@ -36,6 +36,7 @@ pub enum IntSetting {
     MaxFps,
     FOV,
     MasterVolume,
+    DefaultProtocolVersion,
 }
 
 #[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
@@ -84,7 +85,7 @@ pub struct SettingStore(Mutex<HashMap<SettingType, ConfigVar>>);
 
 impl SettingStore {
     pub fn new() -> Self {
-        let mut store = SettingStore(Mutex::new(HashMap::new()));
+        let mut store = Self(Mutex::new(HashMap::new()));
         store.load_defaults();
         store.load_config();
         store.save_config();
