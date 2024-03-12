@@ -2,6 +2,8 @@
 
 Multi-version Minecraft-compatible client written in Rust, forked from [Stevenarella](https://github.com/iceiix/stevenarella/).
 
+Installer: https://github.com/Lea-fish/Leafish/releases/tag/v0.0.1-alpha
+
 ---
 
 ![Screenshot showing the main menu](.github/readme-resources/screenshot-mainmenu.jpg)
@@ -90,6 +92,11 @@ Forge servers are supported on 1.7.10 - 1.12.2 (FML) and 1.13.2 - 1.16.5 (FML2).
 Support for older protocols will _not_ be dropped as newer protocols are added.
 
 ## Getting the game
+
+### Using the installer
+
+The easiest way to use Leafish is by using the official cross-platform installer: https://github.com/Lea-fish/Leafish/releases/tag/v0.0.1-alpha
+It works for Windows, Linux and MacOS and can install into Mojang's official launcher and Prism Launcher.
 
 ### Downloading a pre-built version
 
