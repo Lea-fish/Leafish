@@ -169,10 +169,10 @@ impl InventoryWindow {
 
         if item.stack.count != 1 {
             let text = ui::TextBuilder::new()
-                .scale_x(icon_scale / 2.0)
-                .scale_y(icon_scale / 2.0)
+                .scale_x(icon_scale / 2.25)
+                .scale_y(icon_scale / 2.25)
                 .text(item.stack.count.to_string())
-                .position(x, y)
+                .position(x + icon_scale * 6.0, y + icon_scale * 9.0)
                 .alignment(v_attach, ui::HAttach::Left)
                 .colour((255, 255, 255, 255))
                 .shadow(true)
