@@ -505,7 +505,7 @@ impl DiggingState {
         match mining_time {
             Some(mining_time) => {
                 let finish_time = self.start + mining_time;
-                finish_time > std::time::Instant::now()
+                finish_time < std::time::Instant::now()
             }
             None => false,
         }
