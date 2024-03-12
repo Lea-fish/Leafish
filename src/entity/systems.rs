@@ -203,17 +203,40 @@ impl ApplyDigging<'_, '_> {
         // Send required digging packets
         match (&digging.last, &mut digging.current) {
             // Start the new digging operation.
-            (None, Some(current)) => self.start_digging(current, &mut digging.effect),
+            (None, Some(current)) => {
+                self.start_digging(current, &mut digging.effect);
+                if current.is_finished(&self.tool) == DiggingFinishState::FinishedInstant {
+                    current.finished = true;
+                    self.finish_digging(current, &mut digging.effect, world, false);
+                }
+            }
             // Cancel the previous digging operation.
-            (Some(last), None) if !last.finished => self.abort_digging(last, &mut digging.effect),
+            (Some(last), None) if !last.finished => {
+                if last.is_finished(&self.tool) == DiggingFinishState::FinishedInstant {
+                    self.start_digging(last, &mut digging.effect);
+                    self.finish_digging(last, &mut digging.effect, world, false);
+                } else {
+                    self.abort_digging(last, &mut digging.effect);
+                }
+            }
             // Move to digging a new block
             (Some(last), Some(current)) if last.position != current.position => {
                 // Cancel the previous digging operation.
-                if !current.finished {
-                    self.abort_digging(last, &mut digging.effect);
+                if !last.finished {
+                    if last.is_finished(&self.tool) == DiggingFinishState::FinishedInstant {
+                        // Finish the previous digging operation
+                        self.start_digging(last, &mut digging.effect);
+                        self.finish_digging(last, &mut digging.effect, world, false);
+                    } else {
+                        self.abort_digging(last, &mut digging.effect);
+                    }
                 }
                 // Start the new digging operation.
                 self.start_digging(current, &mut digging.effect);
+                if current.is_finished(&self.tool) == DiggingFinishState::FinishedInstant {
+                    current.finished = true;
+                    self.finish_digging(current, &mut digging.effect, world, false);
+                }
             }
             // Finish the new digging operation.
             (Some(_), Some(current)) => match current.is_finished(&self.tool) {
@@ -222,8 +245,7 @@ impl ApplyDigging<'_, '_> {
                     self.finish_digging(current, &mut digging.effect, world, true);
                 }
                 DiggingFinishState::FinishedInstant => {
-                    current.finished = true;
-                    self.finish_digging(current, &mut digging.effect, world, false);
+                    // noop as the breaking should already have been performed at this point
                 }
                 DiggingFinishState::NotFinished => {}
             },

@@ -494,6 +494,7 @@ pub struct DiggingState {
     pub finished: bool,
 }
 
+#[derive(PartialEq, Eq)]
 pub enum DiggingFinishState {
     Finished,
     FinishedInstant,
