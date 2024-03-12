@@ -719,7 +719,7 @@ impl Server {
                             server
                                 .inventory_context
                                 .write()
-                                .try_close_inventory(&server.screen_sys);
+                                .try_close_inventory(&server.screen_sys, true);
                         }
                         MappedPacket::WindowOpen(open) => {
                             let inv_type = if let Some(name) = &open.ty_name {
@@ -742,6 +742,7 @@ impl Server {
                                         inventory.clone(),
                                         &server.screen_sys,
                                         server.inventory_context.clone(),
+                                        true,
                                     );
                                 }
                             }
@@ -1275,6 +1276,7 @@ impl Server {
                         player_inv,
                         &self.screen_sys,
                         self.inventory_context.clone(),
+                        false,
                     );
                     return true;
                 }
@@ -1346,7 +1348,7 @@ impl Server {
         false
     }
 
-    pub fn on_left_click(&self, focused: bool) {
+    pub fn on_left_click(&self, focused: bool, shift: bool) {
         if focused {
             let mut entities = self.entities.write();
             // check if the player exists, as it might not be initialized very early on server join
@@ -1358,7 +1360,7 @@ impl Server {
                     .unwrap();
             }
         } else {
-            self.inventory_context.write().on_click()
+            self.inventory_context.write().on_click(true, shift);
         }
     }
 
@@ -1376,7 +1378,7 @@ impl Server {
     }
 
     #[allow(unused_must_use)]
-    pub fn on_right_click(&self, focused: bool) {
+    pub fn on_right_click(&self, focused: bool, shift: bool) {
         if self.player.load().as_ref().is_some() && focused {
             {
                 let mut entities = self.entities.write();
@@ -1434,6 +1436,8 @@ impl Server {
             }
             // we don't look it a block while rightclicking
             packet::send_use_item(self.conn.clone().write().as_mut().unwrap(), Hand::MainHand);
+        } else {
+            self.inventory_context.write().on_click(false, shift);
         }
         // TODO: Pass events into inventory context when not focused
     }
@@ -1621,7 +1625,12 @@ impl Server {
                         material: to_material(id as u16, self.mapped_protocol_version),
                     }
                 });
-                top_inventory.write().cursor = item; // TODO: Set to HUD and make it dirty!
+                top_inventory.write().cursor = item.clone();
+                self.inventory_context.write().set_cursor(item);
+                self.hud_context
+                    .read()
+                    .dirty_slots
+                    .store(true, Ordering::Relaxed);
             } else {
                 warn!("The server tried to set an item to slot {} but the current inventory only has {} slots. Did it try to crash you?", slot, curr_slots);
             }
@@ -1633,9 +1642,9 @@ impl Server {
                     material: to_material(id as u16, self.mapped_protocol_version),
                 }
             });
-            inventory.write().set_item(slot as u16, item);
+            inventory.write().set_item(slot as u16, item.clone());
             self.hud_context
-                .write()
+                .read()
                 .dirty_slots
                 .store(true, Ordering::Relaxed);
         }

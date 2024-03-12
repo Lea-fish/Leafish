@@ -734,7 +734,7 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Left) => {
                         if let Some(server) = &game.server {
-                            server.on_left_click(game.focused);
+                            server.on_left_click(game.focused, false); // FIXME: impl shift
                         }
                     }
                     (ElementState::Released, MouseButton::Right) => {
@@ -744,7 +744,7 @@ fn handle_window_event<T>(
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
                         if let Some(server) = &game.server {
-                            server.on_right_click(game.focused);
+                            server.on_right_click(game.focused, false); // FIXME: impl shift
                         }
                     }
                     (_, _) => (),

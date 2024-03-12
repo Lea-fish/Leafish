@@ -44,7 +44,7 @@ impl Screen for InventoryWindow {
         _renderer: Arc<Renderer>,
         _ui_container: &mut Container,
     ) {
-        self.inventory_context.clone().write().inventory = None;
+        self.inventory_context.write().inventory = None;
         self.clear_elements();
     }
 
@@ -106,7 +106,7 @@ impl Screen for InventoryWindow {
         if (key.0 == Key::Named(NamedKey::Escape) || is_inv) && down && !repeat {
             self.inventory_context
                 .write()
-                .try_close_inventory(&game.screen_sys);
+                .try_close_inventory(&game.screen_sys, false);
         }
     }
 
