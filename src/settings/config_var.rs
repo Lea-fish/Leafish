@@ -1,4 +1,3 @@
-#![allow(clippy::redundant_closure)]
 use crate::paths;
 use log::{info, warn};
 use parking_lot::Mutex;
@@ -49,7 +48,6 @@ pub enum BoolSetting {
     RightPantsVisible,
     LeftPantsVisible,
     HatVisible,
-    AutomaticOfflineAccounts,
 }
 
 #[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
@@ -59,7 +57,7 @@ pub enum FloatSetting {
 
 #[derive(PartialEq, PartialOrd, Hash, Eq, Ord, Clone, Copy)]
 pub enum StringSetting {
-    AuthClientToken,
+    AuthClientToken, // TODO: get rid of this as this is a dead, unused setting
     BackgroundImage,
     LogLevelFile,
     LogLevelTerm,
@@ -214,9 +212,9 @@ impl SettingStore {
 
 fn deserialize_value(input: &str, old: SettingValue) -> Option<SettingValue> {
     match old {
-        SettingValue::Num(_) => input.parse::<i32>().ok().map(|num| SettingValue::Num(num)),
-        SettingValue::Float(_) => input.parse::<f64>().ok().map(|f| SettingValue::Float(f)),
-        SettingValue::Bool(_) => input.parse::<bool>().ok().map(|b| SettingValue::Bool(b)),
+        SettingValue::Num(_) => input.parse::<i32>().ok().map(SettingValue::Num),
+        SettingValue::Float(_) => input.parse::<f64>().ok().map(SettingValue::Float),
+        SettingValue::Bool(_) => input.parse::<bool>().ok().map(SettingValue::Bool),
         SettingValue::String(_) => Some(SettingValue::String(input.to_owned())),
     }
 }

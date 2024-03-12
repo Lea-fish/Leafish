@@ -26,7 +26,7 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
                 name: "vsync",
                 description: "Toggle to enable/disable vsync",
                 serializable: true,
-                value: SettingValue::Bool(false),
+                value: SettingValue::Bool(true),
             },
         ),
         (
@@ -106,16 +106,6 @@ pub fn default_vars() -> Vec<(SettingType, ConfigVar)> {
             ConfigVar {
                 name: "hat",
                 description: "Toggle your hat",
-                serializable: true,
-                value: SettingValue::Bool(false),
-            },
-        ),
-        (
-            SettingType::Bool(BoolSetting::AutomaticOfflineAccounts),
-            ConfigVar {
-                name: "automatic_offline_accounts",
-                description:
-                    "Enables using no password in the login screen for creating offline accounts",
                 serializable: true,
                 value: SettingValue::Bool(false),
             },
