@@ -23,7 +23,8 @@ use std::fs;
 use std::hash::BuildHasherDefault;
 use std::io;
 use std::path;
-use std::sync::mpsc;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -46,9 +47,8 @@ pub struct Manager {
     packs: Vec<Box<dyn Pack>>,
     version: usize,
 
-    vanilla_chan: Option<mpsc::Receiver<bool>>,
-    vanilla_assets_chan: Option<mpsc::Receiver<bool>>,
     vanilla_progress: Arc<Mutex<Progress>>,
+    pending_downloads: Arc<AtomicUsize>,
 }
 
 pub struct ManagerUI {
@@ -81,13 +81,16 @@ struct Task {
 unsafe impl Sync for Manager {}
 
 impl Manager {
+    const LOAD_VANILLA_FLAG: usize = 1 << (usize::BITS as usize - 1);
+    const LOAD_ASSETS_FLAG: usize = 1 << (usize::BITS as usize - 2);
+    const META_MASK: usize = Self::LOAD_ASSETS_FLAG | Self::LOAD_VANILLA_FLAG;
+
     pub fn new() -> (Manager, ManagerUI) {
         let mut m = Manager {
             packs: Vec::new(),
             version: 0,
-            vanilla_chan: None,
-            vanilla_assets_chan: None,
             vanilla_progress: Arc::new(Mutex::new(Progress { tasks: vec![] })),
+            pending_downloads: Arc::new(AtomicUsize::new(1)),
         };
         m.add_pack(Box::new(InternalPack));
         m.download_vanilla();
@@ -140,30 +143,36 @@ impl Manager {
 
     pub fn tick(&mut self, mui: &mut ManagerUI, ui_container: &mut ui::Container, delta: f64) {
         let delta = delta.min(5.0);
-        // Check to see if the download of vanilla has completed
-        // (if it was started)
-        let mut done = false;
-        if let Some(ref recv) = self.vanilla_chan {
-            if recv.try_recv().is_ok() {
-                done = true;
-            }
-        }
-        if done {
-            self.vanilla_chan = None;
-            self.load_vanilla();
-        }
-        let mut done = false;
-        if let Some(ref recv) = self.vanilla_assets_chan {
-            if recv.try_recv().is_ok() {
-                done = true;
-            }
-        }
-        if done {
-            self.vanilla_assets_chan = None;
-            self.load_assets();
-        }
 
         const UI_HEIGHT: f64 = 32.0;
+
+        let pending = self.pending_downloads.load(Ordering::Acquire);
+        if pending == 0 {
+            // the asset manager has nothing to do!
+            return;
+        }
+
+        if pending & Self::META_MASK != 0 {
+            if pending & Self::LOAD_ASSETS_FLAG != 0 {
+                self.pending_downloads
+                    .fetch_sub(Self::LOAD_ASSETS_FLAG, Ordering::AcqRel);
+                self.load_assets();
+            }
+            if pending & Self::LOAD_VANILLA_FLAG != 0 {
+                self.pending_downloads
+                    .fetch_sub(Self::LOAD_VANILLA_FLAG, Ordering::AcqRel);
+                self.load_vanilla();
+            }
+        }
+
+        // Check to see if all downloads have completed
+        if pending == 1 {
+            self.vanilla_progress.lock().unwrap().tasks.clear();
+            mui.num_tasks = 0;
+            mui.progress_ui.clear();
+            self.pending_downloads.store(0, Ordering::Release);
+            return;
+        }
 
         let mut progress = self.vanilla_progress.lock().unwrap();
         progress.tasks.retain(|v| v.progress < v.total);
@@ -306,12 +315,12 @@ impl Manager {
         let loc = paths::get_data_dir().join(format!("index/{}.json", ASSET_VERSION));
         let location = path::Path::new(&loc).to_owned();
         let progress_info = self.vanilla_progress.clone();
-        let (send, recv) = mpsc::channel();
         if fs::metadata(&location).is_ok() {
             self.load_assets();
-        } else {
-            self.vanilla_assets_chan = Some(recv);
         }
+        self.pending_downloads
+            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        let pending_downloads = self.pending_downloads.clone();
         thread::spawn(move || {
             let client = reqwest::blocking::Client::new();
             if fs::metadata(&location).is_err() {
@@ -344,7 +353,11 @@ impl Manager {
                     io::copy(&mut progress, &mut file).unwrap();
                 }
                 fs::rename(tmp_file, &location).unwrap();
-                send.send(true).unwrap();
+                #[allow(arithmetic_overflow)]
+                pending_downloads.fetch_add(
+                    (-1_isize as usize) + Self::LOAD_ASSETS_FLAG,
+                    Ordering::AcqRel,
+                );
             }
 
             let file = fs::File::open(&location).unwrap();
@@ -408,10 +421,10 @@ impl Manager {
             self.load_vanilla();
             return;
         }
-        let (send, recv) = mpsc::channel();
-        self.vanilla_chan = Some(recv);
+        self.pending_downloads.fetch_add(1, Ordering::AcqRel);
 
         let progress_info = self.vanilla_progress.clone();
+        let pending_downloads = self.pending_downloads.clone();
         thread::spawn(move || {
             let client = reqwest::blocking::Client::new();
             let res = client.get(VANILLA_CLIENT_URL).send().unwrap();
@@ -475,7 +488,11 @@ impl Manager {
             }
 
             fs::File::create(location.join("leafish.assets")).unwrap(); // Marker file
-            send.send(true).unwrap();
+            #[allow(arithmetic_overflow)]
+            pending_downloads.fetch_add(
+                (-1_isize as usize) + Self::LOAD_VANILLA_FLAG,
+                Ordering::AcqRel,
+            );
 
             fs::remove_file(paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION)))
                 .unwrap();
