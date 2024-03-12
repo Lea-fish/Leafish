@@ -3297,6 +3297,7 @@ pub enum DigType {
     DropAllItems,
     DropItem,
     ReleaseUseItem,
+    SwapItemInHand,
     Invalid(i32),
 }
 
@@ -3309,6 +3310,7 @@ impl DigType {
             DigType::DropAllItems => 3,
             DigType::DropItem => 4,
             DigType::ReleaseUseItem => 5,
+            DigType::SwapItemInHand => 6,
             DigType::Invalid(id) => *id,
         }
     }
@@ -3323,6 +3325,7 @@ impl From<i32> for DigType {
             3 => DigType::DropAllItems,
             4 => DigType::DropItem,
             5 => DigType::ReleaseUseItem,
+            6 => DigType::SwapItemInHand,
             _ => DigType::Invalid(src),
         }
     }
@@ -3445,6 +3448,28 @@ pub fn send_use_item(conn: &mut Conn, hand: Hand) -> Result<(), Error> {
             hand: VarInt(hand.ordinal()),
         })
     }
+}
+
+pub fn send_drop_item(conn: &mut Conn, whole_stack: bool) -> Result<(), Error> {
+    send_digging(
+        conn,
+        if whole_stack {
+            DigType::DropAllItems
+        } else {
+            DigType::DropItem
+        },
+        Position::new(0, 0, 0),
+        0,
+    )
+}
+
+pub fn send_swap_item_in_hand(conn: &mut Conn) -> Result<(), Error> {
+    send_digging(conn, DigType::SwapItemInHand, Position::new(0, 0, 0), 0)
+}
+
+/// shoot an arrow or finish eating
+pub fn send_release_use_item(conn: &mut Conn) -> Result<(), Error> {
+    send_digging(conn, DigType::ReleaseUseItem, Position::new(0, 0, 0), 255)
 }
 
 pub fn send_block_place(
