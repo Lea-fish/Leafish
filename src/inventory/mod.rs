@@ -30,6 +30,7 @@ use crate::ui::{Container, VAttach};
 use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
+use leafish_protocol::protocol::packet::InventoryOperation;
 use leafish_protocol::protocol::{packet, Conn};
 use log::warn;
 use parking_lot::RwLock;
@@ -266,21 +267,31 @@ impl InventoryContext {
         inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
         screen_sys: &Arc<ScreenSystem>,
         self_ref: Arc<RwLock<InventoryContext>>,
+        server_forced: bool,
     ) {
-        self.try_close_inventory(screen_sys);
+        self.try_close_inventory(screen_sys, server_forced);
         screen_sys.add_screen(Box::new(InventoryWindow::new(inventory.clone(), self_ref)));
         self.safe_inventory.replace(inventory.clone());
         self.has_inv_open = true;
     }
 
-    pub fn try_close_inventory(&mut self, screen_sys: &Arc<ScreenSystem>) -> bool {
+    pub fn try_close_inventory(
+        &mut self,
+        screen_sys: &Arc<ScreenSystem>,
+        server_forced: bool,
+    ) -> bool {
         if self.has_inv_open {
             self.has_inv_open = false;
             if let Some(inventory) = self.safe_inventory.take() {
-                let inventory_id = inventory.read().id() as u8;
-                let mut conn = self.conn.write();
-                let conn = conn.as_mut().unwrap();
-                packet::send_close_window(conn, inventory_id).unwrap();
+                // if the close is server-forced we should not close the inventory ourselves again
+                // as that might close an additional inventory if the server opens one right after closing
+                // this one
+                if !server_forced {
+                    let inventory_id = inventory.read().id() as u8;
+                    let mut conn = self.conn.write();
+                    let conn = conn.as_mut().unwrap();
+                    packet::send_close_window(conn, inventory_id).unwrap();
+                }
             }
             screen_sys.pop_screen();
 
@@ -325,7 +336,8 @@ impl InventoryContext {
         }
     }
 
-    pub fn on_click(&mut self) {
+    #[allow(clippy::collapsible_else_if)]
+    pub fn on_click(&mut self, left: bool, shift: bool) {
         if let Some(inventory) = &self.safe_inventory {
             let mut inventory = inventory.write();
 
@@ -341,7 +353,19 @@ impl InventoryContext {
                         conn,
                         inventory.id() as u8,
                         slot as i16,
-                        packet::InventoryOperation::LeftClick,
+                        if left {
+                            if shift {
+                                InventoryOperation::ShiftLeftClick
+                            } else {
+                                InventoryOperation::LeftClick
+                            }
+                        } else {
+                            if shift {
+                                InventoryOperation::ShiftRightClick
+                            } else {
+                                InventoryOperation::RightClick
+                            }
+                        },
                         inventory.get_client_state_id() as u16,
                         item.as_ref().map(|i| i.stack.clone()),
                     )
@@ -353,21 +377,54 @@ impl InventoryContext {
                             // Merge the cursor into a slot stack of the same
                             // material.
                             if item.is_stackable(&cursor) {
-                                let max = item.material.get_stack_size(conn.get_version());
-                                let total = (item.stack.count + cursor.stack.count) as u8;
-                                item.stack.count = total.min(max) as isize;
+                                if left {
+                                    let max = item.material.get_stack_size(conn.get_version());
+                                    let total = (item.stack.count + cursor.stack.count) as u8;
+                                    item.stack.count = total.min(max) as isize;
 
-                                if total > max {
-                                    cursor.stack.count = (total - max) as isize;
-                                    (Some(cursor), Some(item))
+                                    if total > max {
+                                        cursor.stack.count = (total - max) as isize;
+                                        (Some(cursor), Some(item))
+                                    } else {
+                                        (None, Some(item))
+                                    }
                                 } else {
-                                    (None, Some(item))
+                                    if item.stack.count
+                                        >= item.material.get_stack_size(conn.get_version()) as isize
+                                    {
+                                        (Some(cursor), Some(item))
+                                    } else {
+                                        item.stack.count += 1;
+                                        if cursor.stack.count <= 1 {
+                                            (None, Some(item))
+                                        } else {
+                                            cursor.stack.count -= 1;
+                                            (Some(cursor), Some(item))
+                                        }
+                                    }
                                 }
                             } else {
                                 (Some(item), Some(cursor))
                             }
                         }
-                        (Some(cursor), None) => (None, Some(cursor)),
+                        (Some(cursor), None) => {
+                            if !left {
+                                let mut item = cursor.clone();
+                                item.stack.count = 1;
+                                let mut cursor = cursor.clone();
+                                cursor.stack.count -= 1;
+                                (
+                                    if cursor.stack.count > 0 {
+                                        Some(cursor)
+                                    } else {
+                                        None
+                                    },
+                                    Some(item),
+                                )
+                            } else {
+                                (None, Some(cursor))
+                            }
+                        }
                         (None, Some(item)) => (Some(item), None),
                         (None, None) => (None, None),
                     };
@@ -376,6 +433,35 @@ impl InventoryContext {
                         .write()
                         .dirty_slots
                         .store(true, Ordering::Relaxed);
+                } else if let Some(cursor) = self.cursor.take() {
+                    // when right clicking we don't drop the whole stack but only one item of the stack
+                    if !left {
+                        let mut cursor = cursor.clone();
+                        cursor.stack.count -= 1;
+                        self.cursor = Some(cursor);
+                    }
+                    self.dirty = true;
+                    self.hud_context
+                        .write()
+                        .dirty_slots
+                        .store(true, Ordering::Relaxed);
+                    let mut conn = self.conn.write();
+                    let conn = conn.as_mut().unwrap();
+
+                    // Send the update to the server
+                    packet::send_click_container(
+                        conn,
+                        inventory.id() as u8,
+                        -999,
+                        if left {
+                            InventoryOperation::LeftClickOutside
+                        } else {
+                            InventoryOperation::RightClickOutside
+                        },
+                        inventory.get_client_state_id() as u16,
+                        Some(cursor.stack),
+                    )
+                    .unwrap();
                 }
             }
         }
@@ -383,6 +469,11 @@ impl InventoryContext {
 
     pub fn on_cursor_moved(&mut self, x: f64, y: f64) {
         self.mouse_position = Some((x, y));
+        self.dirty = true;
+    }
+
+    pub fn set_cursor(&mut self, cursor: Option<Item>) {
+        self.cursor = cursor;
         self.dirty = true;
     }
 
