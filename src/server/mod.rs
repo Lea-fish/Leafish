@@ -18,6 +18,7 @@ use crate::entity::player::{create_local, PlayerModel, PlayerMovement};
 use crate::entity::{EntityType, GameInfo, Gravity, MouseButtons, TargetPosition, TargetRotation};
 use crate::format;
 use crate::inventory::material::versions::to_material;
+use crate::inventory::Inventory;
 use crate::inventory::{inventory_from_type, InventoryContext, InventoryType, Item};
 use crate::particle::block_break_effect::{BlockBreakEffect, BlockEffectData};
 use crate::protocol::{self, forge, mapped_packet, packet};
@@ -54,7 +55,7 @@ use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
 use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
-use leafish_protocol::protocol::packet::Hand;
+use leafish_protocol::protocol::packet::{send_drop_item, Hand};
 use leafish_protocol::protocol::Conn;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
@@ -1251,7 +1252,7 @@ impl Server {
         }
     }
 
-    pub fn key_press(&self, down: bool, key: Actionkey, focused: bool) -> bool {
+    pub fn key_press(&self, down: bool, key: Actionkey, focused: bool, ctrl_pressed: bool) -> bool {
         if focused || key == Actionkey::OpenInv || key == Actionkey::ToggleChat {
             let mut state_changed = false;
             if let Some(player) = self.player.load().as_ref() {
@@ -1296,6 +1297,27 @@ impl Server {
                     self.screen_sys
                         .add_screen(Box::new(Chat::new(self.chat_ctx.clone())));
                     return true;
+                }
+                Actionkey::DropItem => {
+                    if state_changed {
+                        let inv = self.inventory_context.read();
+                        let mut slots = inv.player_inventory.write();
+                        let slot_id = 36 + inv.hotbar_index as u16;
+                        if let Some(mut item) = slots.get_item(slot_id) {
+                            if ctrl_pressed || item.stack.count <= 1 {
+                                slots.set_item(slot_id, None);
+                            } else {
+                                item.stack.count -= 1;
+                                slots.set_item(slot_id, Some(item));
+                            }
+                            self.hud_context
+                                .read()
+                                .dirty_slots
+                                .store(true, Ordering::Relaxed);
+                            send_drop_item(self.conn.write().as_mut().unwrap(), ctrl_pressed)
+                                .unwrap();
+                        }
+                    }
                 }
                 Actionkey::Hotbar1 => {
                     self.inventory_context.write().hotbar_index = 0;

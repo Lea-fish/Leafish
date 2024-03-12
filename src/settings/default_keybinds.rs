@@ -69,6 +69,14 @@ pub fn create_keybinds() -> Vec<(Key, Keybind)> {
             },
         ),
         (
+            Key::Character(SmolStr::new_inline("q")),
+            Keybind {
+                name: "keybind_drop_item",
+                description: "Keybinding for dropping items",
+                action: Actionkey::DropItem,
+            },
+        ),
+        (
             Key::Named(NamedKey::F1),
             Keybind {
                 name: "keybind_toggle_hud",

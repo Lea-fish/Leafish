@@ -509,10 +509,12 @@ impl Screen for Hud {
         match key.1 {
             PhysicalKey::Code(code) => {
                 if let Some(action_key) = game.keybinds.get(code, &key.0) {
-                    game.server
-                        .as_ref()
-                        .unwrap()
-                        .key_press(down, action_key.action, game.focused);
+                    game.server.as_ref().unwrap().key_press(
+                        down,
+                        action_key.action,
+                        game.focused,
+                        game.is_ctrl_pressed,
+                    );
                 }
             }
             PhysicalKey::Unidentified(_) => {}

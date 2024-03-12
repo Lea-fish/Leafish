@@ -181,6 +181,7 @@ pub enum Actionkey {
     Sneak,
     Sprint,
     Jump,
+    DropItem,
     ToggleHud,
     ToggleDebug,
     ToggleChat,
@@ -207,6 +208,7 @@ impl FromStr for Actionkey {
             "keybind_sneak" => Ok(Actionkey::Sneak),
             "keybind_sprint" => Ok(Actionkey::Sprint),
             "keybind_jump" => Ok(Actionkey::Jump),
+            "keybind_drop_item" => Ok(Actionkey::DropItem),
             "keybind_toggle_hud" => Ok(Actionkey::ToggleHud),
             "keybind_toggle_debug_info" => Ok(Actionkey::ToggleDebug),
             "keybind_toggle_chat" => Ok(Actionkey::ToggleChat),
@@ -225,7 +227,7 @@ impl FromStr for Actionkey {
 }
 
 impl Actionkey {
-    const VALUES: [Actionkey; 20] = [
+    const VALUES: [Actionkey; 21] = [
         Actionkey::Forward,
         Actionkey::Backward,
         Actionkey::Left,
@@ -234,6 +236,7 @@ impl Actionkey {
         Actionkey::Sneak,
         Actionkey::Sprint,
         Actionkey::Jump,
+        Actionkey::DropItem,
         Actionkey::ToggleHud,
         Actionkey::ToggleDebug,
         Actionkey::ToggleChat,
