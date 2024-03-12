@@ -48,10 +48,7 @@ impl Screen for Background {
                 Some(
                     ui::ImageBuilder::new()
                         .draw_index(i16::MIN as isize)
-                        .texture(&*format!(
-                            "#{}",
-                            self.settings.get_string(StringSetting::BackgroundImage)
-                        ))
+                        .texture(path)
                         .size(
                             renderer.screen_data.read().safe_width as f64,
                             renderer.screen_data.read().safe_height as f64,

@@ -184,7 +184,7 @@ impl super::Screen for Launcher {
                 if let Some(files) = files {
                     let file_name = files.as_path().to_str().unwrap();
                     game.settings
-                        .set_string(StringSetting::BackgroundImage, file_name);
+                        .set_string(StringSetting::BackgroundImage, &format!("#{}", file_name));
                 }
                 true
             })
