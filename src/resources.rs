@@ -32,6 +32,16 @@ use crate::types::hash::FNVHash;
 use crate::ui;
 use std::fs::File;
 
+// for latest asset indices and a list of them in general https://piston-meta.mojang.com/mc/game/version_manifest_v2.json
+
+/*
+const RESOURCES_VERSION: &str = "1.20.4";
+const VANILLA_CLIENT_URL: &str =
+    "https://piston-data.mojang.com/v1/objects/fd19469fed4a4b4c15b2d5133985f0e3e7816a8a/client.jar";
+const ASSET_VERSION: &str = "1.20";
+const ASSET_INDEX_URL: &str =
+    "https://piston-meta.mojang.com/v1/packages/54c04f81364f5fcb91da8b95ecf146cc396a4afc/1.20.4.json";
+*/
 const RESOURCES_VERSION: &str = "1.19.2";
 const VANILLA_CLIENT_URL: &str =
     "https://piston-data.mojang.com/v1/objects/055b30d860ead928cba3849ba920c88b6950b654/client.jar";
@@ -85,7 +95,7 @@ impl Manager {
     const LOAD_ASSETS_FLAG: usize = 1 << (usize::BITS as usize - 2);
     const META_MASK: usize = Self::LOAD_ASSETS_FLAG | Self::LOAD_VANILLA_FLAG;
 
-    pub fn new() -> (Manager, ManagerUI) {
+    pub fn new(provided_assets: Option<String>) -> (Manager, ManagerUI) {
         let mut m = Manager {
             packs: Vec::new(),
             version: 0,
@@ -94,7 +104,11 @@ impl Manager {
         };
         m.add_pack(Box::new(InternalPack));
         m.download_vanilla();
-        m.download_assets();
+        if let Some(assets) = provided_assets {
+            m.preload_assets(assets);
+        } else {
+            m.download_assets();
+        }
         (
             m,
             ManagerUI {
@@ -306,8 +320,22 @@ impl Manager {
         self.version += 1;
     }
 
+    fn preload_assets(&mut self, path: String) {
+        self.packs.insert(1, Box::new(ObjectPack::new(path)));
+        self.version += 1;
+    }
+
     fn load_assets(&mut self) {
-        self.packs.insert(1, Box::new(ObjectPack::new()));
+        self.packs.insert(
+            1,
+            Box::new(ObjectPack::new(
+                paths::get_data_dir()
+                    .join(format!("index/{}.json", ASSET_VERSION))
+                    .to_str()
+                    .unwrap()
+                    .to_string(),
+            )),
+        );
         self.version += 1;
     }
 
@@ -353,6 +381,7 @@ impl Manager {
                     io::copy(&mut progress, &mut file).unwrap();
                 }
                 fs::rename(tmp_file, &location).unwrap();
+                // this operation is a combination of `- 1` and `+ LOAD_ASSETS_FLAG`
                 #[allow(arithmetic_overflow)]
                 pending_downloads.fetch_add(
                     (-1_isize as usize) + Self::LOAD_ASSETS_FLAG,
@@ -488,6 +517,8 @@ impl Manager {
             }
 
             fs::File::create(location.join("leafish.assets")).unwrap(); // Marker file
+
+            // this operation is a combination of `- 1` and `+ LOAD_VANILLA_FLAG`
             #[allow(arithmetic_overflow)]
             pending_downloads.fetch_add(
                 (-1_isize as usize) + Self::LOAD_VANILLA_FLAG,
@@ -551,8 +582,7 @@ struct ObjectPack {
 }
 
 impl ObjectPack {
-    fn new() -> ObjectPack {
-        let loc = paths::get_data_dir().join(format!("index/{}.json", ASSET_VERSION));
+    fn new(loc: String) -> ObjectPack {
         let location = path::Path::new(&loc);
         let file = fs::File::open(location).unwrap();
         let index: serde_json::Value = serde_json::from_reader(&file).unwrap();
