@@ -247,7 +247,9 @@ impl World {
                     if let Some(chunk) = self.chunks.write().get_mut(&CPos(pos.x >> 4, pos.z >> 4))
                     {
                         if let Some(entity) = chunk.block_entities.remove(&pos) {
-                            cmds.entity(entity).despawn();
+                            if let Some(mut entity) = cmds.get_entity(entity) {
+                                entity.despawn();
+                            }
                         }
                     }
                 }

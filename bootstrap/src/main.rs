@@ -33,6 +33,14 @@ async fn main() {
             cmd.push(args[idx + 1].clone());
             continue;
         }
+        if arg == "--assetIndex" {
+            cmd.push("--asset-index".to_string());
+            cmd.push(args[idx + 1].clone());
+        }
+        if arg == "--assetsDir" {
+            cmd.push("--assets-dir".to_string());
+            cmd.push(args[idx + 1].clone());
+        }
     }
     if args[args.len() - 1] == "noupdate" {
         Command::new(

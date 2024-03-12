@@ -125,7 +125,7 @@ pub mod mojang {
         let mut json = File::create_new(&json_path)?;
         json.write_all(serde_json::to_string_pretty(&Description {
             id: "Leafish".to_string(),
-            inherits_from: "1.8.9".to_string(), // FIXME: is this a good default?
+            inherits_from: "1.19.2".to_string(), // FIXME: can we use 1.8.9 instead while preserving the asset index somehow?
             time: "2020-01-01T00:00:00+02:00".to_string(), // FIXME: use some sensible time
             release_time: "2020-01-01T00:00:00+02:00".to_string(),
             ty: "release".to_string(),

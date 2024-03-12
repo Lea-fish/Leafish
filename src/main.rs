@@ -215,6 +215,10 @@ struct Opt {
     name: Option<String>,
     #[structopt(long)]
     token: Option<String>,
+    #[structopt(long)]
+    asset_index: Option<String>,
+    #[structopt(long)]
+    assets_dir: Option<String>,
 }
 
 // TODO: Hide own character and show only the right hand. (with an item)
@@ -243,7 +247,12 @@ fn main() {
     con.lock().configure(&settings);
     let vsync = settings.get_bool(BoolSetting::Vsync);
 
-    let (res, mut resui) = resources::Manager::new();
+    let (res, mut resui) = resources::Manager::new(
+        opt.assets_dir
+            .clone()
+            .zip(opt.asset_index.clone())
+            .map(|(dir, idx)| format!("{}/indexes/{}.json", dir, idx)),
+    );
     let resource_manager = Arc::new(RwLock::new(res));
 
     let events_loop = winit::event_loop::EventLoop::new().unwrap();
