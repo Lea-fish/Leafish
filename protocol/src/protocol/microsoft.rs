@@ -55,7 +55,7 @@ impl AccountImpl for MicrosoftAccount {
             .join("");
         let hash_val = hash_str.trim_start_matches('0');
         let hash_str = if negative {
-            "-".to_owned() + &hash_val[..]
+            "-".to_owned() + hash_val
         } else {
             hash_val.to_owned()
         };
