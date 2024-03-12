@@ -216,10 +216,17 @@ impl ApplyDigging<'_, '_> {
                 self.start_digging(current, &mut digging.effect);
             }
             // Finish the new digging operation.
-            (Some(_), Some(current)) if current.is_finished(&self.tool) => {
-                current.finished = true;
-                self.finish_digging(current, &mut digging.effect, world);
-            }
+            (Some(_), Some(current)) => match current.is_finished(&self.tool) {
+                DiggingFinishState::Finished => {
+                    current.finished = true;
+                    self.finish_digging(current, &mut digging.effect, world, true);
+                }
+                DiggingFinishState::FinishedInstant => {
+                    current.finished = true;
+                    self.finish_digging(current, &mut digging.effect, world, false);
+                }
+                DiggingFinishState::NotFinished => {}
+            },
             _ => {}
         }
 
@@ -301,13 +308,16 @@ impl ApplyDigging<'_, '_> {
         state: &DiggingState,
         effect: &mut Option<Entity>,
         world: &Arc<World>,
+        send_digging: bool,
     ) {
         if let Some(effect) = effect.take() {
             self.commands.entity(effect).despawn();
         }
         world.set_block(state.position, block::Block::Air {});
 
-        self.send_digging(state, packet::DigType::FinishDestroyBlock);
+        if send_digging {
+            self.send_digging(state, packet::DigType::FinishDestroyBlock);
+        }
     }
 
     fn send_digging(&self, state: &DiggingState, status: packet::DigType) {
