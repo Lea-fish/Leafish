@@ -888,8 +888,8 @@ fn handle_window_event<T>(
                             (state, key) => {
                                 let pressed = state == ElementState::Pressed;
                                 #[cfg(target_os = "macos")]
-                                if pressed && game.is_logo_pressed && key.eq_ignore_case('q') {
-                                    game.should_close = true;
+                                if pressed && game.is_logo_pressed() && key.eq_ignore_case('q') {
+                                    game.set_should_close();
                                 }
                                 if !game.is_focused() {
                                     let ctrl_pressed = game.is_ctrl_pressed()
