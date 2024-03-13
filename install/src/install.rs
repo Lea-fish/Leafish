@@ -248,11 +248,11 @@ pub mod prism {
         }
 
         let cfg_path = format!("{}{}", prefix, CFG_PATH);
-        fs::write(&cfg_path, DEFAULT_CFG.as_bytes())?;
+        fs::write(cfg_path, DEFAULT_CFG.as_bytes())?;
 
         let pack_path = format!("{}{}", prefix, PACK_PATH);
         fs::write(
-            &pack_path,
+            pack_path,
             serde_json::to_string_pretty(&PackDesc {
                 components: vec![Component {
                     important: Some(true),
@@ -270,17 +270,23 @@ pub mod prism {
             })?,
         )?;
         let dir_path = format!("{}{}", prefix, LIB_DIR_PATH);
-        mk_dir(&dir_path, "[Info] [PrismLauncher] Creating library directory...")?;
+        mk_dir(
+            &dir_path,
+            "[Info] [PrismLauncher] Creating library directory...",
+        )?;
         let lib_path = format!("{}{}", prefix, LIB_PATH);
-        fs::write(&lib_path, include_bytes!("../resources/wrapper.jar"))?;
+        fs::write(lib_path, include_bytes!("../resources/wrapper.jar"))?;
         let dir_path = format!("{}{}", prefix, META_DIR_PATH);
-        mk_dir(&dir_path, "[Info] [PrismLauncher] Creating meta directory...")?;
+        mk_dir(
+            &dir_path,
+            "[Info] [PrismLauncher] Creating meta directory...",
+        )?;
         let meta_path = format!("{}{}", prefix, META_PATH);
 
         let now = Utc::now();
         let now = now.format("%Y-%m-%dT%H:%M:%S");
 
-        fs::write(&meta_path, serde_json::to_string_pretty(&VersionMeta {
+        fs::write(meta_path, serde_json::to_string_pretty(&VersionMeta {
             traits: None,
             asset_index: AssetIndex { // FIXME: don't choose one version statically!
                 id: "12".to_string(),
@@ -410,7 +416,6 @@ pub mod prism {
         suggests: String,
         uid: String,
     }
-
 }
 
 fn mk_dir(path: &str, msg: &str) -> anyhow::Result<()> {

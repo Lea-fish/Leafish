@@ -1,5 +1,6 @@
 use std::{
     env, fs,
+    path::Path,
     process::{exit, Command, Stdio},
     time::UNIX_EPOCH,
 };
@@ -12,6 +13,8 @@ const URL: &str = "https://api.github.com/repos/Lea-fish/Releases/releases/lates
 const MAIN_BINARY_PATH: &str = "./leafish";
 const UPDATED_BOOTSTRAP_BINARY_PATH: &str = "./bootstrap_new";
 const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap";
+const CLIENT_JAR_PATH: &str = "./client.jar";
+const ASSETS_FILE_NAME: &str = "assets.txt";
 
 #[cfg(target_os = "windows")]
 const USER_AGENT: &str =
@@ -26,6 +29,7 @@ const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux i686; rv:123.0) Gecko/20100101
 async fn main() {
     let args: Vec<String> = env::args().collect();
     let mut cmd = vec![];
+    let mut provided_client = false;
     for (idx, arg) in args.iter().enumerate() {
         if arg == "--uuid" {
             cmd.push("--uuid".to_string());
@@ -50,8 +54,34 @@ async fn main() {
             cmd.push("--assets-dir".to_string());
             cmd.push(args[idx + 1].clone());
         }
+        if arg == "--client-jar" {
+            match fs::canonicalize(&args[idx + 1]) {
+                Ok(path) => {
+                    if let Some(path) = path.to_str() {
+                        cmd.push("--client-jar".to_string());
+                        cmd.push(path.to_string());
+                        provided_client = true;
+                    } else {
+                        println!("[Warn] Couldn't convert client jar path to string");
+                    }
+                }
+                Err(err) => println!("[Warn] Couldn't canonicalize client jar path: {}", err),
+            }
+        }
     }
     if args[args.len() - 1] == "noupdate" {
+        if !provided_client && Path::new(CLIENT_JAR_PATH).exists() {
+            if let Ok(client_jar) = fs::canonicalize(CLIENT_JAR_PATH) {
+                if let Some(client_jar) = client_jar.to_str() {
+                    cmd.push("--client-jar".to_string());
+                    cmd.push(client_jar.to_string());
+                } else {
+                    println!("[Warn] (noupdate) Couldn't convert client jar path to string");
+                }
+            } else {
+                println!("[Warn] (noupdate) Couldn't canonicalize client jar path");
+            }
+        }
         Command::new(
             fs::canonicalize(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX))
                 .unwrap()
@@ -67,16 +97,16 @@ async fn main() {
         .wait()
         .unwrap();
     } else {
-        let _ = try_update().await;
-        println!("[INFO] Restarting bootstrap...");
+        let _ = try_update(provided_client).await;
+        println!("[Info] Restarting bootstrap...");
         // shut down the process if we performed an update and let our parent bootstrap restart us, running a new version
         // otherwise we also have to shutdown in order not to restart leafish as soon as it is closed
         exit(0);
     }
 }
 
-async fn try_update() -> anyhow::Result<()> {
-    println!("[INFO] Checking for updates....");
+async fn try_update(provided_client: bool) -> anyhow::Result<()> {
+    println!("[Info] Checking for updates....");
     let latest = Client::builder()
         .user_agent(USER_AGENT)
         .build()?
@@ -86,7 +116,7 @@ async fn try_update() -> anyhow::Result<()> {
         .text()
         .await?;
     let latest: LatestResponse = serde_json::from_str(&latest).unwrap();
-    println!("[INFO] Looking for update files...");
+    println!("[Info] Looking for update files...");
     let bootstrap_binary_name = format!(
         "bootstrap_{}_{}{}",
         env::consts::ARCH,
@@ -100,13 +130,13 @@ async fn try_update() -> anyhow::Result<()> {
         env::consts::EXE_SUFFIX
     );
     for asset in latest.assets {
-        if &asset.name == &main_binary_name {
+        if asset.name == main_binary_name {
             if do_update(
                 &latest.published_at,
                 &asset.updated_at,
                 time_stamp_binary(MAIN_BINARY_PATH),
             )? {
-                println!("[INFO] Downloading update for leafish binary...");
+                println!("[Info] Downloading update for leafish binary...");
                 let new_binary = reqwest::get(&asset.browser_download_url)
                     .await?
                     .bytes()
@@ -116,15 +146,15 @@ async fn try_update() -> anyhow::Result<()> {
                     &new_binary,
                 )?;
                 adjust_binary_perms()?;
-                println!("[INFO] Successfully updated leafish binary");
+                println!("[Info] Successfully updated leafish binary");
             }
-        } else if &asset.name == &bootstrap_binary_name {
+        } else if asset.name == bootstrap_binary_name {
             if do_update(
                 &latest.published_at,
                 &asset.updated_at,
                 time_stamp_binary(BOOTSTRAP_BINARY_PATH),
             )? {
-                println!("[INFO] Downloading update for bootstrap...");
+                println!("[Info] Downloading update for bootstrap...");
                 let new_binary = reqwest::get(&asset.browser_download_url)
                     .await?
                     .bytes()
@@ -137,11 +167,53 @@ async fn try_update() -> anyhow::Result<()> {
                     ),
                     &new_binary,
                 )?;
-                println!("[INFO] Successfully downloaded bootstrap update");
+                println!("[Info] Successfully downloaded bootstrap update");
             }
+        } else if asset.name == ASSETS_FILE_NAME {
+            load_links(&asset.name, provided_client).await;
         }
     }
     Ok(())
+}
+
+async fn load_links(raw: &str, provided_client: bool) {
+    let lines = raw.split('\n');
+    for line in lines {
+        if let Some((key, value)) = line.split_once(": ") {
+            let key = key.to_lowercase();
+            match key.as_str() {
+                "client" => {
+                    if provided_client || Path::new(CLIENT_JAR_PATH).exists() {
+                        continue;
+                    }
+                    let res = reqwest::get(value).await;
+                    match res {
+                        Ok(res) => match res.bytes().await {
+                            Ok(res) => {
+                                if let Err(err) = fs::write(CLIENT_JAR_PATH, &res) {
+                                    println!("[Warn] error writing client jar {err}");
+                                }
+                            }
+                            Err(err) => {
+                                println!("[Warn] An error occoured while trying to fetch client bytes: {err}");
+                            }
+                        },
+                        Err(err) => {
+                            println!(
+                                "[Warn] An error occoured while trying to fetch client: {err}"
+                            );
+                        }
+                    }
+                }
+                "assets" => {
+                    // FIXME: update assets description in the launcher
+                    // FIXME: (this means that the client's asset expectations and the real asset version are out of sync)
+                    // FIXME: following we have to support even outdated asset versions (to a certain degree)
+                }
+                _ => {}
+            }
+        }
+    }
 }
 
 fn time_stamp_binary(path: &str) -> u64 {
@@ -170,7 +242,7 @@ fn time_stamp_binary(path: &str) -> u64 {
 
 fn parse_date(date: &str) -> anyhow::Result<i64> {
     // FIXME: get rid of all the unwraps
-    let (date, time) = (&date[0..(date.len() - 2)]).split_once('T').unwrap();
+    let (date, time) = date[0..(date.len() - 2)].split_once('T').unwrap();
     let mut date_parts = date.split('-');
     let years = date_parts.next().unwrap();
     let months = date_parts.next().unwrap();
@@ -213,7 +285,7 @@ fn adjust_binary_perms() -> anyhow::Result<()> {
     let file_name =
         fs::canonicalize(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX)).unwrap();
     Command::new("chmod")
-        .args(&["777", file_name.as_path().to_str().unwrap()])
+        .args(["777", file_name.as_path().to_str().unwrap()])
         .spawn()?
         .wait()?; // FIXME: check for exit status!
     Ok(())
