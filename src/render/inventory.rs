@@ -97,7 +97,7 @@ impl Screen for InventoryWindow {
         );
     }
 
-    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &Game) {
         let is_inv = if let PhysicalKey::Code(code) = key.1 {
             game.keybinds.get(code, &key.0).map(|kb| kb.action) == Some(Actionkey::OpenInv)
         } else {

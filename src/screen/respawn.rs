@@ -86,7 +86,7 @@ impl super::Screen for Respawn {
                 .attach(&mut *respawn_button);
             respawn_button.add_text(txt);
             respawn_button.add_click_func(|_, game| {
-                let server = game.server.as_ref().unwrap().clone();
+                let server = game.server.load().as_ref().unwrap().clone();
 
                 // TODO: Use ClientStatus_u8 instead!
                 #[allow(clippy::if_same_then_else)]
@@ -99,7 +99,7 @@ impl super::Screen for Respawn {
                         action_id: VarInt(0),
                     }
                 };
-                game.server.as_ref().unwrap().clone().write_packet(packet);
+                server.write_packet(packet);
                 true
             });
         }
@@ -116,10 +116,9 @@ impl super::Screen for Respawn {
                 .attach(&mut *main_menu_button);
             main_menu_button.add_text(txt);
             main_menu_button.add_click_func(|_, game| {
-                game.server.as_ref().unwrap().disconnect(None);
-                game.screen_sys.clone().pop_screen();
+                game.server.load().as_ref().unwrap().disconnect(None);
+                game.screen_sys.pop_screen();
                 game.screen_sys
-                    .clone()
                     .replace_screen(Box::new(super::ServerList::new(None)));
                 true
             });

@@ -1011,7 +1011,7 @@ impl Server {
         self.conn.read().is_some()
     }
 
-    pub fn tick(&self, delta: f64, game: &mut Game) {
+    pub fn tick(&self, delta: f64, game: &Game) {
         {
             let mut entities = self.entities.write();
             // FIXME: is there another way to do this?
@@ -1080,7 +1080,7 @@ impl Server {
                 renderer.camera.lock().pitch = rotation.pitch;
             }
         }
-        self.entity_tick(delta, game.focused, self.dead.load(Ordering::Acquire));
+        self.entity_tick(delta, game.is_focused(), self.dead.load(Ordering::Acquire));
 
         self.tick_timer.store(
             self.tick_timer.load(Ordering::Acquire) + delta,
@@ -1197,7 +1197,7 @@ impl Server {
     }
 
     #[allow(unused_must_use)]
-    pub fn minecraft_tick(&self, game: &mut Game) {
+    pub fn minecraft_tick(&self, game: &Game) {
         if let Some(player) = self.player.load().as_ref() {
             let mut entities = self.entities.write();
             let on_ground = {
@@ -1243,7 +1243,7 @@ impl Server {
             )
             .map_err(|_| self.disconnect_closed(None));
 
-            if !game.focused {
+            if !game.is_focused() {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
                 mouse_buttons.left = false;

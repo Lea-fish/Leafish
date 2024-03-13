@@ -19,7 +19,7 @@ use crate::screen::{Screen, ScreenSystem};
 use std::rc::Rc;
 use std::sync::Arc;
 
-type EditAccountEntryCallback = dyn Fn(&mut Game, String, String);
+type EditAccountEntryCallback = dyn Fn(&Game, String, String);
 
 pub struct EditAccountEntry {
     elements: Option<UIElements>,

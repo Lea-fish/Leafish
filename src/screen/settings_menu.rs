@@ -6,7 +6,6 @@ use crate::screen::{Screen, ScreenSystem};
 use crate::BoolSetting;
 use crate::FloatSetting;
 use crate::IntSetting;
-use std::rc::Rc;
 use std::sync::Arc;
 
 pub struct UIElements {
@@ -16,7 +15,7 @@ pub struct UIElements {
 }
 
 pub struct SettingsMenu {
-    settings: Rc<SettingStore>,
+    settings: Arc<SettingStore>,
     elements: Option<UIElements>,
     show_disconnect_button: bool,
 }
@@ -32,7 +31,7 @@ impl Clone for SettingsMenu {
 }
 
 impl SettingsMenu {
-    pub fn new(settings: Rc<SettingStore>, show_disconnect_button: bool) -> Self {
+    pub fn new(settings: Arc<SettingStore>, show_disconnect_button: bool) -> Self {
         SettingsMenu {
             settings,
             elements: None,
@@ -72,7 +71,6 @@ impl super::Screen for SettingsMenu {
             audio_settings.add_text(txt);
             audio_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone()
                     .add_screen(Box::new(AudioSettingsMenu::new(game.settings.clone())));
                 true
             });
@@ -93,7 +91,6 @@ impl super::Screen for SettingsMenu {
             video_settings.add_text(txt);
             video_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone()
                     .add_screen(Box::new(VideoSettingsMenu::new(game.settings.clone())));
                 true
             });
@@ -114,7 +111,6 @@ impl super::Screen for SettingsMenu {
             controls_settings.add_text(txt);
             controls_settings.add_click_func(|_, game| {
                 game.screen_sys
-                    .clone()
                     .add_screen(Box::new(ControlsMenu::new(game.settings.clone())));
                 true
             });
@@ -171,7 +167,7 @@ impl super::Screen for SettingsMenu {
                 .attach(&mut *done_button);
             done_button.add_text(txt);
             done_button.add_click_func(|_, game| {
-                game.screen_sys.clone().pop_screen();
+                game.screen_sys.pop_screen();
                 true
             });
         }
@@ -191,10 +187,9 @@ impl super::Screen for SettingsMenu {
                     .attach(&mut *disconnect_button);
                 disconnect_button.add_text(txt);
                 disconnect_button.add_click_func(|_, game| {
-                    game.server.as_ref().unwrap().disconnect(None);
-                    game.screen_sys.clone().pop_screen();
+                    game.server.load().as_ref().unwrap().disconnect(None);
+                    game.screen_sys.pop_screen();
                     game.screen_sys
-                        .clone()
                         .replace_screen(Box::new(super::ServerList::new(None)));
                     true
                 });
@@ -254,13 +249,13 @@ impl super::Screen for SettingsMenu {
 }
 
 pub struct VideoSettingsMenu {
-    settings: Rc<SettingStore>,
+    settings: Arc<SettingStore>,
     elements: Option<UIElements>,
 }
 
 impl Clone for VideoSettingsMenu {
     fn clone(&self) -> Self {
-        VideoSettingsMenu {
+        Self {
             settings: self.settings.clone(),
             elements: None,
         }
@@ -268,8 +263,8 @@ impl Clone for VideoSettingsMenu {
 }
 
 impl VideoSettingsMenu {
-    pub fn new(settings: Rc<SettingStore>) -> Self {
-        VideoSettingsMenu {
+    pub fn new(settings: Arc<SettingStore>) -> Self {
+        Self {
             settings,
             elements: None,
         }
@@ -438,7 +433,7 @@ impl super::Screen for VideoSettingsMenu {
 }
 
 pub struct AudioSettingsMenu {
-    _settings: Rc<SettingStore>,
+    _settings: Arc<SettingStore>,
     elements: Option<UIElements>,
 }
 
@@ -452,7 +447,7 @@ impl Clone for AudioSettingsMenu {
 }
 
 impl AudioSettingsMenu {
-    pub fn new(_settings: Rc<SettingStore>) -> AudioSettingsMenu {
+    pub fn new(_settings: Arc<SettingStore>) -> AudioSettingsMenu {
         AudioSettingsMenu {
             _settings,
             elements: None,
@@ -548,7 +543,7 @@ impl super::Screen for AudioSettingsMenu {
 }
 
 pub struct SkinSettingsMenu {
-    settings: Rc<SettingStore>,
+    settings: Arc<SettingStore>,
     elements: Option<UIElements>,
 }
 
@@ -562,7 +557,7 @@ impl Clone for SkinSettingsMenu {
 }
 
 impl SkinSettingsMenu {
-    pub fn new(settings: Rc<SettingStore>) -> Self {
+    pub fn new(settings: Arc<SettingStore>) -> Self {
         SkinSettingsMenu {
             settings,
             elements: None,
@@ -748,13 +743,13 @@ impl super::Screen for SkinSettingsMenu {
 }
 
 pub struct ControlsMenu {
-    settings: Rc<SettingStore>,
+    settings: Arc<SettingStore>,
     elements: Option<UIElements>,
 }
 
 impl Clone for ControlsMenu {
     fn clone(&self) -> Self {
-        ControlsMenu {
+        Self {
             settings: self.settings.clone(),
             elements: None,
         }
@@ -762,8 +757,8 @@ impl Clone for ControlsMenu {
 }
 
 impl ControlsMenu {
-    pub fn new(settings: Rc<SettingStore>) -> Self {
-        ControlsMenu {
+    pub fn new(settings: Arc<SettingStore>) -> Self {
+        Self {
             settings,
             elements: None,
         }
@@ -824,7 +819,7 @@ impl super::Screen for ControlsMenu {
                 let screen_width = game.screen_sys.screens.read().last().unwrap().last_width as f64;
                 let slider_btn = this.button.as_mut().expect("Slider had no button");
                 //update button position
-                slider_btn.borrow_mut().x = (game.last_mouse_x) - screen_width / 2.0 - this.x;
+                slider_btn.borrow_mut().x = (game.get_last_mouse_x()) - screen_width / 2.0 - this.x;
                 //update game setting based on button position
                 game.settings.set_float(
                     FloatSetting::MouseSense,

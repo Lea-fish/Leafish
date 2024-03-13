@@ -18,6 +18,8 @@
 #![allow(clippy::float_cmp)] // float comparison used to check if changed
 
 mod console;
+use arc_swap::ArcSwapOption;
+use atomic_float::AtomicF64;
 use copypasta::nop_clipboard;
 use copypasta::ClipboardContext;
 use copypasta::ClipboardProvider;
@@ -40,6 +42,7 @@ use raw_window_handle::HasRawWindowHandle;
 use shared::Version;
 use std::fs;
 use std::num::NonZeroU32;
+use std::sync::atomic::AtomicBool;
 use std::time::Instant;
 use winit::keyboard::Key;
 use winit::keyboard::ModifiersState;
@@ -98,31 +101,119 @@ pub struct Game {
     resource_manager: Arc<RwLock<resources::Manager>>,
     clipboard_provider: Mutex<Box<dyn copypasta::ClipboardProvider>>,
     console: Arc<Mutex<console::Console>>,
-    settings: Rc<settings::SettingStore>,
-    keybinds: Rc<settings::KeybindStore>,
-    should_close: bool,
+    settings: Arc<settings::SettingStore>,
+    keybinds: Arc<settings::KeybindStore>,
+    should_close: AtomicBool,
 
-    server: Option<Arc<server::Server>>,
-    focused: bool,
-    chunk_builder: chunk_builder::ChunkBuilder,
+    server: ArcSwapOption<server::Server>,
+    focused: AtomicBool,
+    chunk_builder: Mutex<chunk_builder::ChunkBuilder>,
 
-    connect_error: Option<Error>,
+    connect_error: ArcSwapOption<Error>,
 
-    dpi_factor: f64,
-    last_mouse_x: f64,
-    last_mouse_y: f64,
-    last_mouse_xrel: f64,
-    last_mouse_yrel: f64,
-    is_shift_pressed: bool,
-    is_ctrl_pressed: bool,
-    is_logo_pressed: bool,
-    is_fullscreen: bool,
+    dpi_factor: AtomicF64, // FIXME: try moving this out of Game into a local variable
+    last_mouse_x: AtomicF64,
+    last_mouse_y: AtomicF64,
+    last_mouse_xrel: AtomicF64, // FIXME: try moving this out of Game into a local variable
+    last_mouse_yrel: AtomicF64, // FIXME: try moving this out of Game into a local variable
+    shift_pressed: AtomicBool,
+    ctrl_pressed: AtomicBool,
+    logo_pressed: AtomicBool,
+    fullscreen: AtomicBool,
     current_account: Arc<Mutex<Option<Account>>>,
 }
 
 impl Game {
+    pub fn is_focused(&self) -> bool {
+        self.focused.load(Ordering::Acquire)
+    }
+
+    pub fn set_focused(&self, focused: bool) {
+        self.focused.store(focused, Ordering::Release);
+    }
+
+    pub fn get_last_mouse_x(&self) -> f64 {
+        self.last_mouse_x.load(Ordering::Acquire)
+    }
+
+    pub fn set_last_mouse_x(&self, x: f64) {
+        self.last_mouse_x.store(x, Ordering::Release);
+    }
+
+    pub fn get_last_mouse_y(&self) -> f64 {
+        self.last_mouse_y.load(Ordering::Acquire)
+    }
+
+    pub fn set_last_mouse_y(&self, y: f64) {
+        self.last_mouse_y.store(y, Ordering::Release);
+    }
+
+    pub fn get_dpi_factor(&self) -> f64 {
+        self.dpi_factor.load(Ordering::Acquire)
+    }
+
+    pub fn set_dpi_factor(&self, dpi_factor: f64) {
+        self.dpi_factor.store(dpi_factor, Ordering::Release);
+    }
+
+    pub fn get_last_mouse_xrel(&self) -> f64 {
+        self.last_mouse_xrel.load(Ordering::Acquire)
+    }
+
+    pub fn set_last_mouse_xrel(&self, xrel: f64) {
+        self.last_mouse_xrel.store(xrel, Ordering::Release);
+    }
+
+    pub fn get_last_mouse_yrel(&self) -> f64 {
+        self.last_mouse_yrel.load(Ordering::Acquire)
+    }
+
+    pub fn set_last_mouse_yrel(&self, yrel: f64) {
+        self.last_mouse_yrel.store(yrel, Ordering::Release);
+    }
+
+    pub fn should_close(&self) -> bool {
+        self.should_close.load(Ordering::Acquire)
+    }
+
+    pub fn set_should_close(&self) {
+        self.should_close.store(true, Ordering::Release);
+    }
+
+    pub fn is_fullscreen(&self) -> bool {
+        self.fullscreen.load(Ordering::Acquire)
+    }
+
+    pub fn set_full_screen(&self, full_screen: bool) {
+        self.fullscreen.store(full_screen, Ordering::Release);
+    }
+
+    pub fn is_logo_pressed(&self) -> bool {
+        self.logo_pressed.load(Ordering::Acquire)
+    }
+
+    pub fn set_logo_pressed(&self, pressed: bool) {
+        self.logo_pressed.store(pressed, Ordering::Release);
+    }
+
+    pub fn is_shift_pressed(&self) -> bool {
+        self.shift_pressed.load(Ordering::Acquire)
+    }
+
+    pub fn set_shift_pressed(&self, pressed: bool) {
+        self.shift_pressed.store(pressed, Ordering::Release);
+    }
+
+    pub fn is_ctrl_pressed(&self) -> bool {
+        self.ctrl_pressed.load(Ordering::Acquire)
+    }
+
+    pub fn set_ctrl_pressed(&self, pressed: bool) {
+        self.ctrl_pressed.store(pressed, Ordering::Release);
+    }
+
     pub fn connect_to(
-        &mut self,
+        &self,
         address: &str,
         hud_context: Arc<RwLock<HudContext>>,
     ) -> Result<(), Error> {
@@ -179,12 +270,12 @@ impl Game {
             Ok(result) => {
                 match result {
                     Ok(srv) => {
-                        self.server = Some(srv);
+                        self.server.store(Some(srv));
                         Ok(())
                     }
                     Err(err) => {
                         let str = err.to_string();
-                        self.connect_error = Some(err);
+                        self.connect_error.store(Some(Arc::new(err)));
                         // self.server.disconnect_reason = Some(Component::from_string(&*err.to_string()));
                         Err(Error::Err(str))
                     }
@@ -237,8 +328,8 @@ fn main() {
 
     info!("Starting Leafish...");
 
-    let settings = Rc::new(SettingStore::new());
-    let keybinds = Rc::new(KeybindStore::new());
+    let settings = Arc::new(SettingStore::new());
+    let keybinds = Arc::new(KeybindStore::new());
     info!("settings all loaded!");
 
     con.lock().configure(&settings);
@@ -406,24 +497,24 @@ fn main() {
     let clipboard = create_clipboard();
 
     let game = Game {
-        server: None,
-        focused: false,
+        server: ArcSwapOption::empty(),
+        focused: AtomicBool::new(false),
         renderer: Arc::new(renderer),
         screen_sys,
         resource_manager: resource_manager.clone(),
         console: con,
-        should_close: false,
-        chunk_builder: chunk_builder::ChunkBuilder::new(resource_manager, textures),
-        connect_error: None,
-        dpi_factor,
-        last_mouse_x: 0.0,
-        last_mouse_y: 0.0,
-        last_mouse_xrel: 0.0,
-        last_mouse_yrel: 0.0,
-        is_shift_pressed: false,
-        is_ctrl_pressed: false,
-        is_logo_pressed: false,
-        is_fullscreen: false,
+        should_close: AtomicBool::new(false),
+        chunk_builder: Mutex::new(chunk_builder::ChunkBuilder::new(resource_manager, textures)),
+        connect_error: ArcSwapOption::empty(),
+        dpi_factor: AtomicF64::new(dpi_factor),
+        last_mouse_x: AtomicF64::new(0.0),
+        last_mouse_y: AtomicF64::new(0.0),
+        last_mouse_xrel: AtomicF64::new(0.0),
+        last_mouse_yrel: AtomicF64::new(0.0),
+        shift_pressed: AtomicBool::new(false),
+        ctrl_pressed: AtomicBool::new(false),
+        logo_pressed: AtomicBool::new(false),
+        fullscreen: AtomicBool::new(false),
         clipboard_provider: Mutex::new(clipboard),
         current_account: active_account,
         settings,
@@ -451,7 +542,7 @@ fn main() {
     let ui_container = Rc::clone(&ui_container);
     events_loop
         .run(move |event, event_loop| {
-            let mut game = game.borrow_mut();
+            let game = game.borrow();
             let mut ui_container = ui_container.borrow_mut();
             event_loop.set_control_flow(winit::event_loop::ControlFlow::Poll);
 
@@ -467,14 +558,14 @@ fn main() {
                 );
             }
 
-            if !handle_window_event(&window, &mut game, &mut ui_container, event) {
+            if !handle_window_event(&window, &game, &mut ui_container, event) {
                 return;
             }
 
             let start = Instant::now();
             tick_all(
                 &window,
-                &mut game,
+                &game,
                 &mut ui_container,
                 &mut last_frame,
                 &mut resui,
@@ -489,7 +580,7 @@ fn main() {
                 .swap_buffers(&context)
                 .expect("Failed to swap GL buffers");
 
-            if game.should_close {
+            if game.should_close() {
                 event_loop.exit();
             }
         })
@@ -500,52 +591,33 @@ const DEBUG: bool = false;
 
 fn tick_all(
     window: &winit::window::Window,
-    game: &mut Game,
+    game: &Game,
     ui_container: &mut ui::Container,
     last_frame: &mut Instant,
     resui: &mut resources::ManagerUI,
     last_resource_version: &mut usize,
     vsync: bool,
 ) {
-    if game.server.is_some() {
-        if !game.server.as_ref().unwrap().is_connected() {
-            let disconnect_reason = game
-                .server
-                .as_ref()
-                .unwrap()
-                .disconnect_data
-                .write()
-                .disconnect_reason
-                .take();
+    let server = game.server.load();
+    if let Some(server) = server.as_ref() {
+        if !server.is_connected() {
+            let disconnect_reason = server.disconnect_data.write().disconnect_reason.take();
             game.screen_sys.close_closable_screens();
             game.screen_sys
                 .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
-            game.server = None;
+            game.server.store(None);
             game.renderer.reset();
-        } else if game
-            .server
-            .as_ref()
-            .unwrap()
-            .disconnect_gracefully
-            .load(Ordering::Relaxed)
-        {
-            game.server.as_ref().unwrap().finish_disconnect();
-            let disconnect_reason = game
-                .server
-                .as_ref()
-                .unwrap()
-                .disconnect_data
-                .write()
-                .disconnect_reason
-                .take();
+        } else if server.disconnect_gracefully.load(Ordering::Relaxed) {
+            server.finish_disconnect();
+            let disconnect_reason = server.disconnect_data.write().disconnect_reason.take();
             game.screen_sys.close_closable_screens();
             game.screen_sys
                 .replace_screen(Box::new(screen::ServerList::new(disconnect_reason)));
-            game.server = None;
+            game.server.store(None);
             game.renderer.reset();
         }
     } else {
-        game.chunk_builder.reset();
+        game.chunk_builder.lock().reset();
     }
     let now = Instant::now();
     let diff = now.duration_since(*last_frame);
@@ -554,7 +626,9 @@ fn tick_all(
     let delta = (diff.subsec_nanos() as f64) / frame_time;
     let physical_size = window.inner_size();
     let (physical_width, physical_height) = physical_size.into();
-    let (width, height): (u32, u32) = physical_size.to_logical::<f64>(game.dpi_factor).into();
+    let (width, height): (u32, u32) = physical_size
+        .to_logical::<f64>(game.get_dpi_factor())
+        .into();
 
     let version = {
         let try_res = game.resource_manager.try_write();
@@ -572,14 +646,14 @@ fn tick_all(
     let vsync_changed = game.settings.get_bool(BoolSetting::Vsync);
     if vsync != vsync_changed {
         error!("Changing vsync currently requires restarting");
-        game.should_close = true;
+        game.set_should_close();
         // TODO: after changing to wgpu and the new renderer, allow changing vsync on a Window
         // vsync = vsync_changed;
     }
     let fps_cap = game.settings.get_int(IntSetting::MaxFps);
 
-    if let Some(server) = game.server.as_ref() {
-        server.clone().tick(delta, game);
+    if let Some(server) = game.server.load().as_ref() {
+        server.tick(delta, game);
     }
 
     // Check if window is valid, it might be minimized
@@ -587,9 +661,10 @@ fn tick_all(
         return;
     }
 
-    if let Some(server) = game.server.as_ref() {
+    if let Some(server) = game.server.load().as_ref() {
         game.renderer.update_camera(physical_width, physical_height);
         game.chunk_builder
+            .lock()
             .tick(server.world.clone(), game.renderer.clone(), version);
     } else if game.renderer.screen_data.read().safe_width != physical_width
         || game.renderer.screen_data.read().safe_height != physical_height
@@ -603,14 +678,14 @@ fn tick_all(
         .screen_sys
         .tick(delta, game.renderer.clone(), ui_container, window)
     {
-        if game.focused {
+        if game.is_focused() {
             window
                 .set_cursor_grab(winit::window::CursorGrabMode::None)
                 .unwrap();
             window.set_cursor_visible(true);
-            game.focused = false;
+            game.set_focused(false);
         }
-    } else if !game.focused {
+    } else if !game.is_focused() {
         // see https://docs.rs/winit/latest/winit/window/enum.CursorGrabMode.html
         // fix for https://github.com/Lea-fish/Leafish/issues/265
         // prefer Locked cursor mode, and fallback to Confined if that doesn't work
@@ -618,7 +693,7 @@ fn tick_all(
             window.set_cursor_grab(CursorGrabMode::Confined).unwrap();
         }
         window.set_cursor_visible(false);
-        game.focused = true;
+        game.set_focused(true);
     }
     game.console
         .lock()
@@ -626,17 +701,13 @@ fn tick_all(
     ui_container.tick(game.renderer.clone(), delta, width as f64, height as f64);
     let world = game
         .server
+        .load()
         .as_ref()
         .map(|server: &Arc<server::Server>| server.world.clone());
     game.renderer
         .tick(world, delta, width, height, physical_width, physical_height);
-    if game.server.is_some() {
-        game.server
-            .as_ref()
-            .unwrap()
-            .render_list_computer
-            .send(true)
-            .unwrap();
+    if let Some(server) = game.server.load().as_ref() {
+        server.render_list_computer.send(true).unwrap();
     }
 
     if fps_cap > 0 && !vsync {
@@ -652,7 +723,7 @@ fn tick_all(
 
 fn handle_window_event<T>(
     window: &winit::window::Window,
-    game: &mut Game,
+    game: &Game,
     ui_container: &mut ui::Container,
     event: winit::event::Event<T>,
 ) -> bool {
@@ -673,35 +744,35 @@ fn handle_window_event<T>(
                 // sdl2::hint::set_with_priority("SDL_MOUSE_RELATIVE_MODE_WARP", "1", &sdl2::hint::Hint::Override);
                 let s = 8000.0 + 0.01;
                 (
-                    ((xrel - game.last_mouse_xrel) / s) * mouse_sens,
-                    ((yrel - game.last_mouse_yrel) / s) * mouse_sens,
+                    ((xrel - game.get_last_mouse_xrel()) / s) * mouse_sens,
+                    ((yrel - game.get_last_mouse_yrel()) / s) * mouse_sens,
                 )
             } else {
                 let s = 2000.0 + 0.01;
                 ((xrel / s) * mouse_sens, (yrel / s) * mouse_sens)
             };
 
-            game.last_mouse_xrel = xrel;
-            game.last_mouse_yrel = yrel;
+            game.set_last_mouse_xrel(xrel);
+            game.set_last_mouse_yrel(yrel);
 
             use std::f64::consts::PI;
 
-            if game.focused
-                && game.server.is_some()
-                && !game.server.as_ref().unwrap().dead.load(Ordering::Acquire)
-            {
-                if let Some(player) = game.server.as_ref().unwrap().player.load().as_ref() {
-                    let server = game.server.as_ref().unwrap();
-                    let mut entities = server.entities.write();
-                    let mut player = entities.world.entity_mut(player.1);
-                    let mut rotation = player.get_mut::<Rotation>().unwrap();
-                    rotation.yaw -= rx;
-                    rotation.pitch -= ry;
-                    if rotation.pitch < (PI / 2.0) + 0.01 {
-                        rotation.pitch = (PI / 2.0) + 0.01;
-                    }
-                    if rotation.pitch > (PI / 2.0) * 3.0 - 0.01 {
-                        rotation.pitch = (PI / 2.0) * 3.0 - 0.01;
+            if game.is_focused() {
+                if let Some(server) = game.server.load().as_ref() {
+                    if !server.dead.load(Ordering::Acquire) {
+                        if let Some(player) = server.player.load().as_ref() {
+                            let mut entities = server.entities.write();
+                            let mut player = entities.world.entity_mut(player.1);
+                            let mut rotation = player.get_mut::<Rotation>().unwrap();
+                            rotation.yaw -= rx;
+                            rotation.pitch -= ry;
+                            if rotation.pitch < (PI / 2.0) + 0.01 {
+                                rotation.pitch = (PI / 2.0) + 0.01;
+                            }
+                            if rotation.pitch > (PI / 2.0) * 3.0 - 0.01 {
+                                rotation.pitch = (PI / 2.0) * 3.0 - 0.01;
+                            }
+                        }
                     }
                 }
             }
@@ -710,65 +781,71 @@ fn handle_window_event<T>(
         Event::WindowEvent { event, .. } => {
             match event {
                 WindowEvent::ModifiersChanged(modifiers_state) => {
-                    game.is_ctrl_pressed = modifiers_state.state() & ModifiersState::CONTROL
-                        != ModifiersState::empty();
-                    game.is_logo_pressed =
-                        modifiers_state.state() & ModifiersState::SUPER != ModifiersState::empty();
-                    game.is_shift_pressed =
-                        modifiers_state.state() & ModifiersState::SHIFT != ModifiersState::empty();
+                    game.set_ctrl_pressed(
+                        modifiers_state.state() & ModifiersState::CONTROL
+                            != ModifiersState::empty(),
+                    );
+                    game.set_logo_pressed(
+                        modifiers_state.state() & ModifiersState::SUPER != ModifiersState::empty(),
+                    );
+                    game.set_shift_pressed(
+                        modifiers_state.state() & ModifiersState::SHIFT != ModifiersState::empty(),
+                    );
                 }
-                WindowEvent::CloseRequested => game.should_close = true,
+                WindowEvent::CloseRequested => game.set_should_close(),
                 WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                    game.dpi_factor = scale_factor;
+                    game.set_dpi_factor(scale_factor);
                 }
 
                 WindowEvent::MouseInput { state, button, .. } => match (state, button) {
                     (ElementState::Released, MouseButton::Left) => {
                         let physical_size = window.inner_size();
-                        let (width, height) =
-                            physical_size.to_logical::<f64>(game.dpi_factor).into();
-                        if !game.screen_sys.is_current_ingame() && !game.focused {
+                        let (width, height) = physical_size
+                            .to_logical::<f64>(game.get_dpi_factor())
+                            .into();
+                        if !game.screen_sys.is_current_ingame() && !game.is_focused() {
                             // TODO: after Pointer Lock https://github.com/rust-windowing/winit/issues/1674
                             ui_container.click_at(
                                 game,
-                                game.last_mouse_x,
-                                game.last_mouse_y,
+                                game.get_last_mouse_x(),
+                                game.get_last_mouse_y(),
                                 width,
                                 height,
                             );
                         }
-                        if let Some(server) = &game.server {
-                            server.on_release_left_click(game.focused);
+                        if let Some(server) = game.server.load().as_ref() {
+                            server.on_release_left_click(game.is_focused());
                         }
                     }
                     (ElementState::Pressed, MouseButton::Left) => {
-                        if let Some(server) = &game.server {
-                            server.on_left_click(game.focused, game.is_shift_pressed);
+                        if let Some(server) = game.server.load().as_ref() {
+                            server.on_left_click(game.is_focused(), game.is_shift_pressed());
                         }
                     }
                     (ElementState::Released, MouseButton::Right) => {
-                        if let Some(server) = &game.server {
-                            server.on_release_right_click(game.focused);
+                        if let Some(server) = game.server.load().as_ref() {
+                            server.on_release_right_click(game.is_focused());
                         }
                     }
                     (ElementState::Pressed, MouseButton::Right) => {
-                        if let Some(server) = &game.server {
-                            server.on_right_click(game.focused, game.is_shift_pressed);
+                        if let Some(server) = game.server.load().as_ref() {
+                            server.on_right_click(game.is_focused(), game.is_shift_pressed());
                         }
                     }
                     (_, _) => (),
                 },
                 WindowEvent::CursorMoved { position, .. } => {
-                    let (x, y) = position.to_logical::<f64>(game.dpi_factor).into();
-                    game.last_mouse_x = x;
-                    game.last_mouse_y = y;
+                    let (x, y) = position.to_logical::<f64>(game.get_dpi_factor()).into();
+                    game.set_last_mouse_x(x);
+                    game.set_last_mouse_y(y);
 
-                    if !game.focused {
+                    if !game.is_focused() {
                         let physical_size = window.inner_size();
-                        let (width, height) =
-                            physical_size.to_logical::<f64>(game.dpi_factor).into();
+                        let (width, height) = physical_size
+                            .to_logical::<f64>(game.get_dpi_factor())
+                            .into();
                         ui_container.hover_at(game, x, y, width, height);
-                        if let Some(server) = &game.server {
+                        if let Some(server) = game.server.load().as_ref() {
                             server.on_cursor_moved(x, y);
                         }
                     }
@@ -793,7 +870,7 @@ fn handle_window_event<T>(
                         match (event.state, event.logical_key) {
                             (ElementState::Pressed, Key::Named(NamedKey::F11)) => {
                                 if !event.repeat {
-                                    if !game.is_fullscreen {
+                                    if !game.is_fullscreen() {
                                         // TODO: support options for exclusive and simple fullscreen
                                         // see https://docs.rs/glutin/0.22.0-alpha5/glutin/window/struct.Window.html#method.set_fullscreen
                                         window.set_fullscreen(Some(
@@ -805,7 +882,7 @@ fn handle_window_event<T>(
                                         window.set_fullscreen(None);
                                     }
 
-                                    game.is_fullscreen = !game.is_fullscreen;
+                                    game.set_full_screen(!game.is_fullscreen());
                                 }
                             }
                             (state, key) => {
@@ -814,9 +891,9 @@ fn handle_window_event<T>(
                                 if pressed && game.is_logo_pressed && key.eq_ignore_case('q') {
                                     game.should_close = true;
                                 }
-                                if !game.focused {
-                                    let ctrl_pressed =
-                                        game.is_ctrl_pressed || (pressed && game.is_logo_pressed);
+                                if !game.is_focused() {
+                                    let ctrl_pressed = game.is_ctrl_pressed()
+                                        || (pressed && game.is_logo_pressed());
                                     ui_container.key_press(
                                         game,
                                         key.clone(),
