@@ -242,7 +242,7 @@ impl Inventory for EnchantmentTableInventory {
                 .borrow_mut()
                 .add_click_func(move |this, game| {
                     if this.texture_coords == BUTTON_FOCUSED {
-                        game.server.clone().unwrap().write_packet(
+                        game.server.load().as_ref().unwrap().write_packet(
                             packet::play::serverbound::ClickWindowButton { id, button: i },
                         );
                     }

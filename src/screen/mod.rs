@@ -95,7 +95,7 @@ pub trait Screen {
     ) {
     } // TODO: make non-optional!
 
-    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &Game) {
         if key.0 == Key::Named(NamedKey::Escape) && down && !repeat && self.is_closable() {
             game.screen_sys.pop_screen();
         }
@@ -215,7 +215,7 @@ impl ScreenSystem {
         ScreenType::Other(String::new())
     }
 
-    pub fn press_key(&self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
+    pub fn press_key(&self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &Game) {
         if let Some(screen) = self.screens.read().last() {
             screen.screen.lock().on_key_press(key, down, repeat, game);
         }

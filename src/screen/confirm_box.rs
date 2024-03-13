@@ -23,8 +23,8 @@ use std::sync::Arc;
 pub struct ConfirmBox {
     elements: Option<UIElements>,
     prompt: String,
-    cancel_callback: Rc<dyn Fn(&mut Game)>,
-    confirm_callback: Rc<dyn Fn(&mut Game)>,
+    cancel_callback: Rc<dyn Fn(&Game)>,
+    confirm_callback: Rc<dyn Fn(&Game)>,
 }
 
 impl Clone for ConfirmBox {
@@ -49,8 +49,8 @@ struct UIElements {
 impl ConfirmBox {
     pub fn new(
         prompt: String,
-        cancel_callback: Rc<dyn Fn(&mut Game)>,
-        confirm_callback: Rc<dyn Fn(&mut Game)>,
+        cancel_callback: Rc<dyn Fn(&Game)>,
+        confirm_callback: Rc<dyn Fn(&Game)>,
     ) -> Self {
         Self {
             elements: None,

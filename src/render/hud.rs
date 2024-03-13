@@ -497,8 +497,8 @@ impl Screen for Hud {
         }
     }
 
-    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
-        if key.0 == Key::Named(NamedKey::Escape) && down && !repeat && game.focused {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &Game) {
+        if key.0 == Key::Named(NamedKey::Escape) && down && !repeat && game.is_focused() {
             game.screen_sys
                 .add_screen(Box::new(screen::SettingsMenu::new(
                     game.settings.clone(),
@@ -509,11 +509,11 @@ impl Screen for Hud {
         match key.1 {
             PhysicalKey::Code(code) => {
                 if let Some(action_key) = game.keybinds.get(code, &key.0) {
-                    game.server.as_ref().unwrap().key_press(
+                    game.server.load().as_ref().unwrap().key_press(
                         down,
                         action_key.action,
-                        game.focused,
-                        game.is_ctrl_pressed,
+                        game.is_focused(),
+                        game.is_ctrl_pressed(),
                     );
                 }
             }

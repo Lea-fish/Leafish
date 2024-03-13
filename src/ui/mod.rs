@@ -16,6 +16,7 @@ pub mod logo;
 
 use crate::format;
 use crate::render;
+use crate::Game;
 use crate::KeyCmp;
 use std::cell::{RefCell, RefMut};
 use std::rc::{Rc, Weak};
@@ -164,7 +165,7 @@ macro_rules! define_elements {
                 }
             }
 
-            fn hover_at(&self, r: &Region, game: &mut crate::Game, mx: f64, my: f64, sw: f64, sh: f64) -> bool {
+            fn hover_at(&self, r: &Region, game: &Game, mx: f64, my: f64, sw: f64, sh: f64) -> bool {
                 match *self {
                     $(
                         Element::$name(ref inner) => {
@@ -175,7 +176,7 @@ macro_rules! define_elements {
                 }
             }
 
-            fn click_at(&self, r: &Region, game: &mut crate::Game, mx: f64, my: f64, sw: f64, sh: f64) -> bool {
+            fn click_at(&self, r: &Region, game: &Game, mx: f64, my: f64, sw: f64, sh: f64) -> bool {
                 match *self {
                     $(
                         Element::$name(ref inner) => {
@@ -186,7 +187,7 @@ macro_rules! define_elements {
                 }
             }
 
-            fn key_press(&self, game: &mut crate::Game, key: Key, down: bool, ctrl_pressed: bool) -> bool {
+            fn key_press(&self, game: &Game, key: Key, down: bool, ctrl_pressed: bool) -> bool {
                 match *self {
                     $(
                         Element::$name(ref inner) => {
@@ -196,7 +197,7 @@ macro_rules! define_elements {
                     )*
                 }
             }
-            fn key_type(&self, game: &mut crate::Game, c: char) {
+            fn key_type(&self, game: &Game, c: char) {
                 match *self {
                     $(
                         Element::$name(ref inner) => {
@@ -290,8 +291,8 @@ impl Default for Container {
 }
 
 impl Container {
-    pub fn new() -> Container {
-        Container {
+    pub fn new() -> Self {
+        Self {
             elements: Vec::new(),
             focusable_elements: Vec::new(),
 
@@ -358,7 +359,7 @@ impl Container {
         }
     }
 
-    pub fn hover_at(&mut self, game: &mut crate::Game, x: f64, y: f64, width: f64, height: f64) {
+    pub fn hover_at(&mut self, game: &Game, x: f64, y: f64, width: f64, height: f64) {
         let (sw, sh) = match self.mode {
             Mode::Scaled => (SCALED_WIDTH / width, SCALED_HEIGHT / height),
             Mode::Unscaled(scale) => (scale, scale),
@@ -372,7 +373,7 @@ impl Container {
         }
     }
 
-    pub fn click_at(&mut self, game: &mut crate::Game, x: f64, y: f64, width: f64, height: f64) {
+    pub fn click_at(&mut self, game: &Game, x: f64, y: f64, width: f64, height: f64) {
         let (sw, sh) = match self.mode {
             Mode::Scaled => (SCALED_WIDTH / width, SCALED_HEIGHT / height),
             Mode::Unscaled(scale) => (scale, scale),
@@ -429,7 +430,7 @@ impl Container {
         focusables[next_focus].set_focused(true);
     }
 
-    pub fn key_press(&mut self, game: &mut crate::Game, key: Key, down: bool, ctrl_pressed: bool) {
+    pub fn key_press(&mut self, game: &Game, key: Key, down: bool, ctrl_pressed: bool) {
         if key == Key::Named(NamedKey::Tab) {
             if !down {
                 self.cycle_focus();
@@ -510,16 +511,10 @@ trait UIElement {
     fn get_size(&self) -> (f64, f64);
     fn is_dirty(&self) -> bool;
     fn post_init(_: Rc<RefCell<Self>>) {}
-    fn key_press(
-        &mut self,
-        _game: &mut crate::Game,
-        _key: Key,
-        _down: bool,
-        _ctrl_pressed: bool,
-    ) -> bool {
+    fn key_press(&mut self, _game: &Game, _key: Key, _down: bool, _ctrl_pressed: bool) -> bool {
         true
     }
-    fn key_type(&mut self, _game: &mut crate::Game, _c: char) {}
+    fn key_type(&mut self, _game: &Game, _c: char) {}
     fn tick(&mut self, renderer: Arc<render::Renderer>);
 }
 
@@ -551,9 +546,9 @@ macro_rules! element {
             data: Vec<u8>,
             needs_rebuild: bool,
 
-            hover_funcs: Vec<Box<dyn Fn(&mut $name, bool, &mut crate::Game) -> bool>>,
+            hover_funcs: Vec<Box<dyn Fn(&mut $name, bool, &Game) -> bool>>,
             hover_state: bool,
-            click_funcs: Vec<Box<dyn Fn(&mut $name, &mut crate::Game) -> bool>>,
+            click_funcs: Vec<Box<dyn Fn(&mut $name, &Game) -> bool>>,
 
             focused: bool,
 
@@ -631,7 +626,7 @@ macro_rules! element {
                 }
             }
 
-            fn hover_at(&mut self, super_region: &Region, game: &mut crate::Game, mx: f64, my: f64, sw: f64, sh: f64) -> bool {
+            fn hover_at(&mut self, super_region: &Region, game: &Game, mx: f64, my: f64, sw: f64, sh: f64) -> bool {
                 use std::mem;
                 let mut handle_self = true;
                 for e in &self.elements {
@@ -660,11 +655,11 @@ macro_rules! element {
                 }
             }
 
-            pub fn add_hover_func<F: Fn(&mut $name, bool, &mut crate::Game) -> bool + 'static>(&mut self, func: F) {
+            pub fn add_hover_func<F: Fn(&mut $name, bool, &Game) -> bool + 'static>(&mut self, func: F) {
                 self.hover_funcs.push(Box::new(func));
             }
 
-            fn click_at(&mut self, super_region: &Region, game: &mut crate::Game, mx: f64, my: f64, sw: f64, sh: f64) -> bool {
+            fn click_at(&mut self, super_region: &Region, game: &Game, mx: f64, my: f64, sw: f64, sh: f64) -> bool {
                 use std::mem;
                 let mut handle_self = true;
                 for e in &self.elements {
@@ -689,7 +684,7 @@ macro_rules! element {
                 }
             }
 
-            pub fn add_click_func<F: Fn(&mut $name, &mut crate::Game) -> bool + 'static>(&mut self, func: F) {
+            pub fn add_click_func<F: Fn(&mut $name, &Game) -> bool + 'static>(&mut self, func: F) {
                 self.click_funcs.push(Box::new(func));
             }
 
@@ -1519,7 +1514,7 @@ impl Button {
     }
 }
 
-type TextBoxSubmitCallback = dyn Fn(&mut TextBox, &mut crate::Game);
+type TextBoxSubmitCallback = dyn Fn(&mut TextBox, &Game);
 
 element! {
     ref TextBoxRef
@@ -1617,13 +1612,7 @@ impl UIElement for TextBox {
         );
     }
 
-    fn key_press(
-        &mut self,
-        game: &mut crate::Game,
-        key: Key,
-        down: bool,
-        ctrl_pressed: bool,
-    ) -> bool {
+    fn key_press(&mut self, game: &Game, key: Key, down: bool, ctrl_pressed: bool) -> bool {
         if key == Key::Named(NamedKey::Enter) && !down {
             use std::mem;
             let len = self.submit_funcs.len();
@@ -1642,7 +1631,7 @@ impl UIElement for TextBox {
         true
     }
 
-    fn key_type(&mut self, _game: &mut crate::Game, c: char) {
+    fn key_type(&mut self, _game: &Game, c: char) {
         if c == '\x7f' || c == '\x08' {
             // Backspace
             self.input.pop();
@@ -1658,7 +1647,7 @@ impl UIElement for TextBox {
 }
 
 impl TextBox {
-    pub fn add_submit_func<F: Fn(&mut TextBox, &mut crate::Game) + 'static>(&mut self, f: F) {
+    pub fn add_submit_func<F: Fn(&mut TextBox, &Game) + 'static>(&mut self, f: F) {
         self.submit_funcs.push(Box::new(f));
     }
 

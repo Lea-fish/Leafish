@@ -3,12 +3,11 @@ use crate::screen::{Screen, ScreenSystem};
 use crate::settings::*;
 use crate::ui;
 use crate::ui::Container;
-use std::rc::Rc;
 use std::sync::Arc;
 
 pub struct Background {
     background: Option<ui::ImageRef>,
-    settings: Rc<SettingStore>,
+    settings: Arc<SettingStore>,
     screen_sys: Arc<ScreenSystem>,
     active: bool,
     delay: f64,
@@ -22,7 +21,7 @@ impl Clone for Background {
 }
 
 impl Background {
-    pub fn new(settings: Rc<SettingStore>, screen_sys: Arc<ScreenSystem>) -> Self {
+    pub fn new(settings: Arc<SettingStore>, screen_sys: Arc<ScreenSystem>) -> Self {
         Self {
             background: None,
             settings,

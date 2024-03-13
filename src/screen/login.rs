@@ -29,7 +29,7 @@ use leafish_protocol::protocol::Error;
 use std::ops::Deref;
 
 pub struct Login {
-    settings: Rc<SettingStore>,
+    settings: Arc<SettingStore>,
     elements: Option<UIElements>,
     callback: Arc<dyn Fn(Option<Account>)>,
 }
@@ -61,9 +61,9 @@ struct UIElements {
 }
 
 impl Login {
-    pub fn new(callback: Arc<dyn Fn(Option<Account>)>, vars: Rc<SettingStore>) -> Self {
+    pub fn new(callback: Arc<dyn Fn(Option<Account>)>, settings: Arc<SettingStore>) -> Self {
         Login {
-            settings: vars,
+            settings,
             elements: None,
             callback,
         }

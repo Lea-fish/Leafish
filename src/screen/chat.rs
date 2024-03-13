@@ -259,7 +259,7 @@ impl super::Screen for Chat {
         self.on_active(screen_sys, renderer, ui_container);
     }
 
-    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &mut Game) {
+    fn on_key_press(&mut self, key: (Key, PhysicalKey), down: bool, repeat: bool, game: &Game) {
         if !down {
             return;
         }
@@ -269,7 +269,7 @@ impl super::Screen for Chat {
         }
         if key.0 == Key::Named(NamedKey::Enter) && !repeat {
             if !self.written.is_empty() {
-                game.server.as_ref().unwrap().write_packet(
+                game.server.load().as_ref().unwrap().write_packet(
                     packet::play::serverbound::ChatMessage {
                         message: self.written.clone(),
                     },
@@ -278,11 +278,11 @@ impl super::Screen for Chat {
             game.screen_sys.pop_screen();
             return;
         }
-        if key.0.eq_ignore_case('v') && game.is_ctrl_pressed {
+        if key.0.eq_ignore_case('v') && game.is_ctrl_pressed() {
             if let Ok(clipboard) = game.clipboard_provider.lock().get_contents() {
                 for c in clipboard.chars() {
                     if self.written.len()
-                        >= if game.server.as_ref().unwrap().mapped_protocol_version
+                        >= if game.server.load().as_ref().unwrap().mapped_protocol_version
                             >= Version::V1_11
                         {
                             MAX_MESSAGE_LENGTH_SINCE_1_11
@@ -315,7 +315,9 @@ impl super::Screen for Chat {
             let curr = str.chars().next().unwrap();
             if !ILLEGAL_CHARS.iter().any(|illegal| curr == *illegal) {
                 if self.written.len()
-                    >= if game.server.as_ref().unwrap().mapped_protocol_version >= Version::V1_11 {
+                    >= if game.server.load().as_ref().unwrap().mapped_protocol_version
+                        >= Version::V1_11
+                    {
                         MAX_MESSAGE_LENGTH_SINCE_1_11
                     } else {
                         MAX_MESSAGE_LENGTH_PRE_1_11
