@@ -6,8 +6,8 @@ use std::{
 };
 
 use chrono::{TimeZone, Utc};
-use reqwest::Client;
-use serde_derive::Deserialize;
+use serde::Deserialize;
+use ureq::AgentBuilder;
 
 const URL: &str = "https://api.github.com/repos/Lea-fish/Releases/releases/latest";
 const MAIN_BINARY_PATH: &str = "./leafish";
@@ -25,14 +25,14 @@ const USER_AGENT: &str =
 #[cfg(target_os = "linux")]
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux i686; rv:123.0) Gecko/20100101 Firefox/123.0";
 
-#[tokio::main]
-async fn main() {
+fn main() {
     let args: Vec<String> = env::args().collect();
     let mut cmd = vec![];
     let mut provided_client = false;
     let mut no_update = false;
     for (idx, arg) in args.iter().enumerate() {
         // "noupdate" is required in order to support legacy installations
+        println!("got arg {arg}");
         if arg == "--noupdate" || arg == "noupdate" {
             no_update = true;
             continue;
@@ -109,7 +109,7 @@ async fn main() {
         .wait()
         .unwrap();
     } else {
-        let _ = try_update(provided_client).await;
+        let _ = try_update(provided_client);
         println!("[Info] Restarting bootstrap...");
         // shut down the process if we performed an update and let our parent bootstrap restart us, running a new version
         // otherwise we also have to shutdown in order not to restart leafish as soon as it is closed
@@ -117,16 +117,14 @@ async fn main() {
     }
 }
 
-async fn try_update(provided_client: bool) -> anyhow::Result<()> {
+fn try_update(provided_client: bool) -> anyhow::Result<()> {
     println!("[Info] Checking for updates....");
-    let latest = Client::builder()
+    let latest = AgentBuilder::new()
         .user_agent(USER_AGENT)
-        .build()?
+        .build()
         .get(URL)
-        .send()
-        .await?
-        .text()
-        .await?;
+        .call()?
+        .into_string()?;
     let latest: LatestResponse = serde_json::from_str(&latest).unwrap();
     println!("[Info] Looking for update files...");
     let bootstrap_binary_name = format!(
@@ -149,10 +147,11 @@ async fn try_update(provided_client: bool) -> anyhow::Result<()> {
                 time_stamp_binary(MAIN_BINARY_PATH),
             )? {
                 println!("[Info] Downloading update for leafish binary...");
-                let new_binary = reqwest::get(&asset.browser_download_url)
-                    .await?
-                    .bytes()
-                    .await?;
+                let mut new_binary = vec![];
+                ureq::get(&asset.browser_download_url)
+                    .call()?
+                    .into_reader()
+                    .read_to_end(&mut new_binary)?;
                 fs::write(
                     format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX),
                     &new_binary,
@@ -167,10 +166,11 @@ async fn try_update(provided_client: bool) -> anyhow::Result<()> {
                 time_stamp_binary(BOOTSTRAP_BINARY_PATH),
             )? {
                 println!("[Info] Downloading update for bootstrap...");
-                let new_binary = reqwest::get(&asset.browser_download_url)
-                    .await?
-                    .bytes()
-                    .await?;
+                let mut new_binary = vec![];
+                ureq::get(&asset.browser_download_url)
+                    .call()?
+                    .into_reader()
+                    .read_to_end(&mut new_binary)?;
                 fs::write(
                     format!(
                         "{}{}",
@@ -182,13 +182,13 @@ async fn try_update(provided_client: bool) -> anyhow::Result<()> {
                 println!("[Info] Successfully downloaded bootstrap update");
             }
         } else if asset.name == ASSETS_FILE_NAME {
-            load_links(&asset.name, provided_client).await;
+            load_links(&asset.name, provided_client)?;
         }
     }
     Ok(())
 }
 
-async fn load_links(raw: &str, provided_client: bool) {
+fn load_links(raw: &str, provided_client: bool) -> anyhow::Result<()> {
     let lines = raw.split('\n');
     for line in lines {
         if let Some((key, value)) = line.split_once(": ") {
@@ -198,23 +198,13 @@ async fn load_links(raw: &str, provided_client: bool) {
                     if provided_client || Path::new(CLIENT_JAR_PATH).exists() {
                         continue;
                     }
-                    let res = reqwest::get(value).await;
-                    match res {
-                        Ok(res) => match res.bytes().await {
-                            Ok(res) => {
-                                if let Err(err) = fs::write(CLIENT_JAR_PATH, &res) {
-                                    println!("[Warn] error writing client jar {err}");
-                                }
-                            }
-                            Err(err) => {
-                                println!("[Warn] An error occoured while trying to fetch client bytes: {err}");
-                            }
-                        },
-                        Err(err) => {
-                            println!(
-                                "[Warn] An error occoured while trying to fetch client: {err}"
-                            );
-                        }
+                    let mut client_jar = vec![];
+                    ureq::get(value)
+                        .call()?
+                        .into_reader()
+                        .read_to_end(&mut client_jar)?;
+                    if let Err(err) = fs::write(CLIENT_JAR_PATH, &client_jar) {
+                        println!("[Warn] error writing client jar {err}");
                     }
                 }
                 "assets" => {
@@ -226,6 +216,7 @@ async fn load_links(raw: &str, provided_client: bool) {
             }
         }
     }
+    Ok(())
 }
 
 fn time_stamp_binary(path: &str) -> u64 {
