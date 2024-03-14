@@ -1,4 +1,7 @@
-use std::{fs::{self, File}, path::Path};
+use std::{
+    fs::{self, File},
+    path::Path,
+};
 
 #[cfg(all(target_os = "linux", target_arch = "x86_64"))]
 const BOOTSTRAP_BIN: &[u8] = include_bytes!("../resources/bootstrap_x86_64_linux");
@@ -37,11 +40,12 @@ pub mod mojang {
 
     // FIXME: add cli that allows reinstalling, uninstalling, installing and getting info
 
-    #[derive(Serialize, Deserialize)]
+    #[derive(Serialize)]
     struct Description {
         id: String,
-        #[serde(rename = "inheritsFrom")]
-        inherits_from: String,
+        #[serde(rename = "assetIndex")]
+        asset_index: AssetIndex,
+        assets: String,
         time: String,
         #[serde(rename = "releaseTime")]
         release_time: String,
@@ -52,6 +56,16 @@ pub mod mojang {
         main_class: String,
         #[serde(rename = "minecraftArguments")]
         minecraft_arguments: String,
+    }
+
+    #[derive(Serialize)]
+    struct AssetIndex {
+        id: String,
+        sha1: String,
+        size: usize,
+        #[serde(rename = "totalSize")]
+        total_size: usize,
+        url: String,
     }
 
     #[derive(Serialize, Deserialize)]
@@ -137,13 +151,20 @@ pub mod mojang {
         let mut json = File::create_new(&json_path)?;
         json.write_all(serde_json::to_string_pretty(&Description {
             id: "Leafish".to_string(),
-            inherits_from: "1.8.9".to_string(), // FIXME: can we use 1.8.9 instead while preserving the asset index somehow?
             time: "2020-01-01T00:00:00+02:00".to_string(), // FIXME: use some sensible time
             release_time: "2020-01-01T00:00:00+02:00".to_string(),
             ty: "release".to_string(),
             libraries: vec![Library { name: "leafish:Leafish:Jar".to_string() }], // we need nobody, but ourselves ;)
             main_class: "de.leafish.Main".to_string(),
             minecraft_arguments: "--username ${auth_player_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userProperties ${user_properties} --userType ${user_type} --path ./versions/Leafish/".to_string(),
+            asset_index: AssetIndex { // FIXME: don't choose one version statically!
+                id: "1.19".to_string(),
+                sha1: "a9c8b05a8082a65678beda6dfa2b8f21fa627bce".to_string(),
+                size: 385608,
+                total_size: 557023211, // FIXME: does this not depend on the client jar?
+                url: "https://piston-meta.mojang.com/v1/packages/a9c8b05a8082a65678beda6dfa2b8f21fa627bce/1.19.json".to_string(),
+            },
+            assets: "1.19".to_string(),
         })?.as_bytes())?;
 
         // FIXME: download the latest jar from github
@@ -204,11 +225,14 @@ pub mod mojang {
 
         Ok(true)
     }
-
 }
 
 pub mod prism {
-    use std::{fs::{self, File}, io::Write, path::Path};
+    use std::{
+        fs::{self, File},
+        io::Write,
+        path::Path,
+    };
 
     use chrono::Utc;
     use serde::Serialize;
@@ -315,11 +339,11 @@ pub mod prism {
         fs::write(meta_path, serde_json::to_string_pretty(&VersionMeta {
             traits: None,
             asset_index: AssetIndex { // FIXME: don't choose one version statically!
-                id: "12".to_string(),
-                sha1: "518a69b460cb49a5547cea4290d343116a5d2eb8".to_string(),
-                size: 436400,
-                total_size: 627004279, // FIXME: does this not depend on the client jar?
-                url: "https://piston-meta.mojang.com/v1/packages/518a69b460cb49a5547cea4290d343116a5d2eb8/12.json".to_string(),
+                id: "1.19".to_string(),
+                sha1: "a9c8b05a8082a65678beda6dfa2b8f21fa627bce".to_string(),
+                size: 385608,
+                total_size: 557023211, // FIXME: does this not depend on the client jar?
+                url: "https://piston-meta.mojang.com/v1/packages/a9c8b05a8082a65678beda6dfa2b8f21fa627bce/1.19.json".to_string(),
             },
             compatible_java_majors: vec![8,9,10,11,12,13,14,15,16,17],
             format_version: 1,
@@ -342,7 +366,7 @@ pub mod prism {
             requires: vec![],
             ty: "release".to_string(),
             uid: "net.minecraft".to_string(),
-            version: "1.20.4".to_string(),
+            version: "1.19.2".to_string(),
         })?)?;
 
         Ok(true)
