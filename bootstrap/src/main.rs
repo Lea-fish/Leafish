@@ -30,7 +30,17 @@ async fn main() {
     let args: Vec<String> = env::args().collect();
     let mut cmd = vec![];
     let mut provided_client = false;
+    let mut no_update = false;
     for (idx, arg) in args.iter().enumerate() {
+        // "noupdate" is required in order to support legacy installations
+        if arg == "--noupdate" || arg == "noupdate" {
+            no_update = true;
+            continue;
+        }
+        if args.len() <= (idx + 1) {
+            // skip multi parameter args in case the value is missing
+            continue;
+        }
         if arg == "--uuid" {
             cmd.push("--uuid".to_string());
             cmd.push(args[idx + 1].clone());
@@ -54,7 +64,7 @@ async fn main() {
             cmd.push("--assets-dir".to_string());
             cmd.push(args[idx + 1].clone());
         }
-        if arg == "--client-jar" {
+        if arg == "--client-jar" && Path::new(&args[idx + 1]).exists() {
             match fs::canonicalize(&args[idx + 1]) {
                 Ok(path) => {
                     if let Some(path) = path.to_str() {
@@ -69,7 +79,7 @@ async fn main() {
             }
         }
     }
-    if args[args.len() - 1] == "noupdate" {
+    if no_update {
         if !provided_client && Path::new(CLIENT_JAR_PATH).exists() {
             if let Ok(client_jar) = fs::canonicalize(CLIENT_JAR_PATH) {
                 if let Some(client_jar) = client_jar.to_str() {
@@ -81,6 +91,8 @@ async fn main() {
             } else {
                 println!("[Warn] (noupdate) Couldn't canonicalize client jar path");
             }
+        } else {
+            println!("[Warn] (noupdate) Couldn't find client jar");
         }
         Command::new(
             fs::canonicalize(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX))
