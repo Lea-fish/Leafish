@@ -307,6 +307,8 @@ struct Opt {
     asset_index: Option<String>,
     #[structopt(long)]
     assets_dir: Option<String>,
+    #[structopt(long)]
+    client_jar: Option<String>,
 }
 
 // TODO: Hide own character and show only the right hand. (with an item)
@@ -340,6 +342,7 @@ fn main() {
             .clone()
             .zip(opt.asset_index.clone())
             .map(|(dir, idx)| format!("{}/indexes/{}.json", dir, idx)),
+        opt.client_jar.clone(),
     );
     let resource_manager = Arc::new(RwLock::new(res));
 

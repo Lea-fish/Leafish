@@ -95,7 +95,10 @@ impl Manager {
     const LOAD_ASSETS_FLAG: usize = 1 << (usize::BITS as usize - 2);
     const META_MASK: usize = Self::LOAD_ASSETS_FLAG | Self::LOAD_VANILLA_FLAG;
 
-    pub fn new(provided_assets: Option<String>) -> (Manager, ManagerUI) {
+    pub fn new(
+        provided_assets: Option<String>,
+        provided_client: Option<String>,
+    ) -> (Manager, ManagerUI) {
         let mut m = Manager {
             packs: Vec::new(),
             version: 0,
@@ -103,7 +106,7 @@ impl Manager {
             pending_downloads: Arc::new(AtomicUsize::new(1)),
         };
         m.add_pack(Box::new(InternalPack));
-        m.download_vanilla();
+        m.download_vanilla(provided_client);
         if let Some(assets) = provided_assets {
             m.preload_assets(assets);
         } else {
@@ -443,7 +446,7 @@ impl Manager {
         });
     }
 
-    fn download_vanilla(&mut self) {
+    fn download_vanilla(&mut self, provided_client: Option<String>) {
         let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
         let location = path::Path::new(&loc);
         if fs::metadata(location.join("leafish.assets")).is_ok() {
@@ -455,40 +458,46 @@ impl Manager {
         let progress_info = self.vanilla_progress.clone();
         let pending_downloads = self.pending_downloads.clone();
         thread::spawn(move || {
-            let client = reqwest::blocking::Client::new();
-            let res = client.get(VANILLA_CLIENT_URL).send().unwrap();
-            let tmp_file_path = paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION));
-            let mut file = fs::File::create(tmp_file_path.clone()).unwrap();
+            let task_file = if let Some(client) = &provided_client {
+                client.clone()
+            } else {
+                let client = reqwest::blocking::Client::new();
+                let res = client.get(VANILLA_CLIENT_URL).send().unwrap();
+                let tmp_file_path =
+                    paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION));
+                let mut file = fs::File::create(tmp_file_path.clone()).unwrap();
 
-            let length = res
-                .headers()
-                .get(reqwest::header::CONTENT_LENGTH)
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .parse::<u64>()
-                .unwrap();
-            let task_file_path =
-                paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
-            let task_file = task_file_path.into_os_string().into_string().unwrap();
-            Self::add_task(
-                &progress_info,
-                "Downloading Core Assets",
-                &task_file,
-                length,
-            );
-            {
-                let mut progress = ProgressRead {
-                    read: res,
-                    progress: &progress_info,
-                    task_name: "Downloading Core Assets".into(),
-                    task_file,
-                };
-                io::copy(&mut progress, &mut file).unwrap();
-            }
+                let length = res
+                    .headers()
+                    .get(reqwest::header::CONTENT_LENGTH)
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap();
+                let task_file_path =
+                    paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
+                let task_file = task_file_path.into_os_string().into_string().unwrap();
+                Self::add_task(
+                    &progress_info,
+                    "Downloading Core Assets",
+                    &task_file,
+                    length,
+                );
+                {
+                    let mut progress = ProgressRead {
+                        read: res,
+                        progress: &progress_info,
+                        task_name: "Downloading Core Assets".into(),
+                        task_file,
+                    };
+                    io::copy(&mut progress, &mut file).unwrap();
+                }
+                tmp_file_path.to_str().unwrap().to_string()
+            };
 
             // Copy the resources from the zip
-            let file = fs::File::open(tmp_file_path).unwrap();
+            let file = fs::File::open(task_file).unwrap();
             let mut zip = zip::ZipArchive::new(file).unwrap();
 
             let task_file_path =
@@ -525,8 +534,10 @@ impl Manager {
                 Ordering::AcqRel,
             );
 
-            fs::remove_file(paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION)))
-                .unwrap();
+            if provided_client.is_none() {
+                fs::remove_file(paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION)))
+                    .unwrap();
+            }
         });
     }
 
