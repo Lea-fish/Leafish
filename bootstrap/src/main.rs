@@ -2,6 +2,7 @@ use std::{
     env, fs,
     path::Path,
     process::{exit, Command, Stdio},
+    thread,
     time::UNIX_EPOCH,
 };
 
@@ -139,6 +140,7 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
         env::consts::OS,
         env::consts::EXE_SUFFIX
     );
+    let mut downloads = vec![];
     for asset in latest.assets {
         if asset.name == main_binary_name {
             if do_update(
@@ -147,17 +149,22 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
                 time_stamp_binary(MAIN_BINARY_PATH),
             )? {
                 println!("[Info] Downloading update for leafish binary...");
-                let mut new_binary = vec![];
-                ureq::get(&asset.browser_download_url)
-                    .call()?
-                    .into_reader()
-                    .read_to_end(&mut new_binary)?;
-                fs::write(
-                    format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX),
-                    &new_binary,
-                )?;
-                adjust_binary_perms()?;
-                println!("[Info] Successfully updated leafish binary");
+                downloads.push(thread::spawn(move || {
+                    let mut new_binary = vec![];
+                    ureq::get(&asset.browser_download_url)
+                        .call()?
+                        .into_reader()
+                        .read_to_end(&mut new_binary)?;
+                    if let Err(err) = fs::write(
+                        format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX),
+                        &new_binary,
+                    ) {
+                        return Err(anyhow::Error::from(err));
+                    }
+                    adjust_binary_perms()?;
+                    println!("[Info] Successfully updated leafish binary");
+                    Ok(())
+                }));
             }
         } else if asset.name == bootstrap_binary_name {
             if do_update(
@@ -166,24 +173,36 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
                 time_stamp_binary(BOOTSTRAP_BINARY_PATH),
             )? {
                 println!("[Info] Downloading update for bootstrap...");
-                let mut new_binary = vec![];
-                ureq::get(&asset.browser_download_url)
-                    .call()?
-                    .into_reader()
-                    .read_to_end(&mut new_binary)?;
-                fs::write(
-                    format!(
-                        "{}{}",
-                        UPDATED_BOOTSTRAP_BINARY_PATH,
-                        env::consts::EXE_SUFFIX
-                    ),
-                    &new_binary,
-                )?;
-                println!("[Info] Successfully downloaded bootstrap update");
+                downloads.push(thread::spawn(move || {
+                    let mut new_binary = vec![];
+                    ureq::get(&asset.browser_download_url)
+                        .call()?
+                        .into_reader()
+                        .read_to_end(&mut new_binary)?;
+                    fs::write(
+                        format!(
+                            "{}{}",
+                            UPDATED_BOOTSTRAP_BINARY_PATH,
+                            env::consts::EXE_SUFFIX
+                        ),
+                        &new_binary,
+                    )?;
+                    println!("[Info] Successfully downloaded bootstrap update");
+                    Ok(())
+                }));
             }
         } else if asset.name == ASSETS_FILE_NAME {
             load_links(&asset.name, provided_client)?;
         }
+    }
+    let mut results = vec![];
+    for download in downloads {
+        let res = download.join();
+        results.push(res);
+    }
+    for result in results {
+        // FIXME: handle this more gracefully!
+        let _ = result.unwrap();
     }
     Ok(())
 }
