@@ -554,6 +554,9 @@ fn main() {
                 ..
             } = event
             {
+                if physical_size.width == 0 || physical_size.height == 0 {
+                    return;
+                }
                 surface.resize(
                     &context,
                     NonZeroU32::new(physical_size.width).unwrap(),
