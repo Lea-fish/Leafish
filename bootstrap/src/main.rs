@@ -1,8 +1,10 @@
 use std::{
-    env, fs,
+    env,
+    fs::{self, File},
+    io::Write,
     path::Path,
     process::{exit, Command, Stdio},
-    thread,
+    thread::{self, JoinHandle},
     time::UNIX_EPOCH,
 };
 
@@ -11,11 +13,23 @@ use serde::Deserialize;
 use ureq::AgentBuilder;
 
 const URL: &str = "https://api.github.com/repos/Lea-fish/Releases/releases/latest";
-const MAIN_BINARY_PATH: &str = "./leafish";
-const UPDATED_BOOTSTRAP_BINARY_PATH: &str = "./bootstrap_new";
-const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap";
 const CLIENT_JAR_PATH: &str = "./client.jar";
 const ASSETS_FILE_NAME: &str = "assets.txt";
+
+#[cfg(target_os = "windows")]
+const MAIN_BINARY_PATH: &str = "./leafish.exe";
+#[cfg(not(target_os = "windows"))]
+const MAIN_BINARY_PATH: &str = "./leafish";
+
+#[cfg(target_os = "windows")]
+const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap.exe";
+#[cfg(not(target_os = "windows"))]
+const BOOTSTRAP_BINARY_PATH: &str = "./bootstrap";
+
+#[cfg(target_os = "windows")]
+const UPDATED_BOOTSTRAP_BINARY_PATH: &str = "./bootstrap_new.exe";
+#[cfg(not(target_os = "windows"))]
+const UPDATED_BOOTSTRAP_BINARY_PATH: &str = "./bootstrap_new";
 
 #[cfg(target_os = "windows")]
 const USER_AGENT: &str =
@@ -95,7 +109,7 @@ fn main() {
             println!("[Warn] (noupdate) Couldn't find client jar");
         }
         Command::new(
-            fs::canonicalize(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX))
+            fs::canonicalize(MAIN_BINARY_PATH)
                 .unwrap()
                 .as_path()
                 .to_str()
@@ -139,7 +153,7 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
         env::consts::OS,
         env::consts::EXE_SUFFIX
     );
-    let mut downloads = vec![];
+    let mut downloads: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
     for asset in latest.assets {
         if asset.name == main_binary_name {
             if do_update(
@@ -154,13 +168,9 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
                         .call()?
                         .into_reader()
                         .read_to_end(&mut new_binary)?;
-                    if let Err(err) = fs::write(
-                        format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX),
-                        &new_binary,
-                    ) {
-                        return Err(anyhow::Error::from(err));
-                    }
-                    adjust_binary_perms()?;
+                    let mut file = File::create(MAIN_BINARY_PATH)?;
+                    file.write_all(&new_binary)?;
+                    adjust_binary_perms(&file)?;
                     println!("[Info] Successfully updated leafish binary");
                     Ok(())
                 }));
@@ -178,14 +188,7 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
                         .call()?
                         .into_reader()
                         .read_to_end(&mut new_binary)?;
-                    fs::write(
-                        format!(
-                            "{}{}",
-                            UPDATED_BOOTSTRAP_BINARY_PATH,
-                            env::consts::EXE_SUFFIX
-                        ),
-                        &new_binary,
-                    )?;
+                    fs::write(UPDATED_BOOTSTRAP_BINARY_PATH, &new_binary)?;
                     println!("[Info] Successfully downloaded bootstrap update");
                     Ok(())
                 }));
@@ -316,18 +319,17 @@ fn do_update(
 
 // FIXME: should we do this for mac as well?
 #[cfg(target_os = "linux")]
-fn adjust_binary_perms() -> anyhow::Result<()> {
-    let file_name =
-        fs::canonicalize(format!("{}{}", MAIN_BINARY_PATH, env::consts::EXE_SUFFIX)).unwrap();
-    Command::new("chmod")
-        .args(["777", file_name.as_path().to_str().unwrap()])
-        .spawn()?
-        .wait()?; // FIXME: check for exit status!
+fn adjust_binary_perms(file: &File) -> anyhow::Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let mut perms = file.metadata()?.permissions();
+    perms.set_mode(0o777);
+    file.set_permissions(perms)?;
     Ok(())
 }
 
 #[cfg(not(target_os = "linux"))]
-fn adjust_binary_perms() -> anyhow::Result<()> {
+fn adjust_binary_perms(_file: &File) -> anyhow::Result<()> {
     Ok(())
 }
 
