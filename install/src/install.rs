@@ -156,7 +156,7 @@ pub mod mojang {
             ty: "release".to_string(),
             libraries: vec![Library { name: "leafish:Leafish:Jar".to_string() }], // we need nobody, but ourselves ;)
             main_class: "de.leafish.Main".to_string(),
-            minecraft_arguments: "--username ${auth_player_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userProperties ${user_properties} --userType ${user_type} --path ./versions/Leafish/".to_string(),
+            minecraft_arguments: "--username ${auth_player_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userProperties ${user_properties} --userType ${user_type} --launcher official".to_string(),
             asset_index: AssetIndex { // FIXME: don't choose one version statically!
                 id: "1.19".to_string(),
                 sha1: "a9c8b05a8082a65678beda6dfa2b8f21fa627bce".to_string(),

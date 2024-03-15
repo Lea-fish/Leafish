@@ -5,7 +5,7 @@ use std::{
     path::Path,
     process::{exit, Command, Stdio},
     thread::{self, JoinHandle},
-    time::UNIX_EPOCH,
+    time::{SystemTime, UNIX_EPOCH},
 };
 
 use chrono::{TimeZone, Utc};
@@ -15,6 +15,7 @@ use ureq::AgentBuilder;
 const URL: &str = "https://api.github.com/repos/Lea-fish/Releases/releases/latest";
 const CLIENT_JAR_PATH: &str = "./client.jar";
 const ASSETS_FILE_NAME: &str = "assets.txt";
+const ASSETS_META_PATH: &str = "./assets.txt";
 
 #[cfg(target_os = "windows")]
 const MAIN_BINARY_PATH: &str = "./leafish.exe";
@@ -41,6 +42,7 @@ const USER_AGENT: &str =
 const USER_AGENT: &str = "Mozilla/5.0 (X11; Linux i686; rv:123.0) Gecko/20100101 Firefox/123.0";
 
 fn main() {
+    println!("[Info] Starting up bootstrap...");
     let args: Vec<String> = env::args().collect();
     let mut cmd = vec![];
     let mut provided_client = false;
@@ -123,7 +125,7 @@ fn main() {
         .wait()
         .unwrap();
     } else {
-        let _ = try_update(provided_client);
+        let _ = try_update();
         println!("[Info] Restarting bootstrap...");
         // shut down the process if we performed an update and let our parent bootstrap restart us, running a new version
         // otherwise we also have to shutdown in order not to restart leafish as soon as it is closed
@@ -131,7 +133,7 @@ fn main() {
     }
 }
 
-fn try_update(provided_client: bool) -> anyhow::Result<()> {
+fn try_update() -> anyhow::Result<()> {
     println!("[Info] Checking for updates....");
     let latest = AgentBuilder::new()
         .user_agent(USER_AGENT)
@@ -159,7 +161,7 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
             if do_update(
                 &latest.published_at,
                 &asset.updated_at,
-                time_stamp_binary(MAIN_BINARY_PATH),
+                time_stamp_file(MAIN_BINARY_PATH),
             )? {
                 println!("[Info] Downloading update for leafish binary...");
                 downloads.push(thread::spawn(move || {
@@ -179,7 +181,7 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
             if do_update(
                 &latest.published_at,
                 &asset.updated_at,
-                time_stamp_binary(BOOTSTRAP_BINARY_PATH),
+                time_stamp_file(BOOTSTRAP_BINARY_PATH),
             )? {
                 println!("[Info] Downloading update for bootstrap...");
                 downloads.push(thread::spawn(move || {
@@ -194,16 +196,23 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
                 }));
             }
         } else if asset.name == ASSETS_FILE_NAME {
-            println!("[Info] Loading metadata...");
-            downloads.push(thread::spawn(move || {
-                let raw_meta = ureq::get(&asset.browser_download_url)
-                    .call()?
-                    .into_string()?;
+            if do_update(
+                &latest.published_at,
+                &asset.updated_at,
+                time_stamp_file(ASSETS_META_PATH),
+            )? || !Path::new(CLIENT_JAR_PATH).exists()
+            {
+                println!("[Info] Updating assets...");
+                downloads.push(thread::spawn(move || {
+                    let raw_meta = ureq::get(&asset.browser_download_url)
+                        .call()?
+                        .into_string()?;
 
-                load_links(&raw_meta, provided_client)?;
-                println!("[Info] Loaded metadata");
-                Ok(())
-            }));
+                    update_assets(&raw_meta)?;
+                    println!("[Info] Updated assets");
+                    Ok(())
+                }));
+            }
         }
     }
     let mut results = vec![];
@@ -218,7 +227,7 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
     Ok(())
 }
 
-fn load_links(raw: &str, provided_client: bool) -> anyhow::Result<()> {
+fn update_assets(raw: &str) -> anyhow::Result<()> {
     let lines = raw.split('\n');
     for line in lines {
         if line.is_empty() {
@@ -228,9 +237,6 @@ fn load_links(raw: &str, provided_client: bool) -> anyhow::Result<()> {
             let key = key.to_lowercase();
             match key.as_str() {
                 "client" => {
-                    if provided_client || Path::new(CLIENT_JAR_PATH).exists() {
-                        continue;
-                    }
                     println!("[Info] Downloading client jar...");
                     let mut client_jar = vec![];
                     ureq::get(value)
@@ -251,10 +257,12 @@ fn load_links(raw: &str, provided_client: bool) -> anyhow::Result<()> {
             println!("[Warn] Couldn't read metadata line \"{line}\"");
         }
     }
+    // update the metadata as well
+    File::create(ASSETS_META_PATH)?.set_modified(SystemTime::now())?;
     Ok(())
 }
 
-fn time_stamp_binary(path: &str) -> u64 {
+fn time_stamp_file(path: &str) -> u64 {
     fs::metadata(path)
         .map(|meta| {
             let modified = meta
