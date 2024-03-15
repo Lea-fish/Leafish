@@ -33,7 +33,6 @@ fn main() {
     let mut no_update = false;
     for (idx, arg) in args.iter().enumerate() {
         // "noupdate" is required in order to support legacy installations
-        println!("got arg {arg}");
         if arg == "--noupdate" || arg == "noupdate" {
             no_update = true;
             continue;
@@ -192,7 +191,16 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
                 }));
             }
         } else if asset.name == ASSETS_FILE_NAME {
-            load_links(&asset.name, provided_client)?;
+            println!("[Info] Loading metadata...");
+            downloads.push(thread::spawn(move || {
+                let raw_meta = ureq::get(&asset.browser_download_url)
+                    .call()?
+                    .into_string()?;
+
+                load_links(&raw_meta, provided_client)?;
+                println!("[Info] Loaded metadata");
+                Ok(())
+            }));
         }
     }
     let mut results = vec![];
@@ -210,6 +218,9 @@ fn try_update(provided_client: bool) -> anyhow::Result<()> {
 fn load_links(raw: &str, provided_client: bool) -> anyhow::Result<()> {
     let lines = raw.split('\n');
     for line in lines {
+        if line.is_empty() {
+            continue;
+        }
         if let Some((key, value)) = line.split_once(": ") {
             let key = key.to_lowercase();
             match key.as_str() {
@@ -217,14 +228,14 @@ fn load_links(raw: &str, provided_client: bool) -> anyhow::Result<()> {
                     if provided_client || Path::new(CLIENT_JAR_PATH).exists() {
                         continue;
                     }
+                    println!("[Info] Downloading client jar...");
                     let mut client_jar = vec![];
                     ureq::get(value)
                         .call()?
                         .into_reader()
                         .read_to_end(&mut client_jar)?;
-                    if let Err(err) = fs::write(CLIENT_JAR_PATH, &client_jar) {
-                        println!("[Warn] error writing client jar {err}");
-                    }
+                    fs::write(CLIENT_JAR_PATH, &client_jar)?;
+                    println!("[Info] Downloaded client jar");
                 }
                 "assets" => {
                     // FIXME: update assets description in the launcher
@@ -233,6 +244,8 @@ fn load_links(raw: &str, provided_client: bool) -> anyhow::Result<()> {
                 }
                 _ => {}
             }
+        } else {
+            println!("[Warn] Couldn't read metadata line \"{line}\"");
         }
     }
     Ok(())
