@@ -447,14 +447,19 @@ impl Manager {
     }
 
     fn download_vanilla(&mut self, provided_client: Option<String>) {
-        if let Some(provided_client) = provided_client.as_ref() {
-            // FIXME: this is only temporary, don't block main thread in the future!
-            Self::unpack_assets(&self.vanilla_progress, &provided_client);
-        }
-
         let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
         let location = path::Path::new(&loc);
+        // check if there are already preexisting assets we can use
         if fs::metadata(location.join("leafish.assets")).is_ok() {
+            self.load_vanilla();
+            return;
+        }
+
+        // check if there are no preexisting assets, but the bootstrap provided us with a file
+        // we can extract the assets from
+        if let Some(provided_client) = provided_client.as_ref() {
+            // FIXME: this is only temporary, don't block main thread in the future and give some feedback to the user instead!
+            Self::unpack_assets(&self.vanilla_progress, &provided_client);
             self.load_vanilla();
             return;
         }
