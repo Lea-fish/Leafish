@@ -16,7 +16,7 @@ const URL: &str = "https://api.github.com/repos/Lea-fish/Releases/releases/lates
 const CLIENT_JAR_PATH: &str = "./client.jar";
 const ASSETS_FILE_NAME: &str = "assets.txt";
 const ASSETS_META_PATH: &str = "./assets.txt";
-const CLIENT_VER_PLACEHOLDER: &str = "$client_ver";
+const CLIENT_VER_PLACEHOLDER: &str = "%client_ver";
 
 #[cfg(target_os = "windows")]
 const MAIN_BINARY_PATH: &str = "./leafish.exe";
