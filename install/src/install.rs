@@ -30,8 +30,8 @@ pub mod mojang {
     const DESC_JSON_PATH: &str = "/versions/Leafish/Leafish.json";
     const JAR_PATH: &str = "/versions/Leafish/Leafish.jar";
     const PROFILES_JSON_PATH: &str = "/launcher_profiles.json";
-    const LIBRARY_DIR_PATH: &str = "/libraries/leafish/Leafish/Jar/";
-    const LIBRARY_PATH: &str = "/libraries/leafish/Leafish/Jar/Leafish-Jar.jar";
+    const LIBRARY_DIR_PATH: &str = "/libraries/de/leafish/Leafish/Jar/";
+    const LIBRARY_PATH: &str = "/libraries/de/leafish/Leafish/Jar/Leafish-Jar.jar";
 
     #[cfg(target_os = "windows")]
     const BOOTSTRAP_BIN_PATH: &str = "/versions/Leafish/bootstrap.exe";
@@ -122,7 +122,7 @@ pub mod mojang {
 
     pub fn setup(prefix: &str) -> anyhow::Result<bool> {
         if !Path::new(prefix).exists() {
-            println!("[Info] [Official] Couldn't find .minecraft directory");
+            println!("[Info] [Official] Couldn't find .minecraft directory (\"{prefix}\")");
             return Ok(false);
         }
 
@@ -154,7 +154,7 @@ pub mod mojang {
             time: "2020-01-01T00:00:00+02:00".to_string(), // TODO: use time now
             release_time: "2020-01-01T00:00:00+02:00".to_string(), // TODO: use actual latest release time
             ty: "release".to_string(),
-            libraries: vec![Library { name: "leafish:Leafish:Jar".to_string() }], // we need nobody, but ourselves ;)
+            libraries: vec![Library { name: "de.leafish:Leafish:Jar".to_string() }], // we need nobody, but ourselves ;)
             main_class: "de.leafish.Main".to_string(),
             minecraft_arguments: "--username ${auth_player_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userProperties ${user_properties} --userType ${user_type} --path ./versions/Leafish/ --launcher official".to_string(),
             asset_index: AssetIndex { // FIXME: don't choose one version statically
@@ -221,7 +221,9 @@ pub mod mojang {
         profiles_json_file.seek(std::io::SeekFrom::Start(0))?;
         profiles_json_file.write_all(serde_json::to_string_pretty(&profiles)?.as_bytes())?;
 
-        println!("[Info] [Official] Installation into .minecraft directory successful");
+        println!(
+            "[Info] [Official] Installation into .minecraft directory (\"{prefix}\") successful"
+        );
 
         Ok(true)
     }
@@ -263,8 +265,7 @@ pub mod prism {
 
     pub fn setup(prefix: &str) -> anyhow::Result<bool> {
         if !Path::new(prefix).exists() {
-            // TODO: this will print twice, fix this
-            println!("[Info] [Prism] Couldn't find PrismLauncher directory");
+            println!("[Info] [Prism] Couldn't find PrismLauncher directory (\"{prefix}\")");
             return Ok(false);
         }
 
@@ -355,6 +356,10 @@ pub mod prism {
             uid: "net.minecraft".to_string(),
             version: "1.19.2".to_string(),
         })?)?;
+
+        println!(
+            "[Info] [Prism] Installation into PrismLauncher directory (\"{prefix}\") successful"
+        );
 
         Ok(true)
     }
