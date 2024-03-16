@@ -459,7 +459,7 @@ impl Manager {
         // we can extract the assets from
         if let Some(provided_client) = provided_client.as_ref() {
             // FIXME: this is only temporary, don't block main thread in the future and give some feedback to the user instead!
-            Self::unpack_assets(&self.vanilla_progress, &provided_client);
+            Self::unpack_assets(&self.vanilla_progress, provided_client);
             self.load_vanilla();
             return;
         }
@@ -501,7 +501,7 @@ impl Manager {
                 io::copy(&mut progress, &mut file).unwrap();
             }
 
-            Self::unpack_assets(&progress_info, &tmp_file_path.to_str().unwrap().to_string());
+            Self::unpack_assets(&progress_info, tmp_file_path.to_str().unwrap());
 
             // this operation is a combination of `- 1` and `+ LOAD_VANILLA_FLAG`
             #[allow(arithmetic_overflow)]

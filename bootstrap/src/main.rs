@@ -16,6 +16,7 @@ const URL: &str = "https://api.github.com/repos/Lea-fish/Releases/releases/lates
 const CLIENT_JAR_PATH: &str = "./client.jar";
 const ASSETS_FILE_NAME: &str = "assets.txt";
 const ASSETS_META_PATH: &str = "./assets.txt";
+const CLIENT_VER_PLACEHOLDER: &str = "$client_ver";
 
 #[cfg(target_os = "windows")]
 const MAIN_BINARY_PATH: &str = "./leafish.exe";
@@ -45,7 +46,7 @@ fn main() {
     println!("[Info] Starting up bootstrap...");
     let args: Vec<String> = env::args().collect();
     let mut cmd = vec![];
-    let mut provided_client = false;
+    let mut provided_client = None;
     let mut no_update = false;
     for (idx, arg) in args.iter().enumerate() {
         // "noupdate" is required in order to support legacy installations
@@ -80,34 +81,22 @@ fn main() {
             cmd.push("--assets-dir".to_string());
             cmd.push(args[idx + 1].clone());
         }
-        if arg == "--client-jar" && Path::new(&args[idx + 1]).exists() {
-            match fs::canonicalize(&args[idx + 1]) {
-                Ok(path) => {
-                    if let Some(path) = path.to_str() {
-                        cmd.push("--client-jar".to_string());
-                        cmd.push(path.to_string());
-                        provided_client = true;
-                    } else {
-                        println!("[Warn] Couldn't convert client jar path to string");
-                    }
-                }
-                Err(err) => println!("[Warn] Couldn't canonicalize client jar path: {}", err),
-            }
+        if arg == "--client-jar" {
+            provided_client = Some(args[idx + 1].clone());
         }
     }
     if no_update {
-        if !provided_client && Path::new(CLIENT_JAR_PATH).exists() {
-            if let Ok(client_jar) = fs::canonicalize(CLIENT_JAR_PATH) {
-                if let Some(client_jar) = client_jar.to_str() {
-                    cmd.push("--client-jar".to_string());
-                    cmd.push(client_jar.to_string());
-                } else {
-                    println!("[Warn] (noupdate) Couldn't convert client jar path to string");
-                }
-            } else {
-                println!("[Warn] (noupdate) Couldn't canonicalize client jar path");
+        // replace the client_ver placeholder with the actual version
+        if let Some(provided_client) = provided_client.as_mut() {
+            if let Ok(client_ver) = fs::read_to_string(ASSETS_META_PATH) {
+                *provided_client = provided_client.replace(CLIENT_VER_PLACEHOLDER, &client_ver);
             }
-        } else {
+        }
+        // try to provide leafish with a client path
+        if (provided_client.is_none()
+            || !try_push_client_path(provided_client.as_ref().unwrap(), &mut cmd))
+            && !try_push_client_path(CLIENT_JAR_PATH, &mut cmd)
+        {
             println!("[Warn] (noupdate) Couldn't find client jar");
         }
         Command::new(
@@ -125,7 +114,7 @@ fn main() {
         .wait()
         .unwrap();
     } else {
-        let _ = try_update();
+        let _ = try_update(provided_client.as_ref());
         println!("[Info] Restarting bootstrap...");
         // shut down the process if we performed an update and let our parent bootstrap restart us, running a new version
         // otherwise we also have to shutdown in order not to restart leafish as soon as it is closed
@@ -133,7 +122,28 @@ fn main() {
     }
 }
 
-fn try_update() -> anyhow::Result<()> {
+fn try_push_client_path(provided_client: &str, cmd: &mut Vec<String>) -> bool {
+    if Path::new(provided_client).exists() {
+        match fs::canonicalize(provided_client) {
+            Ok(path) => {
+                if let Some(path) = path.to_str() {
+                    cmd.push("--client-jar".to_string());
+                    cmd.push(path.to_string());
+                    return true;
+                } else {
+                    println!("[Warn] (noupdate) Couldn't convert client jar path to string");
+                }
+            }
+            Err(err) => println!(
+                "[Warn] (noupdate) Couldn't canonicalize client jar path: {}",
+                err
+            ),
+        }
+    }
+    false
+}
+
+fn try_update(provided_client: Option<&String>) -> anyhow::Result<()> {
     println!("[Info] Checking for updates....");
     let latest = AgentBuilder::new()
         .user_agent(USER_AGENT)
@@ -157,6 +167,7 @@ fn try_update() -> anyhow::Result<()> {
     );
     let mut downloads: Vec<JoinHandle<anyhow::Result<()>>> = vec![];
     for asset in latest.assets {
+        #[allow(clippy::collapsible_if)]
         if asset.name == main_binary_name {
             if do_update(
                 &latest.published_at,
@@ -203,12 +214,13 @@ fn try_update() -> anyhow::Result<()> {
             )? || !Path::new(CLIENT_JAR_PATH).exists()
             {
                 println!("[Info] Updating assets...");
+                let provided_client = provided_client.cloned();
                 downloads.push(thread::spawn(move || {
                     let raw_meta = ureq::get(&asset.browser_download_url)
                         .call()?
                         .into_string()?;
 
-                    update_assets(&raw_meta)?;
+                    update_assets(&raw_meta, provided_client.as_ref())?;
                     println!("[Info] Updated assets");
                     Ok(())
                 }));
@@ -227,7 +239,9 @@ fn try_update() -> anyhow::Result<()> {
     Ok(())
 }
 
-fn update_assets(raw: &str) -> anyhow::Result<()> {
+fn update_assets(raw: &str, provided_client: Option<&String>) -> anyhow::Result<()> {
+    let mut client_ver = None;
+    let mut client_url = None;
     let lines = raw.split('\n');
     for line in lines {
         if line.is_empty() {
@@ -237,28 +251,46 @@ fn update_assets(raw: &str) -> anyhow::Result<()> {
             let key = key.to_lowercase();
             match key.as_str() {
                 "client" => {
-                    println!("[Info] Downloading client jar...");
-                    let mut client_jar = vec![];
-                    ureq::get(value)
-                        .call()?
-                        .into_reader()
-                        .read_to_end(&mut client_jar)?;
-                    fs::write(CLIENT_JAR_PATH, &client_jar)?;
-                    println!("[Info] Downloaded client jar");
+                    client_url = Some(value.to_string());
                 }
                 "assets" => {
                     // FIXME: update assets description in the launcher
                     // FIXME: (this means that the client's asset expectations and the real asset version are out of sync)
                     // FIXME: following we have to support even outdated asset versions (to a certain degree)
                 }
+                "client-ver" => client_ver = Some(value.to_string()),
                 _ => {}
             }
         } else {
             println!("[Warn] Couldn't read metadata line \"{line}\"");
         }
     }
+    if let Some(client_url) = client_url {
+        let update = if let Some((curr, provided_client)) = client_ver.as_ref().zip(provided_client)
+        {
+            !Path::new(&provided_client.replace(CLIENT_VER_PLACEHOLDER, curr)).exists()
+        } else {
+            true
+        };
+        if update {
+            println!("[Info] Downloading client jar...");
+            let mut client_jar = vec![];
+            ureq::get(&client_url)
+                .call()?
+                .into_reader()
+                .read_to_end(&mut client_jar)?;
+            fs::write(CLIENT_JAR_PATH, &client_jar)?;
+            println!("[Info] Downloaded client jar");
+        }
+    }
     // update the metadata as well
-    File::create(ASSETS_META_PATH)?.set_modified(SystemTime::now())?;
+    let mut meta = File::create(ASSETS_META_PATH)?;
+    if let Some(client_ver) = client_ver {
+        meta.write_all(client_ver.as_bytes())?;
+    } else {
+        // FIXME: is this a good fallback?
+        meta.set_modified(SystemTime::now())?;
+    }
     Ok(())
 }
 
