@@ -153,7 +153,7 @@ Used to identify this client vs others."#,
                 name: "default_protocol_version",
                 description: "Protocol version to use in the autodetection ping",
                 serializable: true,
-                value: SettingValue::String("".to_owned()),
+                value: SettingValue::Num(47),
             },
         ),
     ]
