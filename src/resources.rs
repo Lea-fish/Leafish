@@ -95,7 +95,10 @@ impl Manager {
     const LOAD_ASSETS_FLAG: usize = 1 << (usize::BITS as usize - 2);
     const META_MASK: usize = Self::LOAD_ASSETS_FLAG | Self::LOAD_VANILLA_FLAG;
 
-    pub fn new(provided_assets: Option<String>) -> (Manager, ManagerUI) {
+    pub fn new(
+        provided_assets: Option<String>,
+        provided_client: Option<String>,
+    ) -> (Manager, ManagerUI) {
         let mut m = Manager {
             packs: Vec::new(),
             version: 0,
@@ -103,7 +106,7 @@ impl Manager {
             pending_downloads: Arc::new(AtomicUsize::new(1)),
         };
         m.add_pack(Box::new(InternalPack));
-        m.download_vanilla();
+        m.download_vanilla(provided_client);
         if let Some(assets) = provided_assets {
             m.preload_assets(assets);
         } else {
@@ -443,13 +446,24 @@ impl Manager {
         });
     }
 
-    fn download_vanilla(&mut self) {
+    fn download_vanilla(&mut self, provided_client: Option<String>) {
         let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
         let location = path::Path::new(&loc);
+        // check if there are already preexisting assets we can use
         if fs::metadata(location.join("leafish.assets")).is_ok() {
             self.load_vanilla();
             return;
         }
+
+        // check if there are no preexisting assets, but the bootstrap provided us with a file
+        // we can extract the assets from
+        if let Some(provided_client) = provided_client.as_ref() {
+            // FIXME: this is only temporary, don't block main thread in the future and give some feedback to the user instead!
+            Self::unpack_assets(&self.vanilla_progress, provided_client);
+            self.load_vanilla();
+            return;
+        }
+
         self.pending_downloads.fetch_add(1, Ordering::AcqRel);
 
         let progress_info = self.vanilla_progress.clone();
@@ -487,36 +501,7 @@ impl Manager {
                 io::copy(&mut progress, &mut file).unwrap();
             }
 
-            // Copy the resources from the zip
-            let file = fs::File::open(tmp_file_path).unwrap();
-            let mut zip = zip::ZipArchive::new(file).unwrap();
-
-            let task_file_path =
-                paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
-            let task_file = task_file_path.into_os_string().into_string().unwrap();
-            Self::add_task(
-                &progress_info,
-                "Unpacking Core Assets",
-                &task_file,
-                zip.len() as u64,
-            );
-
-            let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
-            let location = path::Path::new(&loc);
-            let count = zip.len();
-            for i in 0..count {
-                Self::add_task_progress(&progress_info, "Unpacking Core Assets", &task_file, 1);
-                let mut file = zip.by_index(i).unwrap();
-                if !file.name().starts_with("assets/") {
-                    continue;
-                }
-                let path = location.join(file.name());
-                fs::create_dir_all(path.parent().unwrap()).unwrap();
-                let mut out = fs::File::create(path).unwrap();
-                io::copy(&mut file, &mut out).unwrap();
-            }
-
-            fs::File::create(location.join("leafish.assets")).unwrap(); // Marker file
+            Self::unpack_assets(&progress_info, tmp_file_path.to_str().unwrap());
 
             // this operation is a combination of `- 1` and `+ LOAD_VANILLA_FLAG`
             #[allow(arithmetic_overflow)]
@@ -528,6 +513,38 @@ impl Manager {
             fs::remove_file(paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION)))
                 .unwrap();
         });
+    }
+
+    fn unpack_assets(progress_info: &Arc<Mutex<Progress>>, path: &str) {
+        // Copy the resources from the zip
+        let file = fs::File::open(path).unwrap();
+        let mut zip = zip::ZipArchive::new(file).unwrap();
+
+        let task_file_path = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
+        let task_file = task_file_path.into_os_string().into_string().unwrap();
+        Self::add_task(
+            progress_info,
+            "Unpacking Core Assets",
+            &task_file,
+            zip.len() as u64,
+        );
+
+        let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
+        let location = path::Path::new(&loc);
+        let count = zip.len();
+        for i in 0..count {
+            Self::add_task_progress(progress_info, "Unpacking Core Assets", &task_file, 1);
+            let mut file = zip.by_index(i).unwrap();
+            if !file.name().starts_with("assets/") {
+                continue;
+            }
+            let path = location.join(file.name());
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let mut out = fs::File::create(path).unwrap();
+            io::copy(&mut file, &mut out).unwrap();
+        }
+
+        fs::File::create(location.join("leafish.assets")).unwrap(); // Marker file
     }
 
     fn add_task(progress: &Arc<Mutex<Progress>>, name: &str, file: &str, length: u64) {

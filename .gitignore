@@ -13,3 +13,4 @@ Leafish.code-workspace
 
 # this is part of compiling the installer (but we don't want to upload it)
 install/resources/wrapper.jar
+install/resources/bootstrap_*
