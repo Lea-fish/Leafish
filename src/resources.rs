@@ -447,85 +447,56 @@ impl Manager {
     }
 
     fn download_vanilla(&mut self, provided_client: Option<String>) {
+        if let Some(provided_client) = provided_client.as_ref() {
+            // FIXME: this is only temporary, don't block main thread in the future!
+            Self::unpack_assets(&self.vanilla_progress, &provided_client);
+        }
+
         let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
         let location = path::Path::new(&loc);
         if fs::metadata(location.join("leafish.assets")).is_ok() {
             self.load_vanilla();
             return;
         }
+
         self.pending_downloads.fetch_add(1, Ordering::AcqRel);
 
         let progress_info = self.vanilla_progress.clone();
         let pending_downloads = self.pending_downloads.clone();
         thread::spawn(move || {
-            let task_file = if let Some(client) = &provided_client {
-                client.clone()
-            } else {
-                let client = reqwest::blocking::Client::new();
-                let res = client.get(VANILLA_CLIENT_URL).send().unwrap();
-                let tmp_file_path =
-                    paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION));
-                let mut file = fs::File::create(tmp_file_path.clone()).unwrap();
+            let client = reqwest::blocking::Client::new();
+            let res = client.get(VANILLA_CLIENT_URL).send().unwrap();
+            let tmp_file_path = paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION));
+            let mut file = fs::File::create(tmp_file_path.clone()).unwrap();
 
-                let length = res
-                    .headers()
-                    .get(reqwest::header::CONTENT_LENGTH)
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .parse::<u64>()
-                    .unwrap();
-                let task_file_path =
-                    paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
-                let task_file = task_file_path.into_os_string().into_string().unwrap();
-                Self::add_task(
-                    &progress_info,
-                    "Downloading Core Assets",
-                    &task_file,
-                    length,
-                );
-                {
-                    let mut progress = ProgressRead {
-                        read: res,
-                        progress: &progress_info,
-                        task_name: "Downloading Core Assets".into(),
-                        task_file,
-                    };
-                    io::copy(&mut progress, &mut file).unwrap();
-                }
-                tmp_file_path.to_str().unwrap().to_string()
-            };
-
-            // Copy the resources from the zip
-            let file = fs::File::open(task_file).unwrap();
-            let mut zip = zip::ZipArchive::new(file).unwrap();
-
+            let length = res
+                .headers()
+                .get(reqwest::header::CONTENT_LENGTH)
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .parse::<u64>()
+                .unwrap();
             let task_file_path =
                 paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
             let task_file = task_file_path.into_os_string().into_string().unwrap();
             Self::add_task(
                 &progress_info,
-                "Unpacking Core Assets",
+                "Downloading Core Assets",
                 &task_file,
-                zip.len() as u64,
+                length,
             );
-
-            let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
-            let location = path::Path::new(&loc);
-            let count = zip.len();
-            for i in 0..count {
-                Self::add_task_progress(&progress_info, "Unpacking Core Assets", &task_file, 1);
-                let mut file = zip.by_index(i).unwrap();
-                if !file.name().starts_with("assets/") {
-                    continue;
-                }
-                let path = location.join(file.name());
-                fs::create_dir_all(path.parent().unwrap()).unwrap();
-                let mut out = fs::File::create(path).unwrap();
-                io::copy(&mut file, &mut out).unwrap();
+            {
+                let mut progress = ProgressRead {
+                    read: res,
+                    progress: &progress_info,
+                    task_name: "Downloading Core Assets".into(),
+                    task_file,
+                };
+                io::copy(&mut progress, &mut file).unwrap();
             }
 
-            fs::File::create(location.join("leafish.assets")).unwrap(); // Marker file
+            Self::unpack_assets(&progress_info, &tmp_file_path.to_str().unwrap().to_string());
 
             // this operation is a combination of `- 1` and `+ LOAD_VANILLA_FLAG`
             #[allow(arithmetic_overflow)]
@@ -534,11 +505,41 @@ impl Manager {
                 Ordering::AcqRel,
             );
 
-            if provided_client.is_none() {
-                fs::remove_file(paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION)))
-                    .unwrap();
-            }
+            fs::remove_file(paths::get_cache_dir().join(format!("{}.tmp", RESOURCES_VERSION)))
+                .unwrap();
         });
+    }
+
+    fn unpack_assets(progress_info: &Arc<Mutex<Progress>>, path: &str) {
+        // Copy the resources from the zip
+        let file = fs::File::open(path).unwrap();
+        let mut zip = zip::ZipArchive::new(file).unwrap();
+
+        let task_file_path = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
+        let task_file = task_file_path.into_os_string().into_string().unwrap();
+        Self::add_task(
+            progress_info,
+            "Unpacking Core Assets",
+            &task_file,
+            zip.len() as u64,
+        );
+
+        let loc = paths::get_data_dir().join(format!("resources-{}", RESOURCES_VERSION));
+        let location = path::Path::new(&loc);
+        let count = zip.len();
+        for i in 0..count {
+            Self::add_task_progress(progress_info, "Unpacking Core Assets", &task_file, 1);
+            let mut file = zip.by_index(i).unwrap();
+            if !file.name().starts_with("assets/") {
+                continue;
+            }
+            let path = location.join(file.name());
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            let mut out = fs::File::create(path).unwrap();
+            io::copy(&mut file, &mut out).unwrap();
+        }
+
+        fs::File::create(location.join("leafish.assets")).unwrap(); // Marker file
     }
 
     fn add_task(progress: &Arc<Mutex<Progress>>, name: &str, file: &str, length: u64) {
