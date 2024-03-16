@@ -30,4 +30,4 @@ linux_sub_path="/install_x86_64_linux"
 cp ./target/x86_64-pc-windows-gnu/release/install.exe "$resources_path$windows_sub_path" || { echo "Error copying Windows binary to resources"; exit 1; }
 cp ./target/x86_64-unknown-linux-gnu/release/install "$resources_path$linux_sub_path" || { echo "Error copying Linux binary to resources"; exit 1; }
 
-echo "Updated installer binary resources"
+echo "Successfully updated installer binary resources"
