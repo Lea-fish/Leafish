@@ -151,17 +151,17 @@ pub mod mojang {
         let mut json = File::create_new(&json_path)?;
         json.write_all(serde_json::to_string_pretty(&Description {
             id: "Leafish".to_string(),
-            time: "2020-01-01T00:00:00+02:00".to_string(), // FIXME: use some sensible time
-            release_time: "2020-01-01T00:00:00+02:00".to_string(),
+            time: "2020-01-01T00:00:00+02:00".to_string(), // TODO: use time now
+            release_time: "2020-01-01T00:00:00+02:00".to_string(), // TODO: use actual latest release time
             ty: "release".to_string(),
             libraries: vec![Library { name: "leafish:Leafish:Jar".to_string() }], // we need nobody, but ourselves ;)
             main_class: "de.leafish.Main".to_string(),
             minecraft_arguments: "--username ${auth_player_name} --gameDir ${game_directory} --assetsDir ${assets_root} --assetIndex ${assets_index_name} --uuid ${auth_uuid} --accessToken ${auth_access_token} --userProperties ${user_properties} --userType ${user_type} --path ./versions/Leafish/ --launcher official".to_string(),
-            asset_index: AssetIndex { // FIXME: don't choose one version statically!
+            asset_index: AssetIndex { // FIXME: don't choose one version statically
                 id: "1.19".to_string(),
                 sha1: "a9c8b05a8082a65678beda6dfa2b8f21fa627bce".to_string(),
                 size: 385608,
-                total_size: 557023211, // FIXME: does this not depend on the client jar?
+                total_size: 557023211,
                 url: "https://piston-meta.mojang.com/v1/packages/a9c8b05a8082a65678beda6dfa2b8f21fa627bce/1.19.json".to_string(),
             },
             assets: "1.19".to_string(),
@@ -247,8 +247,8 @@ pub mod prism {
     const PACK_PATH: &str = "/instances/Leafish/mmc-pack.json";
     const META_DIR_PATH: &str = "/meta/de.leafish";
     const META_PATH: &str = "/meta/de.leafish/Leafish.json";
-    const LIB_DIR_PATH: &str = "/libraries/de/leafish";
-    const LIB_PATH: &str = "/libraries/de/leafish/Leafish.jar";
+    const LIB_DIR_PATH: &str = "/libraries/de/leafish/Leafish/v1.0.0";
+    const LIB_PATH: &str = "/libraries/de/leafish/Leafish/v1.0.0/Leafish.jar";
 
     #[cfg(not(target_os = "windows"))]
     const BOOTSTRAP_BIN_PATH: &str = "/instances/Leafish/bootstrap";
@@ -263,32 +263,26 @@ pub mod prism {
 
     pub fn setup(prefix: &str) -> anyhow::Result<bool> {
         if !Path::new(prefix).exists() {
-            // FIXME: this will print twice, fix this
-            println!("[Info] [PrismLauncher] Couldn't find PrismLauncher directory");
+            // TODO: this will print twice, fix this
+            println!("[Info] [Prism] Couldn't find PrismLauncher directory");
             return Ok(false);
         }
 
-        println!("[Info] [PrismLauncher] Found PrismLauncher directory");
+        println!("[Info] [Prism] Found PrismLauncher directory");
 
         let dir_path = format!("{}{}", prefix, INSTANCE_DIR_PATH);
         if Path::new(&dir_path).exists() {
-            println!("[Info] [PrismLauncher] Profile already exists");
+            println!("[Info] [Prism] Profile already exists");
             return Ok(false);
         }
-        mk_dir(
-            &dir_path,
-            "[Info] [PrismLauncher] Creating instance directory...",
-        )?;
+        mk_dir(&dir_path, "[Info] [Prism] Creating instance directory...")?;
 
         let dir_path = format!("{}{}", prefix, ICONS_DIR_PATH);
-        mk_dir(
-            &dir_path,
-            "[Info] [PrismLauncher] Creating icons directory...",
-        )?;
+        mk_dir(&dir_path, "[Info] [Prism] Creating icons directory...")?;
 
         let icon_path = format!("{}{}", prefix, ICON_PATH);
         if !Path::new(&icon_path).exists() {
-            println!("[Info] [PrismLauncher] Copying icon...");
+            println!("[Info] [Prism] Copying icon...");
             fs::write(&icon_path, include_bytes!("../resources/leafish-icon.png"))?;
         }
 
@@ -303,10 +297,8 @@ pub mod prism {
                     important: Some(true),
                     uid: "de.leafish".to_string(),
                     version: "Leafish".to_string(),
-                    // cached_name: Some("Leafish".to_string()),
                     cached_name: None,
                     cached_requires: None,
-                    // cached_version: Some("Leafish".to_string()),
                     cached_version: None,
                     cached_volatile: None,
                     dependency_only: None,
@@ -315,22 +307,16 @@ pub mod prism {
             })?,
         )?;
         let dir_path = format!("{}{}", prefix, LIB_DIR_PATH);
-        mk_dir(
-            &dir_path,
-            "[Info] [PrismLauncher] Creating library directory...",
-        )?;
+        mk_dir(&dir_path, "[Info] [Prism] Creating library directory...")?;
         let lib_path = format!("{}{}", prefix, LIB_PATH);
         fs::write(lib_path, BOOTSTRAP_JAR)?;
 
-        println!("[Info] [PrismLauncher] Copying bootstrap binary...");
+        println!("[Info] [Prism] Copying bootstrap binary...");
         let mut bootstrap_binary = File::create_new(format!("{}{}", prefix, BOOTSTRAP_BIN_PATH))?;
         bootstrap_binary.write_all(BOOTSTRAP_BIN)?;
         adjust_perms(&bootstrap_binary)?;
         let dir_path = format!("{}{}", prefix, META_DIR_PATH);
-        mk_dir(
-            &dir_path,
-            "[Info] [PrismLauncher] Creating meta directory...",
-        )?;
+        mk_dir(&dir_path, "[Info] [Prism] Creating meta directory...")?;
         let meta_path = format!("{}{}", prefix, META_PATH);
 
         let now = Utc::now();
@@ -338,11 +324,11 @@ pub mod prism {
 
         fs::write(meta_path, serde_json::to_string_pretty(&VersionMeta {
             traits: None,
-            asset_index: AssetIndex { // FIXME: don't choose one version statically!
+            asset_index: AssetIndex { // TODO: don't choose one version statically
                 id: "1.19".to_string(),
                 sha1: "a9c8b05a8082a65678beda6dfa2b8f21fa627bce".to_string(),
                 size: 385608,
-                total_size: 557023211, // FIXME: does this not depend on the client jar?
+                total_size: 557023211,
                 url: "https://piston-meta.mojang.com/v1/packages/a9c8b05a8082a65678beda6dfa2b8f21fa627bce/1.19.json".to_string(),
             },
             compatible_java_majors: vec![8,9,10,11,12,13,14,15,16,17],
@@ -352,9 +338,10 @@ pub mod prism {
             main_jar: MainJar {
                 downloads: Download {
                     artifact: Some(Artifact {
-                        sha1: "fdfbab865254c28e67a6c4e7448583147db3a7f2".to_string(),
-                        size: 5118199,
+                        sha1: "2f276263e4ee0408e8c06a9971cf5c9adea773a2".to_string(),
+                        size: 4785,
                         url: "https://github.com/Lea-fish/Releases/releases/download/alpha/bootstrap.jar".to_string(),
+                        // TODO: somehow use latest: https://github.com/Lea-fish/Releases/releases/latest/download/bootstrap.jar
                     }),
                 },
                 name: "de.leafish:Leafish:v1.0.0".to_string(),
