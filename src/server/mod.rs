@@ -920,7 +920,10 @@ impl Server {
         entities.world.insert_resource(DeltaResource(0.0));
         entities.world.insert_resource(WorldData::default());
         entities.world.insert_resource(RenderCtxResource::default());
-        entity::add_systems(&mut entities.schedule.write());
+        entity::add_systems(
+            &mut entities.schedule.write(),
+            &mut entities.render_schedule.write(),
+        );
         add_systems(&mut entities.schedule.write());
 
         hud_context.write().slots = Some(inventory_context.read().base_slots.clone());
@@ -1136,7 +1139,7 @@ impl Server {
                 Ordering::Release,
             );
             entities.world.clear_trackers();
-            let entity_schedule = entities.entity_schedule.clone();
+            let entity_schedule = entities.schedule.clone();
             while self.entity_tick_timer.load(Ordering::Acquire) >= 3.0 {
                 entity_schedule.write().run(&mut entities.world);
                 self.entity_tick_timer.store(
@@ -1144,8 +1147,12 @@ impl Server {
                     Ordering::Release,
                 );
             }
-            let schedule = entities.schedule.clone();
-            schedule.write().run(&mut entities.world);
+            // render tick
+            entities
+                .render_schedule
+                .clone()
+                .write()
+                .run(&mut entities.world);
         }
     }
 

@@ -26,7 +26,7 @@ use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-pub fn add_systems(sched: &mut Schedule) {
+pub fn add_systems(sched: &mut Schedule, render_sched: &mut Schedule) {
     // TODO: Check sync/async usage!
     sched.add_systems(
         handle_movement
@@ -35,7 +35,7 @@ pub fn add_systems(sched: &mut Schedule) {
     );
     // let sys = ParticleRenderer::new(m);
     // m.add_render_system(sys);
-    sched
+    render_sched
         .add_systems(
             update_render_players
                 .in_set(SystemExecStage::Render)

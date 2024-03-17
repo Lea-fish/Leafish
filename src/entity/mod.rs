@@ -56,16 +56,16 @@ srel!(28.0, 20.0, 4.0, 12.0), // East  | 0 1 0 | 0 0 1 OR 1 0 1 | 0 0 1
     [0.0, 0.0, 0.0, 1.0],
 */
 
-pub fn add_systems(sched: &mut Schedule) {
+pub fn add_systems(sched: &mut Schedule, render_sched: &mut Schedule) {
     sched.add_systems(systems::update_last_position.in_set(SystemExecStage::Normal));
 
-    player::add_systems(sched);
+    player::add_systems(sched, render_sched);
     sched
         .add_systems(systems::apply_velocity.in_set(SystemExecStage::Normal))
         .add_systems(systems::apply_gravity.in_set(SystemExecStage::Normal))
         .add_systems(systems::apply_digging.in_set(SystemExecStage::Normal));
 
-    sched /*sync*/
+    render_sched /*sync*/
         .add_systems(
             systems::lerp_position
                 .in_set(SystemExecStage::Render)
