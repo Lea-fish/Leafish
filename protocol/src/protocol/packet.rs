@@ -3395,6 +3395,11 @@ pub fn send_position_look(
 
 pub fn send_client_status(conn: &mut Conn, status: ClientStatus) -> Result<(), Error> {
     let version = conn.get_version();
+    // we don't send any information to the server when opening the inv in newer versions
+    if version > Version::V1_11 && status == ClientStatus::OpenInventory {
+        return Ok(());
+    }
+
     if version < Version::V1_8 {
         conn.write_packet(crate::protocol::packet::play::serverbound::ClientStatus_u8 {
             action_id: status as u8,
@@ -3406,6 +3411,7 @@ pub fn send_client_status(conn: &mut Conn, status: ClientStatus) -> Result<(), E
     }
 }
 
+#[derive(PartialEq, Eq)]
 #[repr(u8)]
 pub enum ClientStatus {
     PerformRespawn = 0,
