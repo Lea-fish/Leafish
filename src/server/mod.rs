@@ -1437,16 +1437,6 @@ impl Server {
                 self.renderer.view_vector.lock().cast().unwrap(),
                 target::test_block,
             ) {
-                // FIXME: should we always send UseItem when in adventure?
-                if gamemode == GameMode::Adventure {
-                    packet::send_use_item(
-                        self.conn.clone().write().as_mut().unwrap(),
-                        Hand::MainHand,
-                        Some(at),
-                        item.as_ref().map(|item| item.stack.clone()),
-                    );
-                    return;
-                }
                 packet::send_block_place(
                     self.conn.write().as_mut().unwrap(),
                     pos,
@@ -1456,18 +1446,21 @@ impl Server {
                     item.clone().map(|item| item.stack),
                 )
                 .map_err(|_| self.disconnect_closed(None));
-                
+
                 // we swing after placing a block
-                if let Some(item) = &item {
-                    if item
-                        .material
-                        .is_placable_block(self.mapped_protocol_version, item.stack.id)
-                    {
-                        packet::send_arm_swing(
-                            self.conn.write().as_mut().unwrap(),
-                            Hand::MainHand,
-                        )
-                        .map_err(|_| self.disconnect_closed(None));
+                // FIXME: how should adventure be handled on higher versions? this only works ensured for v 1.8.9
+                if gamemode != GameMode::Adventure {
+                    if let Some(item) = &item {
+                        if item
+                            .material
+                            .is_placable_block(self.mapped_protocol_version, item.stack.id)
+                        {
+                            packet::send_arm_swing(
+                                self.conn.write().as_mut().unwrap(),
+                                Hand::MainHand,
+                            )
+                            .map_err(|_| self.disconnect_closed(None));
+                        }
                     }
                 }
             }
