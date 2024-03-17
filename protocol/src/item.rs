@@ -26,8 +26,8 @@ pub struct Stack {
 }
 
 impl Default for Stack {
-    fn default() -> Stack {
-        Stack {
+    fn default() -> Self {
+        Self {
             id: -1,
             count: 0,
             damage: None,

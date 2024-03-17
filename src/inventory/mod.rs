@@ -672,7 +672,7 @@ pub enum Material {
     Soil,                            // 1.7.10 (id: 60, stack: 0)
     Furnace,                         // 1.7.10 (id: 61, stack: 0)| 1.13 (id: 8133)
     BurningFurnace,                  // 1.7.10 (id: 62, stack: 0)
-    SignPost,                        // 1.7.10(id; 63, stack: 64, durability: 0 )
+    SignPost,                        // 1.7.10 (id: 63, stack: 64, durability: 0 )
     WoodenDoor,                      // 1.7.10 (id: 64, stack: 0)
     Ladder,                          // 1.7.10 (id: 65, stack: 0)| 1.13 (id: 23599)
     Rails,                           // 1.7.10 (id: 66, stack: 0)
@@ -2097,4 +2097,82 @@ impl Material {
     pub fn get_stack_size(&self, version: Version) -> u8 {
         material::versions::get_stack_size(*self, version)
     }
+
+    pub fn is_placable_block(&self, version: Version, id: isize) -> bool {
+        if version < Version::V1_13 {
+            return id < 256;
+        }
+
+        // FIXME: add support for 1.13+
+        return true;
+    }
+
+    /*
+    pub fn is_placable_block(&self) -> bool {
+        match self {
+            Material::AcaciaButton |
+            Material::AcaciaDoorItem |
+            Material::AcaciaFence |
+            Material::AcaciaFenceGate |
+            Material::AcaciaLeaves |
+            Material::AcaciaLog |
+            Material::AcaciaPlanks |
+            Material::AcaciaPressurePlate |
+            Material::AcaciaSapling |
+            Material::AcaciaSign |
+            Material::AcaciaSlab |
+            Material::AcaciaStairs |
+            Material::AcaciaTrapdoor |
+            Material::AcaciaWood |
+            Material::ActivatorRail |
+            Material::Allium |
+            Material::AmethystBlock |
+            Material::AmethystCluster |
+            Material::AmethystShard |
+            Material::AncientDebris |
+            Material::Andesite |
+            Material::AndesiteSlab |
+            Material::AndesiteStairs |
+            Material::AndesiteWall |
+            Material::Anvil |
+            Material::Azalea |
+            Material::AzaleaLeaves |
+            Material::AzureBluet |
+            Material::Bamboo |
+            Material::Banner |
+            Material::Barrel |
+            Material::Barrier |
+            Material::Basalt |
+            Material::Beacon |
+            Material::Bed |
+            Material::Bedrock |
+            Material::BeeNest |
+            Material::Beehive |
+            Material::Bell |
+            Material::BigDripleaf |
+            Material::BirchButton |
+            Material::BirchDoorItem |
+            Material::BirchFence |
+            Material::BirchFenceGate |
+            Material::BirchLeaves |
+            Material::BirchLog |
+            Material::BirchPlanks |
+            Material::BirchPressurePlate |
+            Material::BirchSapling |
+            Material::BirchSign |
+            Material::BirchSlab |
+            Material::BirchStairs |
+            Material::BirchTrapdoor |
+            Material::BirchWood |
+            Material::BirchWoodStairs |
+            Material::BlackBanner |
+            Material::BlackBed |
+            Material::BlackCandle |
+            Material::BlackCarpet |
+            Material::BlackConcrete |
+            Material::BlackConcretePowder |
+            Material::BlackGlazedTerracotta
+        }
+    }
+    */
 }
