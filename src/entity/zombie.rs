@@ -6,11 +6,12 @@ use crate::server::RendererResource;
 use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::Aabb3;
+use leafish_protocol::format::Component;
 
 #[derive(Component)]
 pub struct ZombieModel {
     model: Option<model::ModelHandle>,
-    name: Option<String>,
+    display_name: Option<Component>,
 
     dir: i32,
     time: f64,
@@ -19,10 +20,10 @@ pub struct ZombieModel {
 }
 
 impl ZombieModel {
-    pub fn new(name: Option<String>) -> ZombieModel {
-        ZombieModel {
+    pub fn new(display_name: Option<Component>) -> Self {
+        Self {
             model: None,
-            name,
+            display_name,
             dir: 0,
             time: 0.0,
             still_time: 0.0,
@@ -46,8 +47,11 @@ pub fn added_zombie(
             renderer.get_textures_ref(),
             "minecraft:entity/zombie/zombie",
         );
-        let components =
-            compute_player_model_components(&tex, &zombie_model.name, renderer.clone());
+        let components = compute_player_model_components(
+            &tex,
+            zombie_model.display_name.as_ref(),
+            renderer.clone(),
+        );
 
         zombie_model
             .model
