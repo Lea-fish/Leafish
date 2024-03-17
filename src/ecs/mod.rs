@@ -30,5 +30,5 @@ pub enum SystemExecStage {
 pub struct Manager {
     pub world: World,
     pub schedule: Arc<RwLock<Schedule>>,
-    pub entity_schedule: Arc<RwLock<Schedule>>,
+    pub render_schedule: Arc<RwLock<Schedule>>,
 }
