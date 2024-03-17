@@ -88,6 +88,8 @@ pub enum TintType {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use super::*;
 
     // Spot check a few blocks across different versions, including the correctly recognized last supported block
@@ -856,7 +858,8 @@ fn update_double_plant_state<W: WorldAccess>(world: &W, pos: Position, half: Blo
         Block::LargeFern { .. } => Block::LargeFern { half },
         Block::RoseBush { .. } => Block::RoseBush { half },
         Block::Peony { .. } => Block::Peony { half },
-        _ => unreachable!(),
+        Block::Air {} => world.get_block(pos), // FIXME: is this the correct way to handle air? (if we don't do this 1.8.9 crashes sometimes)
+        block => unreachable!("unexpected tall block: {:?}", block),
     }
 }
 
