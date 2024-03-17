@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use cgmath::Vector3;
+use cgmath::{Vector3, Zero};
 
 state_packets!(
     handshake Handshaking {
@@ -493,7 +493,7 @@ state_packets!(
             }
             packet PlayerBlockPlacement_u8_Item {
                 field location: Position =,
-                field face: u8 =,
+                field face: i8 =,
                 field hand: Option<item::Stack> =,
                 field cursor_x: u8 =,
                 field cursor_y: u8 =,
@@ -503,7 +503,7 @@ state_packets!(
                 field x: i32 =,
                 field y: u8 =,
                 field z: i32 =,
-                field face: u8 =,
+                field face: i8 =,
                 field hand: Option<item::Stack> =,
                 field cursor_x: u8 =,
                 field cursor_y: u8 =,
@@ -3439,10 +3439,24 @@ pub fn send_digging(
     }
 }
 
-pub fn send_use_item(conn: &mut Conn, hand: Hand) -> Result<(), Error> {
+pub fn send_use_item(conn: &mut Conn, hand: Hand, mut cursor_position: Option<Vector3<f64>>, item: Option<Stack>) -> Result<(), Error> {
     let version = conn.get_version();
-    if version < Version::V1_8 {
-        todo!()
+    if version <= Version::V1_8 {
+        if let Some(item) = item.as_ref() {
+            // all ids below 256 are placable blocks pre 1.13
+            if item.id >= 256 {
+                cursor_position = None;
+            }
+        }
+        let cursor_position = cursor_position.unwrap_or(Vector3::zero());
+        conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8_Item {
+            location: Position::new(-1, -1, -1),
+            face: -1,
+            hand: item,
+            cursor_x: (cursor_position.x * 16.0) as u8,
+            cursor_y: (cursor_position.y * 16.0) as u8,
+            cursor_z: (cursor_position.z * 16.0) as u8,
+        })
     } else {
         conn.write_packet(packet::play::serverbound::UseItem {
             hand: VarInt(hand.ordinal()),
@@ -3475,10 +3489,10 @@ pub fn send_release_use_item(conn: &mut Conn) -> Result<(), Error> {
 pub fn send_block_place(
     conn: &mut Conn,
     pos: Position,
-    face: u8,
+    face: i8,
     cursor_position: Vector3<f64>,
     hand: Hand,
-    item: Box<dyn Fn() -> Option<Stack>>,
+    item: Option<Stack>,
 ) -> Result<(), Error> {
     let version = conn.get_version();
     if version >= Version::V1_14 {
@@ -3516,7 +3530,7 @@ pub fn send_block_place(
         conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8_Item {
             location: pos,
             face,
-            hand: item(),
+            hand: item,
             cursor_x: (cursor_position.x * 16.0) as u8,
             cursor_y: (cursor_position.y * 16.0) as u8,
             cursor_z: (cursor_position.z * 16.0) as u8,
@@ -3528,7 +3542,7 @@ pub fn send_block_place(
                 y: pos.y as u8,
                 z: pos.x,
                 face,
-                hand: item(),
+                hand: item,
                 cursor_x: (cursor_position.x * 16.0) as u8,
                 cursor_y: (cursor_position.y * 16.0) as u8,
                 cursor_z: (cursor_position.z * 16.0) as u8,

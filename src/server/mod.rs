@@ -1419,11 +1419,17 @@ impl Server {
                 .entity(self.player.load().as_ref().unwrap().1)
                 .get::<GameMode>()
                 .unwrap();
-            // FIXME: should we always send UseItem when in adventure?
-            if gamemode == GameMode::Adventure {
-                packet::send_use_item(self.conn.clone().write().as_mut().unwrap(), Hand::MainHand);
-                return;
-            }
+            let item = self
+                .hud_context
+                .read()
+                .slots
+                .as_ref()
+                .unwrap()
+                .clone()
+                .read()
+                .get_item((27 + self.hud_context.read().get_slot_index()) as u16)
+                .as_ref()
+                .map(|item| item.clone());
             if let Some((pos, _, face, at)) = target::trace_ray(
                 &self.world,
                 4.0,
@@ -1431,33 +1437,50 @@ impl Server {
                 self.renderer.view_vector.lock().cast().unwrap(),
                 target::test_block,
             ) {
-                let hud_context = self.hud_context.clone();
+                // FIXME: should we always send UseItem when in adventure?
+                if gamemode == GameMode::Adventure {
+                    packet::send_use_item(
+                        self.conn.clone().write().as_mut().unwrap(),
+                        Hand::MainHand,
+                        Some(at),
+                        item.as_ref().map(|item| item.stack.clone()),
+                    );
+                    return;
+                }
                 packet::send_block_place(
                     self.conn.write().as_mut().unwrap(),
                     pos,
-                    face.index() as u8,
+                    face.index() as u8 as i8,
                     at,
                     Hand::MainHand,
-                    Box::new(move || {
-                        hud_context
-                            .read()
-                            .slots
-                            .as_ref()
-                            .unwrap()
-                            .clone()
-                            .read()
-                            .get_item((27 + hud_context.read().get_slot_index()) as u16)
-                            .as_ref()
-                            .map(|item| item.stack.clone())
-                    }),
+                    item.clone().map(|item| item.stack),
                 )
                 .map_err(|_| self.disconnect_closed(None));
-                packet::send_arm_swing(self.conn.clone().write().as_mut().unwrap(), Hand::MainHand)
-                    .map_err(|_| self.disconnect_closed(None)); // FIXME: should we actually swing after placing a block?
-                return;
+                
+                // we swing after placing a block
+                if let Some(item) = &item {
+                    if item
+                        .material
+                        .is_placable_block(self.mapped_protocol_version, item.stack.id)
+                    {
+                        packet::send_arm_swing(
+                            self.conn.write().as_mut().unwrap(),
+                            Hand::MainHand,
+                        )
+                        .map_err(|_| self.disconnect_closed(None));
+                    }
+                }
             }
-            // we don't look it a block while rightclicking
-            packet::send_use_item(self.conn.clone().write().as_mut().unwrap(), Hand::MainHand);
+            // only send right click when we have an item in hand
+            if let Some(item) = item {
+                // we don't look it a block while rightclicking
+                packet::send_use_item(
+                    self.conn.clone().write().as_mut().unwrap(),
+                    Hand::MainHand,
+                    None,
+                    Some(item.stack),
+                );
+            }
         } else {
             self.inventory_context.write().on_click(false, shift);
         }
