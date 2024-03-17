@@ -7,11 +7,12 @@ use crate::server::RendererResource;
 use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::Aabb3;
+use leafish_protocol::format::Component;
 
 #[derive(Component)]
 pub struct SlimeModel {
     model: Option<model::ModelHandle>,
-    _name: String,
+    _display_name: Option<Component>,
 
     _dir: i32,
     _time: f64,
@@ -20,10 +21,10 @@ pub struct SlimeModel {
 }
 
 impl SlimeModel {
-    pub fn new(name: &str) -> SlimeModel {
-        SlimeModel {
+    pub fn new(display_name: Option<Component>) -> Self {
+        Self {
             model: None,
-            _name: name.to_owned(),
+            _display_name: display_name,
 
             _dir: 0,
             _time: 0.0,
@@ -45,7 +46,7 @@ pub fn create_slime(m: &mut Manager) -> Entity {
         )))
         .insert(Light::new())
         .insert(EntityType::Slime)
-        .insert(SlimeModel::new("test"));
+        .insert(SlimeModel::new(None));
     entity.id()
 }
 

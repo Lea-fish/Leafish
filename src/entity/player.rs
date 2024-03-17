@@ -21,6 +21,7 @@ use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::{Aabb, Aabb3};
 use instant::Instant;
+use leafish_protocol::format::{Component, Modifier};
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -84,7 +85,15 @@ pub fn create_local(m: &mut Manager) -> Entity {
             Point3::new(-0.3, 0.0, -0.3),
             Point3::new(0.3, 1.8, 0.3),
         )))
-        .insert(PlayerModel::new("", false, false, true))
+        .insert(PlayerModel::new(
+            Component::new(format::ComponentType::Text {
+                text: "".to_string(),
+                modifier: Modifier::default(),
+            }),
+            false,
+            false,
+            true,
+        ))
         .insert(Light::new())
         .insert(Digging::new())
         .insert(MouseButtons::new())
@@ -92,7 +101,7 @@ pub fn create_local(m: &mut Manager) -> Entity {
     entity.id()
 }
 
-pub fn create_remote(m: &mut Manager, name: &str) -> Entity {
+pub fn create_remote(m: &mut Manager, name: Component) -> Entity {
     let mut entity = m.world.spawn_empty();
     entity
         .insert(Position::new(0.0, 0.0, 0.0))
@@ -115,7 +124,7 @@ pub struct PlayerModel {
     model: Option<model::ModelHandle>,
     skin_url: ArcSwapOption<String>,
     dirty: AtomicBool,
-    name: String,
+    display_name: Component,
 
     has_head: bool,
     has_name_tag: bool,
@@ -129,12 +138,12 @@ pub struct PlayerModel {
 }
 
 impl PlayerModel {
-    pub fn new(name: &str, has_head: bool, has_name_tag: bool, first_person: bool) -> Self {
+    pub fn new(name: Component, has_head: bool, has_name_tag: bool, first_person: bool) -> Self {
         Self {
             model: None,
             skin_url: ArcSwapOption::new(None),
             dirty: AtomicBool::new(false),
-            name: name.to_owned(),
+            display_name: name,
 
             has_head,
             has_name_tag,
@@ -456,8 +465,7 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
             y_scale: 0.16,
             x_scale: 0.01,
         };
-        let name = format::Component::new(format::ComponentType::new(&player_model.name, None));
-        state.build(&name, Some(format::Color::Black));
+        state.build(&player_model.display_name, Some(format::Color::Black));
         // TODO: Remove black shadow and add dark, transparent box around name
         let width = state.width;
         // Center align text
@@ -570,6 +578,7 @@ impl PlayerMovement {
     }
 }
 
+// FIXME: look at this to review our impl: https://www.mcpk.wiki/wiki/Movement_Formulas
 #[allow(clippy::type_complexity)]
 #[allow(unused_mut)] // we ignore this warning, as this case seems to be a clippy bug
 pub fn handle_movement(

@@ -1977,7 +1977,13 @@ impl Server {
             self.players
                 .read()
                 .get(&uuid)
-                .map_or("MISSING", |v| &v.name),
+                .map(|v| {
+                    v.display_name
+                        .clone()
+                        .unwrap_or_else(|| Component::from_str(v.name.as_str()))
+                })
+                .unwrap()
+                .clone(),
         );
         let mut entities = self.entities.write();
         let mut entity = entities.world.entity_mut(world_entity);

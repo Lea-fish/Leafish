@@ -1,5 +1,6 @@
+use leafish_protocol::format::Component;
+
 use crate::entity::resolve_textures;
-use crate::format;
 use crate::render::model::{self, FormatState, Vertex};
 use crate::render::{Renderer, Texture};
 use std::sync::Arc;
@@ -171,7 +172,7 @@ fn update(
 
 pub fn compute_player_model_components(
     tex: &Texture,
-    name: &Option<String>,
+    display_name: Option<&Component>,
     renderer: Arc<Renderer>,
 ) -> Vec<Vec<Vertex>> {
     // TODO: Replace this shit entirely!
@@ -280,7 +281,7 @@ pub fn compute_player_model_components(
     }
 
     let mut name_verts = vec![];
-    if name.is_some() {
+    if let Some(display) = display_name {
         let mut state = FormatState {
             width: 0.0,
             offset: 0.0,
@@ -289,11 +290,7 @@ pub fn compute_player_model_components(
             y_scale: 0.16,
             x_scale: 0.01,
         };
-        let name = format::Component::new(format::ComponentType::new(
-            name.as_ref().unwrap(),
-            Some(format::Color::Black),
-        ));
-        state.build(&name, None);
+        state.build(display, None);
         // TODO: Remove black shadow and add dark, transparent box around name
         let width = state.width;
         // Center align text

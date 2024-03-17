@@ -397,12 +397,10 @@ impl EntityType {
     fn create_model(&self, m: &mut Manager, entity: Entity) {
         match self {
             EntityType::Zombie => {
-                m.world
-                    .entity_mut(entity)
-                    .insert(ZombieModel::new(Some(String::from("test"))));
+                m.world.entity_mut(entity).insert(ZombieModel::new(None));
             }
             EntityType::Slime => {
-                m.world.entity_mut(entity).insert(SlimeModel::new("test"));
+                m.world.entity_mut(entity).insert(SlimeModel::new(None));
             }
             _ => {}
         };
