@@ -8,6 +8,7 @@ use cgmath::InnerSpace;
 use leafish_blocks::Block;
 use leafish_protocol::protocol;
 use leafish_protocol::protocol::packet;
+use leafish_protocol::types::GameMode;
 use parking_lot::RwLock;
 use shared::Direction;
 
@@ -122,7 +123,7 @@ pub fn apply_digging(
     conn: Res<ConnResource>,
     inventory: Res<InventoryContextResource>,
     commands: Commands,
-    mut query: Query<(&MouseButtons, &mut Digging)>,
+    mut query: Query<(&MouseButtons, &GameMode, &mut Digging)>,
     mut effect_query: Query<&mut BlockBreakEffect>,
 ) {
     use crate::server::target::{test_block, trace_ray};
@@ -151,18 +152,21 @@ pub fn apply_digging(
 
     let mut system = ApplyDigging::new(target, conn.clone(), commands, tool);
 
-    for (mouse_buttons, mut digging) in query.iter_mut() {
-        if let Some(effect) = digging.effect {
-            if let Ok(mut effect) = effect_query.get_mut(effect) {
-                system.update(
-                    mouse_buttons,
-                    digging.as_mut(),
-                    Some(effect.as_mut()),
-                    world,
-                );
+    for (mouse_buttons, game_mode, mut digging) in query.iter_mut() {
+        if game_mode.can_interact_with_world() {
+            if let Some(effect) = digging.effect {
+                if let Ok(mut effect) = effect_query.get_mut(effect) {
+                    system.update(
+                        mouse_buttons,
+                        digging.as_mut(),
+                        Some(effect.as_mut()),
+                        world,
+                    );
+                    continue;
+                }
             }
+            system.update(mouse_buttons, digging.as_mut(), None, world);
         }
-        system.update(mouse_buttons, digging.as_mut(), None, world);
     }
 }
 
