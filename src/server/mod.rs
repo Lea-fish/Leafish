@@ -55,7 +55,7 @@ use leafish_protocol::protocol::login::Account;
 use leafish_protocol::protocol::mapped_packet::MappablePacket;
 use leafish_protocol::protocol::mapped_packet::MappedPacket;
 use leafish_protocol::protocol::packet::play::serverbound::HeldItemChange;
-use leafish_protocol::protocol::packet::{send_drop_item, Hand};
+use leafish_protocol::protocol::packet::{send_client_status, send_drop_item, ClientStatus, Hand};
 use leafish_protocol::protocol::Conn;
 use log::{debug, error, info, warn};
 use parking_lot::Mutex;
@@ -1279,6 +1279,12 @@ impl Server {
                         self.inventory_context.clone(),
                         false,
                     );
+                    // FIXME: don't send this for too new clients (this works for 1.8.9 currently)
+                    send_client_status(
+                        self.conn.write().as_mut().unwrap(),
+                        ClientStatus::OpenInventory,
+                    )
+                    .unwrap();
                     return true;
                 }
                 Actionkey::ToggleHud => {
@@ -1377,9 +1383,9 @@ impl Server {
             if let Some(player) = self.player.load().as_ref() {
                 let mut player = entities.world.entity_mut(player.1);
                 let mut mouse_buttons = player.get_mut::<MouseButtons>().unwrap();
-                mouse_buttons.left = true;
                 packet::send_arm_swing(self.conn.write().as_mut().unwrap(), Hand::MainHand)
                     .unwrap();
+                mouse_buttons.left = true;
             }
         } else {
             self.inventory_context.write().on_click(true, shift);

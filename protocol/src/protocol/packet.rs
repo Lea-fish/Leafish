@@ -3393,6 +3393,27 @@ pub fn send_position_look(
     }
 }
 
+pub fn send_client_status(conn: &mut Conn, status: ClientStatus) -> Result<(), Error> {
+    let version = conn.get_version();
+    if version < Version::V1_8 {
+        conn.write_packet(crate::protocol::packet::play::serverbound::ClientStatus_u8 {
+            action_id: status as u8,
+        })
+    } else {
+        conn.write_packet(crate::protocol::packet::play::serverbound::ClientStatus {
+            action_id: VarInt(status as u8 as i32),
+        })
+    }
+}
+
+#[repr(u8)]
+pub enum ClientStatus {
+    PerformRespawn = 0,
+    RequestStats = 1,
+    // this variant isn't available on all versions
+    OpenInventory = 2,
+}
+
 pub fn send_arm_swing(conn: &mut Conn, hand: Hand) -> Result<(), Error> {
     let version = conn.get_version();
     if version < Version::V1_8 {
@@ -3439,15 +3460,9 @@ pub fn send_digging(
     }
 }
 
-pub fn send_use_item(conn: &mut Conn, hand: Hand, mut cursor_position: Option<Vector3<f64>>, item: Option<Stack>) -> Result<(), Error> {
+pub fn send_use_item(conn: &mut Conn, hand: Hand, cursor_position: Option<Vector3<f64>>, item: Option<Stack>) -> Result<(), Error> {
     let version = conn.get_version();
     if version <= Version::V1_8 {
-        if let Some(item) = item.as_ref() {
-            // all ids below 256 are placable blocks pre 1.13
-            if item.id >= 256 {
-                cursor_position = None;
-            }
-        }
         let cursor_position = cursor_position.unwrap_or(Vector3::zero());
         conn.write_packet(packet::play::serverbound::PlayerBlockPlacement_u8_Item {
             location: Position::new(-1, -1, -1),
