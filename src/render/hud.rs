@@ -178,6 +178,9 @@ impl HudContext {
     pub fn update_slot_index(&mut self, slot_index: u8) {
         self.slot_index = slot_index;
         self.dirty_slot_index = true;
+        self.server.as_ref().unwrap().write_packet(HeldItemChange {
+            slot: slot_index as i16,
+        });
     }
 
     pub fn update_fps(&mut self, fps: u32) {
