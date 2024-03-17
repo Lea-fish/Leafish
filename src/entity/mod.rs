@@ -87,7 +87,7 @@ pub fn add_systems(sched: &mut Schedule, render_sched: &mut Schedule) {
 }
 
 /// Location of an entity in the world.
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct Position {
     pub position: Vector3<f64>,
     pub last_position: Vector3<f64>,
@@ -108,7 +108,7 @@ impl Position {
     }
 }
 
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone)]
 pub struct TargetPosition {
     pub position: Vector3<f64>,
     pub lerp_amount: f64,
@@ -146,19 +146,19 @@ impl Velocity {
 }
 
 /// Rotation of an entity in the world
-#[derive(Component, Debug)]
+#[derive(Component, Debug, Clone, PartialEq)]
 pub struct Rotation {
     pub yaw: f64,
     pub pitch: f64,
 }
 
 impl Rotation {
-    pub fn new(yaw: f64, pitch: f64) -> Rotation {
-        Rotation { yaw, pitch }
+    pub fn new(yaw: f64, pitch: f64) -> Self {
+        Self { yaw, pitch }
     }
 
-    pub fn zero() -> Rotation {
-        Rotation::new(0.0, 0.0)
+    pub fn zero() -> Self {
+        Self::new(0.0, 0.0)
     }
 }
 #[derive(Component, Debug)]
@@ -168,12 +168,12 @@ pub struct TargetRotation {
 }
 
 impl TargetRotation {
-    pub fn new(yaw: f64, pitch: f64) -> TargetRotation {
-        TargetRotation { yaw, pitch }
+    pub fn new(yaw: f64, pitch: f64) -> Self {
+        Self { yaw, pitch }
     }
 
-    pub fn zero() -> TargetRotation {
-        TargetRotation::new(0.0, 0.0)
+    pub fn zero() -> Self {
+        Self::new(0.0, 0.0)
     }
 }
 
@@ -183,8 +183,8 @@ pub struct Gravity {
 }
 
 impl Gravity {
-    pub fn new() -> Gravity {
-        Default::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -194,8 +194,8 @@ pub struct Bounds {
 }
 
 impl Bounds {
-    pub fn new(bounds: Aabb3<f64>) -> Bounds {
-        Bounds { bounds }
+    pub fn new(bounds: Aabb3<f64>) -> Self {
+        Self { bounds }
     }
 }
 
@@ -205,8 +205,8 @@ pub struct GameInfo {
 }
 
 impl GameInfo {
-    pub fn new() -> GameInfo {
-        Default::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 
@@ -217,8 +217,8 @@ pub struct Light {
 }
 
 impl Light {
-    pub fn new() -> Light {
-        Default::default()
+    pub fn new() -> Self {
+        Self::default()
     }
 }
 

@@ -21,7 +21,7 @@ use bevy_ecs::prelude::*;
 use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::{Aabb, Aabb3};
 use instant::Instant;
-use leafish_protocol::format::{Component, Modifier};
+use leafish_protocol::format::Component;
 use std::collections::HashMap;
 use std::hash::BuildHasherDefault;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -86,10 +86,7 @@ pub fn create_local(m: &mut Manager) -> Entity {
             Point3::new(0.3, 1.8, 0.3),
         )))
         .insert(PlayerModel::new(
-            Component::new(format::ComponentType::Text {
-                text: "".to_string(),
-                modifier: Modifier::default(),
-            }),
+            Component::from_str(""),
             false,
             false,
             true,
@@ -97,6 +94,7 @@ pub fn create_local(m: &mut Manager) -> Entity {
         .insert(Light::new())
         .insert(Digging::new())
         .insert(MouseButtons::new())
+        .insert(MovementDelta::default())
         .insert(EntityType::Player);
     entity.id()
 }
@@ -874,5 +872,23 @@ impl Collidable<Aabb3<f64>> for Aabb3<f64> {
             }
         }
         self
+    }
+}
+
+#[derive(Component)]
+pub struct MovementDelta {
+    pub prev_pos: Vector3<f64>,
+    pub prev_rot: Rotation,
+}
+
+impl Default for MovementDelta {
+    fn default() -> Self {
+        Self {
+            prev_pos: Vector3::new(f64::MAX, f64::MAX, f64::MAX),
+            prev_rot: Rotation {
+                yaw: f64::MAX,
+                pitch: f64::MAX,
+            },
+        }
     }
 }
