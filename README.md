@@ -157,6 +157,7 @@ If nothing happens consider running the executable from the command-line, `./lea
 A list of bugs and missing features can be found on the [issue tracker](https://github.com/Lea-fish/Leafish/issues/).
 Feel free to work on any bug and submit a pull request to the `main` branch with the fix.
 Mentioning that you intend to fix a bug on the issue will prevent other people from trying as well and makes sure no duplicated work is done.
+Note that all contributions are will be dual-licensed under MIT and ApacheV2
 
 ### New features
 
