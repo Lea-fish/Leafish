@@ -12,9 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::nbt;
+use crate::format::Component;
+use crate::nbt::{self, NamedTag, Tag};
 use crate::protocol::{self, Serializable};
 use byteorder::{BigEndian, ReadBytesExt, WriteBytesExt};
+use std::collections::HashMap;
 use std::io;
 
 #[derive(Debug, Clone)]
@@ -22,7 +24,7 @@ pub struct Stack {
     pub id: isize,
     pub count: isize,
     pub damage: Option<isize>,
-    pub tag: Option<nbt::NamedTag>,
+    pub meta: ItemMeta,
 }
 
 impl Default for Stack {
@@ -31,7 +33,7 @@ impl Default for Stack {
             id: -1,
             count: 0,
             damage: None,
-            tag: None,
+            meta: ItemMeta(None),
         }
     }
 }
@@ -84,7 +86,7 @@ impl Serializable for Option<Stack> {
             id: id as isize,
             count,
             damage,
-            tag,
+            meta: ItemMeta(tag),
         }))
     }
     fn write_to<W: io::Write>(&self, buf: &mut W) -> Result<(), protocol::Error> {
@@ -92,10 +94,10 @@ impl Serializable for Option<Stack> {
         if protocol_version >= 404 {
             match *self {
                 Some(ref val) => {
-                    buf.write_u8(1)?; //present
+                    buf.write_u8(1)?; // present
                     crate::protocol::VarInt(val.id as i32).write_to(buf)?;
                     buf.write_u8(val.count as u8)?;
-                    val.tag.write_to(buf)?;
+                    val.meta.0.write_to(buf)?;
                 }
                 None => {
                     buf.write_u8(0)?; // not present
@@ -108,11 +110,184 @@ impl Serializable for Option<Stack> {
                     buf.write_u8(val.count as u8)?;
                     buf.write_i16::<BigEndian>(val.damage.unwrap_or(0) as i16)?;
                     // TODO: compress zlib NBT if 1.7
-                    val.tag.write_to(buf)?;
+                    val.meta.0.write_to(buf)?;
                 }
                 None => buf.write_i16::<BigEndian>(-1)?,
             }
         }
         Result::Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ItemMeta(Option<NamedTag>);
+
+impl ItemMeta {
+    fn display(&self) -> Option<&HashMap<String, Tag>> {
+        match self.0.as_ref() {
+            Some(tag) => tag
+                .1
+                .as_compound()
+                .map(|comp| comp.get("display").clone().map(|val| val.as_compound()))
+                .flatten()
+                .flatten(),
+            None => None,
+        }
+    }
+
+    pub fn display_name(&self) -> Option<Component> {
+        self.display()
+            .map(|val| {
+                val.get("Name")
+                    .map(|name| name.as_str().map(|name| Component::from_str(name)))
+            })
+            .flatten()
+            .flatten()
+    }
+
+    pub fn lore(&self) -> Vec<Component> {
+        self.display()
+            .map(|val| {
+                val.get("Lore").map(|lore| {
+                    lore.as_list().map(|lore| {
+                        lore.iter()
+                            .map(|line| line.as_str().map(|line| Component::from_str(line)))
+                            .flatten()
+                            .collect::<Vec<_>>()
+                    })
+                })
+            })
+            .flatten()
+            .flatten()
+            .unwrap_or(vec![])
+    }
+
+    pub fn repair_cost(&self) -> Option<i32> {
+        match self.0.as_ref() {
+            Some(tag) => tag
+                .1
+                .as_compound()
+                .map(|comp| comp.get("RepairCost").clone().map(|val| val.as_int()))
+                .flatten()
+                .flatten(),
+            None => None,
+        }
+    }
+
+    pub fn enchantments(&self) -> Vec<Enchantment> {
+        match self.0.as_ref() {
+            Some(tag) => tag
+                .1
+                .as_compound()
+                .map(|comp| {
+                    comp.get("ench").map(|ench| {
+                        ench.as_list().map(|enchs| {
+                            enchs
+                                .iter()
+                                .map(|ench| {
+                                    ench.as_compound()
+                                        .map(|ench| {
+                                            ench.get("lvl")
+                                                .map(|lvl| lvl.as_short())
+                                                .flatten()
+                                                .zip(
+                                                    ench.get("id")
+                                                        .map(|id| id.as_short())
+                                                        .flatten(),
+                                                )
+                                                .map(|(level, id)| {
+                                                    Enchantment::new(id as u16, level)
+                                                })
+                                                .flatten()
+                                        })
+                                        .flatten()
+                                })
+                                .flatten()
+                                .collect::<Vec<_>>()
+                        })
+                    })
+                })
+                .flatten()
+                .flatten()
+                .unwrap_or(vec![]),
+            None => vec![],
+        }
+    }
+}
+
+pub struct Enchantment {
+    pub ty: EnchantmentTy,
+    pub level: i16,
+}
+
+impl Enchantment {
+    #[inline]
+    fn new(id: u16, level: i16) -> Option<Self> {
+        Some(Self {
+            ty: EnchantmentTy::from_id(id)?,
+            level,
+        })
+    }
+}
+
+#[repr(u32)]
+pub enum EnchantmentTy {
+    Protection = 0,
+    FireProtection = 1,
+    FeatherFalling = 2,
+    BlastProtection = 3,
+    ProjectileProtection = 4,
+    Respiration = 5,
+    AquaAffinity = 6,
+    Thorns = 7,
+    DepthStrider = 8,
+    Sharpness = 16,
+    Smite = 17,
+    BaneOfArthropods = 18,
+    Knockback = 19,
+    FireAspect = 20,
+    Looting = 21,
+    Efficiency = 32,
+    SilkTouch = 33,
+    Unbreaking = 34,
+    Fortune = 35,
+    Power = 48,
+    Punch = 49,
+    Flame = 50,
+    Infinity = 51,
+    LuckOfTheSea = 61,
+    Lure = 62,
+}
+
+impl EnchantmentTy {
+    fn from_id(id: u16) -> Option<Self> {
+        match id {
+            0 => Some(Self::Protection),
+            1 => Some(Self::FireProtection),
+            2 => Some(Self::FeatherFalling),
+            3 => Some(Self::BlastProtection),
+            4 => Some(Self::ProjectileProtection),
+            5 => Some(Self::Respiration),
+            6 => Some(Self::AquaAffinity),
+            7 => Some(Self::Thorns),
+            8 => Some(Self::DepthStrider),
+            16 => Some(Self::Sharpness),
+            17 => Some(Self::Smite),
+            18 => Some(Self::BaneOfArthropods),
+            19 => Some(Self::Knockback),
+            20 => Some(Self::FireAspect),
+            21 => Some(Self::Looting),
+            32 => Some(Self::Efficiency),
+            33 => Some(Self::SilkTouch),
+            34 => Some(Self::Fortune),
+            35 => Some(Self::Fortune),
+            48 => Some(Self::Power),
+            49 => Some(Self::Punch),
+            50 => Some(Self::Flame),
+            51 => Some(Self::Infinity),
+            61 => Some(Self::LuckOfTheSea),
+            62 => Some(Self::Lure),
+            _ => None,
+        }
     }
 }
