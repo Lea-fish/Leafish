@@ -450,10 +450,8 @@ impl InventoryContext {
                         (None, Some(mut item)) => {
                             if !left && item.stack.count > 1 {
                                 let mut cursor = item.clone();
-                                // TODO: this is a stable version of: div_ceil(2) - once this is stabilized, use it instead
-                                cursor.stack.count =
-                                    (item.stack.count / 2) + (item.stack.count % 2);
-                                item.stack.count -= cursor.stack.count;
+                                item.stack.count /= 2;
+                                cursor.stack.count -= item.stack.count;
                                 (Some(cursor), Some(item))
                             } else {
                                 (Some(item), None)
