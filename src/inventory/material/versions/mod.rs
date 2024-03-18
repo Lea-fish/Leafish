@@ -16,7 +16,7 @@ mod mapping1_9_4;
 pub fn to_material(
     id: u16,
     damage: Option<isize>,
-    tag: Option<String>,
+    _tag: Option<String>,
     version: Version,
 ) -> Material {
     match version {
