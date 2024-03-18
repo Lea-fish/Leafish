@@ -335,17 +335,11 @@ impl InventoryContext {
             }
             if let Some((x, y)) = &self.mouse_position {
                 inventory_window.formatted_elements.clear();
-                if let Some(item) = self
-                    .inventory
-                    .as_ref()
-                    .map(|inv| {
-                        inv.read()
-                            .get_slot(*x, *y)
-                            .map(|slot| inv.read().get_item(slot))
-                            .flatten()
-                    })
-                    .flatten()
-                {
+                if let Some(item) = self.inventory.as_ref().and_then(|inv| {
+                    inv.read()
+                        .get_slot(*x, *y)
+                        .and_then(|slot| inv.read().get_item(slot))
+                }) {
                     let icon_scale = Hud::icon_scale(&renderer);
                     let text =
                         ui::FormattedBuilder::new()
