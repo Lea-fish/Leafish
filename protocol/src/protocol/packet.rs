@@ -3421,8 +3421,8 @@ pub fn send_position(
 
 pub fn send_look(conn: &mut Conn, yaw: f32, pitch: f32, on_ground: bool) -> Result<(), Error> {
     conn.write_packet(crate::protocol::packet::play::serverbound::PlayerLook {
-        yaw,
-        pitch,
+        yaw: -yaw * (180.0 / PI),
+        pitch: (-pitch * (180.0 / PI) + 180.0).min(90.0), // used to make sure, that we don't send impossible pitch values
         on_ground,
     })
 }
