@@ -858,8 +858,8 @@ fn update_double_plant_state<W: WorldAccess>(world: &W, pos: Position, half: Blo
         Block::LargeFern { .. } => Block::LargeFern { half },
         Block::RoseBush { .. } => Block::RoseBush { half },
         Block::Peony { .. } => Block::Peony { half },
-        Block::Air {} => world.get_block(pos), // FIXME: is this the correct way to handle air? (if we don't do this 1.8.9 crashes sometimes)
-        block => unreachable!("unexpected tall block: {:?}", block),
+        // fallback to the actual block below, if the plant isn't normal
+        _ => world.get_block(pos), // FIXME: is this correct or should we rather return the block from the match?
     }
 }
 
