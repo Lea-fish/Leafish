@@ -354,10 +354,11 @@ impl InventoryContext {
                             .text(item.stack.meta.display_name().unwrap_or_else(|| {
                                 Component::from_str(item.material.name().as_str())
                             }))
-                            .position(x + icon_scale * 6.0, y + icon_scale * 9.0)
+                            .position(x + icon_scale * 6.0, y - icon_scale * 9.0)
                             .alignment(VAttach::Top, ui::HAttach::Left)
                             .create(ui_container);
                     inventory_window.formatted_elements.push(text);
+                    // TODO: add lore support
                 }
             }
         }
@@ -452,7 +453,18 @@ impl InventoryContext {
                                 (None, Some(cursor))
                             }
                         }
-                        (None, Some(item)) => (Some(item), None),
+                        (None, Some(mut item)) => {
+                            if !left && item.stack.count > 1 {
+                                let mut cursor = item.clone();
+                                // TODO: this is a stable version of: div_ceil(2) - once this is stabilized, use it instead
+                                cursor.stack.count =
+                                    (item.stack.count / 2) + (item.stack.count % 2);
+                                item.stack.count -= cursor.stack.count;
+                                (Some(cursor), Some(item))
+                            } else {
+                                (Some(item), None)
+                            }
+                        }
                         (None, None) => (None, None),
                     };
                     inventory.set_item(slot, item);
