@@ -1694,8 +1694,13 @@ impl Server {
                 let item = item.map(|stack| {
                     let id = stack.id;
                     Item {
+                        material: to_material(
+                            id as u16,
+                            Some(stack.damage.unwrap_or(0)),
+                            None,
+                            self.mapped_protocol_version,
+                        ),
                         stack,
-                        material: to_material(id as u16, self.mapped_protocol_version),
                     }
                 });
                 top_inventory.write().cursor = item.clone();
@@ -1711,8 +1716,13 @@ impl Server {
             let item = item.map(|stack| {
                 let id = stack.id;
                 Item {
+                    material: to_material(
+                        id as u16,
+                        Some(stack.damage.unwrap_or(0)),
+                        None,
+                        self.mapped_protocol_version,
+                    ),
                     stack,
-                    material: to_material(id as u16, self.mapped_protocol_version),
                 }
             });
             inventory.write().set_item(slot as u16, item.clone());

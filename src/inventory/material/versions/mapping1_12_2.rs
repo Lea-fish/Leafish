@@ -469,53 +469,53 @@ pub fn to_id(mat: Material) -> u16 {
     }
 }
 
-pub fn to_material(material_id: u16) -> Material {
+pub fn to_material(material_id: u16, damage: isize) -> Material {
     match material_id {
         0 => Material::Air,
-        1 => Material::Stone,
+        1 => map_stone(damage),
         2 => Material::Grass,
-        3 => Material::Dirt,
+        3 => map_dirt(damage),
         4 => Material::Cobblestone,
-        5 => Material::Wood,
-        6 => Material::Sapling,
+        5 => map_planks(damage),
+        6 => map_sapling(damage),
         7 => Material::Bedrock,
         8 => Material::Water,
         9 => Material::StationaryWater,
         10 => Material::Lava,
         11 => Material::StationaryLava,
-        12 => Material::Sand,
+        12 => map_sand(damage),
         13 => Material::Gravel,
         14 => Material::GoldOre,
         15 => Material::IronOre,
         16 => Material::CoalOre,
-        17 => Material::Log,
-        18 => Material::Leaves,
-        19 => Material::Sponge,
+        17 => map_log(damage),
+        18 => map_leaves(damage),
+        19 => map_sponge(damage),
         20 => Material::Glass,
         21 => Material::LapisOre,
         22 => Material::LapisBlock,
         23 => Material::Dispenser,
-        24 => Material::Sandstone,
+        24 => map_sandstone(damage),
         25 => Material::NoteBlock,
         26 => Material::BedBlock,
         27 => Material::PoweredRail,
         28 => Material::DetectorRail,
         29 => Material::PistonStickyBase,
         30 => Material::Web,
-        31 => Material::LongGrass,
+        31 => map_tall_grass(damage),
         32 => Material::DeadBush,
         33 => Material::PistonBase,
         34 => Material::PistonExtension,
-        35 => Material::Wool,
+        35 => map_wool(damage),
         36 => Material::PistonMovingPiece,
         37 => Material::YellowFlower,
-        38 => Material::RedRose,
+        38 => map_flower(damage),
         39 => Material::BrownMushroom,
         40 => Material::RedMushroom,
         41 => Material::GoldBlock,
         42 => Material::IronBlock,
         43 => Material::DoubleStep,
-        44 => Material::Step,
+        44 => map_stone_slab(damage),
         45 => Material::Brick,
         46 => Material::Tnt,
         47 => Material::Bookshelf,
@@ -566,10 +566,10 @@ pub fn to_material(material_id: u16) -> Material {
         92 => Material::CakeBlock,
         93 => Material::DiodeBlockOff,
         94 => Material::DiodeBlockOn,
-        95 => Material::StainedGlass,
+        95 => map_glass(damage),
         96 => Material::TrapDoor,
-        97 => Material::MonsterEggs,
-        98 => Material::SmoothBrick,
+        97 => map_infested_stone(damage),
+        98 => map_stone_bricks(damage),
         99 => Material::HugeMushroom1,
         100 => Material::HugeMushroom2,
         101 => Material::IronFence,
@@ -597,7 +597,7 @@ pub fn to_material(material_id: u16) -> Material {
         123 => Material::RedstoneLampOff,
         124 => Material::RedstoneLampOn,
         125 => Material::WoodDoubleStep,
-        126 => Material::WoodStep,
+        126 => map_wood_slab(damage),
         127 => Material::Cocoa,
         128 => Material::SandstoneStairs,
         129 => Material::EmeraldOre,
@@ -610,13 +610,13 @@ pub fn to_material(material_id: u16) -> Material {
         136 => Material::JungleWoodStairs,
         137 => Material::Command,
         138 => Material::Beacon,
-        139 => Material::CobbleWall,
+        139 => map_cobble_wall(damage),
         140 => Material::FlowerPot,
         141 => Material::Carrot,
         142 => Material::Potato,
         143 => Material::WoodButton,
-        144 => Material::Skull,
-        145 => Material::Anvil,
+        144 => map_skull(damage),
+        145 => map_anvil(damage),
         146 => Material::TrappedChest,
         147 => Material::GoldPlate,
         148 => Material::IronPlate,
@@ -626,31 +626,31 @@ pub fn to_material(material_id: u16) -> Material {
         152 => Material::RedstoneBlock,
         153 => Material::QuartzOre,
         154 => Material::Hopper,
-        155 => Material::QuartzBlock,
+        155 => map_quartz(damage),
         156 => Material::QuartzStairs,
         157 => Material::ActivatorRail,
         158 => Material::Dropper,
-        159 => Material::StainedClay,
-        160 => Material::StainedGlassPane,
-        161 => Material::Leaves2,
-        162 => Material::Log2,
+        159 => map_terracotta(damage),
+        160 => map_glass_pane(damage),
+        161 => map_leaves2(damage),
+        162 => map_log2(damage),
         163 => Material::AcaciaStairs,
         164 => Material::DarkOakStairs,
         165 => Material::SlimeBlock,
         166 => Material::Barrier,
         167 => Material::IronTrapdoor,
-        168 => Material::Prismarine,
+        168 => map_prismarine(damage),
         169 => Material::SeaLantern,
         170 => Material::HayBlock,
-        171 => Material::Carpet,
+        171 => map_carpet(damage),
         172 => Material::HardClay,
         173 => Material::CoalBlock,
         174 => Material::PackedIce,
-        175 => Material::DoublePlant,
+        175 => map_double_plant(damage),
         176 => Material::StandingBanner,
         177 => Material::WallBanner,
         178 => Material::DaylightDetectorInverted,
-        179 => Material::RedSandstone,
+        179 => map_red_sandstone(damage),
         180 => Material::RedSandstoneStairs,
         181 => Material::DoubleStoneSlab2,
         182 => Material::StoneSlab2,
@@ -722,8 +722,8 @@ pub fn to_material(material_id: u16) -> Material {
         248 => Material::GreenGlazedTerracotta,
         249 => Material::RedGlazedTerracotta,
         250 => Material::BlackGlazedTerracotta,
-        251 => Material::Concrete,
-        252 => Material::ConcretePowder,
+        251 => map_concrete(damage),
+        252 => map_concrete_powder(damage),
         255 => Material::StructureBlock,
         256 => Material::IronSpade,
         257 => Material::IronPickaxe,
@@ -791,7 +791,7 @@ pub fn to_material(material_id: u16) -> Material {
         319 => Material::Pork,
         320 => Material::GrilledPork,
         321 => Material::Painting,
-        322 => Material::GoldenApple,
+        322 => map_gapple(damage),
         323 => Material::Sign,
         324 => Material::WoodDoor,
         325 => Material::Bucket,
@@ -818,13 +818,13 @@ pub fn to_material(material_id: u16) -> Material {
         346 => Material::FishingRod,
         347 => Material::Watch,
         348 => Material::GlowstoneDust,
-        349 => Material::RawFish,
-        350 => Material::CookedFish,
-        351 => Material::InkSack,
+        349 => map_fish(damage),
+        350 => map_cooked_fish(damage),
+        351 => map_dye(damage),
         352 => Material::Bone,
         353 => Material::Sugar,
         354 => Material::Cake,
-        355 => Material::Bed,
+        355 => map_bed(damage),
         356 => Material::Diode,
         357 => Material::Cookie,
         358 => Material::Map,
@@ -894,7 +894,7 @@ pub fn to_material(material_id: u16) -> Material {
         422 => Material::CommandMinecart,
         423 => Material::Mutton,
         424 => Material::CookedMutton,
-        425 => Material::Banner,
+        425 => map_banner(damage),
         426 => Material::EndCrystal,
         427 => Material::SpruceDoorItem,
         428 => Material::BirchDoorItem,
@@ -1059,5 +1059,496 @@ pub fn get_stack_size(mat: Material) -> u8 {
         Material::Record11 => 1,
         Material::Record12 => 1,
         _ => 64,
+    }
+}
+
+pub(crate) fn map_log(damage: isize) -> Material {
+    match damage {
+        0 => Material::OakLog,
+        1 => Material::SpruceLog,
+        2 => Material::BirchLog,
+        3 => Material::JungleLog,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_log2(damage: isize) -> Material {
+    match damage {
+        0 => Material::AcaciaLog,
+        1 => Material::DarkOakLog,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_prismarine(damage: isize) -> Material {
+    match damage {
+        0 => Material::Prismarine,
+        1 => Material::PrismarineBricks,
+        2 => Material::DarkPrismarine,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_planks(damage: isize) -> Material {
+    match damage {
+        0 => Material::OakPlanks,
+        1 => Material::SprucePlanks,
+        2 => Material::BirchPlanks,
+        3 => Material::JunglePlanks,
+        4 => Material::AcaciaPlanks,
+        5 => Material::DarkOakPlanks,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_infested_stone(damage: isize) -> Material {
+    match damage {
+        0 => Material::InfestedStone,
+        1 => Material::InfestedCobblestone,
+        2 => Material::InfestedStoneBricks,
+        3 => Material::InfestedMossyStoneBricks,
+        4 => Material::InfestedCrackedStoneBricks,
+        5 => Material::InfestedChiseledStoneBricks,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_quartz(damage: isize) -> Material {
+    match damage {
+        0 => Material::QuartzBlock,
+        1 => Material::ChiseledQuartzBlock,
+        2 => Material::QuartzPillar,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_flower(damage: isize) -> Material {
+    match damage {
+        0 => Material::Poppy,
+        1 => Material::BlueOrchid,
+        2 => Material::Allium,
+        3 => Material::AzureBluet,
+        4 => Material::OrangeTulip,
+        5 => Material::WhiteTulip,
+        6 => Material::PinkTulip,
+        7 => Material::PinkTulip,
+        8 => Material::OxeyeDaisy,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_red_sandstone(damage: isize) -> Material {
+    match damage {
+        0 => Material::RedSandstone,
+        1 => Material::ChiseledRedSandstone,
+        2 => Material::SmoothRedSandstone,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_anvil(damage: isize) -> Material {
+    match damage {
+        0 => Material::Anvil,
+        1 => Material::ChippedAnvil,
+        2 => Material::DamagedAnvil,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_banner(damage: isize) -> Material {
+    match damage {
+        0 => Material::BlackBanner,
+        1 => Material::RedBanner,
+        2 => Material::GreenBanner,
+        3 => Material::BrownBanner,
+        4 => Material::BlueBanner,
+        5 => Material::PurpleBanner,
+        6 => Material::CyanBanner,
+        7 => Material::LightGrayBanner,
+        8 => Material::GrayBanner,
+        9 => Material::PinkBanner,
+        10 => Material::LimeBanner,
+        11 => Material::YellowBanner,
+        12 => Material::LightBlueBanner,
+        13 => Material::MagentaBanner,
+        14 => Material::OrangeBanner,
+        15 => Material::WhiteBanner,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_bed(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::BlackBed,
+        1 => Material::RedBed,
+        2 => Material::GreenBed,
+        3 => Material::BrownBed,
+        4 => Material::BlueBed,
+        5 => Material::PurpleBed,
+        6 => Material::CyanBed,
+        7 => Material::LightGrayBed,
+        8 => Material::GrayBed,
+        9 => Material::PinkBed,
+        10 => Material::LimeBed,
+        11 => Material::YellowBed,
+        12 => Material::LightBlueBed,
+        13 => Material::MagentaBed,
+        14 => Material::OrangeBed,
+        15 => Material::WhiteBed,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_carpet(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::BlackCarpet,
+        1 => Material::RedCarpet,
+        2 => Material::GreenCarpet,
+        3 => Material::BrownCarpet,
+        4 => Material::BlueCarpet,
+        5 => Material::PurpleCarpet,
+        6 => Material::CyanCarpet,
+        7 => Material::LightGrayCarpet,
+        8 => Material::GrayCarpet,
+        9 => Material::PinkCarpet,
+        10 => Material::LimeCarpet,
+        11 => Material::YellowCarpet,
+        12 => Material::LightBlueCarpet,
+        13 => Material::MagentaCarpet,
+        14 => Material::OrangeCarpet,
+        15 => Material::WhiteCarpet,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_cobble_wall(damage: isize) -> Material {
+    match damage {
+        0 => Material::CobblestoneWall,
+        1 => Material::MossyCobblestoneWall,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_concrete(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::BlackConcrete,
+        1 => Material::RedConcrete,
+        2 => Material::GreenConcrete,
+        3 => Material::BrownConcrete,
+        4 => Material::BlueConcrete,
+        5 => Material::PurpleConcrete,
+        6 => Material::CyanConcrete,
+        7 => Material::LightGrayConcrete,
+        8 => Material::GrayConcrete,
+        9 => Material::PinkConcrete,
+        10 => Material::LimeConcrete,
+        11 => Material::YellowConcrete,
+        12 => Material::LightBlueConcrete,
+        13 => Material::MagentaConcrete,
+        14 => Material::OrangeConcrete,
+        15 => Material::WhiteConcrete,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_concrete_powder(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::BlackConcretePowder,
+        1 => Material::RedConcretePowder,
+        2 => Material::GreenConcretePowder,
+        3 => Material::BrownConcretePowder,
+        4 => Material::BlueConcretePowder,
+        5 => Material::PurpleConcretePowder,
+        6 => Material::CyanConcretePowder,
+        7 => Material::LightGrayConcretePowder,
+        8 => Material::GrayConcretePowder,
+        9 => Material::PinkConcretePowder,
+        10 => Material::LimeConcretePowder,
+        11 => Material::YellowConcretePowder,
+        12 => Material::LightBlueConcretePowder,
+        13 => Material::MagentaConcretePowder,
+        14 => Material::OrangeConcretePowder,
+        15 => Material::WhiteConcretePowder,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_cooked_fish(damage: isize) -> Material {
+    match damage {
+        0 => Material::CookedFish,
+        1 => Material::CookedSalmon,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_dirt(damage: isize) -> Material {
+    match damage {
+        0 => Material::Dirt,
+        1 => Material::CoarseDirt,
+        2 => Material::Podzol,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_double_plant(damage: isize) -> Material {
+    match damage {
+        0 => Material::Sunflower,
+        1 => Material::Lilac,
+        2 => Material::TallGrass,
+        3 => Material::LargeFern,
+        4 => Material::RoseBush,
+        5 => Material::Peony,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_dye(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::InkSac,
+        1 => Material::RedDye,
+        2 => Material::GreenDye,
+        3 => Material::CocoaBeans,
+        4 => Material::LapisLazuli,
+        5 => Material::PurpleDye,
+        6 => Material::CyanDye,
+        7 => Material::LightGrayDye,
+        8 => Material::GrayDye,
+        9 => Material::PinkDye,
+        10 => Material::LimeDye,
+        11 => Material::YellowDye,
+        12 => Material::LightBlueDye,
+        13 => Material::MagentaDye,
+        14 => Material::OrangeDye,
+        15 => Material::BoneMeal,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_fish(damage: isize) -> Material {
+    match damage {
+        0 => Material::RawFish,
+        1 => Material::Salmon,
+        2 => Material::TropicalFish,
+        3 => Material::Pufferfish,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_gapple(damage: isize) -> Material {
+    match damage {
+        0 => Material::GoldenApple,
+        1 => Material::EnchantedGoldenApple,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_leaves(damage: isize) -> Material {
+    match damage {
+        0 => Material::OakLeaves,
+        1 => Material::SpruceLeaves,
+        2 => Material::BirchLeaves,
+        3 => Material::JungleLeaves,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_leaves2(damage: isize) -> Material {
+    match damage {
+        0 => Material::AcaciaLeaves,
+        1 => Material::DarkOakLeaves,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_sand(damage: isize) -> Material {
+    match damage {
+        0 => Material::Sand,
+        1 => Material::RedSand,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_sandstone(damage: isize) -> Material {
+    match damage {
+        0 => Material::Sandstone,
+        1 => Material::ChiseledSandstone,
+        2 => Material::SmoothSandstone,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_sapling(damage: isize) -> Material {
+    match damage {
+        0 => Material::OakSapling,
+        1 => Material::SpruceSapling,
+        2 => Material::BirchSapling,
+        3 => Material::JungleSapling,
+        4 => Material::AcaciaSapling,
+        5 => Material::DarkOakSapling,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_skull(damage: isize) -> Material {
+    match damage {
+        0 => Material::SkeletonSkull,
+        1 => Material::WitherSkeletonSkull,
+        2 => Material::ZombieHead,
+        3 => Material::PlayerHead,
+        4 => Material::CreeperHead,
+        5 => Material::DragonHead,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_sponge(damage: isize) -> Material {
+    match damage {
+        0 => Material::Sponge,
+        1 => Material::WetSponge,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_glass(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::BlackStainedGlass,
+        1 => Material::RedStainedGlass,
+        2 => Material::GreenStainedGlass,
+        3 => Material::BrownStainedGlass,
+        4 => Material::BlueStainedGlass,
+        5 => Material::PurpleStainedGlass,
+        6 => Material::CyanStainedGlass,
+        7 => Material::LightGrayStainedGlass,
+        8 => Material::GrayStainedGlass,
+        9 => Material::PinkStainedGlass,
+        10 => Material::LimeStainedGlass,
+        11 => Material::YellowStainedGlass,
+        12 => Material::LightBlueStainedGlass,
+        13 => Material::MagentaStainedGlass,
+        14 => Material::OrangeStainedGlass,
+        15 => Material::WhiteStainedGlass,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_glass_pane(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::BlackStainedGlassPane,
+        1 => Material::RedStainedGlassPane,
+        2 => Material::GreenStainedGlassPane,
+        3 => Material::BrownStainedGlassPane,
+        4 => Material::BlueStainedGlassPane,
+        5 => Material::PurpleStainedGlassPane,
+        6 => Material::CyanStainedGlassPane,
+        7 => Material::LightGrayStainedGlassPane,
+        8 => Material::GrayStainedGlassPane,
+        9 => Material::PinkStainedGlassPane,
+        10 => Material::LimeStainedGlassPane,
+        11 => Material::YellowStainedGlassPane,
+        12 => Material::LightBlueStainedGlassPane,
+        13 => Material::MagentaStainedGlassPane,
+        14 => Material::OrangeStainedGlassPane,
+        15 => Material::WhiteStainedGlassPane,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_terracotta(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::BlackTerracotta,
+        1 => Material::RedTerracotta,
+        2 => Material::GreenTerracotta,
+        3 => Material::BrownTerracotta,
+        4 => Material::BlueTerracotta,
+        5 => Material::PurpleTerracotta,
+        6 => Material::CyanTerracotta,
+        7 => Material::LightGrayTerracotta,
+        8 => Material::GrayTerracotta,
+        9 => Material::PinkTerracotta,
+        10 => Material::LimeTerracotta,
+        11 => Material::YellowTerracotta,
+        12 => Material::LightBlueTerracotta,
+        13 => Material::MagentaTerracotta,
+        14 => Material::OrangeTerracotta,
+        15 => Material::WhiteTerracotta,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_stone(damage: isize) -> Material {
+    match damage {
+        0 => Material::Stone,
+        1 => Material::Granite,
+        2 => Material::PolishedGranite,
+        3 => Material::Diorite,
+        4 => Material::PolishedDiorite,
+        5 => Material::Andesite,
+        6 => Material::PolishedAndesite,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_stone_slab(damage: isize) -> Material {
+    match damage {
+        0 => Material::StoneSlab,
+        1 => Material::SandstoneSlab,
+        3 => Material::CobblestoneSlab,
+        4 => Material::BrickSlab,
+        5 => Material::StoneBrickSlab,
+        6 => Material::NetherBrickSlab,
+        7 => Material::QuartzSlab,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_stone_bricks(damage: isize) -> Material {
+    match damage {
+        0 => Material::StoneBricks,
+        1 => Material::MossyStoneBricks,
+        2 => Material::CrackedStoneBricks,
+        3 => Material::ChiseledStoneBricks,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_tall_grass(damage: isize) -> Material {
+    match damage {
+        1 => Material::Grass,
+        2 => Material::Fern,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_wood_slab(damage: isize) -> Material {
+    match damage {
+        0 => Material::OakSlab,
+        1 => Material::SpruceSlab,
+        2 => Material::BirchSlab,
+        3 => Material::JungleSlab,
+        4 => Material::AcaciaSlab,
+        5 => Material::DarkOakSlab,
+        _ => Material::Air,
+    }
+}
+
+pub(crate) fn map_wool(damage: isize) -> Material {
+    match 15 - damage {
+        0 => Material::BlackWool,
+        1 => Material::RedWool,
+        2 => Material::GreenWool,
+        3 => Material::BrownWool,
+        4 => Material::BlueWool,
+        5 => Material::PurpleWool,
+        6 => Material::CyanWool,
+        7 => Material::LightGrayWool,
+        8 => Material::GrayWool,
+        9 => Material::PinkWool,
+        10 => Material::LimeWool,
+        11 => Material::YellowWool,
+        12 => Material::LightBlueWool,
+        13 => Material::MagentaWool,
+        14 => Material::OrangeWool,
+        15 => Material::WhiteWool,
+        _ => Material::Air,
     }
 }

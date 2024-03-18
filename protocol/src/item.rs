@@ -128,8 +128,7 @@ impl ItemMeta {
             Some(tag) => tag
                 .1
                 .as_compound()
-                .map(|comp| comp.get("display").clone().map(|val| val.as_compound()))
-                .flatten()
+                .and_then(|comp| comp.get("display").map(|val| val.as_compound()))
                 .flatten(),
             None => None,
         }
@@ -137,29 +136,26 @@ impl ItemMeta {
 
     pub fn display_name(&self) -> Option<Component> {
         self.display()
-            .map(|val| {
+            .and_then(|val| {
                 val.get("Name")
-                    .map(|name| name.as_str().map(|name| Component::from_str(name)))
+                    .map(|name| name.as_str().map(Component::from_str))
             })
-            .flatten()
             .flatten()
     }
 
     pub fn lore(&self) -> Vec<Component> {
         self.display()
-            .map(|val| {
+            .and_then(|val| {
                 val.get("Lore").map(|lore| {
                     lore.as_list().map(|lore| {
                         lore.iter()
-                            .map(|line| line.as_str().map(|line| Component::from_str(line)))
-                            .flatten()
+                            .filter_map(|line| line.as_str().map(Component::from_str))
                             .collect::<Vec<_>>()
                     })
                 })
             })
             .flatten()
-            .flatten()
-            .unwrap_or(vec![])
+            .unwrap_or_default()
     }
 
     pub fn repair_cost(&self) -> Option<i32> {
@@ -167,8 +163,7 @@ impl ItemMeta {
             Some(tag) => tag
                 .1
                 .as_compound()
-                .map(|comp| comp.get("RepairCost").clone().map(|val| val.as_int()))
-                .flatten()
+                .and_then(|comp| comp.get("RepairCost").map(|val| val.as_int()))
                 .flatten(),
             None => None,
         }
@@ -179,35 +174,25 @@ impl ItemMeta {
             Some(tag) => tag
                 .1
                 .as_compound()
-                .map(|comp| {
+                .and_then(|comp| {
                     comp.get("ench").map(|ench| {
                         ench.as_list().map(|enchs| {
                             enchs
                                 .iter()
-                                .map(|ench| {
-                                    ench.as_compound()
-                                        .map(|ench| {
-                                            ench.get("lvl")
-                                                .map(|lvl| lvl.as_short())
-                                                .flatten()
-                                                .zip(
-                                                    ench.get("id")
-                                                        .map(|id| id.as_short())
-                                                        .flatten(),
-                                                )
-                                                .map(|(level, id)| {
-                                                    Enchantment::new(id as u16, level)
-                                                })
-                                                .flatten()
-                                        })
-                                        .flatten()
+                                .filter_map(|ench| {
+                                    ench.as_compound().and_then(|ench| {
+                                        ench.get("lvl")
+                                            .and_then(|lvl| lvl.as_short())
+                                            .zip(ench.get("id").and_then(|id| id.as_short()))
+                                            .and_then(|(level, id)| {
+                                                Enchantment::new(id as u16, level)
+                                            })
+                                    })
                                 })
-                                .flatten()
                                 .collect::<Vec<_>>()
                         })
                     })
                 })
-                .flatten()
                 .flatten()
                 .unwrap_or(vec![]),
             None => vec![],
