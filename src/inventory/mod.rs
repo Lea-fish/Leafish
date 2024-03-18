@@ -26,7 +26,7 @@ use crate::render::hud::{Hud, HudContext};
 use crate::render::inventory::InventoryWindow;
 use crate::render::Renderer;
 use crate::screen::ScreenSystem;
-use crate::ui::{Container, VAttach};
+use crate::ui::{self, Container, VAttach};
 use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::item::Stack;
@@ -315,11 +315,11 @@ impl InventoryContext {
             inventory_window.text_elements.get_mut(3).unwrap().clear();
             if let Some(item) = &self.cursor {
                 if let Some(mouse_position) = &self.mouse_position {
-                    let scale = Hud::icon_scale(&renderer);
+                    let icon_scale = Hud::icon_scale(&renderer);
                     let (x, y) = *mouse_position;
                     // Center the icon on the mouse position
-                    let x = x - scale * 8.0;
-                    let y = y - scale * 8.0;
+                    let x = x - icon_scale * 8.0;
+                    let y = y - icon_scale * 8.0;
 
                     InventoryWindow::draw_item(
                         item,
@@ -331,6 +331,33 @@ impl InventoryContext {
                         &renderer,
                         VAttach::Top,
                     );
+                }
+            }
+            if let Some((x, y)) = &self.mouse_position {
+                inventory_window.formatted_elements.clear();
+                if let Some(item) = self
+                    .inventory
+                    .as_ref()
+                    .map(|inv| {
+                        inv.read()
+                            .get_slot(*x, *y)
+                            .map(|slot| inv.read().get_item(slot))
+                            .flatten()
+                    })
+                    .flatten()
+                {
+                    let icon_scale = Hud::icon_scale(&renderer);
+                    let text =
+                        ui::FormattedBuilder::new()
+                            .scale_x(icon_scale / 2.25)
+                            .scale_y(icon_scale / 2.25)
+                            .text(item.stack.meta.display_name().unwrap_or_else(|| {
+                                Component::from_str(item.material.name().as_str())
+                            }))
+                            .position(x + icon_scale * 6.0, y + icon_scale * 9.0)
+                            .alignment(VAttach::Top, ui::HAttach::Left)
+                            .create(ui_container);
+                    inventory_window.formatted_elements.push(text);
                 }
             }
         }

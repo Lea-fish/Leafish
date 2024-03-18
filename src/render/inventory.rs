@@ -2,7 +2,7 @@ use crate::inventory::{Inventory, InventoryContext, Item};
 use crate::render::hud::Hud;
 use crate::render::Renderer;
 use crate::screen::{Screen, ScreenSystem};
-use crate::ui::{Container, ImageRef, TextBoxRef, TextRef, VAttach};
+use crate::ui::{Container, FormattedRef, ImageRef, TextBoxRef, TextRef, VAttach};
 use crate::{ui, Actionkey, Game};
 use parking_lot::RwLock;
 use std::sync::Arc;
@@ -12,6 +12,7 @@ use winit::keyboard::{Key, NamedKey, PhysicalKey};
 pub struct InventoryWindow {
     pub elements: Vec<Vec<ImageRef>>,
     pub text_elements: Vec<Vec<TextRef>>,
+    pub formatted_elements: Vec<FormattedRef>,
     pub cursor_element: Vec<ImageRef>,
     pub text_box: Vec<TextBoxRef>,
     pub inventory: Arc<RwLock<dyn Inventory + Sync + Send>>,
@@ -131,6 +132,7 @@ impl InventoryWindow {
             inventory_context,
             cursor_element: vec![],
             text_box: vec![],
+            formatted_elements: vec![],
         }
     }
 }
