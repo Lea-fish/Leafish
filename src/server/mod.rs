@@ -1465,7 +1465,7 @@ impl Server {
                 .read()
                 .get_item((27 + self.hud_context.read().get_slot_index()) as u16)
                 .as_ref()
-                .map(|item| item.clone());
+                .cloned();
             if let Some((pos, _, face, at)) = target::trace_ray(
                 &self.world,
                 4.0,
@@ -1739,7 +1739,7 @@ impl Server {
             let mut model = player.get_mut::<PlayerModel>().unwrap();
             model.set_skin(info.skin_url.clone());
         }
-        self.hud_context.clone().write().update_game_mode(gamemode);
+        self.hud_context.write().update_game_mode(gamemode);
         *self
             .entities
             .write()
@@ -1785,7 +1785,6 @@ impl Server {
     }
 
     fn on_respawn(&self, respawn: mapped_packet::play::clientbound::Respawn) {
-        println!("respawn!");
         let protocol::mapped_packet::play::clientbound::Respawn {
             gamemode,
             dimension,
@@ -2103,7 +2102,6 @@ impl Server {
             }
 
             if let Some(teleport_id) = teleport.teleport_id {
-                println!("tp send");
                 self.write_packet(packet::play::serverbound::TeleportConfirm {
                     teleport_id: protocol::VarInt(teleport_id),
                 });

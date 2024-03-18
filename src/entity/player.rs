@@ -171,7 +171,6 @@ fn update_render_players(
     let renderer = &renderer.0;
     let delta = game_info.delta;
     for (mut player_model, position, rotation, light) in query.iter_mut() {
-        // println!("render player!");
         use std::f32::consts::PI;
         use std::f64::consts::PI as PI64;
 

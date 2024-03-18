@@ -2104,7 +2104,7 @@ impl Material {
         }
 
         // FIXME: add support for 1.13+
-        return true;
+        true
     }
 
     /*

@@ -3407,22 +3407,19 @@ pub fn send_position(
             on_ground,
         })
     } else {
-        conn.write_packet(crate::protocol::packet::play::serverbound::PlayerPosition_HeadY {
-            x: position.x,
-            z: position.z,
-            on_ground,
-            feet_y: position.y,
-            head_y: position.y + 1.62,
-        })
+        conn.write_packet(
+            crate::protocol::packet::play::serverbound::PlayerPosition_HeadY {
+                x: position.x,
+                z: position.z,
+                on_ground,
+                feet_y: position.y,
+                head_y: position.y + 1.62,
+            },
+        )
     }
 }
 
-pub fn send_look(
-    conn: &mut Conn,
-    yaw: f32,
-    pitch: f32,
-    on_ground: bool,
-) -> Result<(), Error> {
+pub fn send_look(conn: &mut Conn, yaw: f32, pitch: f32, on_ground: bool) -> Result<(), Error> {
     conn.write_packet(crate::protocol::packet::play::serverbound::PlayerLook {
         yaw,
         pitch,
@@ -3430,13 +3427,8 @@ pub fn send_look(
     })
 }
 
-pub fn send_flying(
-    conn: &mut Conn,
-    on_ground: bool,
-) -> Result<(), Error> {
-    conn.write_packet(crate::protocol::packet::play::serverbound::Player {
-        on_ground,
-    })
+pub fn send_flying(conn: &mut Conn, on_ground: bool) -> Result<(), Error> {
+    conn.write_packet(crate::protocol::packet::play::serverbound::Player { on_ground })
 }
 
 pub fn send_client_status(conn: &mut Conn, status: ClientStatus) -> Result<(), Error> {
@@ -3447,9 +3439,11 @@ pub fn send_client_status(conn: &mut Conn, status: ClientStatus) -> Result<(), E
     }
 
     if version < Version::V1_8 {
-        conn.write_packet(crate::protocol::packet::play::serverbound::ClientStatus_u8 {
-            action_id: status as u8,
-        })
+        conn.write_packet(
+            crate::protocol::packet::play::serverbound::ClientStatus_u8 {
+                action_id: status as u8,
+            },
+        )
     } else {
         conn.write_packet(crate::protocol::packet::play::serverbound::ClientStatus {
             action_id: VarInt(status as u8 as i32),
@@ -3512,7 +3506,12 @@ pub fn send_digging(
     }
 }
 
-pub fn send_use_item(conn: &mut Conn, hand: Hand, cursor_position: Option<Vector3<f64>>, item: Option<Stack>) -> Result<(), Error> {
+pub fn send_use_item(
+    conn: &mut Conn,
+    hand: Hand,
+    cursor_position: Option<Vector3<f64>>,
+    item: Option<Stack>,
+) -> Result<(), Error> {
     let version = conn.get_version();
     if version <= Version::V1_8 {
         let cursor_position = cursor_position.unwrap_or(Vector3::zero());
