@@ -125,6 +125,7 @@ pub mod mojang {
             println!("[Info] [Official] Couldn't find .minecraft directory (\"{prefix}\")");
             return Ok(false);
         }
+        println!("[Info] (Official) Found .minecraft directory (\"{prefix}\")");
 
         let json_path = format!("{}{}", prefix, DESC_JSON_PATH);
         let jar_path = format!("{}{}", prefix, JAR_PATH);
@@ -269,7 +270,7 @@ pub mod prism {
             return Ok(false);
         }
 
-        println!("[Info] [Prism] Found PrismLauncher directory");
+        println!("[Info] [Prism] Found PrismLauncher directory (\"{prefix}\")");
 
         let dir_path = format!("{}{}", prefix, INSTANCE_DIR_PATH);
         if Path::new(&dir_path).exists() {

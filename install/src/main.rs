@@ -52,6 +52,15 @@ fn prism_dirs() -> Vec<String> {
             ".var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher"
         )
     };
+    let share = {
+        let state = platform_dirs::AppDirs::new(None, false).unwrap();
+        let full = state.config_dir.to_str().unwrap();
+        format!(
+            "{}{}",
+            &full[0..(full.len() - ".config".len())],
+            ".local/share/PrismLauncher"
+        )
+    };
     vec![
         platform_dirs::AppDirs::new(None, false)
             .unwrap()
@@ -60,5 +69,6 @@ fn prism_dirs() -> Vec<String> {
             .unwrap()
             .to_string(),
         flatpak,
+        share,
     ]
 }

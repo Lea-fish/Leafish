@@ -634,6 +634,7 @@ impl Item {
     /// on an inventory slot.
     pub fn is_stackable(&self, other: &Item) -> bool {
         self.material == other.material && self.stack.damage == other.stack.damage
+        // FIXME: compare meta
     }
 }
 

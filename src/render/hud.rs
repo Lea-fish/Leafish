@@ -204,7 +204,6 @@ impl HudContext {
             .as_ref()
             .unwrap()
             .chat_ctx
-            .clone()
             .push_msg(message);
     }
 

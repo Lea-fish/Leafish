@@ -214,5 +214,6 @@ impl InventoryWindow {
             element.clear();
         }
         self.text_box.clear();
+        self.formatted_elements.clear();
     }
 }
