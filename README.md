@@ -97,6 +97,7 @@ Support for older protocols will _not_ be dropped as newer protocols are added.
 
 The easiest way to use Leafish is by using the official cross-platform installer: https://github.com/Lea-fish/Leafish/releases/tag/v0.0.1-alpha
 It works for Windows, Linux and MacOS and can install into Mojang's official launcher and Prism Launcher.
+If you encounter any issues during the installation process, you might want to try using a different java version to run the installer (java 8 should work).
 
 ### Downloading a pre-built version
 
