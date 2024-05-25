@@ -46,14 +46,14 @@ impl Version {
     }
 
     pub fn is_supported(&self) -> bool {
-        match self {
-            Version::Old => false,
-            Version::New => false,
-            Version::Other => false,
-            Version::V1_17 => false,
-            Version::V1_18 => false,
-            Version::V1_19 => false,
-            _ => true,
-        }
+        !matches!(
+            self,
+            Version::Old
+                | Version::New
+                | Version::Other
+                | Version::V1_17
+                | Version::V1_18
+                | Version::V1_19
+        )
     }
 }

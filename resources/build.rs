@@ -10,9 +10,9 @@ fn main() {
 
     let base = Path::new("assets");
     let mut out = Vec::new();
-    build_map(&mut out, &base);
+    build_map(&mut out, base);
 
-    let mut file = BufWriter::new(fs::File::create(&dest.join("resources.rs")).unwrap());
+    let mut file = BufWriter::new(fs::File::create(dest.join("resources.rs")).unwrap());
     writeln!(
         file,
         "pub fn get_file(name: &str) -> Option<&'static [u8]> {{"
