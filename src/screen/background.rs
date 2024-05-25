@@ -41,7 +41,7 @@ impl Screen for Background {
         ui_container: &mut Container,
     ) {
         let path = self.settings.get_string(StringSetting::BackgroundImage);
-        self.last_path = path.clone();
+        self.last_path.clone_from(&path);
         let background =
             if Renderer::get_texture_optional(renderer.get_textures_ref(), &path).is_some() {
                 Some(

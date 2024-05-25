@@ -1483,7 +1483,7 @@ impl Command for UpdateSignInfoCmd {
             .as_mut()
             .and_then(|entity| entity.get_mut::<SignInfo>())
         {
-            info.lines = self.0.clone();
+            info.lines.clone_from(&self.0);
             info.dirty = true;
         }
     }

@@ -1050,7 +1050,6 @@ fn calculate_biome(
     z: i32,
     img: &image::DynamicImage,
 ) -> (u8, u8, u8) {
-    use std::cmp::{max, min};
     let mut count = 0;
     let mut r = 0;
     let mut g = 0;
@@ -1062,8 +1061,8 @@ fn calculate_biome(
             let ix = color_index & 0xFF;
             let iy = color_index >> 8;
 
-            let ix = min(max(ix, 0), 255);
-            let iy = min(max(iy, 0), 255);
+            let ix = ix.clamp(0, 255);
+            let iy = iy.clamp(0, 255);
 
             let col = img.get_pixel(ix as u32, iy as u32);
             let col = bi.process_color(col);

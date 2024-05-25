@@ -881,7 +881,7 @@ impl UIElement for Image {
             element.a = self.colour.3;
             self.data.extend_from_slice(&element.bytes(width, height));
             self.super_draw(renderer, r, sw, sh, width, height, delta);
-            self.last_texture = self.texture.clone();
+            self.last_texture.clone_from(&self.texture);
             self.last_colour = self.colour;
             self.last_texture_coords = self.texture_coords;
         }
@@ -1040,7 +1040,7 @@ impl UIElement for Text {
             self.data.extend_from_slice(&text.bytes(width, height));
             self.super_draw(renderer, r, sw, sh, width, height, delta);
 
-            self.last_text = self.text.clone();
+            self.last_text.clone_from(&self.text);
             self.last_colour = self.colour;
             self.last_scale_x = self.scale_x;
             self.last_scale_y = self.scale_y;

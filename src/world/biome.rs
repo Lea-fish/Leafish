@@ -22,8 +22,8 @@ impl Biome {
     }
 
     pub fn get_color_index(self) -> usize {
-        let t = (self.temperature as f64 / 100f64).min(1.0).max(0.0);
-        let m = (self.moisture as f64 / 100f64).min(1.0).max(0.0);
+        let t = (self.temperature as f64 / 100f64).clamp(0.0, 1.0);
+        let m = (self.moisture as f64 / 100f64).clamp(0.0, 1.0);
         (((1.0 - t) * 255.0) as usize) | ((((1.0 - (m * t)) * 255.0) as usize) << 8)
     }
 

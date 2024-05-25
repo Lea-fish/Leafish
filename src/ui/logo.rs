@@ -146,7 +146,8 @@ impl Logo {
         let mut text = self.text.borrow_mut();
         if self.text_index != text_index {
             self.text_index = text_index;
-            text.text = self.text_strings[text_index as usize].clone();
+            text.text
+                .clone_from(&self.text_strings[text_index as usize]);
             let width = (renderer.ui.lock().size_of_string(&text.text) + 2.0) * text.scale_x;
             self.text_base_scale = 300.0 / width;
             if self.text_base_scale > 1.0 {

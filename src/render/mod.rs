@@ -1693,7 +1693,7 @@ impl TextureManager {
             // work with the new name
             let mut old = self.textures.remove(&old_name).unwrap();
             old.name = format!("leafish-dynamic:{}", name);
-            t.name = old.name.clone();
+            t.name.clone_from(&old.name);
             self.textures
                 .insert(format!("leafish-dynamic:{}", name), old);
             t

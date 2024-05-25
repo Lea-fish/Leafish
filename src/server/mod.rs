@@ -1204,11 +1204,7 @@ impl Server {
         offset = prev_offset + (offset - prev_offset) / 3.0;
 
         offset = 1.0 - ((offset * PI * 2.0).cos() * 2.0 + 0.2);
-        if offset > 1.0 {
-            offset = 1.0;
-        } else if offset < 0.0 {
-            offset = 0.0;
-        }
+        offset = offset.clamp(0.0, 1.0);
         offset = 1.0 - offset;
         offset * 0.8 + 0.2
     }
@@ -1703,7 +1699,7 @@ impl Server {
                         stack,
                     }
                 });
-                top_inventory.write().cursor = item.clone();
+                top_inventory.write().cursor.clone_from(&item);
                 self.inventory_context.write().set_cursor(item);
                 self.hud_context
                     .read()
