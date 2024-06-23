@@ -111,7 +111,6 @@ pub struct Game {
 
     connect_error: ArcSwapOption<Error>,
 
-    dpi_factor: AtomicF64, // FIXME: try moving this out of Game into a local variable
     last_mouse_x: AtomicF64,
     last_mouse_y: AtomicF64,
     last_mouse_xrel: AtomicF64, // FIXME: try moving this out of Game into a local variable
@@ -146,14 +145,6 @@ impl Game {
 
     pub fn set_last_mouse_y(&self, y: f64) {
         self.last_mouse_y.store(y, Ordering::Release);
-    }
-
-    pub fn get_dpi_factor(&self) -> f64 {
-        self.dpi_factor.load(Ordering::Acquire)
-    }
-
-    pub fn set_dpi_factor(&self, dpi_factor: f64) {
-        self.dpi_factor.store(dpi_factor, Ordering::Release);
     }
 
     pub fn get_last_mouse_xrel(&self) -> f64 {
@@ -364,7 +355,7 @@ fn main() {
         .with_inner_size(winit::dpi::LogicalSize::new(854.0, 480.0)) // FIXME: Why are we using this particular value here?
         .with_maximized(true);
 
-    let (context, shader_version, dpi_factor, window, surface, display) = {
+    let (context, shader_version, window, surface, display) = {
         let template = ConfigTemplateBuilder::new()
             .with_stencil_size(0)
             .with_depth_size(24)
@@ -422,14 +413,7 @@ fn main() {
             }
         }
 
-        (
-            gl_context,
-            shader_version,
-            window.scale_factor(),
-            window,
-            gl_surface,
-            gl_display,
-        )
+        (gl_context, shader_version, window, gl_surface, gl_display)
     };
 
     gl::init(&display);
@@ -509,7 +493,6 @@ fn main() {
         should_close: AtomicBool::new(false),
         chunk_builder: Mutex::new(chunk_builder::ChunkBuilder::new(resource_manager, textures)),
         connect_error: ArcSwapOption::empty(),
-        dpi_factor: AtomicF64::new(dpi_factor),
         last_mouse_x: AtomicF64::new(0.0),
         last_mouse_y: AtomicF64::new(0.0),
         last_mouse_xrel: AtomicF64::new(0.0),
@@ -633,7 +616,7 @@ fn tick_all(
     let physical_size = window.inner_size();
     let (physical_width, physical_height) = physical_size.into();
     let (width, height): (u32, u32) = physical_size
-        .to_logical::<f64>(game.get_dpi_factor())
+        .to_logical::<f64>(window.scale_factor())
         .into();
 
     let version = {
@@ -734,6 +717,7 @@ fn handle_window_event<T>(
     event: winit::event::Event<T>,
 ) -> bool {
     use winit::event::*;
+    let dpi_factor = window.scale_factor();
     match event {
         Event::AboutToWait => return true,
         Event::DeviceEvent {
@@ -799,16 +783,10 @@ fn handle_window_event<T>(
                     );
                 }
                 WindowEvent::CloseRequested => game.set_should_close(),
-                WindowEvent::ScaleFactorChanged { scale_factor, .. } => {
-                    game.set_dpi_factor(scale_factor);
-                }
-
                 WindowEvent::MouseInput { state, button, .. } => match (state, button) {
                     (ElementState::Released, MouseButton::Left) => {
                         let physical_size = window.inner_size();
-                        let (width, height) = physical_size
-                            .to_logical::<f64>(game.get_dpi_factor())
-                            .into();
+                        let (width, height) = physical_size.to_logical::<f64>(dpi_factor).into();
                         if !game.screen_sys.is_current_ingame() && !game.is_focused() {
                             // TODO: after Pointer Lock https://github.com/rust-windowing/winit/issues/1674
                             ui_container.click_at(
@@ -841,15 +819,13 @@ fn handle_window_event<T>(
                     (_, _) => (),
                 },
                 WindowEvent::CursorMoved { position, .. } => {
-                    let (x, y) = position.to_logical::<f64>(game.get_dpi_factor()).into();
+                    let (x, y) = position.to_logical::<f64>(dpi_factor).into();
                     game.set_last_mouse_x(x);
                     game.set_last_mouse_y(y);
 
                     if !game.is_focused() {
                         let physical_size = window.inner_size();
-                        let (width, height) = physical_size
-                            .to_logical::<f64>(game.get_dpi_factor())
-                            .into();
+                        let (width, height) = physical_size.to_logical::<f64>(dpi_factor).into();
                         ui_container.hover_at(game, x, y, width, height);
                         if let Some(server) = game.server.load().as_ref() {
                             server.on_cursor_moved(x, y);
