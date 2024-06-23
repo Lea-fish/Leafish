@@ -53,6 +53,7 @@ pub trait Pack: Sync + Send {
     fn open(&self, name: &str) -> Option<Box<dyn io::Read>>;
 }
 
+// This is a singleton, that keeps track of all available resource packs
 pub struct Manager {
     packs: Vec<Box<dyn Pack>>,
     version: usize,
@@ -122,7 +123,7 @@ impl Manager {
     }
 
     /// Returns the 'version' of the manager. The version is
-    /// increase everytime a pack is added or removed.
+    /// increased everytime a pack is added or removed.
     pub fn version(&self) -> usize {
         self.version
     }
@@ -570,6 +571,7 @@ impl Manager {
     }
 }
 
+// A resource pack stored inside of a directory
 struct DirPack {
     root: path::PathBuf,
 }
@@ -583,6 +585,7 @@ impl Pack for DirPack {
     }
 }
 
+// The internal resource pack
 struct InternalPack;
 
 impl Pack for InternalPack {
