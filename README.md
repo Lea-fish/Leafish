@@ -116,7 +116,7 @@ Rust stable version 1.53.0 or newer is required.
 As current Debian stable (Bullseye) has a rust version below the required one, you need to either update from an external source, or consider using Debian Testing (Bookworm) for example.  
 For Ubuntu you might want to use the -updates repository for your version.
 ```
-# apt install cargo libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgtk-3-dev
+# apt install cargo libssl-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libgtk-3-dev libgtk-3-dev libatk1.0-dev libgdk-pixbuf-2.0-dev libpango1.0-dev
 ```
 
 **Alpine Linux**
