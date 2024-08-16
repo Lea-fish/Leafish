@@ -816,8 +816,8 @@ pub const DEPTH_ATTACHMENT: Attachment = gl::DEPTH_ATTACHMENT;
 pub struct Framebuffer(glow::Framebuffer);
 
 pub fn check_framebuffer_status() {
-    unsafe {
-        let status = glow_context().check_framebuffer_status(gl::FRAMEBUFFER);
+    
+        let status = unsafe { glow_context().check_framebuffer_status(gl::FRAMEBUFFER) }; 
         let s = match status {
             gl::FRAMEBUFFER_UNDEFINED => "GL_FRAMEBUFFER_UNDEFINED",
             gl::FRAMEBUFFER_INCOMPLETE_ATTACHMENT => "GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT",
@@ -841,7 +841,7 @@ pub fn check_framebuffer_status() {
                 status, s
             );
         }
-    }
+    
 }
 
 pub fn check_gl_error() {
