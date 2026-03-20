@@ -18,7 +18,7 @@ use crate::types::GameMode;
 use crate::world;
 use arc_swap::ArcSwapOption;
 use bevy_ecs::prelude::*;
-use cgmath::{Decomposed, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
+use cgmath::{Decomposed, InnerSpace, Matrix4, Point3, Quaternion, Rad, Rotation3, Vector3};
 use collision::{Aabb, Aabb3};
 use instant::Instant;
 use leafish_protocol::format::Component;
@@ -180,8 +180,6 @@ fn update_render_players(
 
         if let Some(pmodel) = &player_model.model {
             let renderer = renderer.clone();
-            let cam_x = renderer.camera.lock().pos.x;
-            let cam_z = renderer.camera.lock().pos.z;
             let mut models = renderer.models.lock();
             let mdl = models.get_model(pmodel).unwrap();
 
@@ -209,12 +207,14 @@ fn update_render_players(
                 disp: offset,
             });
 
-            // TODO This sucks
             if player_model.has_name_tag {
-                let ang = (position.position.x - cam_x).atan2(position.position.z - cam_z) as f32;
+                let view = *renderer.view_vector.lock();
+                let yaw = Rad(view.x.atan2(view.z));
+                let pitch = Rad(view.y.asin());
+
                 mdl.matrix[PlayerModelPart::NameTag as usize] = Matrix4::from(Decomposed {
                     scale: 1.0,
-                    rot: Quaternion::from_angle_y(Rad(ang)),
+                    rot: Quaternion::from_angle_y(yaw) * Quaternion::from_angle_x(pitch),
                     disp: offset + Vector3::new(0.0, (-24.0 / 16.0) - 0.6, 0.0),
                 });
             }
@@ -463,20 +463,37 @@ fn add_player(renderer: Arc<Renderer>, player_model: &mut PlayerModel) {
             x_scale: 0.01,
         };
         state.build(&player_model.display_name, Some(format::Color::Black));
-        // TODO: Remove black shadow and add dark, transparent box around name
-        let width = state.width;
-        // Center align text
+        
+        let solid = Renderer::get_texture(&renderer.get_textures(), "leafish:solid");
+        let vert_id = state.text.first().map_or(0, |v| v.id);
+        let make_box_vert = |x, y| render::model::Vertex {
+            x,
+            y,
+            z: -0.0374,
+            texture: solid.clone(),
+            texture_x: 0.0,
+            texture_y: 0.0,
+            r: 0,
+            g: 0,
+            b: 0,
+            a: 160,
+            id: vert_id,
+        };
+
+        let x0 = -(state.width * 0.5) - 0.04;
+        let x1 = (state.width * 0.5) + 0.04;
+        let y0 = 0.1;
+        let y1 = 0.32;
+        name_verts.extend_from_slice(&[
+            make_box_vert(x0, y0),
+            make_box_vert(x1, y0),
+            make_box_vert(x0, y1),
+            make_box_vert(x1, y1),
+        ]);
+
         for vert in &mut state.text {
-            vert.x += width * 0.5;
-            vert.r = 64;
-            vert.g = 64;
-            vert.b = 64;
-        }
-        name_verts.extend_from_slice(&state.text);
-        for vert in &mut state.text {
-            vert.x -= 0.01;
-            vert.y -= 0.01;
-            vert.z -= 0.05;
+            println!("{}", vert.z);
+            vert.x += state.width * 0.5;
             vert.r = 255;
             vert.g = 255;
             vert.b = 255;
