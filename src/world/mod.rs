@@ -14,7 +14,8 @@
 
 use arc_swap::ArcSwap;
 use bevy_ecs::entity::Entity;
-use bevy_ecs::system::{Command, Commands};
+use bevy_ecs::system::Commands;
+use bevy_ecs::world::Command;
 pub use leafish_blocks as block;
 use leafish_protocol::format::Component;
 use leafish_protocol::nbt::NamedTag;
@@ -273,7 +274,7 @@ impl World {
                     let (pos, line1, line2, line3, line4) = *bx;
                     if let Some(chunk) = self.chunks.write().get(&CPos(pos.x >> 4, pos.z >> 4)) {
                         if let Some(entity) = chunk.block_entities.get(&pos) {
-                            cmds.add(UpdateSignInfoCmd([line1, line2, line3, line4], *entity));
+                            cmds.queue(UpdateSignInfoCmd([line1, line2, line3, line4], *entity));
                         }
                     }
                 }
@@ -1478,13 +1479,11 @@ struct UpdateSignInfoCmd([Component; 4], Entity);
 
 impl Command for UpdateSignInfoCmd {
     fn apply(self, world: &mut bevy_ecs::world::World) {
-        let mut entity = world.get_entity_mut(self.1);
-        if let Some(mut info) = entity
-            .as_mut()
-            .and_then(|entity| entity.get_mut::<SignInfo>())
-        {
-            info.lines.clone_from(&self.0);
-            info.dirty = true;
+        if let Ok(mut entity) = world.get_entity_mut(self.1) {
+            if let Some(mut info) = entity.get_mut::<SignInfo>() {
+                info.lines.clone_from(&self.0);
+                info.dirty = true;
+            }
         }
     }
 }

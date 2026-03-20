@@ -293,7 +293,7 @@ impl Texture {
         pixels: &mut [u8],
     ) {
         unsafe {
-            glow_context().get_tex_image(target, level, format, ty, PixelPackData::Slice(pixels));
+            glow_context().get_tex_image(target, level, format, ty, PixelPackData::Slice(Some(pixels)));
         }
     }
 
@@ -317,7 +317,7 @@ impl Texture {
                 0,
                 format,
                 ty,
-                pix,
+                PixelUnpackData::Slice(pix),
             );
         }
     }
@@ -344,7 +344,7 @@ impl Texture {
                 height as i32,
                 format,
                 ty,
-                PixelUnpackData::Slice(pix),
+                PixelUnpackData::Slice(Some(pix)),
             );
         }
     }
@@ -370,7 +370,7 @@ impl Texture {
                 0,
                 format,
                 ty,
-                pix,
+                PixelUnpackData::Slice(pix),
             );
         }
     }
@@ -397,7 +397,7 @@ impl Texture {
                 0,
                 format,
                 ty,
-                Some(pix),
+                PixelUnpackData::Slice(Some(pix)),
             );
         }
     }
@@ -428,7 +428,7 @@ impl Texture {
                 depth as i32,
                 format,
                 ty,
-                PixelUnpackData::Slice(pix),
+                PixelUnpackData::Slice(Some(pix)),
             );
         }
     }

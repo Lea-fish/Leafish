@@ -223,7 +223,7 @@ impl super::Screen for Launcher {
                     if client_token.is_empty() {
                         client_token = std::iter::repeat(())
                             .map(|()| {
-                                rand::thread_rng().sample(rand::distributions::Alphanumeric) as char
+                                rand::rng().sample(rand::distr::Alphanumeric) as char
                             })
                             .take(20)
                             .collect();

@@ -38,7 +38,7 @@ use glutin_winit::GlWindow;
 use instant::Duration;
 use leafish_protocol::protocol::login::AccountType;
 use log::{debug, error, info, warn};
-use raw_window_handle::HasRawWindowHandle;
+use raw_window_handle::HasWindowHandle;
 use shared::Version;
 use std::fs;
 use std::num::NonZeroU32;
@@ -339,7 +339,7 @@ fn main() {
 
     let events_loop = winit::event_loop::EventLoop::new().unwrap();
 
-    let window_builder = winit::window::WindowBuilder::new()
+    let window_attributes = winit::window::Window::default_attributes()
         .with_title("Leafish")
         .with_window_icon(Some(
             Icon::from_rgba(
@@ -360,7 +360,7 @@ fn main() {
             .with_stencil_size(0)
             .with_depth_size(24)
             .with_api(Api::GLES3.union(Api::OPENGL));
-        let display_builder = DisplayBuilder::new().with_window_builder(Some(window_builder));
+        let display_builder = DisplayBuilder::new().with_window_attributes(Some(window_attributes));
 
         let (window, gl_config) = display_builder
             .build(&events_loop, template, |mut configs| {
@@ -368,7 +368,9 @@ fn main() {
             })
             .unwrap();
 
-        let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
+        let raw_window_handle = window
+            .as_ref()
+            .map(|window| window.window_handle().unwrap().as_raw());
         let gl_display = gl_config.display();
         let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
 
@@ -393,7 +395,7 @@ fn main() {
 
         let window = window.unwrap();
 
-        let attrs = window.build_surface_attributes(Default::default());
+        let attrs = window.build_surface_attributes(Default::default()).unwrap();
         let gl_surface = unsafe {
             gl_config
                 .display()

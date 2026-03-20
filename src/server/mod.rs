@@ -248,7 +248,7 @@ impl Server {
         }
 
         let mut shared = [0; 16];
-        rand::thread_rng().fill(&mut shared);
+        rand::rng().fill(&mut shared);
 
         let shared_e = rsa_public_encrypt_pkcs1::encrypt(&public_key, &shared).unwrap();
         let token_e = rsa_public_encrypt_pkcs1::encrypt(&public_key, &verify_token).unwrap();
@@ -989,7 +989,7 @@ impl Server {
             self.entities.write().world.despawn(player.1);
         }
         for entity in &*self.entity_map.write() {
-            if self.entities.read().world.get_entity(*entity.1).is_some() {
+            if self.entities.read().world.get_entity(*entity.1).is_ok() {
                 self.entities.write().world.despawn(*entity.1);
             }
         }
@@ -1009,7 +1009,7 @@ impl Server {
             self.entities.write().world.despawn(player.1);
         }
         for entity in &*self.entity_map.write() {
-            if self.entities.read().world.get_entity(*entity.1).is_some() {
+            if self.entities.read().world.get_entity(*entity.1).is_ok() {
                 self.entities.write().world.despawn(*entity.1);
             }
         }
@@ -1801,7 +1801,7 @@ impl Server {
         } = respawn;
 
         for entity in &*self.entity_map.write() {
-            if self.entities.read().world.get_entity(*entity.1).is_some() {
+            if self.entities.read().world.get_entity(*entity.1).is_ok() {
                 self.entities.write().world.despawn(*entity.1);
             }
         }

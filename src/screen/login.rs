@@ -216,7 +216,7 @@ impl super::Screen for Login {
             // Generate random token if it wasn't supplied
             if client_token.is_empty() {
                 client_token = std::iter::repeat(())
-                    .map(|()| rand::thread_rng().sample(rand::distributions::Alphanumeric) as char)
+                    .map(|()| rand::rng().sample(rand::distr::Alphanumeric) as char)
                     .take(20)
                     .collect();
                 self.settings
@@ -231,7 +231,7 @@ impl super::Screen for Login {
                 tx.send(try_login(
                     refresh,
                     if username.is_empty() {
-                        format!("Player{}", rand::thread_rng().gen::<u8>())
+                        format!("Player{}", rand::rng().random::<u8>())
                     } else {
                         username
                     },

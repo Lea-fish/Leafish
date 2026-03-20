@@ -17,7 +17,7 @@ use std::hash::BuildHasherDefault;
 
 use image::GenericImageView;
 use parking_lot::RwLock;
-use rand::seq::SliceRandom;
+use rand::seq::IndexedRandom;
 use rand::Rng;
 
 pub struct Factory {

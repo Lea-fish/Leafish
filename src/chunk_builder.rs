@@ -207,7 +207,7 @@ fn build_func_1(models: Arc<RwLock<model::Factory>>, work: BuildReq) -> BuildRep
                     // Use one step of the rng so that
                     // if a block is placed in an empty
                     // location is variant doesn't change
-                    let _: u32 = rng.gen();
+                    let _: u32 = rng.random();
                     continue;
                 }
 

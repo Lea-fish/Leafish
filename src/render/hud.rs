@@ -20,7 +20,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use leafish_protocol::format::Component;
 use log::debug;
 use parking_lot::RwLock;
-use rand::{thread_rng, Rng};
+use rand::Rng;
 use winit::keyboard::{Key, NamedKey, PhysicalKey};
 
 use crate::inventory::slot_mapping::SlotMapping;
@@ -589,7 +589,7 @@ impl Hud {
 
             if hp <= 4.0 {
                 // Creates the jittery effect when player has less than 2.5 hearts
-                y += icon_scale * (thread_rng().gen_range(0..2) as f64);
+                y += icon_scale * (rand::rng().random_range(0..2) as f64);
                 redirty_health = true;
             }
 

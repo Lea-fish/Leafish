@@ -23,18 +23,23 @@ split-debuginfo = "unpacked"
 opt-level = 1
 
 [dependencies]
-winit = { version = "0.29", features = ["rwh_05", "serde"] }
-raw-window-handle = "0.5.0"
-glow = "0.13"
+winit = { version = "0.30", features = ["rwh_06", "serde"] }
+raw-window-handle = "0.6.0"
+
+# wgpu-mc renderer (optional, enable with --features wgpu-mc)
+wgpu-mc = { path = "/opt/3d/minecraft/wgpu-mc/rust/wgpu-mc", optional = true }
+futures = { version = "0.3", optional = true }
+glam = { version = "0.29", optional = true }
+glow = "0.17"
 byteorder = "1.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 flate2 = { version = "1.0", features = ["rust_backend"], default-features = false }
 zip = { version = "0.6", features = ["deflate"], default-features = false }
 image = "0.25"
-getrandom = { version = "0.2", features = ["js"] }
-rand = "0.8"
-rand_pcg = "0.3"
+getrandom = { version = "0.3", features = ["wasm_js"] }
+rand = "0.9"
+rand_pcg = "0.9"
 base64 = "0.22"
 log = { version = "0.4", features = ["std"] }
 cgmath = "0.17"
@@ -55,13 +60,13 @@ crossbeam-channel = "0.5" # check if flume would be better in terms of performan
 # flume = "0.10.8" # replaced by crossbeam channel
 # tokio = { version = "0.2", features = ["full"] } # readd as soon as we want to impl this!
 rayon = "1.5"
-rfd = "0.14"
-bevy_ecs = "0.13"
+rfd = "0.17"
+bevy_ecs = "0.15"
 
 reqwest = { version = "0.11", features = [ "blocking" ]}
 # glutin = "0.29"
-glutin = "0.31"
-glutin-winit = "0.4"
+glutin = "0.32"
+glutin-winit = "0.5"
 
 arc-swap = "1.7.0"
 # phf = "0.11"

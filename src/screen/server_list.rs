@@ -628,7 +628,7 @@ impl super::Screen for ServerList {
                         if let Some(favicon) = res.favicon {
                             let name: String = std::iter::repeat(())
                                 .map(|()| {
-                                    rand::thread_rng().sample(rand::distributions::Alphanumeric)
+                                    rand::rng().sample(rand::distr::Alphanumeric)
                                         as char
                                 })
                                 .take(30)
